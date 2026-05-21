@@ -75,10 +75,10 @@ The same binary serves REST API endpoints for historical queries, hitting Redis 
                          │
               ┌──────────┴──────────┐
               ▼                     ▼
-       ┌────────────┐        ┌────────────┐
-       │ Web client │        │   Mobile   │
-       │   React    │        │  Flutter   │
-       └────────────┘        └────────────┘
+       ┌───────────────┐        ┌────────────┐
+       │  Web client   │        │   Mobile   │
+       │ React + Caddy │        │  Flutter   │
+       └───────────────┘        └────────────┘
 ```
 
 ### Broker authentication
