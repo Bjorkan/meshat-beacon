@@ -74,22 +74,402 @@ Returns the most recent packets matching filters, newest first, with cursor-base
 GET /api/v1/packets/{packetHash}
 ```
 
-Full packet plus all observations, with each observation's resolved path inline.
+Full packet with all decoded fields plus all observations, with each observation's resolved path inline.
+
+#### Common fields (all payload types)
+
+Every packet detail response includes these top-level fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `packetHash` | string | Content-based dedup hash (hex) |
+| `payloadType` | number | 0x00-0x0F per MeshCore protocol |
+| `payloadTypeName` | string | Human-readable name (ADVERT, TRACE, GROUP_TEXT, etc.) |
+| `payloadVersion` | number | 0-3 from bits 6-7 of header |
+| `routeType` | number | 0-3 from bits 0-1 of header |
+| `routeTypeName` | string | TRANSPORT_FLOOD, FLOOD, DIRECT, or TRANSPORT_DIRECT |
+| `totalBytes` | number | Total packet size in bytes |
+| `transportCodes` | object or null | Present only for TRANSPORT_FLOOD / TRANSPORT_DIRECT |
+| `transportCodes.regionCode` | number | uint16 LE, MeshCore radio region code |
+| `transportCodes.subRegionCode` | number | uint16 LE, return/home region code |
+| `originPubkey` | string or null | Sender public key hex, if extractable from payload (e.g. adverts) |
+| `rawPayload` | string | Full payload as hex |
+| `parsedPayload` | object | Decoded payload, structure depends on payloadType (see below) |
+| `decrypted` | boolean | Whether encrypted content was successfully decrypted |
+| `channelHash` | string or null | 1-byte channel ID hex, if group/channel packet |
+| `firstHeardAt` | number | Epoch ms, first observation |
+| `lastHeardAt` | number | Epoch ms, most recent observation |
+| `observationCount` | number | Total observations across all observers |
+| `observations` | array | Per-observer hearings (see observation fields below) |
+
+#### Observation fields
+
+Each entry in the `observations` array:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | number | Observation ID (for afterId pagination) |
+| `observerId` | string | Observer UUID |
+| `observerName` | string | Observer display name |
+| `iata` | string | IATA code where this observer heard the packet |
+| `heardAt` | number | Epoch ms |
+| `pathLengthByte` | number | Raw path_length byte (encodes hash_size + hop_count) |
+| `hashSize` | number | 1, 2, 3, or 4 bytes per hop hash |
+| `hopCount` | number | 0-63 |
+| `pathBytes` | string | Raw path bytes hex (hashSize * hopCount bytes) |
+| `rssi` | number | Received signal strength (dBm) |
+| `snr` | number | Signal-to-noise ratio (dB) |
+| `propagationTimeMs` | number | Time from origin to observer (ms) |
+| `radio` | object | Radio parameters |
+| `radio.freqMhz` | number | Frequency in MHz |
+| `radio.spreadFactor` | number | LoRa spread factor |
+| `radio.bandwidthKhz` | number | Bandwidth in kHz |
+| `radio.codingRate` | number | Coding rate |
+| `sourceBroker` | string | "mqtt1" or "mqtt2" |
+| `resolvedPath` | array | Per-hop resolution results (see path resolution in high level design) |
+
+#### parsedPayload by payload type
+
+The `parsedPayload` object is fully typed per payload type. Every payload includes a `type` field matching the packet's `payloadTypeName`.
+
+##### Advert (0x04)
+
+```json
+{
+  "type": "ADVERT",
+  "publicKey": "7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+  "timestamp": 1747665450,
+  "signature": "a1b2c3d4e5f6...64 bytes hex",
+  "signatureValid": true,
+  "flags": 144,
+  "deviceRole": 2,
+  "deviceRoleName": "REPEATER",
+  "hasLocation": true,
+  "hasName": true,
+  "hasFeature1": false,
+  "hasFeature2": false,
+  "latitude": 48.4284,
+  "longitude": -123.3656,
+  "name": "WW7STR/PugetMesh Cougar"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `publicKey` | string | 32-byte Ed25519 public key (hex) |
+| `timestamp` | number | uint32 unix timestamp from advert |
+| `signature` | string | 64-byte Ed25519 signature (hex) |
+| `signatureValid` | boolean | Whether the signature verified against publicKey |
+| `flags` | number | Raw flags byte |
+| `deviceRole` | number | 0=Unknown, 1=ChatNode/Companion, 2=Repeater, 3=RoomServer, 4=Sensor |
+| `deviceRoleName` | string | Human-readable role name |
+| `hasLocation` | boolean | Bit 4 of flags |
+| `hasName` | boolean | Bit 7 of flags |
+| `hasFeature1` | boolean | Bit 5 of flags |
+| `hasFeature2` | boolean | Bit 6 of flags |
+| `latitude` | number or null | Degrees, present if hasLocation is true |
+| `longitude` | number or null | Degrees, present if hasLocation is true |
+| `name` | string or null | Node name, present if hasName is true |
+
+##### Trace (0x09)
+
+```json
+{
+  "type": "TRACE",
+  "traceTag": "a3f1b2c4",
+  "authCode": 2948173621,
+  "flags": 2,
+  "pathHashSize": 4,
+  "pathHashes": ["ae9b1c2d", "bf3c4e5f"],
+  "snrValues": [10.75, 7.25, -2.5]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `traceTag` | string | 4-byte unique trace identifier (hex) |
+| `authCode` | number | uint32 authentication code |
+| `flags` | number | 1-byte control flags |
+| `pathHashSize` | number | Bytes per hash: 1, 2, 4, or 8 (derived from lower 2 bits of flags) |
+| `pathHashes` | string[] | Per-hop hashes from the trace payload, each pathHashSize bytes (hex) |
+| `snrValues` | number[] or null | SNR in dB per hop (signed int8 / 4.0), derived from packet path field. Null if no path data. |
+
+##### GroupText (0x05)
+
+```json
+{
+  "type": "GROUP_TEXT",
+  "channelHash": "f3",
+  "cipherMac": "a1b2",
+  "ciphertext": "9c8d7e6f5a4b3c2d...",
+  "ciphertextLength": 42,
+  "decrypted": {
+    "timestamp": 1747665450,
+    "flags": 0,
+    "sender": "Chris",
+    "message": "anyone hear that trace?"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `channelHash` | string | 1-byte channel hash (hex), first byte of SHA256 of channel shared key |
+| `cipherMac` | string | 2-byte MAC (hex) for HMAC-SHA256 verification |
+| `ciphertext` | string | Encrypted content (hex) |
+| `ciphertextLength` | number | Ciphertext length in bytes |
+| `decrypted` | object or null | Null if key not available or decryption failed |
+| `decrypted.timestamp` | number | uint32 unix timestamp |
+| `decrypted.flags` | number | 1-byte flags |
+| `decrypted.sender` | string | Sender name parsed from message body |
+| `decrypted.message` | string | Message text content |
+
+##### TextMessage (0x02)
+
+```json
+{
+  "type": "TEXT_MESSAGE",
+  "destinationHash": "ae",
+  "sourceHash": "bf",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b9c0d1e2f...",
+  "ciphertextLength": 38,
+  "decrypted": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `destinationHash` | string | 1-byte destination node hash (hex) |
+| `sourceHash` | string | 1-byte source node hash (hex) |
+| `cipherMac` | string | 2-byte MAC (hex) |
+| `ciphertext` | string | Encrypted content (hex) |
+| `ciphertextLength` | number | Ciphertext length in bytes |
+| `decrypted` | object or null | Null if decryption not possible |
+| `decrypted.timestamp` | number | uint32 unix timestamp |
+| `decrypted.flags` | number | Flags byte |
+| `decrypted.attempt` | number | Attempt counter |
+| `decrypted.message` | string | Message text content |
+
+##### Request (0x00)
+
+```json
+{
+  "type": "REQUEST",
+  "destinationHash": "ae",
+  "sourceHash": "bf",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b...",
+  "decrypted": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `destinationHash` | string | 1-byte destination node hash (hex) |
+| `sourceHash` | string | 1-byte source node hash (hex) |
+| `cipherMac` | string | 2-byte MAC (hex) |
+| `ciphertext` | string | Encrypted content (hex) |
+| `decrypted` | object or null | Null if decryption not possible |
+| `decrypted.timestamp` | number | uint32 unix timestamp |
+| `decrypted.requestType` | number | 1=GetStats, 2=Keepalive, 3=GetTelemetryData, 4=GetMinMaxAvgData, 5=GetAccessList |
+| `decrypted.requestTypeName` | string | Human-readable request type |
+| `decrypted.requestData` | string | Request-specific data (hex) |
+
+##### Response (0x01)
+
+```json
+{
+  "type": "RESPONSE",
+  "destinationHash": "ae",
+  "sourceHash": "bf",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b9c0d...",
+  "ciphertextLength": 28,
+  "decrypted": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `destinationHash` | string | 1-byte destination node hash (hex) |
+| `sourceHash` | string | 1-byte source node hash (hex) |
+| `cipherMac` | string | 2-byte MAC (hex) |
+| `ciphertext` | string | Encrypted content (hex) |
+| `ciphertextLength` | number | Ciphertext length in bytes |
+| `decrypted` | object or null | Null if decryption not possible |
+| `decrypted.tag` | number | Response tag |
+| `decrypted.content` | string | Response content |
+
+##### AnonRequest (0x07)
+
+```json
+{
+  "type": "ANON_REQUEST",
+  "destinationHash": "ae",
+  "senderPublicKey": "7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b9c0d1e2f...",
+  "ciphertextLength": 24,
+  "decrypted": null
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `destinationHash` | string | 1-byte destination node hash (hex) |
+| `senderPublicKey` | string | 32-byte Ed25519 sender public key (hex) |
+| `cipherMac` | string | 2-byte MAC (hex) |
+| `ciphertext` | string | Encrypted content (hex) |
+| `ciphertextLength` | number | Ciphertext length in bytes |
+| `decrypted` | object or null | Null if decryption not possible |
+| `decrypted.timestamp` | number | uint32 unix timestamp |
+| `decrypted.syncTimestamp` | number or null | Room server sync-since timestamp |
+| `decrypted.password` | string or null | Password for repeater/room |
+
+##### Ack (0x03)
+
+```json
+{
+  "type": "ACK",
+  "checksum": "a1b2c3d4"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `checksum` | string | 4-byte CRC checksum (hex) of message timestamp + text + sender pubkey |
+
+##### Path (0x08)
+
+```json
+{
+  "type": "PATH",
+  "pathLength": 3,
+  "pathHashSize": 2,
+  "pathHashes": ["ae9b", "bf3c", "d4e5"],
+  "extraType": 4,
+  "extraTypeName": "ADVERT",
+  "extraData": "7e7662676f7f..."
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `pathLength` | number | Hop count (0-63) |
+| `pathHashSize` | number | Bytes per hash: 1, 2, or 3 |
+| `pathHashes` | string[] | Per-hop hashes (hex), each pathHashSize bytes |
+| `extraType` | number | Bundled payload type that follows the path data |
+| `extraTypeName` | string | Human-readable bundled payload type name |
+| `extraData` | string | Bundled payload content (hex) |
+
+##### Control (0x0B)
+
+Control packets have a `subType` that determines the remaining fields.
+
+**DISCOVER_REQ (subType 0x80):**
+
+```json
+{
+  "type": "CONTROL",
+  "subType": 128,
+  "subTypeName": "DISCOVER_REQ",
+  "rawFlags": 128,
+  "prefixOnly": false,
+  "typeFilter": 6,
+  "typeFilterNames": ["REPEATER", "ROOM_SERVER"],
+  "tag": 2948173621,
+  "since": 1747500000
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subType` | number | 0x80 |
+| `subTypeName` | string | "DISCOVER_REQ" |
+| `rawFlags` | number | Full first byte |
+| `prefixOnly` | boolean | Lowest bit, whether to return only key prefixes |
+| `typeFilter` | number | Bitmask for node types (bit per ADV_TYPE) |
+| `typeFilterNames` | string[] | Human-readable filtered types |
+| `tag` | number | uint32, randomly generated by sender for response matching |
+| `since` | number or null | uint32 epoch timestamp filter, null if not present |
+
+**DISCOVER_RESP (subType 0x90):**
+
+```json
+{
+  "type": "CONTROL",
+  "subType": 144,
+  "subTypeName": "DISCOVER_RESP",
+  "rawFlags": 146,
+  "nodeType": 2,
+  "nodeTypeName": "REPEATER",
+  "snr": 10.75,
+  "tag": 2948173621,
+  "publicKey": "7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+  "publicKeyLength": 32
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `subType` | number | 0x90 |
+| `subTypeName` | string | "DISCOVER_RESP" |
+| `rawFlags` | number | Full first byte |
+| `nodeType` | number | Lower 4 bits (matches ADV_TYPE / deviceRole) |
+| `nodeTypeName` | string | Human-readable node type |
+| `snr` | number | Inbound SNR in dB (signed int8 / 4.0) |
+| `tag` | number | uint32, reflected from DISCOVER_REQ |
+| `publicKey` | string | 8 or 32 bytes hex depending on prefixOnly flag from the request |
+| `publicKeyLength` | number | 8 (prefix) or 32 (full) |
+
+##### GroupData (0x06), Multipart (0x0A), RawCustom (0x0F)
+
+These payload types have no structured decoder yet. `parsedPayload` returns only the raw bytes:
+
+```json
+{
+  "type": "GROUP_DATA",
+  "raw": "a1b2c3d4e5f6..."
+}
+```
+
+#### Full example: Advert packet with 2 observations
 
 ```json
 {
   "packetHash": "9e9b7d6a91cab445",
   "payloadType": 4,
+  "payloadTypeName": "ADVERT",
   "payloadVersion": 0,
   "routeType": 1,
+  "routeTypeName": "FLOOD",
+  "totalBytes": 112,
   "transportCodes": null,
-  "originPubkey": "7e7662676f7f0850...",
-  "parsedPayload": { "name": "WW7STR/PugetMesh Cougar", "deviceRole": 2, "location": {} },
+  "originPubkey": "7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
   "rawPayload": "7e7662676f7f...",
+  "parsedPayload": {
+    "type": "ADVERT",
+    "publicKey": "7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f",
+    "timestamp": 1747665450,
+    "signature": "a1b2c3d4e5f67890abcdef1234567890a1b2c3d4e5f67890abcdef1234567890a1b2c3d4e5f67890abcdef1234567890a1b2c3d4e5f67890abcdef1234567890",
+    "signatureValid": true,
+    "flags": 144,
+    "deviceRole": 2,
+    "deviceRoleName": "REPEATER",
+    "hasLocation": true,
+    "hasName": true,
+    "hasFeature1": false,
+    "hasFeature2": false,
+    "latitude": 48.4284,
+    "longitude": -123.3656,
+    "name": "WW7STR/PugetMesh Cougar"
+  },
   "decrypted": false,
   "channelHash": null,
   "firstHeardAt": 1747665456000,
-  "lastHeardAt": 1747665462000,
+  "lastHeardAt": 1747665464000,
+  "observationCount": 15,
   "observations": [
     {
       "id": 12345,
@@ -128,6 +508,80 @@ Full packet plus all observations, with each observation's resolved path inline.
       "resolvedPath": [
         { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b...", "latitude": 45.3, "longitude": -75.9 } },
         { "confidence": "ambiguous", "candidates": [{ "id": "e5f6a7b8-c9d0-1234-ef01-23456789abcd", "name": "YOW_Gatineau", "publicKey": "bf3c..." }, { "id": "f6a7b8c9-d0e1-2345-f012-3456789abcde", "name": "YOW_Hull_West", "publicKey": "bf3c..." }], "idBytes": "bf3c" }
+      ]
+    }
+  ]
+}
+```
+
+#### Full example: Trace packet with 2 observations
+
+```json
+{
+  "packetHash": "b4c5d6e7f8a90b12",
+  "payloadType": 9,
+  "payloadTypeName": "TRACE",
+  "payloadVersion": 0,
+  "routeType": 1,
+  "routeTypeName": "FLOOD",
+  "totalBytes": 24,
+  "transportCodes": null,
+  "originPubkey": null,
+  "rawPayload": "a3f1b2c4d5e6f7a8...",
+  "parsedPayload": {
+    "type": "TRACE",
+    "traceTag": "a3f1b2c4",
+    "authCode": 2948173621,
+    "flags": 2,
+    "pathHashSize": 4,
+    "pathHashes": ["ae9b1c2d", "bf3c4e5f"],
+    "snrValues": [10.75, 7.25]
+  },
+  "decrypted": false,
+  "channelHash": null,
+  "firstHeardAt": 1747665470000,
+  "lastHeardAt": 1747665478000,
+  "observationCount": 4,
+  "observations": [
+    {
+      "id": 12350,
+      "observerId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "observerName": "FlightlessDt",
+      "iata": "KEH",
+      "heardAt": 1747665470000,
+      "pathLengthByte": 194,
+      "hashSize": 4,
+      "hopCount": 2,
+      "pathBytes": "ae9b1c2dbf3c4e5f",
+      "rssi": -92,
+      "snr": 12.5,
+      "propagationTimeMs": 820,
+      "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
+      "sourceBroker": "mqtt1",
+      "resolvedPath": [
+        { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b1c2d...", "latitude": 45.3, "longitude": -75.9 } },
+        { "confidence": "high", "node": { "id": "c3d4e5f6-a7b8-9012-cdef-0123456789ab", "name": "YOW_Barrhaven", "publicKey": "bf3c4e5f...", "latitude": 45.28, "longitude": -75.76 } }
+      ]
+    },
+    {
+      "id": 12351,
+      "observerId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "observerName": "Hull_Hospital",
+      "iata": "YOW",
+      "heardAt": 1747665478000,
+      "pathLengthByte": 195,
+      "hashSize": 4,
+      "hopCount": 3,
+      "pathBytes": "ae9b1c2dbf3c4e5f72d8a314",
+      "rssi": -108,
+      "snr": 5.5,
+      "propagationTimeMs": 6200,
+      "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
+      "sourceBroker": "mqtt2",
+      "resolvedPath": [
+        { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b1c2d...", "latitude": 45.3, "longitude": -75.9 } },
+        { "confidence": "high", "node": { "id": "c3d4e5f6-a7b8-9012-cdef-0123456789ab", "name": "YOW_Barrhaven", "publicKey": "bf3c4e5f...", "latitude": 45.28, "longitude": -75.76 } },
+        { "confidence": "none", "idBytes": "72d8a314" }
       ]
     }
   ]
