@@ -508,7 +508,8 @@ CREATE INDEX idx_short_ids_p4 ON node_short_ids(iata, prefix_4);
 
 CREATE TABLE packets (
   packet_hash             BYTEA PRIMARY KEY,    -- content-based hash from decoder
-  payload_type            SMALLINT NOT NULL,    -- 0x00..0x0F per MeshCore protocol
+  header_byte             SMALLINT NOT NULL,    -- raw header byte (VVPPPPRR bit-packed)
+  payload_type            SMALLINT NOT NULL,    -- 0x00..0x0F, bits 2-5 of header
   payload_version         SMALLINT NOT NULL,    -- bits 6-7 of header
   route_type              SMALLINT NOT NULL,    -- bits 0-1 of header (set by sender)
   -- Transport codes (only present for TRANSPORT_FLOOD or TRANSPORT_DIRECT)
@@ -560,6 +561,10 @@ CREATE TABLE packet_observations (
   coding_rate         SMALLINT,
   -- Origin tracking
   source_broker       TEXT,                 -- "mqtt1" or "mqtt2"
+  -- Full wire-format bytes as received by this observer (header + optional transport
+  -- codes + path_length_byte + path_bytes + payload). Differs per observation because
+  -- path bytes accumulate as the packet hops through repeaters.
+  raw_packet          BYTEA NOT NULL,
   -- Dedup across both brokers
   UNIQUE (packet_hash, observer_id, heard_at)
 );

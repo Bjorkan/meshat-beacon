@@ -83,6 +83,7 @@ Every packet detail response includes these top-level fields:
 | Field | Type | Description |
 |-------|------|-------------|
 | `packetHash` | string | Content-based dedup hash (hex) |
+| `headerByte` | string | Raw header byte (hex, e.g. "14"). Bit-packed as VVPPPPRR: bits 0-1 = routeType, bits 2-5 = payloadType, bits 6-7 = payloadVersion |
 | `payloadType` | number | 0x00-0x0F per MeshCore protocol |
 | `payloadTypeName` | string | Human-readable name (ADVERT, TRACE, GROUP_TEXT, etc.) |
 | `payloadVersion` | number | 0-3 from bits 6-7 of header |
@@ -126,6 +127,7 @@ Each entry in the `observations` array:
 | `radio.bandwidthKhz` | number | Bandwidth in kHz |
 | `radio.codingRate` | number | Coding rate |
 | `sourceBroker` | string | "mqtt1" or "mqtt2" |
+| `rawPacket` | string | Complete wire-format hex as received by this observer (header + optional transport codes + path_length_byte + path_bytes + payload). Differs per observation because path bytes accumulate as the packet hops. |
 | `resolvedPath` | array | Per-hop resolution results (see path resolution in high level design) |
 
 #### parsedPayload by payload type
@@ -439,6 +441,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
 ```json
 {
   "packetHash": "9e9b7d6a91cab445",
+  "headerByte": "11",
   "payloadType": 4,
   "payloadTypeName": "ADVERT",
   "payloadVersion": 0,
@@ -486,6 +489,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
       "propagationTimeMs": 1936,
       "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
       "sourceBroker": "mqtt1",
+      "rawPacket": "1141ae9b7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f...",
       "resolvedPath": [
         { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b...", "latitude": 45.3, "longitude": -75.9 } }
       ]
@@ -505,6 +509,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
       "propagationTimeMs": 4122,
       "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
       "sourceBroker": "mqtt2",
+      "rawPacket": "1182ae9bbf3c7e7662676f7f08501a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f...",
       "resolvedPath": [
         { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b...", "latitude": 45.3, "longitude": -75.9 } },
         { "confidence": "ambiguous", "candidates": [{ "id": "e5f6a7b8-c9d0-1234-ef01-23456789abcd", "name": "YOW_Gatineau", "publicKey": "bf3c..." }, { "id": "f6a7b8c9-d0e1-2345-f012-3456789abcde", "name": "YOW_Hull_West", "publicKey": "bf3c..." }], "idBytes": "bf3c" }
@@ -519,6 +524,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
 ```json
 {
   "packetHash": "b4c5d6e7f8a90b12",
+  "headerByte": "25",
   "payloadType": 9,
   "payloadTypeName": "TRACE",
   "payloadVersion": 0,
@@ -558,6 +564,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
       "propagationTimeMs": 820,
       "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
       "sourceBroker": "mqtt1",
+      "rawPacket": "25c2ae9b1c2dbf3c4e5fa3f1b2c4d5e6f7a802ae9b1c2dbf3c4e5f...",
       "resolvedPath": [
         { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b1c2d...", "latitude": 45.3, "longitude": -75.9 } },
         { "confidence": "high", "node": { "id": "c3d4e5f6-a7b8-9012-cdef-0123456789ab", "name": "YOW_Barrhaven", "publicKey": "bf3c4e5f...", "latitude": 45.28, "longitude": -75.76 } }
@@ -578,6 +585,7 @@ These payload types have no structured decoder yet. `parsedPayload` returns only
       "propagationTimeMs": 6200,
       "radio": { "freqMhz": 910.525, "spreadFactor": 7, "bandwidthKhz": 62.5, "codingRate": 5 },
       "sourceBroker": "mqtt2",
+      "rawPacket": "25c3ae9b1c2dbf3c4e5f72d8a314a3f1b2c4d5e6f7a802ae9b1c2dbf3c4e5f...",
       "resolvedPath": [
         { "confidence": "high", "node": { "id": "d4e5f6a7-b8c9-0123-def0-123456789abc", "name": "YOW_Kanata", "publicKey": "ae9b1c2d...", "latitude": 45.3, "longitude": -75.9 } },
         { "confidence": "high", "node": { "id": "c3d4e5f6-a7b8-9012-cdef-0123456789ab", "name": "YOW_Barrhaven", "publicKey": "bf3c4e5f...", "latitude": 45.28, "longitude": -75.76 } },
