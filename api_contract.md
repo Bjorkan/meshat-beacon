@@ -342,28 +342,61 @@ The `parsedPayload` object is fully typed per payload type. Every payload includ
 |-------|------|-------------|
 | `checksum` | string | 4-byte CRC checksum (hex) of message timestamp + text + sender pubkey |
 
-##### Path (0x08)
+##### Path (0x08) -- Returned Path
+
+A PATH packet is a "returned path" message. When Node A sends a flooded packet to Node B, each repeater along the way appends its hash to the packet-level path field. When Node B receives it, the accumulated path describes the route from A to B. Node B then sends a PATH packet back to Node A containing that discovered route, typically with an ACK or Response piggybacked as an "extra" payload. The return trip is sent DIRECT using the reversed path.
+
+PATH shares the same encrypted envelope as Request, Response, and TextMessage: the first 2 bytes are destination/source hashes, followed by a 2-byte MAC and ciphertext. The decrypted inner payload contains the returned path hashes plus a bundled extra payload.
+
+For a passive observer (Tower), the encrypted content cannot be decrypted without the shared secret between the two nodes. The outer envelope (destination hash, source hash, MAC) is always visible.
 
 ```json
 {
   "type": "PATH",
-  "pathLength": 3,
-  "pathHashSize": 2,
-  "pathHashes": ["ae9b", "bf3c", "d4e5"],
-  "extraType": 4,
-  "extraTypeName": "ADVERT",
-  "extraData": "7e7662676f7f..."
+  "destinationHash": "ae",
+  "sourceHash": "bf",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b9c0d1e2f...",
+  "ciphertextLength": 28,
+  "decrypted": null
+}
+```
+
+When decryption is possible (e.g. if Tower has the shared secret):
+
+```json
+{
+  "type": "PATH",
+  "destinationHash": "ae",
+  "sourceHash": "bf",
+  "cipherMac": "c3d4",
+  "ciphertext": "5e6f7a8b9c0d1e2f...",
+  "ciphertextLength": 28,
+  "decrypted": {
+    "pathLength": 3,
+    "pathHashSize": 2,
+    "pathHashes": ["ae9b", "bf3c", "d4e5"],
+    "extraType": 3,
+    "extraTypeName": "ACK",
+    "extraData": "a1b2c3d4"
+  }
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `pathLength` | number | Hop count (0-63) |
-| `pathHashSize` | number | Bytes per hash: 1, 2, or 3 |
-| `pathHashes` | string[] | Per-hop hashes (hex), each pathHashSize bytes |
-| `extraType` | number | Bundled payload type that follows the path data |
-| `extraTypeName` | string | Human-readable bundled payload type name |
-| `extraData` | string | Bundled payload content (hex) |
+| `destinationHash` | string | 1-byte destination node hash (hex), first byte of destination public key |
+| `sourceHash` | string | 1-byte source node hash (hex), first byte of source public key |
+| `cipherMac` | string | 2-byte MAC (hex) for encrypted data verification |
+| `ciphertext` | string | Encrypted content (hex) |
+| `ciphertextLength` | number | Ciphertext length in bytes |
+| `decrypted` | object or null | Null if shared secret not available or decryption failed |
+| `decrypted.pathLength` | number | Hop count (0-63), from bits 5:0 of the inner path_len byte |
+| `decrypted.pathHashSize` | number | Bytes per hash: 1, 2, or 3, from (bits 7:6 + 1) of path_len byte |
+| `decrypted.pathHashes` | string[] | Per-hop node hashes (hex), each pathHashSize bytes long |
+| `decrypted.extraType` | number | Bundled payload type (lower 4 bits of extra_type byte, e.g. 0x03 = ACK, 0x01 = Response) |
+| `decrypted.extraTypeName` | string | Human-readable bundled payload type name |
+| `decrypted.extraData` | string | Bundled payload content (hex), e.g. a 4-byte ACK checksum or response data |
 
 ##### Control (0x0B)
 
