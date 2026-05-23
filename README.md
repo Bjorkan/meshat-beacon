@@ -12,3 +12,4 @@ Documentation, architecture decisions, and guides for MeshCore Tower.
 - `/adr` — Architecture Decision Records
 - `/guides` — Developer guides and onboarding
 - `/diagrams` — System diagrams
+- `/codex-thoughts` — Clanker thoughts.
