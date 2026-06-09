@@ -1,0 +1,6 @@
+# Type 2 Web: Frontend-only
+{$DOMAIN} {
+    handle {
+        reverse_proxy tower-web:80
+    }
+}

@@ -1,0 +1,13 @@
+{$DOMAIN} {
+    handle /api/* {
+        reverse_proxy tower-app:8080
+    }
+
+    handle /ws {
+        reverse_proxy tower-app:8080
+    }
+
+    handle {
+          reverse_proxy tower-web:80
+    }
+}

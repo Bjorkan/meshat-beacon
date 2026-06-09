@@ -1,0 +1,135 @@
+# Tower configuration file
+# Copy to config.yaml and adjust as needed.
+
+iatas:
+  YVR:
+    name: Vancouver International
+    lat: 49.1967
+    lng: -123.1815
+  YYJ:
+    name: Victoria International
+    lat: 48.6469
+    lng: -123.4260
+  YYC:
+    name: Calgary International
+    lat: 51.1139
+    lng: -114.0200
+  YEG:
+    name: Edmonton International
+    lat: 53.3097
+    lng: -113.5797
+  YOW:
+    name: Ottawa International
+    lat: 45.3225
+    lng: -75.6692
+  YYZ:
+    name: Toronto Pearson
+    lat: 43.6777
+    lng: -79.6248
+  XCM:
+    name: Chatham-Kent Airport
+    lat: 42.3064
+    lng: -82.0819
+  YCD:
+    name: Nanaimo Airport
+    lat: 49.0544
+    lng: -123.8700
+  YKF:
+    name: Region of Waterloo International
+    lat: 43.4608
+    lng: -80.3786
+  YLK:
+    name: Lake Simcoe Regional
+    lat: 44.4853
+    lng: -79.5556
+  YPA:
+    name: Prince Albert (Glass Field)
+    lat: 53.2144
+    lng: -105.6731
+  YQA:
+    name: Muskoka Airport
+    lat: 44.9764
+    lng: -79.3067
+  YQB:
+    name: Quebec City Jean Lesage International
+    lat: 46.7911
+    lng: -71.3933
+  YQL:
+    name: Lethbridge Airport
+    lat: 49.6303
+    lng: -112.7997
+  YSJ:
+    name: Saint John Airport
+    lat: 45.3161
+    lng: -65.8903
+  YTR:
+    name: CFB Trenton
+    lat: 44.1189
+    lng: -77.5281
+  YUL:
+    name: Montreal-Trudeau International
+    lat: 45.4706
+    lng: -73.7408
+
+regions:
+  - slug: western-canada
+    name: Western Canada
+    display_order: 1
+    center_lat: 51.0
+    center_lng: -114.0
+    zoom_level: 5
+    iatas: [YVR, YYJ, YYC, YEG]
+
+  - slug: eastern-canada
+    name: Eastern Canada
+    display_order: 2
+    center_lat: 45.0
+    center_lng: -75.0
+    zoom_level: 5
+    iatas: [YOW, YYZ]
+
+channel_keys:
+  # Hashtag channels: Tower derives the PSK automatically from the tag name.
+  # secret = SHA256("#tag")[:16], channel_hash = SHA256(secret)[0]
+  # Hashtag names should be provided without the # prefix.
+  # Tower prepends # automatically before deriving the key.
+  hashtags:
+    - meshcore
+    - ottawa
+    - testing
+    - towertest
+
+  # Explicit keys: provide the channel hash (hex) and key (hex) directly.
+  # An optional name can be set for display purposes.
+  keys:
+    "11":
+      key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
+      name: "Public"
+
+
+# Regional transport scopes for matching TRANSPORT_FLOOD packets.
+# Plain names have # prepended automatically (e.g. "bc" → "#bc").
+scopes:
+  - name: bc
+  - name: "#west"
+
+telemetry:
+  retention: 672h   # 4 weeks
+  resolution: 1h    # store one snapshot per observer per hour
+
+packets:
+  retention: 720h   # 30 days
+
+websocket:
+  max_connections_per_ip: 5 # default: 5
+
+# Geographic ingest filter (optional).
+# Drop packets from observers outside the specified area at ingest time.
+# Country codes are ISO 3166-1 alpha-2 (e.g. CA, US, GB).
+# Continent codes: AF (Africa), AN (Antarctica), AS (Asia),
+#                  EU (Europe), NA (North America), OC (Oceania), SA (South America).
+# If both are set an IATA passes if it matches either (OR semantics).
+# Omit this section entirely to accept packets from all IATAs (default).
+ingest:
+  allow_countries: [CA]
+#  allow_continents: [NA]
