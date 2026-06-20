@@ -104,6 +104,17 @@ Visit `https://<your-domain>` and you're off to the races. 🚀
 > ```
 > (then hard-refresh / use incognito, since `/assets/*` is cached immutable.)
 
+### Container images
+
+The `app` and `web` services pull public images from GitHub Container Registry
+(`ghcr.io/meshcore-beacon/beacon-server` and `…/beacon-web`) — **no `docker login`
+is required**.
+
+> **Troubleshooting — `403 Forbidden` on pull.** If `docker compose up` fails with a
+> `... manifests/<tag>: 403 Forbidden` error, the package has been set (or defaulted)
+> to **Private** on GHCR. A maintainer must set it back to Public — see
+> [Maintainers: publishing images](#maintainers-publishing-images).
+
 ### Type 2 — Split Server + Web
 
 🚧 **Not done yet.** [`docker-deployment-type2/`](docker-deployment-type2/) is a placeholder; instructions and compose files will land here.
@@ -121,6 +132,20 @@ Project-wide docs that describe the entire system live in [`app_documentation/`]
 
 - **Beacon Server (API):** [github.com/MeshCore-Beacon/beacon-server](https://github.com/MeshCore-Beacon/beacon-server) — image `ghcr.io/meshcore-beacon/beacon-server`
 - **Beacon Web (Frontend):** [github.com/MeshCore-Beacon/beacon-web](https://github.com/MeshCore-Beacon/beacon-web) — image `ghcr.io/meshcore-beacon/beacon-web`
+
+## Maintainers: publishing images
+
+Container images are published automatically by each repo's `docker-publish.yml`
+workflow on pushes to `main`/`dev` and on `v*` tags. **GHCR packages are Private by
+default**, which makes anonymous `docker pull` fail with `403 Forbidden`. To make a
+package publicly pullable (one-time, per package):
+
+1. GitHub → the **MeshCore-Beacon** org → **Packages** → select `beacon-server`.
+2. **Package settings** → **Danger Zone** → **Change visibility** → **Public**.
+3. Repeat for `beacon-web`.
+
+Once a package is Public, every future CI push to it stays Public. `GITHUB_TOKEN`
+cannot change package visibility, so this step can't be automated in the workflow.
 
 ## Repo structure
 
