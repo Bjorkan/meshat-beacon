@@ -692,21 +692,40 @@ Search behavior by field:
 ### Nodes
 
 ```
-GET    /api/v1/nodes?type=2&iata=YOW&firmwareTier=1.14.0&limit=50&cursor=<opaque>
+GET    /api/v1/nodes?typeName=repeater&iata=YOW&sort=name&direction=asc&limit=50
+GET    /api/v1/nodes?typeName=repeater&iata=YOW&sort=name&direction=asc&pageToken=<opaque>
 GET    /api/v1/nodes/{nodeId}
-GET    /api/v1/nodes/{nodeId}/observations?since=<ts>&limit=50&cursor=<opaque>
+GET    /api/v1/nodes/{nodeId}/observations?limit=50&cursor=<id>
 ```
+
+The node list supports global server-side sorting by `name`, `type`, `radio`, `neighbors`, or `last_seen` with `direction=asc|desc`. The default API order remains `last_seen desc` for backward compatibility. Sortable pagination uses the response's opaque `nextPageToken`; clients should round-trip it unchanged with the same `sort` and `direction`. The historical numeric `cursor`/`nextCursor` remains available only for `last_seen desc` clients.
+
+A list response has the following shape:
+
+```json
+{
+  "items": [],
+  "nextCursor": 1747612800000,
+  "nextPageToken": "eyJzIjoibGFzdF9zZWVuIiwiZCI6ImRlc2MiLC4uLn0",
+  "hasMore": true
+}
+```
+
+`nextCursor` is omitted for non-legacy sort orders. `nextPageToken` is the preferred cursor whenever `hasMore` is true. Tokens are versioned and bound to the endpoint/collection, sort field, and direction that produced them. Reusing a token on another sortable endpoint or with another order returns `400 Bad Request`. Keep the same filters while paging a result set.
 
 The node detail includes `iatasHeardIn`, `supportsMultibytePaths`, `supportsMultibyteTraces`, `minFirmwareVersion`, and the latest advert payload.
 
 ### Observers
 
 ```
-GET    /api/v1/observers?iata=YOW&type=meshcoretomqtt&broker=mqtt1&status=online
+GET    /api/v1/observers?iata=YOW&type=meshcoretomqtt&broker=mqtt1&status=online&sort=name&direction=asc
+GET    /api/v1/observers?iata=YOW&sort=status&direction=desc&pageToken=<opaque>
 GET    /api/v1/observers/{observerId}
 GET    /api/v1/observers/{observerId}/telemetry?range=24h
-GET    /api/v1/observers/{observerId}/adverts?limit=50&cursor=<opaque>
+GET    /api/v1/observers/{observerId}/adverts?limit=50&cursor=<id>
 ```
+
+The observer list supports global server-side sorting by `name`, `type`, `radio`, `iata`, `status`, or `last_seen`. It uses the same opaque `nextPageToken` contract as `/nodes`, while retaining the legacy numeric cursor only for the default `last_seen desc` order.
 
 Telemetry response is a time-bucketed array suitable for direct chart consumption:
 
