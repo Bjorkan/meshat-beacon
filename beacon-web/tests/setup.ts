@@ -25,6 +25,22 @@ if (!window.matchMedia) {
   }));
 }
 
+// Radix floating primitives observe their trigger/content geometry. jsdom has no layout engine, so
+// a no-op observer is sufficient for interaction tests while production uses the browser native API.
+class ResizeObserverMock implements ResizeObserver {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+globalThis.ResizeObserver = ResizeObserverMock;
+
+// Radix DismissableLayer uses PointerEvent/capture APIs that jsdom does not expose.
+window.PointerEvent = MouseEvent as typeof PointerEvent;
+HTMLElement.prototype.hasPointerCapture = () => false;
+HTMLElement.prototype.setPointerCapture = () => {};
+HTMLElement.prototype.releasePointerCapture = () => {};
+HTMLElement.prototype.scrollIntoView = () => {};
+
 afterEach(() => {
   cleanup();
 });

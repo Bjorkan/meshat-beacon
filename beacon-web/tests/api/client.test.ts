@@ -306,6 +306,16 @@ describe('getChannels', () => {
     expect(url.searchParams.has('iata')).toBe(false);
     expect(url.searchParams.has('iatas')).toBe(false);
   });
+
+  it('rejects a generated response that omits a required UI contract field', async () => {
+    mockFetchOnce({
+      items: [{ id: 1, name: 'Public', channelHash: '8b', lastSeen: 1000, isHashtag: false }],
+    });
+
+    await expect(getChannels()).rejects.toThrow(
+      'Invalid ChannelSummary response: missing keyKnown',
+    );
+  });
 });
 
 describe('getChannelMessagesPage', () => {

@@ -740,7 +740,27 @@ WITH node_base AS (
     (SELECT COUNT(DISTINCT nn.neighbor_id) FROM node_neighbors nn WHERE nn.node_id = n.id)::bigint AS known_neighbor_count,
     (CASE WHEN $10::bool THEN
       (SELECT COALESCE(array_agg(DISTINCT nn.neighbor_id), '{}'::uuid[]) FROM node_neighbors nn WHERE nn.node_id = n.id)
-    ELSE NULL END)::uuid[] AS neighbor_ids
+    ELSE NULL END)::uuid[] AS neighbor_ids,
+    CASE WHEN $10::bool THEN (
+      SELECT COALESCE(jsonb_agg(jsonb_build_object(
+        'nodeId', link.neighbor_id,
+        'snr', link.snr,
+        'snrSampleCount', link.snr_sample_count,
+        'snrLastSeen', CASE WHEN link.snr_last_seen IS NULL THEN NULL
+          ELSE (extract(epoch from link.snr_last_seen) * 1000)::bigint END
+      ) ORDER BY link.neighbor_id), '[]'::jsonb)
+      FROM (
+        SELECT nn.neighbor_id,
+          CASE WHEN SUM(nn.snr_sample_count) > 0
+            THEN SUM(nn.snr * nn.snr_sample_count) / SUM(nn.snr_sample_count)
+            ELSE NULL END AS snr,
+          SUM(nn.snr_sample_count)::bigint AS snr_sample_count,
+          MAX(nn.snr_last_seen) AS snr_last_seen
+        FROM node_neighbors nn
+        WHERE nn.node_id = n.id
+        GROUP BY nn.neighbor_id
+      ) link
+    ) ELSE NULL END::jsonb AS neighbor_links
   FROM nodes n
   LEFT JOIN node_iatas ni ON ni.node_id = n.id
   LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
@@ -790,7 +810,8 @@ WITH node_base AS (
 )
 SELECT id, public_key, node_type, name, latitude, longitude, last_seen,
        radio_freq_mhz, radio_sf, radio_bw_khz, default_scope_name, iatas,
-       is_observer, observer_id, known_neighbor_count, neighbor_ids, page_sort_key, page_sort_empty
+       is_observer, observer_id, known_neighbor_count, neighbor_ids, neighbor_links,
+       page_sort_key, page_sort_empty
 FROM node_ranked
 WHERE
   NOT $14::bool
@@ -1281,14 +1302,25 @@ ORDER BY hop_count ASC, last_seen DESC;
 -- common case). regionScope is optional too; pass NULL whenever the OTA
 -- scope query for this neighbor didn't succeed (status != "responded"),
 -- so a failed/timed-out query doesn't erase a previously known scope.
--- On conflict, snr and region_scope are only overwritten when a new
--- non-null value is supplied.
-INSERT INTO node_neighbors (node_id, neighbor_id, iata, observation_count, snr, region_scope)
-VALUES ($1, $2, $3, 1, $4, $5)
+-- On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
+-- a stable map link quality while making recent RF conditions matter more than old samples.
+INSERT INTO node_neighbors (
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope
+)
+VALUES (
+  $1, $2, $3, 1, $4, CASE WHEN $4 IS NULL THEN 0 ELSE 1 END,
+  CASE WHEN $4 IS NULL THEN NULL ELSE NOW() END, $5
+)
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
   observation_count = node_neighbors.observation_count + 1,
-  snr               = COALESCE(EXCLUDED.snr, node_neighbors.snr),
+  snr               = CASE
+                        WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr
+                        WHEN node_neighbors.snr IS NULL THEN EXCLUDED.snr
+                        ELSE node_neighbors.snr * 0.8 + EXCLUDED.snr * 0.2
+                      END,
+  snr_sample_count  = node_neighbors.snr_sample_count + CASE WHEN EXCLUDED.snr IS NULL THEN 0 ELSE 1 END,
+  snr_last_seen     = CASE WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr_last_seen ELSE NOW() END,
   region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope);
 
 -- name: UpdateObserverRegionScope :exec
@@ -1301,10 +1333,11 @@ UPDATE observers SET region_scope = $2 WHERE id = $1;
 -- Returns the neighbors of a node with details, ordered by most recently seen.
 SELECT
     n.id, n.public_key, n.name, n.node_type, n.latitude, n.longitude,
-    nn.iata, nn.observation_count, nn.first_seen, nn.last_seen, nn.snr
+    nn.iata, nn.observation_count, nn.first_seen, nn.last_seen,
+    nn.snr, nn.snr_sample_count, nn.snr_last_seen
 FROM node_neighbors nn
-JOIN nodes n ON n.id = nn.neighbor_id
-WHERE nn.node_id = $1
+JOIN nodes n ON n.id = CASE WHEN nn.node_id = $1 THEN nn.neighbor_id ELSE nn.node_id END
+WHERE nn.node_id = $1 OR nn.neighbor_id = $1
 ORDER BY nn.last_seen DESC;
 
 -- name: GetCrossIATANeighbors :many

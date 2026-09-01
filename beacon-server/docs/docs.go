@@ -211,7 +211,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelMessage"
                         }
                     },
                     "400": {
@@ -397,7 +397,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "type": "object"
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelMessage"
                         }
                     },
                     "400": {
@@ -2730,6 +2730,13 @@ const docTemplate = `{
                         "type": "string"
                     }
                 },
+                "neighborLinks": {
+                    "description": "bulk link quality for the same optional map topology",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.NodeLinkMetric"
+                    }
+                },
                 "neighbors": {
                     "type": "array",
                     "items": {
@@ -2781,6 +2788,23 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeLinkMetric": {
+            "type": "object",
+            "properties": {
+                "nodeId": {
+                    "type": "string"
+                },
+                "snr": {
+                    "type": "number"
+                },
+                "snrLastSeen": {
+                    "type": "integer"
+                },
+                "snrSampleCount": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeNeighbor": {
             "type": "object",
             "properties": {
@@ -2821,6 +2845,13 @@ const docTemplate = `{
                 },
                 "snr": {
                     "type": "number"
+                },
+                "snrLastSeen": {
+                    "description": "epoch ms of most recent reliable SNR sample",
+                    "type": "integer"
+                },
+                "snrSampleCount": {
+                    "type": "integer"
                 }
             }
         },
@@ -2864,6 +2895,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "neighborLinks": {
+                    "description": "bulk link quality for the same optional map topology",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.NodeLinkMetric"
                     }
                 },
                 "nodeType": {
@@ -3454,6 +3492,26 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdvertObservation"
+                    }
+                },
+                "nextCursor": {
+                    "type": "integer"
+                },
+                "nextPageToken": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelMessage": {
+            "type": "object",
+            "properties": {
+                "hasMore": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelMessage"
                     }
                 },
                 "nextCursor": {

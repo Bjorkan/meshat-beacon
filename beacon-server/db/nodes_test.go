@@ -652,6 +652,25 @@ func TestGetNodeNeighbors_DBError(t *testing.T) {
 	}
 }
 
+func TestMergeNeighborSNR_WeightsSamplesAndTracksFreshness(t *testing.T) {
+	old := float32(-10)
+	item := api.NodeNeighbor{SNR: &old, SNRSampleCount: 3, SNRLastSeen: 1_000}
+	newValue := float32(2)
+	newSeen := pgtype.Timestamptz{Time: time.UnixMilli(2_000), Valid: true}
+
+	mergeNeighborSNR(&item, &newValue, 1, newSeen)
+
+	if item.SNR == nil || *item.SNR != -7 {
+		t.Fatalf("expected weighted SNR -7, got %v", item.SNR)
+	}
+	if item.SNRSampleCount != 4 {
+		t.Fatalf("expected four samples, got %d", item.SNRSampleCount)
+	}
+	if item.SNRLastSeen != 2_000 {
+		t.Fatalf("expected latest reliable sample timestamp, got %d", item.SNRLastSeen)
+	}
+}
+
 func TestListNodes_IncludeNeighbors_PassesFlagAndMapsIDs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock := mockdb.NewMockQuerier(ctrl)

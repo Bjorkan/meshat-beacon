@@ -170,6 +170,12 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 			NeighborIDs:        v.NeighborIds,
 			Stale:              v.LastSeen.Valid && v.LastSeen.Time.Before(time.Now().Add(-s.staleThreshold)),
 		}
+		if len(v.NeighborLinks) > 0 {
+			if err := json.Unmarshal(v.NeighborLinks, &node.NeighborLinks); err != nil {
+				log.Printf("store: failed to unmarshal node link metrics: %v", err)
+				node.NeighborLinks = []api.NodeLinkMetric{}
+			}
+		}
 		if len(v.Iatas) > 0 {
 			if err := json.Unmarshal(v.Iatas, &node.IATAs); err != nil {
 				log.Printf("store: failed to unmarshal node iatas: %v", err)
@@ -307,10 +313,10 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 	for _, r := range rows {
 		if idx, ok := seen[r.ID]; ok {
 			items[idx].ObservationCount += r.ObservationCount
+			mergeNeighborSNR(&items[idx], r.Snr, r.SnrSampleCount, r.SnrLastSeen)
 			if r.LastSeen.Time.After(time.UnixMilli(items[idx].LastSeen)) {
 				items[idx].LastSeen = r.LastSeen.Time.UnixMilli()
 				items[idx].IATA = r.Iata
-				items[idx].SNR = r.Snr
 			}
 			if r.FirstSeen.Time.Before(time.UnixMilli(items[idx].FirstSeen)) {
 				items[idx].FirstSeen = r.FirstSeen.Time.UnixMilli()
@@ -331,9 +337,36 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 			FirstSeen:        r.FirstSeen.Time.UnixMilli(),
 			LastSeen:         r.LastSeen.Time.UnixMilli(),
 			SNR:              r.Snr,
+			SNRSampleCount:   r.SnrSampleCount,
+			SNRLastSeen:      timestampMillis(r.SnrLastSeen),
 		})
 	}
 	return items, nil
+}
+
+func timestampMillis(value pgtype.Timestamptz) int64 {
+	if !value.Valid {
+		return 0
+	}
+	return value.Time.UnixMilli()
+}
+
+func mergeNeighborSNR(item *api.NodeNeighbor, snr *float32, count int64, lastSeen pgtype.Timestamptz) {
+	if snr != nil && count > 0 {
+		if item.SNR == nil || item.SNRSampleCount == 0 {
+			value := *snr
+			item.SNR = &value
+			item.SNRSampleCount = count
+		} else {
+			total := item.SNRSampleCount + count
+			value := (*item.SNR*float32(item.SNRSampleCount) + *snr*float32(count)) / float32(total)
+			item.SNR = &value
+			item.SNRSampleCount = total
+		}
+	}
+	if lastSeen.Valid && lastSeen.Time.UnixMilli() > item.SNRLastSeen {
+		item.SNRLastSeen = lastSeen.Time.UnixMilli()
+	}
 }
 
 func (s *Store) ReconfirmNeighbors(ctx context.Context) error {

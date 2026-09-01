@@ -205,11 +205,11 @@ describe('PayloadBreakdown — GROUP_TEXT decrypted channel message', () => {
     expect(screen.getByText('hello mesh')).toBeInTheDocument();
   });
 
-  it('formats sentAt as epoch milliseconds, not seconds', () => {
+  it('formats sentAt as epoch milliseconds, not seconds', async () => {
     render(<PayloadBreakdown payload={payload} />);
     // <Timestamp> shows a relative label; hovering reveals the absolute time in the tooltip
-    fireEvent.mouseEnter(screen.getByText(`${timeAgoMs(sentAt)} ago`));
-    expect(screen.getByRole('tooltip').textContent).toBe(formatAbsolute(sentAt));
+    fireEvent.pointerMove(screen.getByText(`${timeAgoMs(sentAt)} ago`), { pointerType: 'mouse' });
+    expect((await screen.findByRole('tooltip')).textContent).toBe(formatAbsolute(sentAt));
     // the seconds interpretation (×1000) would be a far-future date
     expect(screen.getByRole('tooltip').textContent).not.toBe(formatAbsolute(sentAt * 1000));
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { Tooltip } from '../../src/components/Tooltip';
 
 // mobile/touch == no hover-capable pointer; desktop == has hover. Interaction modality keys off
@@ -20,7 +20,7 @@ function setMobile(mobile: boolean) {
 afterEach(() => vi.restoreAllMocks());
 
 describe('Tooltip (desktop)', () => {
-  it('shows on mouse enter and hides on mouse leave', () => {
+  it('shows on pointer hover', async () => {
     setMobile(false);
     render(
       <Tooltip label="tip text">
@@ -29,11 +29,22 @@ describe('Tooltip (desktop)', () => {
     );
     const trigger = screen.getByText('target');
 
-    fireEvent.mouseEnter(trigger);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('tip text');
+    fireEvent.pointerMove(trigger, { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('tip text');
+  });
 
-    fireEvent.mouseLeave(trigger);
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  it('shows the same information on keyboard focus and dismisses with Escape', async () => {
+    setMobile(false);
+    render(
+      <Tooltip label="tip text">
+        <button type="button">target</button>
+      </Tooltip>,
+    );
+    const trigger = screen.getByRole('button', { name: 'target' });
+    fireEvent.focus(trigger);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('tip text');
+    fireEvent.keyDown(trigger, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
   });
 
   it('does not open on click', () => {
@@ -49,7 +60,7 @@ describe('Tooltip (desktop)', () => {
 });
 
 describe('Tooltip (mobile)', () => {
-  it('toggles on tap and dismisses on an outside pointerdown', () => {
+  it('toggles on tap and dismisses on an outside pointerdown', async () => {
     setMobile(true);
     render(
       <div>
@@ -62,14 +73,17 @@ describe('Tooltip (mobile)', () => {
     const trigger = screen.getByText('target');
 
     fireEvent.click(trigger);
-    expect(screen.getByRole('tooltip')).toHaveTextContent('tip text');
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('tip text');
 
-    // a tap outside the trigger closes it
-    fireEvent.pointerDown(screen.getByText('outside'));
-    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    // Radix defers primary-pointer dismissal until the matching click so drags/selections do not
+    // close the popover. A complete outside tap closes it.
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    fireEvent.pointerDown(document.body, { pointerType: 'touch' });
+    fireEvent.click(document.body);
+    await waitFor(() => expect(screen.queryByRole('tooltip')).not.toBeInTheDocument());
   });
 
-  it('stops the tap from reaching a parent click handler', () => {
+  it('stops the tap from reaching a parent click handler', async () => {
     setMobile(true);
     const onParentClick = vi.fn();
     render(
@@ -80,7 +94,7 @@ describe('Tooltip (mobile)', () => {
       </div>,
     );
     fireEvent.click(screen.getByText('target'));
-    expect(screen.getByRole('tooltip')).toBeInTheDocument();
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
     expect(onParentClick).not.toHaveBeenCalled();
   });
 });

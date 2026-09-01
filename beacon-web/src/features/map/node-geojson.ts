@@ -1,5 +1,5 @@
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
-import type { NodeSummary, NodeNeighbor } from '../nodes/types';
+import type { NodeSummary, NodeNeighbor, NodeLinkMetric } from '../nodes/types';
 import type { NeighborLinesMode } from './types';
 
 // Build the maplibre GeoJSON source from the nodes API response. Properties stay primitive because
@@ -41,6 +41,8 @@ export interface NeighborEdgeProps {
   // ambient "on" mesh) render uniform.
   obs?: number;
   ageDays?: number;
+  snr?: number;
+  snrSampleCount?: number;
 }
 
 export interface FocusedNeighborPointProps {
@@ -79,20 +81,41 @@ export function buildNeighborEdges(
     if (n.lat != null && n.lng != null) located.set(n.id, n);
   }
 
-  const seen = new Set<string>();
-  const features: Feature<LineString, NeighborEdgeProps>[] = [];
+  const features = new Map<string, Feature<LineString, NeighborEdgeProps>>();
   for (const n of nodes) {
-    if (n.lat == null || n.lng == null || !n.neighborIds) continue;
-    for (const otherId of n.neighborIds) {
+    if (n.lat == null || n.lng == null) continue;
+    const links: NodeLinkMetric[] =
+      n.neighborLinks ?? n.neighborIds?.map((nodeId) => ({ nodeId, snrSampleCount: 0 })) ?? [];
+    for (const link of links) {
+      const otherId = link.nodeId;
       if (otherId === n.id) continue; // a node listing itself would draw a zero-length edge
       const other = located.get(otherId);
       if (!other) continue;
       const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
-      if (seen.has(key)) continue;
       const incident = n.id === selectedId || otherId === selectedId;
       if (mode === 'selected' && !incident) continue;
-      seen.add(key);
-      features.push({
+      const existing = features.get(key);
+      if (existing) {
+        if (link.snr != null && link.snrSampleCount > 0) {
+          const previousSamples = existing.properties.snrSampleCount ?? 0;
+          const totalSamples = previousSamples + link.snrSampleCount;
+          existing.properties.snr =
+            existing.properties.snr != null && previousSamples > 0
+              ? (existing.properties.snr * previousSamples + link.snr * link.snrSampleCount) /
+                totalSamples
+              : link.snr;
+          existing.properties.snrSampleCount = totalSamples;
+          if (link.snrLastSeen != null) {
+            const incomingAge = Math.max(0, (Date.now() - link.snrLastSeen) / 86400000);
+            existing.properties.ageDays = Math.min(
+              existing.properties.ageDays ?? incomingAge,
+              incomingAge,
+            );
+          }
+        }
+        continue;
+      }
+      features.set(key, {
         type: 'Feature',
         geometry: {
           type: 'LineString',
@@ -101,11 +124,22 @@ export function buildNeighborEdges(
             [other.lng!, other.lat!],
           ],
         },
-        properties: { selected: incident },
+        properties: {
+          selected: incident,
+          ...(link.snr != null && link.snrSampleCount > 0
+            ? {
+                snr: link.snr,
+                snrSampleCount: link.snrSampleCount,
+                ...(link.snrLastSeen != null
+                  ? { ageDays: Math.max(0, (Date.now() - link.snrLastSeen) / 86400000) }
+                  : {}),
+              }
+            : {}),
+        },
       });
     }
   }
-  return { type: 'FeatureCollection', features };
+  return { type: 'FeatureCollection', features: [...features.values()] };
 }
 
 // The selected node's edges, coloured by observation count and freshness. Data comes from the node
@@ -125,19 +159,39 @@ export function buildFocusedNeighborEdges(
   if (!selected || selected.lat == null || selected.lng == null) return empty;
   const from: [number, number] = [selected.lng, selected.lat];
 
-  const byId = new Map<string, { lng: number; lat: number; obs: number; lastSeen: number }>();
+  const byId = new Map<
+    string,
+    {
+      lng: number;
+      lat: number;
+      obs: number;
+      lastSeen: number;
+      snrLastSeen: number;
+      snrTotal: number;
+      snrSamples: number;
+    }
+  >();
   for (const nb of neighbors) {
     if (nb.id === selected.id || nb.lat == null || nb.lng == null) continue;
     const prev = byId.get(nb.id);
     if (prev) {
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
+      prev.snrLastSeen = Math.max(prev.snrLastSeen, nb.snrLastSeen ?? 0);
+      if (nb.snr != null) {
+        const weight = Math.max(1, nb.snrSampleCount ?? 1);
+        prev.snrTotal += nb.snr * weight;
+        prev.snrSamples += weight;
+      }
     } else {
       byId.set(nb.id, {
         lng: nb.lng,
         lat: nb.lat,
         obs: nb.observationCount,
         lastSeen: nb.lastSeen,
+        snrLastSeen: nb.snrLastSeen ?? 0,
+        snrTotal: nb.snr != null ? nb.snr * Math.max(1, nb.snrSampleCount ?? 1) : 0,
+        snrSamples: nb.snr != null ? Math.max(1, nb.snrSampleCount ?? 1) : 0,
       });
     }
   }
@@ -150,7 +204,9 @@ export function buildFocusedNeighborEdges(
       properties: {
         selected: true,
         obs: n.obs,
-        ageDays: Math.max(0, (now - n.lastSeen) / 86400000),
+        ageDays: Math.max(0, (now - (n.snrLastSeen || n.lastSeen)) / 86400000),
+        ...(n.snrSamples > 0 ? { snr: n.snrTotal / n.snrSamples } : {}),
+        ...(n.snrSamples > 0 ? { snrSampleCount: n.snrSamples } : {}),
       },
     });
   }

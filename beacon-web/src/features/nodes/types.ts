@@ -16,10 +16,18 @@ export interface NodeSummary {
   iatas: NodeIATA[];
   knownNeighborCount: number; // distinct first-hop neighbors we've resolved for this node
   neighborIds?: string[]; // first-hop neighbor node ids; only present when the list request opts in (?neighbors)
+  neighborLinks?: NodeLinkMetric[]; // bulk quality metrics for the same optional map topology
   // Set when this node also runs as an observer (watches traffic for uplink). isObserver drives the
   // map's observer-pip marker variant; observerId, when present, links to that observer's detail.
   isObserver?: boolean;
   observerId?: string;
+}
+
+export interface NodeLinkMetric {
+  nodeId: string;
+  snr?: number;
+  snrSampleCount: number;
+  snrLastSeen?: number;
 }
 
 export interface Node extends NodeSummary {
@@ -52,6 +60,9 @@ export interface NodeNeighbor {
   observationCount: number;
   firstSeen: number; // epoch ms
   lastSeen: number; // epoch ms
+  snr?: number; // aggregated link SNR (dB), when trusted samples exist
+  snrSampleCount?: number;
+  snrLastSeen?: number;
 }
 
 export interface NodeObservation {

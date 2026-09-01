@@ -8,14 +8,15 @@ function renderOverlay(onClose: () => void) {
       <p data-testid="panel-text">selectable panel text</p>
     </ModalOverlay>,
   );
-  return screen.getByRole('dialog', { name: 'Test panel' });
+  const dialog = screen.getByRole('dialog', { name: 'Test panel' });
+  return { dialog, backdrop: dialog.previousElementSibling! };
 }
 
 describe('ModalOverlay', () => {
   it('closes when a click starts and ends on the backdrop', () => {
     const onClose = vi.fn();
-    const backdrop = renderOverlay(onClose);
-    fireEvent.mouseDown(backdrop);
+    const { backdrop } = renderOverlay(onClose);
+    fireEvent.pointerDown(backdrop);
     fireEvent.click(backdrop);
     expect(onClose).toHaveBeenCalledTimes(1);
   });
@@ -24,7 +25,7 @@ describe('ModalOverlay', () => {
     // regression: selecting text in the panel and releasing over the backdrop fired a click on the
     // backdrop (the common ancestor) and closed the modal
     const onClose = vi.fn();
-    const backdrop = renderOverlay(onClose);
+    const { backdrop } = renderOverlay(onClose);
     fireEvent.mouseDown(screen.getByTestId('panel-text'));
     fireEvent.click(backdrop);
     expect(onClose).not.toHaveBeenCalled();

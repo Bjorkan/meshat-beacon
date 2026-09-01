@@ -28,4 +28,4 @@ export const useIsMobile = () => useMediaQuery('(max-width: 1023px)');
 
 // Interaction modality (hover-to-reveal vs tap-to-toggle), not width: a wide touch device must still
 // tap, or hover-driven popovers dismiss before they can be reached.
-export const useHasHover = () => useMediaQuery('(hover: hover)');
+export const useHasHover = () => useMediaQuery('(hover: hover) and (pointer: fine)');

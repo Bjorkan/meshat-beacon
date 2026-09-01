@@ -135,11 +135,11 @@ describe('TraceList', () => {
     // First/Last show a relative label (same here, 122ms apart); the exact ms is in the hover tooltip
     const labels = screen.getAllByText(`${timeAgoMs(1717689045001)} ago`);
     expect(labels).toHaveLength(2);
-    fireEvent.mouseEnter(labels[0]);
-    expect(screen.getByRole('tooltip').textContent).toMatch(/\.001$/); // First, ms preserved
-    fireEvent.mouseLeave(labels[0]);
-    fireEvent.mouseEnter(labels[1]);
-    expect(screen.getByRole('tooltip').textContent).toMatch(/\.123$/); // Last, ms preserved
+    fireEvent.pointerMove(labels[0], { pointerType: 'mouse' });
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/\.001$/); // First, ms preserved
+    fireEvent.pointerLeave(labels[0], { pointerType: 'mouse' });
+    fireEvent.pointerMove(labels[1], { pointerType: 'mouse' });
+    await waitFor(() => expect(screen.getByRole('tooltip').textContent).toMatch(/\.123$/)); // Last, ms preserved
   });
 
   it('calls onAnalyze with the packet hash when a packet row is clicked', async () => {

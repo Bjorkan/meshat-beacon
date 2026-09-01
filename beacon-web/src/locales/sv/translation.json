@@ -249,6 +249,7 @@
     "firstSeen": "Först sedd",
     "lastSeen": "Senast sedd",
     "findPath": "Hitta sökväg",
+    "selectScope": "Välj en IATA eller region i den globala väljaren för att söka rutter.",
     "fromHash": "från hash",
     "toHash": "till hash",
     "search": "Sök",

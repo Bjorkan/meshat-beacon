@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PacketDetail } from '../../types/api';
 import { PacketAnalyzerDrawer } from './PacketAnalyzerDrawer';
@@ -25,16 +25,6 @@ export function PacketAnalyzerOverlay({
   const { t } = useTranslation();
   const [selectedObservationId, setSelectedObservationId] = useState<number | null>(null);
   const [viewNodeId, setViewNodeId] = useState<string | null>(null);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      // peel back one layer at a time: the nested node overlay handles its own Escape, so only
-      // close the analyzer once nothing is stacked above it
-      if (e.key === 'Escape' && !viewNodeId && !inactive) onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose, viewNodeId, inactive]);
 
   return (
     <>

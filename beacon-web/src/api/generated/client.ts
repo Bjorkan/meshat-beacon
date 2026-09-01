@@ -38,8 +38,8 @@ export async function rawGetChannelsChannelID(params: { channelID: number; }): P
   return request<Models.Channel>(`/channels/${encodeURIComponent(String(params.channelID))}`, undefined);
 }
 
-export async function rawGetChannelsChannelIDMessages(params: { channelID: number; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<unknown> {
-  return request<unknown>(`/channels/${encodeURIComponent(String(params.channelID))}/messages`, { "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetChannelsChannelIDMessages(params: { channelID: number; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<Models.PageChannelMessage> {
+  return request<Models.PageChannelMessage>(`/channels/${encodeURIComponent(String(params.channelID))}/messages`, { "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
 }
 
 export async function rawGetIatas(): Promise<Array<Models.IATA>> {
@@ -54,8 +54,8 @@ export async function rawGetIatasIataBorder(params: { iata: string; }): Promise<
   return request<unknown>(`/iatas/${encodeURIComponent(String(params.iata))}/border`, undefined);
 }
 
-export async function rawGetMessages(params: { channelID?: number; channelHash?: string; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<unknown> {
-  return request<unknown>("/messages", { "channelID": params.channelID, "channelHash": params.channelHash, "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetMessages(params: { channelID?: number; channelHash?: string; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<Models.PageChannelMessage> {
+  return request<Models.PageChannelMessage>("/messages", { "channelID": params.channelID, "channelHash": params.channelHash, "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
 }
 
 export async function rawGetMessagesBackfill(params: { afterId: number; iatas?: string; region?: string; regionId?: number; scope?: string; limit?: number; }): Promise<Array<Models.ChannelMessage>> {

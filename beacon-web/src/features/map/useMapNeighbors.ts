@@ -7,7 +7,7 @@ import type {
 } from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import type { NeighborEdgeProps } from './node-geojson';
-import { OBS_STOPS, AGE } from './neighbor-thresholds';
+import { OBS_STOPS, SNR_STOPS, NO_SNR_COLOR, AGE } from './neighbor-thresholds';
 import { NEIGHBORS_SOURCE_ID, NEIGHBORS_LINE_LAYER_ID } from './types';
 import { syncMapOverlayLayerOrder } from './map-layer-order';
 
@@ -17,11 +17,11 @@ function paletteVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-// Opacity: the selected node's coloured edges (they carry `obs`) fade with age — solid when fresh,
-// faint by ~4 weeks (matches the 30-day retention). Ambient "on" edges keep the flat selected/dim split.
+// Opacity: edges with dated RF evidence fade independently of quality — solid when fresh, faint by
+// ~4 weeks (matches retention). Edges without dated evidence keep the flat selected/dim split.
 const NEIGHBOR_OPACITY = [
   'case',
-  ['has', 'obs'],
+  ['has', 'ageDays'],
   [
     'interpolate',
     ['linear'],
@@ -34,16 +34,23 @@ const NEIGHBOR_OPACITY = [
   ['case', ['get', 'selected'], 0.9, 0.3],
 ] as ExpressionSpecification;
 
-// Colour by observation count on a log axis (counts are heavily right-skewed): ~1 red, ~20 yellow,
-// ~150+ green, clamped past the ends. Edges without a count (the ambient mesh) fall back to primary.
-function neighborLineColor(
-  danger: string,
-  warn: string,
-  green: string,
-  primary: string,
-): ExpressionSpecification {
+// Colour selected links by their aggregated, trusted SNR when available. Older edges keep
+// the observation-confidence scale, so sparse historical data does not masquerade as RF quality.
+function neighborLineColor(danger: string, warn: string, green: string): ExpressionSpecification {
   return [
     'case',
+    ['has', 'snr'],
+    [
+      'interpolate',
+      ['linear'],
+      ['get', 'snr'],
+      SNR_STOPS.danger,
+      danger,
+      SNR_STOPS.warn,
+      warn,
+      SNR_STOPS.green,
+      green,
+    ],
     ['has', 'obs'],
     [
       'interpolate',
@@ -56,7 +63,7 @@ function neighborLineColor(
       OBS_STOPS.green,
       green,
     ],
-    primary,
+    NO_SNR_COLOR,
   ] as ExpressionSpecification;
 }
 
@@ -83,7 +90,6 @@ export function useMapNeighbors(
       paletteVar('--palette-danger', '#EF4444'),
       paletteVar('--palette-warn', '#EAB308'),
       paletteVar('--palette-green', '#22C55E'),
-      paletteVar('--palette-primary', '#3B82F6'),
     );
 
     if (!map.getSource(NEIGHBORS_SOURCE_ID)) {

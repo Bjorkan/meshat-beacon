@@ -117,9 +117,9 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
       (topNodes.data ?? []).map((n) => ({
         name: n.nodeName ?? n.nodeId.slice(0, 8),
         value: n.observationCount,
-        color: nodeTypeColor(n.nodeTypeName, colors),
+        color: nodeTypeColor(n.nodeTypeName),
       })),
-    [topNodes.data, colors],
+    [topNodes.data],
   );
   const nodesOption = useMemo(() => leaderboardOption(nodeRows, colors), [nodeRows, colors]);
 
@@ -167,9 +167,9 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
         .map((t) => ({
           name: t.nodeTypeName,
           value: t.count,
-          color: nodeTypeColor(t.nodeTypeName, colors),
+          color: nodeTypeColor(t.nodeTypeName),
         })),
-    [nodeTypes.data, colors],
+    [nodeTypes.data],
   );
   const typeTotal = useMemo(() => typeRows.reduce((a, t) => a + t.value, 0), [typeRows]);
   const typesOption = useMemo(

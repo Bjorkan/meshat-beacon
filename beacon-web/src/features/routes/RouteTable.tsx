@@ -2,14 +2,14 @@ import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { iataQueries, routeQueries } from '../../api/queries';
+import { routeQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
 import { Badge } from '../../components/Badge';
 import { Timestamp } from '../../components/Timestamp';
 import { DataTable, type Column, type SortState } from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
-import { MultiSelectDropdown } from '../../components/MultiSelectDropdown';
+
 import { RouteDetailPanel } from './RouteDetailPanel';
 import { ResolvedHopBlock } from '../packets/PathData';
 import { formatHex } from '../../lib/formatters';
@@ -190,22 +190,24 @@ export function RouteTable() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ header: 'Last seen', direction: 'desc' });
 
-  // drop the selection when the region changes — the selected route may not be in the new region
+  // Path search form: source→dest hashes, scoped exclusively by the global region picker. One IATA
+  // uses /routes/search; two+ use /routes/cross across directed pairs. Hashes + ≥1 IATA required.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [search, setSearch] = useState<SearchParams | null>(null);
+  const isCross = search != null && search.iatas.length >= 2;
+
+  // A result is only meaningful for the scope that produced it. Clear both the row selection and
+  // submitted path search when the global selection changes so stale cross-region results cannot
+  // remain on screen.
   const prevRegion = useRef(regionKey);
   useEffect(() => {
     if (prevRegion.current !== regionKey) {
       prevRegion.current = regionKey;
       setSelectedKey(null);
+      setSearch(null);
     }
   }, [regionKey]);
-
-  // path search form: source→dest hashes, scoped to a multi-select of IATAs. One IATA → within-IATA
-  // /routes/search; two+ → /routes/cross across the directed pairs. Hashes + ≥1 IATA required.
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [searchIatas, setSearchIatas] = useState<string[]>([]);
-  const [search, setSearch] = useState<SearchParams | null>(null);
-  const isCross = search != null && search.iatas.length >= 2;
 
   // Region filtering and every sortable column are handled by the keyset-paginated endpoint. A sort
   // change creates a new query key and starts at the first correctly ordered page.
@@ -239,20 +241,6 @@ export function RouteTable() {
     ),
   );
 
-  // IATA options for the path-search multi-select, from /iatas (shares the region picker's cached
-  // query). The label carries the display name so the dropdown's search filter matches on it.
-  const { data: iataCodes } = useQuery({
-    ...iataQueries.list(),
-  });
-  const iataOptions = useMemo(
-    () =>
-      (iataCodes ?? []).map((i) => ({
-        value: i.iata,
-        label: i.displayName ? `${i.iata} — ${i.displayName}` : i.iata,
-      })),
-    [iataCodes],
-  );
-
   const rows = useMemo(
     () => (search ? (isCross ? [] : searchRoutes) : listRoutes),
     [search, isCross, searchRoutes, listRoutes],
@@ -263,6 +251,7 @@ export function RouteTable() {
     [rows, selectedKey],
   );
 
+  const searchIatas = useMemo(() => iatas ?? [], [iatas]);
   const canSearch = !!(from.trim() && to.trim() && searchIatas.length >= 1);
   // clear any selection when the visible list changes out from under it (search submit/clear)
   const submitSearch = useCallback(() => {
@@ -306,13 +295,7 @@ export function RouteTable() {
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <MultiSelectDropdown
-            label="IATA"
-            options={iataOptions}
-            selected={searchIatas}
-            onChange={setSearchIatas}
-            align="left"
-          />
+          {!iatas && <span className="text-[11px] text-text-dim">{t('routes.selectScope')}</span>}
           <button
             type="button"
             onClick={submitSearch}

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useTheme } from '../../hooks/useTheme';
+import { nodeTypeColor as semanticNodeTypeColor } from '../node-type-colors';
 
 // ECharts paints to a canvas and can't inherit our CSS variables, so we read the active palette's
 // resolved `--color-*` tokens (defined in index.css `@theme`, which always resolve — palette value or
@@ -106,19 +107,8 @@ export function useChartColors(): ChartColors {
 
 // Per-device-type colour, shared by the Mesh "Node types" donut and the neighbour graph so the two
 // views stay in sync. Unknown types fall back to a dim primary.
-export function nodeTypeColor(typeName: string, c: ChartColors): string {
-  switch (typeName) {
-    case 'companion':
-      return c.primary;
-    case 'repeater':
-      return c.green;
-    case 'room_server':
-      return c.secondary;
-    case 'sensor':
-      return c.warn;
-    default:
-      return c.primaryDim;
-  }
+export function nodeTypeColor(typeName: string): string {
+  return semanticNodeTypeColor(typeName);
 }
 
 // A reusable ECharts tooltip style block bound to the active palette.

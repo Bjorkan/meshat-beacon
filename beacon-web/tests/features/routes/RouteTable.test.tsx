@@ -40,10 +40,6 @@ function renderTable(selection = ALL_REGIONS) {
   render(<RouteTable />, { wrapper });
 }
 
-const openIataPicker = () => fireEvent.click(screen.getByText('IATA'));
-const checkIata = (code: string) =>
-  fireEvent.click(screen.getByRole('option', { name: new RegExp(code) }));
-
 beforeEach(() => {
   mockGetKnownRoutesPage.mockReset();
   mockSearchKnownRoutes.mockReset();
@@ -69,13 +65,11 @@ describe('RouteTable search', () => {
   });
 
   it('searches within a single IATA when exactly one IATA is selected', async () => {
-    renderTable();
+    renderTable({ regions: [], iatas: ['AAA'] });
     await screen.findByText('Find path');
 
     fireEvent.change(screen.getByPlaceholderText('from hash'), { target: { value: 'aa11' } });
     fireEvent.change(screen.getByPlaceholderText('to hash'), { target: { value: 'bb22' } });
-    openIataPicker();
-    checkIata('AAA');
     fireEvent.click(screen.getByText('Search'));
 
     await waitFor(() => expect(mockSearchKnownRoutes).toHaveBeenCalledWith('AAA', 'aa11', 'bb22'));
@@ -99,14 +93,11 @@ describe('RouteTable search', () => {
       Promise.resolve(fromIata === 'AAA' && toIata === 'BBB' ? [cross] : []),
     );
 
-    renderTable();
+    renderTable({ regions: [], iatas: ['AAA', 'BBB'] });
     await screen.findByText('Find path');
 
     fireEvent.change(screen.getByPlaceholderText('from hash'), { target: { value: 'aa11' } });
     fireEvent.change(screen.getByPlaceholderText('to hash'), { target: { value: 'bb22' } });
-    openIataPicker();
-    checkIata('AAA');
-    checkIata('BBB');
     fireEvent.click(screen.getByText('Search'));
 
     await waitFor(() =>
@@ -115,6 +106,15 @@ describe('RouteTable search', () => {
     expect(mockSearchKnownRoutes).not.toHaveBeenCalled();
     expect((await screen.findAllByText('Src Node')).length).toBeGreaterThan(0);
     expect(screen.getAllByText('Dst Node').length).toBeGreaterThan(0);
+  });
+
+  it('uses the global region selection for both search and listing', async () => {
+    renderTable();
+    await screen.findByText('Find path');
+    expect(
+      screen.getByText('Choose an IATA or region in the global selector to search routes.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('Search')).toBeDisabled();
   });
 
   it('sends every selected region IATA to the backend', async () => {

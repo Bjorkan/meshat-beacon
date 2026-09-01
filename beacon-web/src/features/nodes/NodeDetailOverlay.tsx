@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { NodeDetailPanel } from './NodeDetailPanel';
 import { ModalOverlay } from '../../components/ModalOverlay';
@@ -17,14 +16,6 @@ export function NodeDetailOverlay({
   onViewNode?: (nodeId: string) => void;
 }) {
   const { t } = useTranslation();
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
-
   return (
     <ModalOverlay label={t('nodes.detailLabel')} onClose={onClose}>
       <NodeDetailPanel

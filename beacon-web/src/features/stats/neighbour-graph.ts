@@ -197,7 +197,7 @@ export function buildEgoGraph(
 // GraphNode.category index lines up with this list.
 function graphCategories(c: ChartColors, t?: TFunction) {
   return [
-    ...NODE_TYPES.map((t) => ({ name: t.label, itemStyle: { color: nodeTypeColor(t.name, c) } })),
+    ...NODE_TYPES.map((t) => ({ name: t.label, itemStyle: { color: nodeTypeColor(t.name) } })),
     { name: t?.('common.other') ?? 'Other', itemStyle: { color: c.primaryDim } },
   ];
 }
