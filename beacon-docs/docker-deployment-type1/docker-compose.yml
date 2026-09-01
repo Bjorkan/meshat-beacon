@@ -1,6 +1,6 @@
 services:
   app:
-    image: ghcr.io/meshcore-beacon/beacon-server:latest
+    image: ghcr.io/bjorkan/beacon-server:latest
     env_file: .env
     ports:
       - "127.0.0.1:8080:8080"
@@ -61,7 +61,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/meshcore-beacon/beacon-web:latest
+    image: ghcr.io/bjorkan/beacon-web:latest
     env_file: .env
     environment:
       - VITE_API_BASE=${VITE_API_BASE:?VITE_API_BASE environment variable is required}

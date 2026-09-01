@@ -76,7 +76,7 @@ go run ./cmd/beacon
 Or pull and run the Docker image:
 
 ```bash
-docker pull ghcr.io/meshcore-beacon/beacon-server:latest
+docker pull ghcr.io/bjorkan/beacon-server:latest
 ```
 
 The image is public on GitHub Container Registry — no `docker login` required.
