@@ -13,10 +13,12 @@
     "lint": "npm run lint:web && npm run lint:server",
     "lint:web": "npm run lint --workspace=beacon-web",
     "lint:server": "go -C beacon-server vet ./...",
+    "format": "npm run format --workspace=beacon-web",
+    "format:check": "npm run format:check --workspace=beacon-web",
     "test": "npm run test:web && npm run test:server",
     "test:web": "npm test --workspace=beacon-web",
     "test:server": "go -C beacon-server test ./...",
-    "check": "npm run lint && npm run test && npm run build"
+    "check": "npm run format:check && npm run lint && npm run test && npm run build"
   },
   "engines": {
     "node": ">=22"

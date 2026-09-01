@@ -1,10 +1,16 @@
-import { useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useRegion } from "../hooks/useRegion";
-import { statsQueries } from "./queries";
-import { wsManager } from "./ws-instance";
-import { healLiveQueryCaches, syncChannelMessage, syncNodeUpdate, syncObserverStatus, syncPacketObservation } from "./query-ws-sync";
-import type { StatsOverview } from "../features/stats/types";
+import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useRegion } from '../hooks/useRegion';
+import { statsQueries } from './queries';
+import { wsManager } from './ws-instance';
+import {
+  healLiveQueryCaches,
+  syncChannelMessage,
+  syncNodeUpdate,
+  syncObserverStatus,
+  syncPacketObservation,
+} from './query-ws-sync';
+import type { StatsOverview } from '../features/stats/types';
 
 // One app-lifetime bridge owns shared REST-cache coherence. Feature components may still subscribe to
 // WS events for ephemeral presentation (packet animation, live banners, reach counters), but not to
@@ -20,11 +26,15 @@ export function QueryWsBridge() {
       pending.raf = null;
       if (!pending.packets && !pending.observations) return;
       const key = statsQueries.overview(regionKey).queryKey;
-      queryClient.setQueryData<StatsOverview>(key, (old) => old ? {
-        ...old,
-        totalPackets: old.totalPackets + pending.packets,
-        totalObservations: old.totalObservations + pending.observations,
-      } : old);
+      queryClient.setQueryData<StatsOverview>(key, (old) =>
+        old
+          ? {
+              ...old,
+              totalPackets: old.totalPackets + pending.packets,
+              totalObservations: old.totalObservations + pending.observations,
+            }
+          : old,
+      );
       pending.packets = 0;
       pending.observations = 0;
     };
@@ -37,11 +47,17 @@ export function QueryWsBridge() {
     });
     const offNode = wsManager.onNodeUpdate((data) => syncNodeUpdate(queryClient, data));
     const offObserver = wsManager.onObserverStatus((data) => syncObserverStatus(queryClient, data));
-    const offChannel = wsManager.onChannelMessage((data) => syncChannelMessage(queryClient, data, regionKey));
+    const offChannel = wsManager.onChannelMessage((data) =>
+      syncChannelMessage(queryClient, data, regionKey),
+    );
     const offLagged = wsManager.onLagged(() => healLiveQueryCaches(queryClient));
 
     return () => {
-      offPacket(); offNode(); offObserver(); offChannel(); offLagged();
+      offPacket();
+      offNode();
+      offObserver();
+      offChannel();
+      offLagged();
       if (pending.raf != null) cancelAnimationFrame(pending.raf);
     };
   }, [queryClient, regionKey]);

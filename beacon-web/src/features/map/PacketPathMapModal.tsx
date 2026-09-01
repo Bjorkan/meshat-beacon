@@ -1,37 +1,56 @@
-import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import type { PacketDetail } from "../../types/api";
-import { ModalOverlay } from "../../components/ModalOverlay";
-import { CloseButton } from "../../components/CloseButton";
-import { CopyLinkButton } from "../../components/CopyLinkButton";
-import { formatPropagation } from "../../lib/formatters";
-import { useTheme } from "../../hooks/useTheme";
-import { buildPacketPaths } from "./packet-path";
-import { PacketPathMap } from "./PacketPathMap";
-import { mapStyleForTheme } from "./types";
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { PacketDetail } from '../../types/api';
+import { ModalOverlay } from '../../components/ModalOverlay';
+import { CloseButton } from '../../components/CloseButton';
+import { CopyLinkButton } from '../../components/CopyLinkButton';
+import { formatPropagation } from '../../lib/formatters';
+import { useTheme } from '../../hooks/useTheme';
+import { buildPacketPaths } from './packet-path';
+import { PacketPathMap } from './PacketPathMap';
+import { mapStyleForTheme } from './types';
 
 // Closable mini-map of a packet's resolved path(s). "All paths" overlays every observation's route;
 // clicking an observer isolates its path. Lives over the analyzer (no tab switch), so closing it
 // returns the user exactly where they were.
-function Row({ active, color, label, meta, onClick }: {
-  active: boolean; color?: string; label: string; meta?: string; onClick: () => void;
+function Row({
+  active,
+  color,
+  label,
+  meta,
+  onClick,
+}: {
+  active: boolean;
+  color?: string;
+  label: string;
+  meta?: string;
+  onClick: () => void;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] font-mono border-l-2 transition-colors ${
-        active ? "border-l-secondary bg-secondary/5 text-text-bright" : "border-l-transparent text-text-normal hover:bg-text-normal/3"
+        active
+          ? 'border-l-secondary bg-secondary/5 text-text-bright'
+          : 'border-l-transparent text-text-normal hover:bg-text-normal/3'
       }`}
     >
-      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={color ? { backgroundColor: color } : undefined} />
+      <span
+        className="w-2.5 h-2.5 rounded-full shrink-0"
+        style={color ? { backgroundColor: color } : undefined}
+      />
       <span className="truncate">{label}</span>
       {meta != null && <span className="ml-auto text-text-dim">{meta}</span>}
     </button>
   );
 }
 
-export function PacketPathMapModal({ detail, onClose, initialSelectedKey }: {
+export function PacketPathMapModal({
+  detail,
+  onClose,
+  initialSelectedKey,
+}: {
   detail: PacketDetail;
   onClose: () => void;
   initialSelectedKey?: string | null;
@@ -40,31 +59,40 @@ export function PacketPathMapModal({ detail, onClose, initialSelectedKey }: {
   const paths = useMemo(() => buildPacketPaths(detail), [detail]);
   const [selectedKey, setSelectedKey] = useState<string | null>(
     // deep-link value that matches a known path isolates it; anything else (incl. "all") shows All
-    () => (initialSelectedKey && paths.some((p) => p.key === initialSelectedKey) ? initialSelectedKey : null),
+    () =>
+      initialSelectedKey && paths.some((p) => p.key === initialSelectedKey)
+        ? initialSelectedKey
+        : null,
   );
   const { themeId } = useTheme();
   const styleId = useMemo(() => mapStyleForTheme(themeId), [themeId]);
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return (
-    <ModalOverlay label={t("map.packetPathLabel")} onClose={onClose}>
+    <ModalOverlay label={t('map.packetPathLabel')} onClose={onClose}>
       <div className="h-full w-full lg:w-[860px] lg:max-w-[92vw] bg-bg-surface flex flex-col">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
-          <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">{t("map.packetPath")}</span>
+          <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
+            {t('map.packetPath')}
+          </span>
           <div className="flex items-center gap-1.5">
             <CopyLinkButton
               to="/packets"
-              params={() => ({ hash: detail.packetHash, path: selectedKey ?? "all", analyze: null })}
-              ariaLabel={t("map.copyPathLink")}
+              params={() => ({
+                hash: detail.packetHash,
+                path: selectedKey ?? 'all',
+                analyze: null,
+              })}
+              ariaLabel={t('map.copyPathLink')}
             />
-            <CloseButton onClose={onClose} label={t("map.closePath")} className="-mr-1" />
+            <CloseButton onClose={onClose} label={t('map.closePath')} className="-mr-1" />
           </div>
         </div>
 
@@ -74,14 +102,18 @@ export function PacketPathMapModal({ detail, onClose, initialSelectedKey }: {
           </div>
           <div className="lg:w-[220px] lg:border-l border-t lg:border-t-0 border-border flex flex-col min-h-0 overflow-y-auto">
             <div className="sticky top-0 bg-bg-surface z-10 border-b border-border-subtle">
-              <Row active={selectedKey === null} label={t("map.allPaths")} onClick={() => setSelectedKey(null)} />
+              <Row
+                active={selectedKey === null}
+                label={t('map.allPaths')}
+                onClick={() => setSelectedKey(null)}
+              />
             </div>
             {paths.map((p) => (
               <Row
                 key={p.key}
                 active={selectedKey === p.key}
                 color={p.color}
-                label={p.key === "trace" ? t("map.traceRoute") : p.label}
+                label={p.key === 'trace' ? t('map.traceRoute') : p.label}
                 meta={formatPropagation(p.propagationMs)}
                 onClick={() => setSelectedKey(p.key)}
               />

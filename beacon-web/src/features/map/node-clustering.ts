@@ -1,5 +1,5 @@
-import type { GeoJSONSource } from "maplibre-gl";
-import { CLUSTER_MAX_ZOOM, CLUSTER_MIN_POINTS, CLUSTER_RADIUS } from "./types";
+import type { GeoJSONSource } from 'maplibre-gl';
+import { CLUSTER_MAX_ZOOM, CLUSTER_MIN_POINTS, CLUSTER_RADIUS } from './types';
 
 export interface NodeClusterOptions {
   cluster: boolean;

@@ -1,11 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { observerQueries, statsQueries, telemetryQueries } from "../../api/queries";
-import { useRegion } from "../../hooks/useRegion";
-import { useWsPacketHandler, useWsObserverStatusHandler } from "../../hooks/useWsHandlers";
-import type { WsManager } from "../../api/ws-manager";
-import type { WsPacketObservation, WsObserverStatus } from "../../types/ws";
-import type { StatsOverview, StatsRange } from "./types";
+import { useCallback, useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { observerQueries, statsQueries, telemetryQueries } from '../../api/queries';
+import { useRegion } from '../../hooks/useRegion';
+import { useWsPacketHandler, useWsObserverStatusHandler } from '../../hooks/useWsHandlers';
+import type { WsManager } from '../../api/ws-manager';
+import type { WsPacketObservation, WsObserverStatus } from '../../types/ws';
+import type { StatsOverview, StatsRange } from './types';
 
 // Live overview KPIs: every packetObservation bumps the cached overview counters (no refetch). High
 // frequency, so increments are coalesced and flushed once per animation frame. The overview query also
@@ -24,13 +24,17 @@ export function useLiveOverview(wsManager: WsManager) {
     pending.current = { packets: 0, obs: 0 };
     qc.setQueryData<StatsOverview>(statsQueries.overview(regionKey).queryKey, (old) =>
       old
-        ? { ...old, totalPackets: old.totalPackets + packets, totalObservations: old.totalObservations + obs }
+        ? {
+            ...old,
+            totalPackets: old.totalPackets + packets,
+            totalObservations: old.totalObservations + obs,
+          }
         : old,
     );
   }, [qc, regionKey]);
 
   const onPacket = useCallback(
-    (data: WsPacketObservation["data"]) => {
+    (data: WsPacketObservation['data']) => {
       pending.current.obs += 1;
       if (data.packet?.isFirstObservation) pending.current.packets += 1;
       if (raf.current == null) raf.current = requestAnimationFrame(flush);
@@ -55,11 +59,15 @@ export function useLiveOverview(wsManager: WsManager) {
 
 // When the selected observer reports a status update, refresh its header + telemetry so battery,
 // uptime, and the newest points reflect the change. Status messages are infrequent, so a refetch is fine.
-export function useLiveObserver(wsManager: WsManager, observerId: string | null, range: StatsRange) {
+export function useLiveObserver(
+  wsManager: WsManager,
+  observerId: string | null,
+  range: StatsRange,
+) {
   const qc = useQueryClient();
 
   const onStatus = useCallback(
-    (data: WsObserverStatus["data"]) => {
+    (data: WsObserverStatus['data']) => {
       if (!observerId || data.observerId !== observerId) return;
       qc.invalidateQueries({ queryKey: observerQueries.detail(observerId).queryKey });
       qc.invalidateQueries({ queryKey: telemetryQueries.range(observerId, range).queryKey });

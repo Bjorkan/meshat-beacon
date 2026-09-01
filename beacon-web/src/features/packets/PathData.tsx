@@ -1,16 +1,23 @@
-import { useRef, useState, useEffect, useLayoutEffect, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
-import { createPortal } from "react-dom";
-import { useHasHover } from "../../hooks/useMediaQuery";
-import { formatSnr, snrLevel, SIGNAL_LEVEL_CLASSES } from "../../lib/formatters";
-import type { ResolvedHop, ResolvedNode } from "../../types/api";
-import type { PathConfidence } from "../../types/enums";
+import {
+  useRef,
+  useState,
+  useEffect,
+  useLayoutEffect,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { createPortal } from 'react-dom';
+import { useHasHover } from '../../hooks/useMediaQuery';
+import { formatSnr, snrLevel, SIGNAL_LEVEL_CLASSES } from '../../lib/formatters';
+import type { ResolvedHop, ResolvedNode } from '../../types/api';
+import type { PathConfidence } from '../../types/enums';
 
 // hash block tint by resolution confidence
 const HOP_BLOCK_CLASSES: Record<PathConfidence, string> = {
-  high: "bg-green/8 text-green",
-  ambiguous: "bg-warn/8 text-warn",
-  none: "bg-text-muted/8 text-text-dim",
+  high: 'bg-green/8 text-green',
+  ambiguous: 'bg-warn/8 text-warn',
+  none: 'bg-text-muted/8 text-text-dim',
 };
 
 function nodeLabel(node: ResolvedNode): string {
@@ -18,7 +25,13 @@ function nodeLabel(node: ResolvedNode): string {
 }
 
 // Portals to <body> so the drawer's overflow doesn't clip it; a close delay bridges the mouse gap.
-function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
+function HopPopover({
+  hop,
+  rawLabel,
+  onViewNode,
+  showSnr = true,
+  children,
+}: {
   hop: ResolvedHop | undefined;
   rawLabel: string;
   onViewNode?: (nodeId: string) => void;
@@ -50,25 +63,28 @@ function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
   // touch: tap toggles; stopPropagation so a hop tap doesn't also select the Route row/card it's in
   function toggle(e: ReactMouseEvent) {
     e.stopPropagation();
-    setAnchor((a) => (a ? null : ref.current?.getBoundingClientRect() ?? null));
+    setAnchor((a) => (a ? null : (ref.current?.getBoundingClientRect() ?? null)));
   }
 
   // A fixed-position popover would drift away from its hash block on scroll/resize, so close it.
   useEffect(() => {
     if (!anchor) return;
     const close = () => setAnchor(null);
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
     return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
     };
   }, [anchor]);
 
   // clear any pending close timer on unmount
-  useEffect(() => () => {
-    if (closeTimer.current != null) clearTimeout(closeTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (closeTimer.current != null) clearTimeout(closeTimer.current);
+    },
+    [],
+  );
 
   // touch: a tap outside the block and its popover dismisses it
   useEffect(() => {
@@ -77,8 +93,8 @@ function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
       const t = e.target as Node;
       if (!ref.current?.contains(t) && !tipRef.current?.contains(t)) setAnchor(null);
     }
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
   }, [anchor, hasHover]);
 
   // Center above the block, then clamp on-screen and flip below if it would clip the top edge.
@@ -86,7 +102,10 @@ function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
     if (!anchor || !tipRef.current) return;
     const { offsetWidth: w, offsetHeight: h } = tipRef.current;
     const m = 6;
-    const left = Math.min(Math.max(anchor.left + anchor.width / 2 - w / 2, m), window.innerWidth - w - m);
+    const left = Math.min(
+      Math.max(anchor.left + anchor.width / 2 - w / 2, m),
+      window.innerWidth - w - m,
+    );
     const above = anchor.top - m - h;
     setPos({ left, top: above >= m ? above : anchor.bottom + m });
   }, [anchor]);
@@ -108,32 +127,33 @@ function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
             style={{ left: pos.left, top: pos.top }}
             onMouseEnter={hasHover && clickable ? open : undefined}
             onMouseLeave={hasHover && clickable ? scheduleClose : undefined}
-            className={`fixed z-50 flex flex-col gap-0.5 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg ${clickable ? "" : "pointer-events-none"}`}
+            className={`fixed z-50 flex flex-col gap-0.5 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg ${clickable ? '' : 'pointer-events-none'}`}
           >
-            {nodes.length === 0 ? (
-              t("packets.noPathResolutions")
-            ) : clickable ? (
-              nodes.map((node) => (
-                <button
-                  key={node.id}
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setAnchor(null);
-                    onViewNode?.(node.id);
-                  }}
-                  className="cursor-pointer text-left hover:text-primary hover:underline"
-                >
-                  {nodeLabel(node)}
-                </button>
-              ))
-            ) : (
-              nodes.map((node) => <span key={node.id}>{nodeLabel(node)}</span>)
-            )}
+            {nodes.length === 0
+              ? t('packets.noPathResolutions')
+              : clickable
+                ? nodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setAnchor(null);
+                        onViewNode?.(node.id);
+                      }}
+                      className="cursor-pointer text-left hover:text-primary hover:underline"
+                    >
+                      {nodeLabel(node)}
+                    </button>
+                  ))
+                : nodes.map((node) => <span key={node.id}>{nodeLabel(node)}</span>)}
             <span className="text-text-dim">Hash {rawLabel}</span>
             {showSnr && hop?.snr != null && (
               <span className="text-text-dim">
-                SNR <span className={SIGNAL_LEVEL_CLASSES[snrLevel(hop.snr) ?? "bad"]}>{formatSnr(hop.snr)}</span>
+                SNR{' '}
+                <span className={SIGNAL_LEVEL_CLASSES[snrLevel(hop.snr) ?? 'bad']}>
+                  {formatSnr(hop.snr)}
+                </span>
               </span>
             )}
           </span>,
@@ -144,15 +164,20 @@ function HopPopover({ hop, rawLabel, onViewNode, showSnr = true, children }: {
 }
 
 // One hash block + its hop popover. Shared by PathData and the trace payload so both resolve identically.
-export function ResolvedHopBlock({ hop, label, onViewNode, showSnr = true }: {
+export function ResolvedHopBlock({
+  hop,
+  label,
+  onViewNode,
+  showSnr = true,
+}: {
   hop: ResolvedHop | undefined;
   label: string;
   onViewNode?: (nodeId: string) => void;
   showSnr?: boolean;
 }) {
   const hasHover = useHasHover();
-  const confidence: PathConfidence = hop?.confidence ?? "none";
-  const highNode = confidence === "high" && hop?.nodes.length === 1 ? hop.nodes[0] : undefined;
+  const confidence: PathConfidence = hop?.confidence ?? 'none';
+  const highNode = confidence === 'high' && hop?.nodes.length === 1 ? hop.nodes[0] : undefined;
   // High-confidence identity is primary; ambiguous/none deliberately keep the raw hash visible.
   const primaryLabel = highNode ? nodeLabel(highNode) : label;
   const blockClass = `px-1.5 py-px rounded-sm font-semibold ${HOP_BLOCK_CLASSES[confidence]}`;
@@ -179,24 +204,38 @@ export function ResolvedHopBlock({ hop, label, onViewNode, showSnr = true }: {
 }
 
 // resolvedPath[i] lines up with the i-th hash (backend appends one hop per hash, in order).
-export function PathData({ pathBytes, hashSize, resolvedPath, size = "md", onViewNode }: {
+export function PathData({
+  pathBytes,
+  hashSize,
+  resolvedPath,
+  size = 'md',
+  onViewNode,
+}: {
   pathBytes: string;
   hashSize: number;
   resolvedPath: ResolvedHop[];
-  size?: "sm" | "md";
+  size?: 'sm' | 'md';
   onViewNode?: (nodeId: string) => void;
 }) {
   const chars = hashSize * 2;
   if (chars <= 0) return null; // splitter would be an invalid `.{1,0}` RegExp, and there's nothing to show anyway
-  const hops = pathBytes.match(new RegExp(`.{1,${chars}}`, "g")) ?? [];
-  const textClass = size === "sm" ? "text-[11px]" : "text-[13px]";
+  const hops = pathBytes.match(new RegExp(`.{1,${chars}}`, 'g')) ?? [];
+  const textClass = size === 'sm' ? 'text-[11px]' : 'text-[13px]';
 
   return (
     <div className={`flex flex-wrap items-center gap-1 font-mono ${textClass}`}>
       {hops.map((hop, i) => (
         <span key={i} className="contents">
-          {i > 0 && <span className="text-text-dim" aria-hidden>→</span>}
-          <ResolvedHopBlock hop={resolvedPath[i]} label={hop.toUpperCase()} onViewNode={onViewNode} />
+          {i > 0 && (
+            <span className="text-text-dim" aria-hidden>
+              →
+            </span>
+          )}
+          <ResolvedHopBlock
+            hop={resolvedPath[i]}
+            label={hop.toUpperCase()}
+            onViewNode={onViewNode}
+          />
         </span>
       ))}
     </div>

@@ -1,13 +1,20 @@
-import { useEffect, useState } from "react";
-import { useTranslation } from "react-i18next";
-import type { PacketDetail } from "../../types/api";
-import { PacketAnalyzerDrawer } from "./PacketAnalyzerDrawer";
-import { NodeDetailOverlay } from "../nodes/NodeDetailOverlay";
-import { ModalOverlay } from "../../components/ModalOverlay";
+import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { PacketDetail } from '../../types/api';
+import { PacketAnalyzerDrawer } from './PacketAnalyzerDrawer';
+import { NodeDetailOverlay } from '../nodes/NodeDetailOverlay';
+import { ModalOverlay } from '../../components/ModalOverlay';
 
 // Packet analyzer floated over a node detail panel (mirror of NodeDetailOverlay). The node detail it
 // can stack on top gets no onAnalyzePacket, so the overlay chain stops there instead of recursing.
-export function PacketAnalyzerOverlay({ detail, loading, onClose, onViewObserver, onViewPath, inactive = false }: {
+export function PacketAnalyzerOverlay({
+  detail,
+  loading,
+  onClose,
+  onViewObserver,
+  onViewPath,
+  inactive = false,
+}: {
   detail: PacketDetail | undefined;
   loading?: boolean;
   onClose: () => void;
@@ -23,15 +30,19 @@ export function PacketAnalyzerOverlay({ detail, loading, onClose, onViewObserver
     function onKey(e: KeyboardEvent) {
       // peel back one layer at a time: the nested node overlay handles its own Escape, so only
       // close the analyzer once nothing is stacked above it
-      if (e.key === "Escape" && !viewNodeId && !inactive) onClose();
+      if (e.key === 'Escape' && !viewNodeId && !inactive) onClose();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose, viewNodeId, inactive]);
 
   return (
     <>
-      <ModalOverlay label={t("packets.analyzerLabel")} onClose={onClose} inactive={!!viewNodeId || inactive}>
+      <ModalOverlay
+        label={t('packets.analyzerLabel')}
+        onClose={onClose}
+        inactive={!!viewNodeId || inactive}
+      >
         <PacketAnalyzerDrawer
           detail={detail}
           loading={loading}

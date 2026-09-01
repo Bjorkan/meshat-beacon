@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import maplibregl from "maplibre-gl";
-import type { Map as MapLibreMap, RasterDEMSourceSpecification } from "maplibre-gl";
+import { useEffect, useRef, useState } from 'react';
+import maplibregl from 'maplibre-gl';
+import type { Map as MapLibreMap, RasterDEMSourceSpecification } from 'maplibre-gl';
 import {
   DEM_TILES,
   DEM_ATTRIBUTION,
@@ -13,24 +13,24 @@ import {
   IATA_ZOOM,
   IATA_PITCH,
   resolveMapStyle,
-} from "./types";
+} from './types';
 
 // serialized fit target, so the fit effect can skip redundant re-fits
 const fitKey = (points: [number, number][] | null) =>
-  points && points.length ? points.map((p) => `${p[0]},${p[1]}`).join(";") : null;
+  points && points.length ? points.map((p) => `${p[0]},${p[1]}`).join(';') : null;
 
 // Keeps the imperative MapLibre lifecycle out of MapView; exposes mapRef + isReady for overlays.
 
-const TERRAIN_SOURCE_ID = "terrain-dem";
-const HILLSHADE_SOURCE_ID = "hillshade-dem";
-const HILLSHADE_LAYER_ID = "hillshade";
+const TERRAIN_SOURCE_ID = 'terrain-dem';
+const HILLSHADE_SOURCE_ID = 'hillshade-dem';
+const HILLSHADE_LAYER_ID = 'hillshade';
 
 // Terrain and the hillshade layer pull the same terrarium tiles, but maplibre warns when they share
 // a single source (it costs render quality), so we describe the source once and add it twice.
 const demSource = (): RasterDEMSourceSpecification => ({
-  type: "raster-dem",
+  type: 'raster-dem',
   tiles: DEM_TILES,
-  encoding: "terrarium",
+  encoding: 'terrarium',
   tileSize: 256, // terrarium tiles are 256px, not the raster-dem default of 512
   maxzoom: 15,
   attribution: DEM_ATTRIBUTION, // same string on both sources; the attribution control de-dupes it
@@ -43,17 +43,17 @@ function addTerrain(map: MapLibreMap, isDark: boolean) {
   if (!map.getSource(HILLSHADE_SOURCE_ID)) map.addSource(HILLSHADE_SOURCE_ID, demSource());
   if (!map.getLayer(HILLSHADE_LAYER_ID)) {
     // insert beneath labels/roads so they stay legible over the relief
-    const firstSymbolId = map.getStyle().layers?.find((l) => l.type === "symbol")?.id;
+    const firstSymbolId = map.getStyle().layers?.find((l) => l.type === 'symbol')?.id;
     map.addLayer(
       {
         id: HILLSHADE_LAYER_ID,
-        type: "hillshade",
+        type: 'hillshade',
         source: HILLSHADE_SOURCE_ID,
         paint: {
-          "hillshade-exaggeration": 0.5,
-          "hillshade-shadow-color": isDark ? "#000000" : "#1a1a1a",
-          "hillshade-highlight-color": isDark ? "#333333" : "#ffffff",
-          "hillshade-illumination-direction": 315,
+          'hillshade-exaggeration': 0.5,
+          'hillshade-shadow-color': isDark ? '#000000' : '#1a1a1a',
+          'hillshade-highlight-color': isDark ? '#333333' : '#ffffff',
+          'hillshade-illumination-direction': 315,
         },
       },
       firstSymbolId,
@@ -118,15 +118,15 @@ export function useMapLibre(
     mapRef.current = map;
     lastStyleIdRef.current = styleIdRef.current;
 
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), "top-right");
-    map.addControl(new maplibregl.ScaleControl({ unit: "metric" }), "bottom-left");
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
     map.addControl(new maplibregl.AttributionControl({ compact: true })); // bottom-right
     // maplibre pops the compact attribution open the first time the basemap credit loads (it tacks
     // on .maplibregl-compact-show). Mark it .maplibregl-compact up front so it skips that and stays
     // a bare (i) on load — clicking it still opens the credit.
-    const attrib = map.getContainer().querySelector(".maplibregl-ctrl-attrib");
-    attrib?.classList.add("maplibregl-compact");
-    attrib?.classList.remove("maplibregl-compact-show");
+    const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+    attrib?.classList.add('maplibregl-compact');
+    attrib?.classList.remove('maplibregl-compact-show');
 
     const onStyleReady = () => {
       addTerrain(map, resolveMapStyle(styleIdRef.current).dark);
@@ -141,8 +141,8 @@ export function useMapLibre(
       setStyleRevision((revision) => revision + 1);
       setError(null); // a successful (re)load clears any earlier transient/initial error
     };
-    map.on("load", onStyleReady); // first paint (style.load does not reliably fire on initial load)
-    map.on("style.load", onStyleReady); // re-add terrain after every setStyle
+    map.on('load', onStyleReady); // first paint (style.load does not reliably fire on initial load)
+    map.on('style.load', onStyleReady); // re-add terrain after every setStyle
 
     // The OpenFreeMap base styles ask for a handful of sprite icons their sprite doesn't ship (e.g.
     // "circle-11"), so maplibre warns on every load. Hand it a transparent 1x1 for anything that
@@ -150,11 +150,11 @@ export function useMapLibre(
     // identical. Our own markers all start with "node-" and are rasterized by useMapNodes, so we
     // leave those alone. This lives here (not in useMapNodes) so it's listening before the base
     // style's first paint, when those icons are first requested.
-    map.on("styleimagemissing", (e) => {
-      if (!e.id.startsWith("node-") && !map.hasImage(e.id)) map.addImage(e.id, new ImageData(1, 1));
+    map.on('styleimagemissing', (e) => {
+      if (!e.id.startsWith('node-') && !map.hasImage(e.id)) map.addImage(e.id, new ImageData(1, 1));
     });
 
-    map.on("error", (e) => {
+    map.on('error', (e) => {
       const err = e as { error?: Error; sourceId?: string; tile?: unknown };
       // A single tile/source failure (one basemap or DEM tile timing out / 403 / a momentary network
       // blip) is transient and non-fatal — the rest of the map stays usable — so never blank the map
@@ -172,7 +172,7 @@ export function useMapLibre(
       }
       // Initial map/style load failed (no basemap ever shown): surface the overlay. It self-heals if a
       // later load succeeds (onStyleReady clears it). Other post-load style errors are left non-fatal.
-      if (!hasLoadedRef.current) setError(err.error ?? new Error("Map failed to load"));
+      if (!hasLoadedRef.current) setError(err.error ?? new Error('Map failed to load'));
     });
 
     return () => {
@@ -206,7 +206,12 @@ export function useMapLibre(
     lastFitKeyRef.current = key;
 
     if (!fitPoints || fitPoints.length === 0) {
-      map.flyTo({ center: DEFAULT_CENTER, zoom: DEFAULT_ZOOM, pitch: DEFAULT_PITCH, bearing: DEFAULT_BEARING });
+      map.flyTo({
+        center: DEFAULT_CENTER,
+        zoom: DEFAULT_ZOOM,
+        pitch: DEFAULT_PITCH,
+        bearing: DEFAULT_BEARING,
+      });
       return;
     }
 

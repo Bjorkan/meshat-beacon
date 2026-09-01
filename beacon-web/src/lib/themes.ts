@@ -8,27 +8,27 @@ export interface Theme {
   hidden?: boolean;
 }
 
-export const DEFAULT_THEME_ID = "meshat-dark";
+export const DEFAULT_THEME_ID = 'meshat-dark';
 
 const FALLBACK: Theme = {
-  id: "meshat-dark",
-  name: "Meshat Dark",
+  id: 'meshat-dark',
+  name: 'Meshat Dark',
   vars: {
-    "--palette-bg-base": "#111827",
-    "--palette-bg-surface": "#1F2937",
-    "--palette-bg-raised": "#263243",
-    "--palette-border": "#374151",
-    "--palette-border-subtle": "#2C3844",
-    "--palette-primary": "#5CCE7A",
-    "--palette-primary-dim": "#349251",
-    "--palette-secondary": "#67EA94",
-    "--palette-green": "#5CCE7A",
-    "--palette-danger": "#FF8A80",
-    "--palette-warn": "#FCD34D",
-    "--palette-text-bright": "#FFFFFF",
-    "--palette-text-normal": "#E5E7EB",
-    "--palette-text-muted": "#9CA3AF",
-    "--palette-text-dim": "#6B7280",
+    '--palette-bg-base': '#111827',
+    '--palette-bg-surface': '#1F2937',
+    '--palette-bg-raised': '#263243',
+    '--palette-border': '#374151',
+    '--palette-border-subtle': '#2C3844',
+    '--palette-primary': '#5CCE7A',
+    '--palette-primary-dim': '#349251',
+    '--palette-secondary': '#67EA94',
+    '--palette-green': '#5CCE7A',
+    '--palette-danger': '#FF8A80',
+    '--palette-warn': '#FCD34D',
+    '--palette-text-bright': '#FFFFFF',
+    '--palette-text-normal': '#E5E7EB',
+    '--palette-text-muted': '#9CA3AF',
+    '--palette-text-dim': '#6B7280',
   },
 };
 

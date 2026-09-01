@@ -1,20 +1,28 @@
-import type { SubscriptionFilter, WsServerMessage, WsPacketObservation, WsLagged, WsChannelMessage, WsObserverStatus, WsNodeUpdate } from "../types/ws";
+import type {
+  SubscriptionFilter,
+  WsServerMessage,
+  WsPacketObservation,
+  WsLagged,
+  WsChannelMessage,
+  WsObserverStatus,
+  WsNodeUpdate,
+} from '../types/ws';
 import {
   WS_PING_INTERVAL_MS,
   WS_RECONNECT_BASE_MS,
   WS_RECONNECT_MAX_MS,
   WS_RECONNECT_JITTER,
-} from "../lib/constants";
+} from '../lib/constants';
 
 // handler types and status
 
-export type WsStatus = "connected" | "connecting" | "disconnected" | "error";
+export type WsStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
-type PacketHandler = (data: WsPacketObservation["data"]) => void;
+type PacketHandler = (data: WsPacketObservation['data']) => void;
 type LaggedHandler = (data: WsLagged) => void;
-type ChannelMessageHandler = (data: WsChannelMessage["data"]) => void;
-type ObserverStatusHandler = (data: WsObserverStatus["data"]) => void;
-type NodeUpdateHandler = (data: WsNodeUpdate["data"]) => void;
+type ChannelMessageHandler = (data: WsChannelMessage['data']) => void;
+type ObserverStatusHandler = (data: WsObserverStatus['data']) => void;
+type NodeUpdateHandler = (data: WsNodeUpdate['data']) => void;
 type StatusHandler = (status: WsStatus) => void;
 
 export class WsManager {
@@ -27,7 +35,7 @@ export class WsManager {
   private subscriptionId: string | null = null;
   private lastSubscribeId: string | null = null;
   private everConnected = false;
-  private status: WsStatus = "disconnected";
+  private status: WsStatus = 'disconnected';
   private reconnectAttempt = 0;
   private intentionalClose = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -109,7 +117,12 @@ export class WsManager {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
 
     if (this.subscriptionId) {
-      this.send({ v: 1, type: "unsubscribe", id: `unsub-${this.nextId()}`, subscriptionId: this.subscriptionId });
+      this.send({
+        v: 1,
+        type: 'unsubscribe',
+        id: `unsub-${this.nextId()}`,
+        subscriptionId: this.subscriptionId,
+      });
       this.subscriptionId = null;
     }
 
@@ -133,7 +146,7 @@ export class WsManager {
     this.teardownSocket();
     this.subscriptionId = null;
     this.lastSubscribeId = null;
-    this.setStatus("disconnected");
+    this.setStatus('disconnected');
   }
 
   // exponential backoff w/ jitter to avoid thundering herd on reconnect
@@ -145,7 +158,7 @@ export class WsManager {
     this.teardownSocket();
     this.subscriptionId = null; // subscription ids are per-connection
     this.lastSubscribeId = null;
-    this.setStatus("connecting");
+    this.setStatus('connecting');
 
     this.ws = new WebSocket(this.url);
 
@@ -167,7 +180,7 @@ export class WsManager {
     this.ws.onclose = () => {
       this.clearTimers();
       if (this.intentionalClose) {
-        this.setStatus("disconnected");
+        this.setStatus('disconnected');
         return;
       }
       // any unexpected close — including a server-sent 1000 — gets a reconnect
@@ -175,22 +188,27 @@ export class WsManager {
     };
 
     this.ws.onerror = () => {
-      this.setStatus("error");
+      this.setStatus('error');
     };
   }
 
   private handleMessage(msg: WsServerMessage): void {
     switch (msg.type) {
-      case "hello": {
+      case 'hello': {
         const isReconnect = this.everConnected;
         this.everConnected = true;
-        this.setStatus("connected");
+        this.setStatus('connected');
         this.startPing();
         this.sendSubscribe();
         if (this.resolvePath) this.sendConfigure(); // re-apply the connection-wide toggle
         if (isReconnect) {
           // we were dark during the outage — synthesize a lag notice so live views heal the gap
-          const notice: WsLagged = { v: 1, type: "lagged", droppedCount: 0, since: this.lastEventTimestamp };
+          const notice: WsLagged = {
+            v: 1,
+            type: 'lagged',
+            droppedCount: 0,
+            since: this.lastEventTimestamp,
+          };
           for (const handler of this.laggedHandlers) {
             handler(notice);
           }
@@ -198,46 +216,51 @@ export class WsManager {
         break;
       }
 
-      case "subscribed":
+      case 'subscribed':
         if (msg.id === this.lastSubscribeId) {
           this.subscriptionId = msg.subscriptionId;
         } else {
           // ack for a subscribe we've since replaced — drop the server-side sub it created
-          this.send({ v: 1, type: "unsubscribe", id: `unsub-${this.nextId()}`, subscriptionId: msg.subscriptionId });
+          this.send({
+            v: 1,
+            type: 'unsubscribe',
+            id: `unsub-${this.nextId()}`,
+            subscriptionId: msg.subscriptionId,
+          });
         }
         break;
 
-      case "configured":
+      case 'configured':
         // ack for our resolvePath toggle; nothing to do beyond the server now honoring it
         break;
 
-      case "pong":
+      case 'pong':
         // a pong proves the link is alive, so it counts as recent activity
         this.lastEventTimestamp = Date.now();
         break;
 
-      case "event":
+      case 'event':
         this.lastEventTimestamp = Date.now();
-        if (msg.event === "packetObservation") {
+        if (msg.event === 'packetObservation') {
           for (const handler of this.packetHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === "channelMessage") {
+        } else if (msg.event === 'channelMessage') {
           for (const handler of this.channelMessageHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === "observerStatus") {
+        } else if (msg.event === 'observerStatus') {
           for (const handler of this.observerStatusHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === "nodeUpdate") {
+        } else if (msg.event === 'nodeUpdate') {
           for (const handler of this.nodeUpdateHandlers) {
             handler(msg.data);
           }
         }
         break;
 
-      case "lagged":
+      case 'lagged':
         // a lag notice is still server traffic, so it counts as recent activity
         this.lastEventTimestamp = Date.now();
         for (const handler of this.laggedHandlers) {
@@ -245,7 +268,7 @@ export class WsManager {
         }
         break;
 
-      case "error":
+      case 'error':
         break;
     }
   }
@@ -256,14 +279,19 @@ export class WsManager {
     this.lastSubscribeId = id;
     this.send({
       v: 1,
-      type: "subscribe",
+      type: 'subscribe',
       id,
       scope: this.filter,
     });
   }
 
   private sendConfigure(): void {
-    this.send({ v: 1, type: "configure", id: `cfg-${this.nextId()}`, resolvePath: this.resolvePath });
+    this.send({
+      v: 1,
+      type: 'configure',
+      id: `cfg-${this.nextId()}`,
+      resolvePath: this.resolvePath,
+    });
   }
 
   private startPing(): void {
@@ -274,7 +302,7 @@ export class WsManager {
         this.forceReconnect();
         return;
       }
-      this.send({ v: 1, type: "ping", id: `p-${this.nextId()}` });
+      this.send({ v: 1, type: 'ping', id: `p-${this.nextId()}` });
     }, WS_PING_INTERVAL_MS);
   }
 
@@ -287,7 +315,7 @@ export class WsManager {
   }
 
   private scheduleReconnect(): void {
-    this.setStatus("connecting");
+    this.setStatus('connecting');
     const base = Math.min(WS_RECONNECT_BASE_MS * 2 ** this.reconnectAttempt, WS_RECONNECT_MAX_MS);
     const jitter = base * WS_RECONNECT_JITTER * (Math.random() * 2 - 1);
     const delay = Math.max(base + jitter, 100);

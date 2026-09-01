@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
-import type { PacketSummary } from "../../types/api";
-import { LIVE_BUFFER_CAP } from "../../lib/constants";
+import { useEffect, useRef, useState } from 'react';
+import type { PacketSummary } from '../../types/api';
+import { LIVE_BUFFER_CAP } from '../../lib/constants';
 
 const FRESH_HIGHLIGHT_MS = 1000;
 

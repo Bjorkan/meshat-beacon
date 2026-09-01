@@ -1,6 +1,6 @@
-import { PacketList } from "../features/packets/PacketList";
-import { wsManager } from "../api/ws-instance";
-import { useOverlays } from "./overlays";
+import { PacketList } from '../features/packets/PacketList';
+import { wsManager } from '../api/ws-instance';
+import { useOverlays } from './overlays';
 
 export function PacketsRoute() {
   const overlays = useOverlays();

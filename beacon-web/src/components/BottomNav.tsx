@@ -1,18 +1,27 @@
-import { useState, type ReactNode } from "react";
-import { useTranslation } from "react-i18next";
-import "../i18n";
-import { BottomSheet } from "./BottomSheet";
-import { ENABLED_TABS } from "../lib/constants";
+import { useState, type ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import '../i18n';
+import { BottomSheet } from './BottomSheet';
+import { ENABLED_TABS } from '../lib/constants';
 
 // Compact-shell tab bar (hidden at lg+); overflow tabs live behind "More" in a bottom sheet.
-const PRIMARY_TABS = ["Packets", "Channels", "Map", "Nodes"] as const;
-const OVERFLOW_TABS = ["Observers", "Routes", "Traces", "Analytics"] as const;
+const PRIMARY_TABS = ['Packets', 'Channels', 'Map', 'Nodes'] as const;
+const OVERFLOW_TABS = ['Observers', 'Routes', 'Traces', 'Analytics'] as const;
 
 // inline SVGs, 20px / 1.6 stroke to match the rest of the icons
 function Icon({ name }: { name: string }) {
-  const common = { width: 20, height: 20, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
+  const common = {
+    width: 20,
+    height: 20,
+    viewBox: '0 0 24 24',
+    fill: 'none',
+    stroke: 'currentColor',
+    strokeWidth: 1.6,
+    strokeLinecap: 'round' as const,
+    strokeLinejoin: 'round' as const,
+  };
   switch (name) {
-    case "Packets":
+    case 'Packets':
       return (
         <svg {...common}>
           <path d="M21 8l-9-5-9 5 9 5 9-5z" />
@@ -20,20 +29,20 @@ function Icon({ name }: { name: string }) {
           <path d="M12 13v8" />
         </svg>
       );
-    case "Channels":
+    case 'Channels':
       return (
         <svg {...common}>
           <path d="M21 11.5a8.4 8.4 0 0 1-9 8.3l-5 .9 1-4.2A8.4 8.4 0 1 1 21 11.5z" />
         </svg>
       );
-    case "Map":
+    case 'Map':
       return (
         <svg {...common}>
           <path d="M12 21s-6-5.3-6-10a6 6 0 0 1 12 0c0 4.7-6 10-6 10z" />
           <circle cx="12" cy="11" r="2" />
         </svg>
       );
-    case "Nodes":
+    case 'Nodes':
       return (
         <svg {...common}>
           <circle cx="6" cy="6" r="2.2" />
@@ -53,14 +62,23 @@ function Icon({ name }: { name: string }) {
   }
 }
 
-function NavButton({ label, icon, active, onClick, role, ariaSelected, ariaHasPopup, ariaExpanded }: {
+function NavButton({
+  label,
+  icon,
+  active,
+  onClick,
+  role,
+  ariaSelected,
+  ariaHasPopup,
+  ariaExpanded,
+}: {
   label: string;
   icon: ReactNode;
   active: boolean;
   onClick: () => void;
   role?: string;
   ariaSelected?: boolean;
-  ariaHasPopup?: "menu";
+  ariaHasPopup?: 'menu';
   ariaExpanded?: boolean;
 }) {
   return (
@@ -72,7 +90,7 @@ function NavButton({ label, icon, active, onClick, role, ariaSelected, ariaHasPo
       aria-expanded={ariaExpanded}
       onClick={onClick}
       className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium tracking-wide cursor-pointer transition-colors ${
-        active ? "text-primary" : "text-text-muted hover:text-text-normal"
+        active ? 'text-primary' : 'text-text-muted hover:text-text-normal'
       }`}
     >
       {icon}
@@ -82,11 +100,21 @@ function NavButton({ label, icon, active, onClick, role, ariaSelected, ariaHasPo
 }
 
 // Bottom sheet listing the overflow tabs.
-function MoreSheet({ tabs, activeTab, onPick, onClose }: { tabs: string[]; activeTab: string; onPick: (tab: string) => void; onClose: () => void }) {
+function MoreSheet({
+  tabs,
+  activeTab,
+  onPick,
+  onClose,
+}: {
+  tabs: string[];
+  activeTab: string;
+  onPick: (tab: string) => void;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
 
   return (
-    <BottomSheet onClose={onClose} role="menu" label={t("navigation.moreTabs")}>
+    <BottomSheet onClose={onClose} role="menu" label={t('navigation.moreTabs')}>
       {tabs.map((tab) => (
         <button
           key={tab}
@@ -94,7 +122,7 @@ function MoreSheet({ tabs, activeTab, onPick, onClose }: { tabs: string[]; activ
           role="menuitem"
           onClick={() => onPick(tab)}
           className={`w-full flex items-center gap-3 px-5 py-3 text-left text-sm font-medium cursor-pointer transition-colors ${
-            activeTab === tab ? "text-primary" : "text-text-normal hover:bg-text-normal/3"
+            activeTab === tab ? 'text-primary' : 'text-text-normal hover:bg-text-normal/3'
           }`}
         >
           {t(`navigation.tabs.${tab.toLowerCase()}`)}
@@ -104,7 +132,13 @@ function MoreSheet({ tabs, activeTab, onPick, onClose }: { tabs: string[]; activ
   );
 }
 
-export function BottomNav({ activeTab, onTabChange }: { activeTab: string; onTabChange: (tab: string) => void }) {
+export function BottomNav({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}) {
   const { t } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const enabled = new Set<string>(ENABLED_TABS);
@@ -119,7 +153,11 @@ export function BottomNav({ activeTab, onTabChange }: { activeTab: string; onTab
 
   return (
     <>
-      <nav className="flex lg:hidden shrink-0 bg-bg-surface border-t border-border" role="tablist" aria-label={t("navigation.primary")}>
+      <nav
+        className="flex lg:hidden shrink-0 bg-bg-surface border-t border-border"
+        role="tablist"
+        aria-label={t('navigation.primary')}
+      >
         {primary.map((tab) => (
           <NavButton
             key={tab}
@@ -133,7 +171,7 @@ export function BottomNav({ activeTab, onTabChange }: { activeTab: string; onTab
         ))}
         {overflow.length > 0 && (
           <NavButton
-            label={t("navigation.more")}
+            label={t('navigation.more')}
             icon={<Icon name="More" />}
             active={overflowActive || sheetOpen}
             onClick={() => setSheetOpen((v) => !v)}
@@ -144,7 +182,12 @@ export function BottomNav({ activeTab, onTabChange }: { activeTab: string; onTab
       </nav>
 
       {sheetOpen && overflow.length > 0 && (
-        <MoreSheet tabs={overflow} activeTab={activeTab} onPick={pick} onClose={() => setSheetOpen(false)} />
+        <MoreSheet
+          tabs={overflow}
+          activeTab={activeTab}
+          onPick={pick}
+          onClose={() => setSheetOpen(false)}
+        />
       )}
     </>
   );

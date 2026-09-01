@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useSyncExternalStore } from 'react';
 
 // Forces a re-render on a fixed interval so relative time labels ("2m ago") stay fresh. Backed by one
 // shared interval per interval-length (module-level), so the many <Timestamp> instances across the app

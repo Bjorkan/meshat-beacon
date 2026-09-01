@@ -1,11 +1,11 @@
-import type { InfiniteData } from "@tanstack/react-query";
-import type { NodeSummary } from "./types";
-import type { CursorPage } from "../../types/api";
-import type { WsNodeUpdate } from "../../types/ws";
-import { patchInfinitePages } from "../../lib/infinite-pages";
+import type { InfiniteData } from '@tanstack/react-query';
+import type { NodeSummary } from './types';
+import type { CursorPage } from '../../types/api';
+import type { WsNodeUpdate } from '../../types/ws';
+import { patchInfinitePages } from '../../lib/infinite-pages';
 
 export interface NodeListUpdateContext {
-  sort: "name" | "type" | "radio" | "neighbors" | "last_seen";
+  sort: 'name' | 'type' | 'radio' | 'neighbors' | 'last_seen';
   type?: string;
   name?: string;
   pubkeyPrefix?: string;
@@ -13,14 +13,17 @@ export interface NodeListUpdateContext {
   iatas?: readonly string[];
 }
 
-function sameIATAs(a: NodeSummary["iatas"], b: NodeSummary["iatas"]): boolean {
-  return a.length === b.length && a.every((entry, index) => {
-    const other = b[index];
-    return other != null && entry.iata === other.iata && entry.lastHeard === other.lastHeard;
-  });
+function sameIATAs(a: NodeSummary['iatas'], b: NodeSummary['iatas']): boolean {
+  return (
+    a.length === b.length &&
+    a.every((entry, index) => {
+      const other = b[index];
+      return other != null && entry.iata === other.iata && entry.lastHeard === other.lastHeard;
+    })
+  );
 }
 
-function nextNodeSummary(prev: NodeSummary, data: WsNodeUpdate["data"]): NodeSummary {
+function nextNodeSummary(prev: NodeSummary, data: WsNodeUpdate['data']): NodeSummary {
   return {
     ...prev,
     publicKey: data.publicKey || prev.publicKey,
@@ -44,7 +47,7 @@ function intersects(selected: readonly string[] | undefined, values: readonly st
 
 function includesCI(value: string | null | undefined, needle: string | undefined): boolean {
   if (!needle) return true;
-  return (value ?? "").toLocaleLowerCase().includes(needle.toLocaleLowerCase());
+  return (value ?? '').toLocaleLowerCase().includes(needle.toLocaleLowerCase());
 }
 
 /**
@@ -54,25 +57,41 @@ function includesCI(value: string | null | undefined, needle: string | undefined
  */
 export function nodeListUpdateRequiresRefetch(
   prev: NodeSummary,
-  data: WsNodeUpdate["data"],
+  data: WsNodeUpdate['data'],
   context: NodeListUpdateContext,
 ): boolean {
   const next = nextNodeSummary(prev, data);
 
-  if (context.sort === "name" && next.name !== prev.name) return true;
-  if (context.sort === "type" && next.nodeType !== prev.nodeType) return true;
-  if (context.sort === "radio" && next.radio !== prev.radio) return true;
+  if (context.sort === 'name' && next.name !== prev.name) return true;
+  if (context.sort === 'type' && next.nodeType !== prev.nodeType) return true;
+  if (context.sort === 'radio' && next.radio !== prev.radio) return true;
 
-  if (context.type && (prev.nodeTypeName === context.type) !== (next.nodeTypeName === context.type)) return true;
-  if (context.name && includesCI(prev.name, context.name) !== includesCI(next.name, context.name)) return true;
+  if (context.type && (prev.nodeTypeName === context.type) !== (next.nodeTypeName === context.type))
+    return true;
+  if (context.name && includesCI(prev.name, context.name) !== includesCI(next.name, context.name))
+    return true;
   if (context.pubkeyPrefix) {
     const prefix = context.pubkeyPrefix.toLocaleLowerCase();
-    if (prev.publicKey.toLocaleLowerCase().startsWith(prefix) !== next.publicKey.toLocaleLowerCase().startsWith(prefix)) return true;
+    if (
+      prev.publicKey.toLocaleLowerCase().startsWith(prefix) !==
+      next.publicKey.toLocaleLowerCase().startsWith(prefix)
+    )
+      return true;
   }
-  if (context.scope && (prev.defaultScope === context.scope) !== (next.defaultScope === context.scope)) return true;
+  if (
+    context.scope &&
+    (prev.defaultScope === context.scope) !== (next.defaultScope === context.scope)
+  )
+    return true;
   if (context.iatas?.length) {
-    const before = intersects(context.iatas, prev.iatas.map((entry) => entry.iata));
-    const after = intersects(context.iatas, next.iatas.map((entry) => entry.iata));
+    const before = intersects(
+      context.iatas,
+      prev.iatas.map((entry) => entry.iata),
+    );
+    const after = intersects(
+      context.iatas,
+      next.iatas.map((entry) => entry.iata),
+    );
     if (before !== after) return true;
   }
 
@@ -83,7 +102,7 @@ export function nodeListUpdateRequiresRefetch(
 // rebuild the entire map FeatureCollection for IATA/radio timestamp churn.
 export function patchNodeSummary(
   list: NodeSummary[] | undefined,
-  data: WsNodeUpdate["data"],
+  data: WsNodeUpdate['data'],
 ): NodeSummary[] | undefined {
   if (!list) return list;
   const idx = list.findIndex((n) => n.id === data.nodeId);
@@ -103,7 +122,7 @@ export function patchNodeSummary(
 // place without throwing away already loaded pages.
 export function patchNodeTableSummary(
   list: NodeSummary[] | undefined,
-  data: WsNodeUpdate["data"],
+  data: WsNodeUpdate['data'],
 ): NodeSummary[] | undefined {
   if (!list) return list;
   const idx = list.findIndex((n) => n.id === data.nodeId);
@@ -121,7 +140,8 @@ export function patchNodeTableSummary(
     next.defaultScope === prev.defaultScope &&
     next.isObserver === prev.isObserver &&
     sameIATAs(next.iatas, prev.iatas)
-  ) return list;
+  )
+    return list;
 
   const updated = [...list];
   updated[idx] = next;
@@ -133,7 +153,7 @@ export function patchNodeTableSummary(
 // never refetches on its own — staleTime is Infinity).
 export function upsertNodePages(
   old: InfiniteData<CursorPage<NodeSummary>> | undefined,
-  data: WsNodeUpdate["data"],
+  data: WsNodeUpdate['data'],
 ): InfiniteData<CursorPage<NodeSummary>> | undefined {
   if (!old || old.pages.length === 0) return old;
   if (old.pages.some((p) => p.items.some((n) => n.id === data.nodeId))) {

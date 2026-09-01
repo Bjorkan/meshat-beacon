@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { SegmentedControl } from "./SegmentedControl";
-import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from "./types";
-import { Section } from "../../components/DetailPanel";
-import { CopyLinkButton } from "../../components/CopyLinkButton";
-import { useIsMobile } from "../../hooks/useMediaQuery";
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SegmentedControl } from './SegmentedControl';
+import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
+import { Section } from '../../components/DetailPanel';
+import { CopyLinkButton } from '../../components/CopyLinkButton';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 // Open/closed state persists across sessions; no click-outside dismiss, so it stays open while you pan.
-const OPEN_STORAGE_KEY = "beacon-map-settings-open";
+const OPEN_STORAGE_KEY = 'beacon-map-settings-open';
 
 // Swatch matching the border layer paint (secondary line over a faint fill), so the legend tracks the theme.
 function BorderLegend() {
@@ -16,9 +16,13 @@ function BorderLegend() {
     <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-text-dim">
       <span
         className="inline-block h-2.5 w-4 rounded-sm border"
-        style={{ borderColor: "var(--palette-secondary)", backgroundColor: "var(--palette-secondary)", opacity: 0.5 }}
+        style={{
+          borderColor: 'var(--palette-secondary)',
+          backgroundColor: 'var(--palette-secondary)',
+          opacity: 0.5,
+        }}
       />
-      {t("map.iataOutline")}
+      {t('map.iataOutline')}
     </div>
   );
 }
@@ -29,17 +33,24 @@ function NeighborLegend() {
   const { t } = useTranslation();
   return (
     <div className="mt-2.5">
-      <div className="text-[10px] text-text-dim uppercase tracking-wider mb-1">{t("map.observations")}</div>
+      <div className="text-[10px] text-text-dim uppercase tracking-wider mb-1">
+        {t('map.observations')}
+      </div>
       <div
         className="h-2 rounded-sm border border-border-subtle"
-        style={{ background: "linear-gradient(to right, var(--palette-danger) 0%, var(--palette-warn) 60%, var(--palette-green) 100%)" }}
+        style={{
+          background:
+            'linear-gradient(to right, var(--palette-danger) 0%, var(--palette-warn) 60%, var(--palette-green) 100%)',
+        }}
       />
       <div className="relative h-3 mt-0.5 text-[9px] text-text-dim tabular-nums">
         <span className="absolute left-0">1</span>
-        <span className="absolute -translate-x-1/2" style={{ left: "60%" }}>20</span>
+        <span className="absolute -translate-x-1/2" style={{ left: '60%' }}>
+          20
+        </span>
         <span className="absolute right-0">150+</span>
       </div>
-      <div className="text-[9px] text-text-dim mt-1">{t("map.fainterOlder")}</div>
+      <div className="text-[9px] text-text-dim mt-1">{t('map.fainterOlder')}</div>
     </div>
   );
 }
@@ -72,20 +83,20 @@ export function MapSettingsPanel({
 }: MapSettingsPanelProps) {
   const { t } = useTranslation();
   const isMobile = useIsMobile();
-  const typeOptions = [{ value: "", label: t("common.all") }, ...NODE_TYPE_FILTER_OPTIONS];
+  const typeOptions = [{ value: '', label: t('common.all') }, ...NODE_TYPE_FILTER_OPTIONS];
   const toggleOptions = [
-    { value: "on", label: t("map.on") },
-    { value: "off", label: t("map.off") },
+    { value: 'on', label: t('map.on') },
+    { value: 'off', label: t('map.off') },
   ];
   const neighborOptions = [
-    { value: "on", label: t("map.on") },
-    { value: "selected", label: t("map.selected") },
-    { value: "off", label: t("map.off") },
+    { value: 'on', label: t('map.on') },
+    { value: 'selected', label: t('map.selected') },
+    { value: 'off', label: t('map.off') },
   ];
   // collapsed by default on mobile (the card would cover the map); a saved preference still wins
   const [open, setOpen] = useState(() => {
     const stored = localStorage.getItem(OPEN_STORAGE_KEY);
-    return stored === null ? !isMobile : stored === "true";
+    return stored === null ? !isMobile : stored === 'true';
   });
 
   const toggle = () => {
@@ -108,62 +119,74 @@ export function MapSettingsPanel({
       >
         <span className="flex items-center gap-1.5">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path d="M2 4.5h7M2 11.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            <path
+              d="M2 4.5h7M2 11.5h4"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
             <circle cx="12" cy="4.5" r="1.7" fill="currentColor" />
             <circle cx="9" cy="11.5" r="1.7" fill="currentColor" />
-            <path d="M9 11.5h5M12 4.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            <path
+              d="M9 11.5h5M12 4.5h2"
+              stroke="currentColor"
+              strokeWidth="1.3"
+              strokeLinecap="round"
+            />
           </svg>
-          {t("map.settings")}
+          {t('map.settings')}
         </span>
-        <span aria-hidden className="text-text-dim text-[9px]">{open ? "▾" : "▸"}</span>
+        <span aria-hidden className="text-text-dim text-[9px]">
+          {open ? '▾' : '▸'}
+        </span>
       </button>
 
       {open && (
         <div className="border-t border-border-subtle">
-          <Section title={t("map.nodeType")} first>
+          <Section title={t('map.nodeType')} first>
             <SegmentedControl
               wrap
-              ariaLabel={t("map.nodeType")}
+              ariaLabel={t('map.nodeType')}
               options={typeOptions}
               value={typeFilter}
               onChange={onTypeChange}
             />
           </Section>
-          <Section title={t("map.clustering")}>
+          <Section title={t('map.clustering')}>
             <SegmentedControl
-              ariaLabel={t("map.clustering")}
+              ariaLabel={t('map.clustering')}
               options={toggleOptions}
-              value={clustered ? "on" : "off"}
-              onChange={(v) => onClusteredChange(v === "on")}
+              value={clustered ? 'on' : 'off'}
+              onChange={(v) => onClusteredChange(v === 'on')}
               className="w-full"
             />
             {liveMode && (
               <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
-                {t("map.liveUnclusteredHint")}
+                {t('map.liveUnclusteredHint')}
               </div>
             )}
           </Section>
-          <Section title={t("map.neighborLines")}>
+          <Section title={t('map.neighborLines')}>
             <SegmentedControl
-              ariaLabel={t("map.neighborLines")}
+              ariaLabel={t('map.neighborLines')}
               options={neighborOptions}
               value={neighborLines}
               onChange={(v) => onNeighborLinesChange(v as NeighborLinesMode)}
               className="w-full"
             />
-            {liveMode && neighborLines !== "off" && (
+            {liveMode && neighborLines !== 'off' && (
               <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
-                {t("map.liveNeighborHint")}
+                {t('map.liveNeighborHint')}
               </div>
             )}
-            {neighborLines === "selected" && <NeighborLegend />}
+            {neighborLines === 'selected' && <NeighborLegend />}
           </Section>
-          <Section title={t("map.iataBorders")}>
+          <Section title={t('map.iataBorders')}>
             <SegmentedControl
-              ariaLabel={t("map.iataBorders")}
+              ariaLabel={t('map.iataBorders')}
               options={toggleOptions}
-              value={borders ? "on" : "off"}
-              onChange={(v) => onBordersChange(v === "on")}
+              value={borders ? 'on' : 'off'}
+              onChange={(v) => onBordersChange(v === 'on')}
               className="w-full"
             />
             {borders && <BorderLegend />}
@@ -171,8 +194,8 @@ export function MapSettingsPanel({
           <div className="px-3 py-2.5 border-t border-border-subtle flex justify-end">
             <CopyLinkButton
               params={buildShareParams}
-              label={t("map.copyLink")}
-              ariaLabel={t("map.copyLinkLabel")}
+              label={t('map.copyLink')}
+              ariaLabel={t('map.copyLinkLabel')}
             />
           </div>
         </div>

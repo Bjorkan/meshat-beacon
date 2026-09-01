@@ -1,6 +1,6 @@
-import { useState, useCallback } from "react";
-import { useTranslation } from "react-i18next";
-import { VARIANT_CLASSES } from "./badge-utils";
+import { useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
+import { VARIANT_CLASSES } from './badge-utils';
 
 // Copies a shareable deep link to the current page with the given query params set (built fresh from
 // the address bar at click time, so region/other params are preserved). Flips to "Copied" for 1.5s.
@@ -21,13 +21,13 @@ export function CopyLinkButton({
 }) {
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
-  const visibleLabel = label ?? t("common.copyLink");
-  const visibleCopiedLabel = copiedLabel ?? t("common.copied");
+  const visibleLabel = label ?? t('common.copyLink');
+  const visibleCopiedLabel = copiedLabel ?? t('common.copied');
 
   const handleCopy = useCallback(() => {
     const url = new URL(window.location.href);
     if (to) url.pathname = to;
-    const resolved = typeof params === "function" ? params() : params;
+    const resolved = typeof params === 'function' ? params() : params;
     for (const [key, value] of Object.entries(resolved)) {
       if (value === null) url.searchParams.delete(key);
       else url.searchParams.set(key, value);

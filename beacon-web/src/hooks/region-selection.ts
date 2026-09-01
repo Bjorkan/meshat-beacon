@@ -34,7 +34,7 @@ export function resolveIatas(
 
 // Stable query-key fragment for a resolved IATA list. "*" stands in for "all regions".
 export function regionKey(iatas: string[] | undefined): string {
-  return iatas && iatas.length > 0 ? iatas.join(",") : "*";
+  return iatas && iatas.length > 0 ? iatas.join(',') : '*';
 }
 
 export function serializeSelection(selection: RegionSelection): string {
@@ -50,8 +50,8 @@ export function deserializeSelection(raw: string | null): RegionSelection {
       parsed &&
       Array.isArray(parsed.regions) &&
       Array.isArray(parsed.iatas) &&
-      parsed.regions.every((r: unknown) => typeof r === "string") &&
-      parsed.iatas.every((i: unknown) => typeof i === "string")
+      parsed.regions.every((r: unknown) => typeof r === 'string') &&
+      parsed.iatas.every((i: unknown) => typeof i === 'string')
     ) {
       return { regions: parsed.regions, iatas: parsed.iatas };
     }

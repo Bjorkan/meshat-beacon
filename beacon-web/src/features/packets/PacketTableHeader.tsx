@@ -1,5 +1,5 @@
-import { GRID_TEMPLATE } from "./packet-grid";
-import { useTranslation } from "react-i18next";
+import { GRID_TEMPLATE } from './packet-grid';
+import { useTranslation } from 'react-i18next';
 
 // Sticky above the virtualizer's spacer, never inside measured item space.
 export function PacketTableHeader() {
@@ -11,13 +11,13 @@ export function PacketTableHeader() {
     >
       <span aria-hidden />
       <span>Hash</span>
-      <span>{t("entities.type")}</span>
-      <span>{t("routes.route")}</span>
-      <span>{t("packets.observerArea")}</span>
-      <span>{t("packets.path")}</span>
+      <span>{t('entities.type')}</span>
+      <span>{t('routes.route')}</span>
+      <span>{t('packets.observerArea')}</span>
+      <span>{t('packets.path')}</span>
       <span>Obs</span>
-      <span>{t("packets.hopsHash")}</span>
-      <span className="text-right">{t("packets.age")}</span>
+      <span>{t('packets.hopsHash')}</span>
+      <span className="text-right">{t('packets.age')}</span>
     </div>
   );
 }

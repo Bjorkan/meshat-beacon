@@ -92,11 +92,16 @@ export const GLOW_EXTRA_RADIUS_STOPS: readonly NumericStop[] = [
 ];
 
 export function zoomInterpolate(stops: readonly NumericStop[]): unknown[] {
-  return ["interpolate", ["linear"], ["zoom"], ...stops.flatMap(([zoom, value]) => [zoom, value])];
+  return ['interpolate', ['linear'], ['zoom'], ...stops.flatMap(([zoom, value]) => [zoom, value])];
 }
 
 export function propertyInterpolate(property: string, stops: readonly NumericStop[]): unknown[] {
-  return ["interpolate", ["linear"], ["get", property], ...stops.flatMap(([value, output]) => [value, output])];
+  return [
+    'interpolate',
+    ['linear'],
+    ['get', property],
+    ...stops.flatMap(([value, output]) => [value, output]),
+  ];
 }
 
 export function nodeIconSizeExpression(): unknown[] {
@@ -128,24 +133,24 @@ export function selectionStrokeExpression(): unknown[] {
 }
 
 export function clusterRadiusExpression(): unknown[] {
-  return propertyInterpolate("point_count", CLUSTER_RADIUS_STOPS);
+  return propertyInterpolate('point_count', CLUSTER_RADIUS_STOPS);
 }
 
 export function clusterTextSizeExpression(): unknown[] {
-  return propertyInterpolate("point_count", CLUSTER_TEXT_SIZE_STOPS);
+  return propertyInterpolate('point_count', CLUSTER_TEXT_SIZE_STOPS);
 }
 
 export function glowRadiusExpression(): unknown[] {
   return [
-    "interpolate",
-    ["linear"],
-    ["zoom"],
+    'interpolate',
+    ['linear'],
+    ['zoom'],
     ...GLOW_BASE_RADIUS_STOPS.flatMap(([zoom, base], index) => [
       zoom,
       [
-        "+",
+        '+',
         base,
-        ["*", GLOW_EXTRA_RADIUS_STOPS[index]![1], ["coalesce", ["feature-state", "glow"], 0]],
+        ['*', GLOW_EXTRA_RADIUS_STOPS[index]![1], ['coalesce', ['feature-state', 'glow'], 0]],
       ],
     ]),
   ];

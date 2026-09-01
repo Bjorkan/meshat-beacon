@@ -9,16 +9,8 @@
 // shares them. Paginated factories are fully generic-annotated so their InfiniteData contract
 // is explicit and the shared useInfinitePages hook can accept them structurally.
 
-import {
-  infiniteQueryOptions,
-  keepPreviousData,
-  queryOptions,
-} from "@tanstack/react-query";
-import type {
-  InfiniteData,
-  QueryKey,
-  UseInfiniteQueryOptions,
-} from "@tanstack/react-query";
+import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query';
+import type { InfiniteData, QueryKey, UseInfiniteQueryOptions } from '@tanstack/react-query';
 import {
   getBrokers,
   getChannels,
@@ -54,14 +46,14 @@ import {
   getKnownRoutesPage,
   searchCrossIATARoutes,
   searchKnownRoutes,
-} from "./client";
-import type { CursorPage, PacketSummary, TraceType } from "../types/api";
-import type { ChannelMessage } from "../features/channels/types";
-import type { ObserverSummary } from "../features/observers/types";
-import type { NodeSummary } from "../features/nodes/types";
-import type { KnownRoute } from "../types/api";
-import type { StatsRange } from "../features/stats/types";
-import type { PacketServerFilter } from "../features/packets/types";
+} from './client';
+import type { CursorPage, PacketSummary, TraceType } from '../types/api';
+import type { ChannelMessage } from '../features/channels/types';
+import type { ObserverSummary } from '../features/observers/types';
+import type { NodeSummary } from '../features/nodes/types';
+import type { KnownRoute } from '../types/api';
+import type { StatsRange } from '../features/stats/types';
+import type { PacketServerFilter } from '../features/packets/types';
 
 // Cursor-paginated options contract shared by useInfinitePages consumers. TData is pinned to
 // InfiniteData (no select transforms inside factories — callers add select at the hook site).
@@ -80,7 +72,7 @@ type SortablePageParam = string | number | undefined;
 // query — regions are near-static, so the combined result caches long and is shared app-wide.
 
 export const regionQueries = {
-  all: () => ["regions"] as const,
+  all: () => ['regions'] as const,
   list: () =>
     queryOptions({
       queryKey: regionQueries.all(),
@@ -95,7 +87,7 @@ export const regionQueries = {
 // ── iatas + borders ──────────────────────────────────────────────────────────────────────────
 
 export const iataQueries = {
-  all: () => ["iatas"] as const,
+  all: () => ['iatas'] as const,
   list: () =>
     queryOptions({
       queryKey: iataQueries.all(),
@@ -104,7 +96,7 @@ export const iataQueries = {
     }),
   border: (iata: string) =>
     queryOptions({
-      queryKey: ["iata-border", iata] as const,
+      queryKey: ['iata-border', iata] as const,
       queryFn: () => getIataBorder(iata),
     }),
 };
@@ -112,7 +104,7 @@ export const iataQueries = {
 // ── scopes + brokers ─────────────────────────────────────────────────────────────────────────
 
 export const scopeQueries = {
-  all: () => ["scopes"] as const,
+  all: () => ['scopes'] as const,
   list: () =>
     queryOptions({
       queryKey: scopeQueries.all(),
@@ -122,7 +114,7 @@ export const scopeQueries = {
 };
 
 export const brokerQueries = {
-  all: () => ["brokers"] as const,
+  all: () => ['brokers'] as const,
   list: () =>
     queryOptions({
       queryKey: brokerQueries.all(),
@@ -139,32 +131,32 @@ export interface NodeListFilters {
   type?: string;
   name?: string;
   pubkeyPrefix?: string;
-  supportsMultibytePaths?: "true" | "false";
-  supportsMultibyteTraces?: "true" | "false";
+  supportsMultibytePaths?: 'true' | 'false';
+  supportsMultibyteTraces?: 'true' | 'false';
   scope?: string;
-  sort?: "name" | "type" | "radio" | "neighbors" | "last_seen";
-  direction?: "asc" | "desc";
+  sort?: 'name' | 'type' | 'radio' | 'neighbors' | 'last_seen';
+  direction?: 'asc' | 'desc';
 }
 
 // Key shape matters: the unfiltered 2-element prefix is what cache resets match by prefix, and
 // WS patches write through the full filtered key. Keep element order stable.
 function nodeListKey(f: NodeListFilters) {
   return [
-    "nodes",
+    'nodes',
     f.regionKey,
-    f.type ?? "",
-    f.supportsMultibytePaths ?? "",
-    f.supportsMultibyteTraces ?? "",
-    f.name ?? "",
-    f.pubkeyPrefix ?? "",
-    f.scope ?? "",
-    f.sort ?? "name",
-    f.direction ?? "asc",
+    f.type ?? '',
+    f.supportsMultibytePaths ?? '',
+    f.supportsMultibyteTraces ?? '',
+    f.name ?? '',
+    f.pubkeyPrefix ?? '',
+    f.scope ?? '',
+    f.sort ?? 'name',
+    f.direction ?? 'asc',
   ] as const;
 }
 
 export const nodeQueries = {
-  all: () => ["nodes"] as const,
+  all: () => ['nodes'] as const,
   // Map variant: always requests neighborIds so the neighbor-lines toggle is a pure client-side
   // render switch. Deliberately a different key from the filtered Nodes-table list.
   mapList: (args: {
@@ -178,13 +170,13 @@ export const nodeQueries = {
       QueryKey,
       SortablePageParam
     >({
-      queryKey: ["map-nodes", args.regionKey] as const,
+      queryKey: ['map-nodes', args.regionKey] as const,
       queryFn: ({ pageParam }) =>
         getNodesPage(args.iatas, {
-          cursor: typeof pageParam === "number" ? pageParam : undefined,
-          pageToken: typeof pageParam === "string" ? pageParam : undefined,
-          sort: "last_seen",
-          direction: "desc",
+          cursor: typeof pageParam === 'number' ? pageParam : undefined,
+          pageToken: typeof pageParam === 'string' ? pageParam : undefined,
+          sort: 'last_seen',
+          direction: 'desc',
           neighbors: true,
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
@@ -202,10 +194,10 @@ export const nodeQueries = {
       queryKey: nodeListKey(f),
       queryFn: ({ pageParam }) =>
         getNodesPage(f.iatas, {
-          cursor: typeof pageParam === "number" ? pageParam : undefined,
-          pageToken: typeof pageParam === "string" ? pageParam : undefined,
-          sort: f.sort ?? "name",
-          direction: f.direction ?? "asc",
+          cursor: typeof pageParam === 'number' ? pageParam : undefined,
+          pageToken: typeof pageParam === 'string' ? pageParam : undefined,
+          sort: f.sort ?? 'name',
+          direction: f.direction ?? 'asc',
           type: f.type || undefined,
           name: f.name || undefined,
           pubkeyPrefix: f.pubkeyPrefix || undefined,
@@ -219,21 +211,21 @@ export const nodeQueries = {
     }),
   detail: (id: string) =>
     queryOptions({
-      queryKey: ["node", id] as const,
+      queryKey: ['node', id] as const,
       queryFn: () => getNode(id),
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     }),
   observations: (id: string) =>
     queryOptions({
-      queryKey: ["node-observations", id] as const,
+      queryKey: ['node-observations', id] as const,
       queryFn: () => getNodeObservations(id, { limit: 50 }),
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     }),
   neighbors: (id: string) =>
     queryOptions({
-      queryKey: ["node-neighbors", id] as const,
+      queryKey: ['node-neighbors', id] as const,
       queryFn: () => getNodeNeighbors(id),
       staleTime: 30_000,
       refetchOnWindowFocus: false,
@@ -251,27 +243,27 @@ export interface ObserverListFilters {
   name?: string;
   searchField?: string;
   scope?: string;
-  sort?: "name" | "type" | "radio" | "iata" | "status" | "last_seen";
-  direction?: "asc" | "desc";
+  sort?: 'name' | 'type' | 'radio' | 'iata' | 'status' | 'last_seen';
+  direction?: 'asc' | 'desc';
 }
 
 function observerListKey(f: ObserverListFilters) {
   return [
-    "observers",
+    'observers',
     f.regionKey,
-    f.status ?? "",
-    f.type ?? "",
-    f.broker ?? "",
-    f.name ?? "",
-    f.searchField ?? "",
-    f.scope ?? "",
-    f.sort ?? "name",
-    f.direction ?? "asc",
+    f.status ?? '',
+    f.type ?? '',
+    f.broker ?? '',
+    f.name ?? '',
+    f.searchField ?? '',
+    f.scope ?? '',
+    f.sort ?? 'name',
+    f.direction ?? 'asc',
   ] as const;
 }
 
 export const observerQueries = {
-  all: () => ["observers"] as const,
+  all: () => ['observers'] as const,
   list: (f: ObserverListFilters): PagedOptions<ObserverSummary, SortablePageParam> =>
     infiniteQueryOptions<
       CursorPage<ObserverSummary>,
@@ -283,14 +275,14 @@ export const observerQueries = {
       queryKey: observerListKey(f),
       queryFn: ({ pageParam }) =>
         getObserversPage(f.iatas, {
-          cursor: typeof pageParam === "number" ? pageParam : undefined,
-          pageToken: typeof pageParam === "string" ? pageParam : undefined,
-          sort: f.sort ?? "name",
-          direction: f.direction ?? "asc",
+          cursor: typeof pageParam === 'number' ? pageParam : undefined,
+          pageToken: typeof pageParam === 'string' ? pageParam : undefined,
+          sort: f.sort ?? 'name',
+          direction: f.direction ?? 'asc',
           status: f.status || undefined,
           type: f.type || undefined,
           broker: f.broker || undefined,
-          name: f.searchField === "name" ? f.name || undefined : undefined,
+          name: f.searchField === 'name' ? f.name || undefined : undefined,
           scope: f.scope || undefined,
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
@@ -299,14 +291,14 @@ export const observerQueries = {
     }),
   detail: (id: string) =>
     queryOptions({
-      queryKey: ["observer", id] as const,
+      queryKey: ['observer', id] as const,
       queryFn: () => getObserver(id),
       staleTime: 30_000,
       refetchOnWindowFocus: false,
     }),
   adverts: (id: string) =>
     queryOptions({
-      queryKey: ["observer-adverts", id] as const,
+      queryKey: ['observer-adverts', id] as const,
       queryFn: () => getObserverAdverts(id, { limit: 50 }),
       staleTime: 30_000,
       refetchOnWindowFocus: false,
@@ -318,32 +310,23 @@ export const observerQueries = {
 // to the factory so the cache key and the request always agree.
 
 const TELEMETRY_RANGE_PARAM: Record<StatsRange, string> = {
-  "24h": "24h",
-  "7d": "168h",
-  "30d": "720h",
+  '24h': '24h',
+  '7d': '168h',
+  '30d': '720h',
 };
 const TELEMETRY_INTERVAL_PARAM: Record<StatsRange, string> = {
-  "24h": "1h",
-  "7d": "6h",
-  "30d": "24h",
+  '24h': '1h',
+  '7d': '6h',
+  '30d': '24h',
 };
 
 export const telemetryQueries = {
   detail: (id: string) => observerQueries.detail(id),
   range: (id: string, range: StatsRange) =>
     queryOptions({
-      queryKey: [
-        "observer-telemetry",
-        id,
-        range,
-        TELEMETRY_INTERVAL_PARAM[range],
-      ] as const,
+      queryKey: ['observer-telemetry', id, range, TELEMETRY_INTERVAL_PARAM[range]] as const,
       queryFn: () =>
-        getObserverTelemetry(
-          id,
-          TELEMETRY_RANGE_PARAM[range],
-          TELEMETRY_INTERVAL_PARAM[range],
-        ),
+        getObserverTelemetry(id, TELEMETRY_RANGE_PARAM[range], TELEMETRY_INTERVAL_PARAM[range]),
       enabled: !!id,
       staleTime: 30_000,
       placeholderData: keepPreviousData,
@@ -354,7 +337,7 @@ export const telemetryQueries = {
 // ── packets ──────────────────────────────────────────────────────────────────────────────────
 
 export const packetQueries = {
-  all: () => ["packets"] as const,
+  all: () => ['packets'] as const,
   // 2-element key when unfiltered (cache survives filter toggling; prefix resets match both shapes)
   list: (args: {
     regionKey: string;
@@ -369,10 +352,14 @@ export const packetQueries = {
       number | undefined
     >({
       queryKey: args.filter
-        ? (["packets", args.regionKey, args.filter] as const)
-        : (["packets", args.regionKey] as const),
+        ? (['packets', args.regionKey, args.filter] as const)
+        : (['packets', args.regionKey] as const),
       queryFn: ({ pageParam }) =>
-        getPackets(args.iatas, { cursor: pageParam, ...(args.filter ?? {}), includeResolvedPath: true }),
+        getPackets(args.iatas, {
+          cursor: pageParam,
+          ...(args.filter ?? {}),
+          includeResolvedPath: true,
+        }),
       getNextPageParam: (last) => last.nextCursor ?? undefined,
       initialPageParam: undefined,
       staleTime: 15_000,
@@ -380,7 +367,7 @@ export const packetQueries = {
     }),
   detail: (hash: string | null) =>
     queryOptions({
-      queryKey: ["packet-detail", hash] as const,
+      queryKey: ['packet-detail', hash] as const,
       queryFn: () => getPacketDetail(hash!),
       enabled: !!hash,
       // PacketList and the expansion mount in succession for a cold deep-link. Keep that one
@@ -393,10 +380,10 @@ export const packetQueries = {
 // ── channels ─────────────────────────────────────────────────────────────────────────────────
 
 export const channelQueries = {
-  all: () => ["channels"] as const,
+  all: () => ['channels'] as const,
   list: (args: { regionKey: string; iatas?: string[] }) =>
     queryOptions({
-      queryKey: ["channels", args.regionKey] as const,
+      queryKey: ['channels', args.regionKey] as const,
       queryFn: () => getChannels({ iatas: args.iatas }),
       staleTime: 60_000,
     }),
@@ -412,7 +399,7 @@ export const channelQueries = {
       QueryKey,
       number | undefined
     >({
-      queryKey: ["channel-messages", args.channelId, args.regionKey] as const,
+      queryKey: ['channel-messages', args.channelId, args.regionKey] as const,
       queryFn: ({ pageParam }) => {
         if (args.channelId === undefined) {
           return Promise.resolve({
@@ -435,8 +422,13 @@ export const channelQueries = {
 // ── known routes ─────────────────────────────────────────────────────────────────────────────
 
 export const routeQueries = {
-  all: () => ["routes"] as const,
-  list: (args: { iatas?: string[]; hopCount?: number; sort: string; direction: "asc" | "desc" }): PagedOptions<KnownRoute, string | undefined> =>
+  all: () => ['routes'] as const,
+  list: (args: {
+    iatas?: string[];
+    hopCount?: number;
+    sort: string;
+    direction: 'asc' | 'desc';
+  }): PagedOptions<KnownRoute, string | undefined> =>
     infiniteQueryOptions<
       CursorPage<KnownRoute>,
       Error,
@@ -444,7 +436,13 @@ export const routeQueries = {
       QueryKey,
       string | undefined
     >({
-      queryKey: ["routes", args.iatas?.slice().sort().join(",") ?? "", args.hopCount ?? "", args.sort, args.direction] as const,
+      queryKey: [
+        'routes',
+        args.iatas?.slice().sort().join(',') ?? '',
+        args.hopCount ?? '',
+        args.sort,
+        args.direction,
+      ] as const,
       queryFn: ({ pageParam }) =>
         getKnownRoutesPage({
           iatas: args.iatas,
@@ -459,7 +457,7 @@ export const routeQueries = {
     }),
   search: (args: { iata: string; from: string; to: string } | null) =>
     queryOptions({
-      queryKey: ["routes-search", args?.iata, args?.from, args?.to] as const,
+      queryKey: ['routes-search', args?.iata, args?.from, args?.to] as const,
       queryFn: () => searchKnownRoutes(args!.iata, args!.from, args!.to),
       enabled: args !== null,
       staleTime: 60_000,
@@ -469,8 +467,8 @@ export const routeQueries = {
   cross: (args: { iatas: string[]; fromHash: string; toHash: string } | null) =>
     queryOptions({
       queryKey: [
-        "routes-cross",
-        args ? args.iatas.slice().sort().join(",") : null,
+        'routes-cross',
+        args ? args.iatas.slice().sort().join(',') : null,
         args?.fromHash,
         args?.toHash,
       ] as const,
@@ -483,12 +481,7 @@ export const routeQueries = {
         }
         const results = await Promise.all(
           pairs.map(([fromIata, toIata]) =>
-            searchCrossIATARoutes(
-              args!.fromHash,
-              fromIata,
-              args!.toHash,
-              toIata,
-            ),
+            searchCrossIATARoutes(args!.fromHash, fromIata, args!.toHash, toIata),
           ),
         );
         return results.flat();
@@ -501,15 +494,10 @@ export const routeQueries = {
 // ── traces ───────────────────────────────────────────────────────────────────────────────────
 
 export const traceQueries = {
-  all: () => ["traces"] as const,
-  list: (args: {
-    regionKey: string;
-    iatas?: string[];
-    type?: string;
-    limit?: number;
-  }) =>
+  all: () => ['traces'] as const,
+  list: (args: { regionKey: string; iatas?: string[]; type?: string; limit?: number }) =>
     queryOptions({
-      queryKey: ["traces", args.regionKey, args.type ?? ""] as const,
+      queryKey: ['traces', args.regionKey, args.type ?? ''] as const,
       queryFn: () =>
         getTraces(args.iatas, {
           limit: args.limit,
@@ -519,7 +507,7 @@ export const traceQueries = {
     }),
   detail: (tag: string) =>
     queryOptions({
-      queryKey: ["trace", tag] as const,
+      queryKey: ['trace', tag] as const,
       queryFn: () => getTraceDetail(tag),
       staleTime: 30_000,
     }),
@@ -536,114 +524,91 @@ const statsCommon = {
 } as const;
 
 const RANGE_MS_VALUES: Record<StatsRange, number> = {
-  "24h": 24 * 60 * 60_000,
-  "7d": 7 * 24 * 60 * 60_000,
-  "30d": 30 * 24 * 60 * 60_000,
+  '24h': 24 * 60 * 60_000,
+  '7d': 7 * 24 * 60 * 60_000,
+  '30d': 30 * 24 * 60 * 60_000,
 };
 
 const sinceFor = (range: StatsRange) => Date.now() - RANGE_MS_VALUES[range];
 
 export const statsQueries = {
-  all: () => ["stats"] as const,
+  all: () => ['stats'] as const,
   overview: (regionKey: string, iatas?: string[]) =>
     queryOptions({
-      queryKey: ["stats-overview", regionKey] as const,
+      queryKey: ['stats-overview', regionKey] as const,
       queryFn: () => getStatsOverview(iatas),
       ...statsCommon,
       // self-correct the WS-accumulated live counters against the server
       refetchInterval: 60_000,
     }),
-  observations: (
-    regionKey: string,
-    iatas: string[] | undefined,
-    range: StatsRange,
-  ) =>
+  observations: (regionKey: string, iatas: string[] | undefined, range: StatsRange) =>
     queryOptions({
-      queryKey: ["stats-observations", regionKey, range] as const,
+      queryKey: ['stats-observations', regionKey, range] as const,
       queryFn: () => getStatsObservations(iatas, sinceFor(range)),
       ...statsCommon,
       // feeds the observations chart + sparklines and gets no WS bumps, so refetch to stay fresh
       refetchInterval: 60_000,
     }),
-  payloadBreakdown: (
-    regionKey: string,
-    iatas: string[] | undefined,
-    range: StatsRange,
-  ) =>
+  payloadBreakdown: (regionKey: string, iatas: string[] | undefined, range: StatsRange) =>
     queryOptions({
-      queryKey: ["stats-payload", regionKey, range] as const,
+      queryKey: ['stats-payload', regionKey, range] as const,
       queryFn: () => getPayloadBreakdown(iatas, sinceFor(range)),
       ...statsCommon,
     }),
   topNodes: (regionKey: string, iatas: string[] | undefined, limit = 10) =>
     queryOptions({
-      queryKey: ["stats-top-nodes", regionKey, limit] as const,
+      queryKey: ['stats-top-nodes', regionKey, limit] as const,
       queryFn: () => getTopNodes(iatas, limit),
       ...statsCommon,
     }),
-  topObservers: (
-    regionKey: string,
-    iatas: string[] | undefined,
-    range: StatsRange,
-    limit = 10,
-  ) =>
+  topObservers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
     queryOptions({
-      queryKey: ["stats-top-observers", regionKey, range, limit] as const,
+      queryKey: ['stats-top-observers', regionKey, range, limit] as const,
       queryFn: () => getTopObservers(iatas, sinceFor(range), limit),
       ...statsCommon,
     }),
-  topAdvertisers: (
-    regionKey: string,
-    iatas: string[] | undefined,
-    range: StatsRange,
-    limit = 10,
-  ) =>
+  topAdvertisers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
     queryOptions({
-      queryKey: ["stats-top-advertisers", regionKey, range, limit] as const,
+      queryKey: ['stats-top-advertisers', regionKey, range, limit] as const,
       queryFn: () => getTopAdvertisers(iatas, sinceFor(range), limit),
       ...statsCommon,
     }),
-  topTalkers: (
-    regionKey: string,
-    iatas: string[] | undefined,
-    range: StatsRange,
-    limit = 10,
-  ) =>
+  topTalkers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
     queryOptions({
-      queryKey: ["stats-top-talkers", regionKey, range, limit] as const,
+      queryKey: ['stats-top-talkers', regionKey, range, limit] as const,
       queryFn: () => getTopTalkers(iatas, sinceFor(range), limit),
       ...statsCommon,
     }),
   radioPresets: (regionKey: string, iatas?: string[]) =>
     queryOptions({
-      queryKey: ["stats-radio-presets", regionKey] as const,
+      queryKey: ['stats-radio-presets', regionKey] as const,
       queryFn: () => getRadioPresets(iatas),
       ...statsCommon,
     }),
   // node-types is a population census (no time window), so the key is region-only
   nodeTypes: (regionKey: string, iatas?: string[]) =>
     queryOptions({
-      queryKey: ["stats-node-types", regionKey] as const,
+      queryKey: ['stats-node-types', regionKey] as const,
       queryFn: () => getStatsNodeTypes(iatas),
       ...statsCommon,
     }),
   // clock drift reflects each node's latest measured drift, not a windowed aggregate, so region-only
   clockDrift: (regionKey: string, iatas?: string[], limit = 100) =>
     queryOptions({
-      queryKey: ["stats-clock-drift", regionKey, limit] as const,
+      queryKey: ['stats-clock-drift', regionKey, limit] as const,
       queryFn: () => getClockDrift(iatas, limit),
       ...statsCommon,
     }),
   // scopes are reported globally by the backend (no region filter), so the key is region-independent
   scopes: () =>
     queryOptions({
-      queryKey: ["stats-scopes"] as const,
+      queryKey: ['stats-scopes'] as const,
       queryFn: getStatsScopes,
       ...statsCommon,
     }),
   observerSearch: (args: { regionKey: string; iatas?: string[]; q: string }) =>
     queryOptions({
-      queryKey: ["observer-search", args.regionKey, args.q] as const,
+      queryKey: ['observer-search', args.regionKey, args.q] as const,
       queryFn: () => getObserversPage(args.iatas, { name: args.q, limit: 50 }),
       staleTime: 30_000,
       placeholderData: keepPreviousData,

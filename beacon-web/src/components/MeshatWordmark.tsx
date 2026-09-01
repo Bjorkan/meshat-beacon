@@ -4,8 +4,13 @@
 // wordmark text recolors (currentColor).
 export function MeshatWordmark({ className }: { className?: string }) {
   return (
-    <span className={`inline-flex h-7 items-center text-text-bright ${className ?? ""}`}>
-      <svg viewBox="0 0 393 120" className="block h-full w-auto max-w-full" role="img" aria-label="Meshat.se">
+    <span className={`inline-flex h-7 items-center text-text-bright ${className ?? ''}`}>
+      <svg
+        viewBox="0 0 393 120"
+        className="block h-full w-auto max-w-full"
+        role="img"
+        aria-label="Meshat.se"
+      >
         <g transform="translate(12 12) scale(4)">
           <rect width="24" height="24" rx="5" fill="#1f7a3d" />
           <g

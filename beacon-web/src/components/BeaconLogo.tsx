@@ -29,7 +29,7 @@ export function BeaconLogo({ size = 24, className, pulse = false }: BeaconLogoPr
         strokeWidth="4.5"
         strokeLinejoin="round"
         opacity="0.3"
-        className={pulse ? "beacon-ring beacon-ring-3" : undefined}
+        className={pulse ? 'beacon-ring beacon-ring-3' : undefined}
       />
       <polygon
         points="78,50 64,74.25 36,74.25 22,50 36,25.75 64,25.75"
@@ -38,7 +38,7 @@ export function BeaconLogo({ size = 24, className, pulse = false }: BeaconLogoPr
         strokeWidth="4.5"
         strokeLinejoin="round"
         opacity="0.6"
-        className={pulse ? "beacon-ring beacon-ring-2" : undefined}
+        className={pulse ? 'beacon-ring beacon-ring-2' : undefined}
       />
       <polygon
         points="66,50 58,63.86 42,63.86 34,50 42,36.14 58,36.14"
@@ -47,14 +47,14 @@ export function BeaconLogo({ size = 24, className, pulse = false }: BeaconLogoPr
         strokeWidth="4.5"
         strokeLinejoin="round"
         opacity="0.95"
-        className={pulse ? "beacon-ring beacon-ring-1" : undefined}
+        className={pulse ? 'beacon-ring beacon-ring-1' : undefined}
       />
       <circle
         cx="50"
         cy="50"
         r="6.5"
         fill="currentColor"
-        className={pulse ? "beacon-core-pulse" : undefined}
+        className={pulse ? 'beacon-core-pulse' : undefined}
       />
     </svg>
   );

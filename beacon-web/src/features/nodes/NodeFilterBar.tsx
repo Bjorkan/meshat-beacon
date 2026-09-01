@@ -1,13 +1,13 @@
-import { useState } from "react";
-import { useTranslation } from "react-i18next";
-import { SearchBar, type SearchFieldOption } from "../../components/SearchBar";
-import { SelectDropdown } from "../../components/SelectDropdown";
-import { FilterSheet, FiltersButton } from "../../components/FilterSheet";
-import { useIsMobile } from "../../hooks/useMediaQuery";
-import { NODE_TYPE_OPTIONS } from "../../lib/node-types";
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { SearchBar, type SearchFieldOption } from '../../components/SearchBar';
+import { SelectDropdown } from '../../components/SelectDropdown';
+import { FilterSheet, FiltersButton } from '../../components/FilterSheet';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { NODE_TYPE_OPTIONS } from '../../lib/node-types';
 
 // "" means no filter (Any)
-export type MultibyteFilter = "" | "true" | "false";
+export type MultibyteFilter = '' | 'true' | 'false';
 
 interface NodeFilterBarProps {
   search: string;
@@ -48,39 +48,79 @@ export function NodeFilterBar({
 
   const activeCount = [typeFilter, pathsFilter, tracesFilter, scopeFilter].filter(Boolean).length;
   const multibyteOptions = [
-    { value: "true", label: t("common.yes") },
-    { value: "false", label: t("common.no") },
+    { value: 'true', label: t('common.yes') },
+    { value: 'false', label: t('common.no') },
   ];
   const searchFields: SearchFieldOption[] = [
-    { value: "name", label: t("fields.name") },
-    { value: "pubkey", label: t("fields.publicKey") },
+    { value: 'name', label: t('fields.name') },
+    { value: 'pubkey', label: t('fields.publicKey') },
   ];
   const clearAll = () => {
-    onTypeChange("");
-    onPathsChange("");
-    onTracesChange("");
-    onScopeChange("");
+    onTypeChange('');
+    onPathsChange('');
+    onTracesChange('');
+    onScopeChange('');
   };
 
   // shared by the desktop inline bar and the mobile filter sheet
   const controls = (fullWidth: boolean) => (
     <>
-      <SelectDropdown label={t("filters.type")} options={NODE_TYPE_OPTIONS} value={typeFilter} onChange={onTypeChange} fullWidth={fullWidth} />
-      <SelectDropdown label={t("filters.multibytePaths")} options={multibyteOptions} allLabel={t("common.any")} value={pathsFilter} onChange={(v) => onPathsChange(v as MultibyteFilter)} fullWidth={fullWidth} />
-      <SelectDropdown label={t("filters.multibyteTraces")} options={multibyteOptions} allLabel={t("common.any")} value={tracesFilter} onChange={(v) => onTracesChange(v as MultibyteFilter)} fullWidth={fullWidth} />
+      <SelectDropdown
+        label={t('filters.type')}
+        options={NODE_TYPE_OPTIONS}
+        value={typeFilter}
+        onChange={onTypeChange}
+        fullWidth={fullWidth}
+      />
+      <SelectDropdown
+        label={t('filters.multibytePaths')}
+        options={multibyteOptions}
+        allLabel={t('common.any')}
+        value={pathsFilter}
+        onChange={(v) => onPathsChange(v as MultibyteFilter)}
+        fullWidth={fullWidth}
+      />
+      <SelectDropdown
+        label={t('filters.multibyteTraces')}
+        options={multibyteOptions}
+        allLabel={t('common.any')}
+        value={tracesFilter}
+        onChange={(v) => onTracesChange(v as MultibyteFilter)}
+        fullWidth={fullWidth}
+      />
       {scopeOptions.length > 0 && (
-        <SelectDropdown label={t("filters.scope")} options={scopeOptions.map((s) => ({ value: s, label: s }))} allLabel={t("common.any")} value={scopeFilter} onChange={onScopeChange} fullWidth={fullWidth} />
+        <SelectDropdown
+          label={t('filters.scope')}
+          options={scopeOptions.map((s) => ({ value: s, label: s }))}
+          allLabel={t('common.any')}
+          value={scopeFilter}
+          onChange={onScopeChange}
+          fullWidth={fullWidth}
+        />
       )}
     </>
   );
 
   if (isMobile) {
     return (
-      <div className="flex items-center gap-1.5 px-4 py-2 border-b border-border-subtle bg-bg-base shrink-0" role="toolbar" aria-label={t("filters.nodes")}>
-        <SearchBar value={search} onChange={onSearchChange} fields={searchFields} field={searchField} onFieldChange={onSearchFieldChange} />
+      <div
+        className="flex items-center gap-1.5 px-4 py-2 border-b border-border-subtle bg-bg-base shrink-0"
+        role="toolbar"
+        aria-label={t('filters.nodes')}
+      >
+        <SearchBar
+          value={search}
+          onChange={onSearchChange}
+          fields={searchFields}
+          field={searchField}
+          onFieldChange={onSearchFieldChange}
+        />
         <FiltersButton activeCount={activeCount} onClick={() => setSheetOpen(true)} />
         {sheetOpen && (
-          <FilterSheet onClose={() => setSheetOpen(false)} onClear={activeCount > 0 ? clearAll : undefined}>
+          <FilterSheet
+            onClose={() => setSheetOpen(false)}
+            onClear={activeCount > 0 ? clearAll : undefined}
+          >
             {controls(true)}
           </FilterSheet>
         )}
@@ -92,7 +132,7 @@ export function NodeFilterBar({
     <div
       className="flex flex-wrap items-center gap-1.5 gap-y-1.5 px-4 py-2 border-b border-border-subtle bg-bg-base shrink-0"
       role="toolbar"
-      aria-label={t("filters.nodes")}
+      aria-label={t('filters.nodes')}
     >
       <SearchBar
         value={search}
@@ -102,7 +142,9 @@ export function NodeFilterBar({
         onFieldChange={onSearchFieldChange}
       />
 
-      <span className="text-border text-sm mx-0.5" aria-hidden>│</span>
+      <span className="text-border text-sm mx-0.5" aria-hidden>
+        │
+      </span>
 
       {controls(false)}
     </div>

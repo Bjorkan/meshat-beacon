@@ -1,13 +1,13 @@
-import { useEffect, type RefObject } from "react";
+import { useEffect, type RefObject } from 'react';
 
 const FOCUSABLE = [
-  "a[href]",
-  "button:not([disabled])",
-  "textarea:not([disabled])",
-  "input:not([disabled])",
-  "select:not([disabled])",
+  'a[href]',
+  'button:not([disabled])',
+  'textarea:not([disabled])',
+  'input:not([disabled])',
+  'select:not([disabled])',
   '[tabindex]:not([tabindex="-1"])',
-].join(",");
+].join(',');
 
 // Keeps keyboard focus inside a modal container: focuses the container itself on open (so a screen
 // reader announces the dialog before Tab moves into the controls), cycles Tab/Shift+Tab within it so
@@ -25,7 +25,7 @@ export function useFocusTrap<T extends HTMLElement>(ref: RefObject<T | null>): v
     node.focus({ preventScroll: true });
 
     function onKeyDown(e: KeyboardEvent) {
-      if (e.key !== "Tab") return;
+      if (e.key !== 'Tab') return;
       const els = focusable();
       const first = els[0];
       const last = els[els.length - 1];
@@ -43,12 +43,13 @@ export function useFocusTrap<T extends HTMLElement>(ref: RefObject<T | null>): v
       }
     }
 
-    node.addEventListener("keydown", onKeyDown);
+    node.addEventListener('keydown', onKeyDown);
     return () => {
-      node.removeEventListener("keydown", onKeyDown);
+      node.removeEventListener('keydown', onKeyDown);
       // Only return focus to a real, still-connected trigger. If the modal was opened from a click that
       // left focus on <body>, restoring would blur wherever the user has since moved.
-      if (restoreTo && restoreTo !== document.body && document.contains(restoreTo)) restoreTo.focus({ preventScroll: true });
+      if (restoreTo && restoreTo !== document.body && document.contains(restoreTo))
+        restoreTo.focus({ preventScroll: true });
     };
   }, [ref]);
 }

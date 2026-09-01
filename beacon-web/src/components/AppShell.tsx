@@ -1,29 +1,35 @@
-import { type ReactNode, useState, useEffect, useMemo, useRef } from "react";
-import { type TFunction } from "i18next";
-import { useTranslation } from "react-i18next";
-import { ErrorBoundary } from "./ErrorBoundary";
-import { useQuery } from "@tanstack/react-query";
-import { useRegionSelection, useRegions } from "../hooks/useRegion";
-import { ALL_REGIONS, isAllRegions, type RegionSelection } from "../hooks/region-selection";
-import { useWsStatus } from "../hooks/useWsStatus";
-import { useTheme } from "../hooks/useTheme";
-import { Dropdown } from "./Dropdown";
-import { BottomNav } from "./BottomNav";
-import { MeshatWordmark } from "./MeshatWordmark";
-import { LanguageSelector } from "./LanguageSelector";
-import { iataQueries } from "../api/queries";
-import { ENABLED_TABS, ENABLED_THEME_IDS, selectableThemes, APP_NAME, GITHUB_URL } from "../lib/constants";
-import type { WsManager } from "../api/ws-manager";
+import { type ReactNode, useState, useEffect, useMemo, useRef } from 'react';
+import { type TFunction } from 'i18next';
+import { useTranslation } from 'react-i18next';
+import { ErrorBoundary } from './ErrorBoundary';
+import { useQuery } from '@tanstack/react-query';
+import { useRegionSelection, useRegions } from '../hooks/useRegion';
+import { ALL_REGIONS, isAllRegions, type RegionSelection } from '../hooks/region-selection';
+import { useWsStatus } from '../hooks/useWsStatus';
+import { useTheme } from '../hooks/useTheme';
+import { Dropdown } from './Dropdown';
+import { BottomNav } from './BottomNav';
+import { MeshatWordmark } from './MeshatWordmark';
+import { LanguageSelector } from './LanguageSelector';
+import { iataQueries } from '../api/queries';
+import {
+  ENABLED_TABS,
+  ENABLED_THEME_IDS,
+  selectableThemes,
+  APP_NAME,
+  GITHUB_URL,
+} from '../lib/constants';
+import type { WsManager } from '../api/ws-manager';
 
 // header widgets: WS status, region picker, theme picker
 
 function LiveBadge({ wsManager }: { wsManager: WsManager }) {
   const { t } = useTranslation();
   const { status } = useWsStatus(wsManager);
-  const [staleStr, setStaleStr] = useState("");
+  const [staleStr, setStaleStr] = useState('');
 
   useEffect(() => {
-    if (status !== "connecting") return;
+    if (status !== 'connecting') return;
     function update() {
       const staleSec = Math.floor((Date.now() - wsManager.getLastEventTimestamp()) / 1000);
       setStaleStr(staleSec > 60 ? `${Math.floor(staleSec / 60)}m` : `${staleSec}s`);
@@ -33,29 +39,29 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
     return () => clearInterval(id);
   }, [status, wsManager]);
 
-  if (status === "connected") {
+  if (status === 'connected') {
     return (
       <div
         className="flex items-center gap-1.5 font-mono text-[11px] text-green bg-green/8 border border-green/15 px-2 py-0.5 rounded-sm"
         role="status"
-        aria-label={t("status.live")}
-        title={t("status.live")}
+        aria-label={t('status.live')}
+        title={t('status.live')}
       >
         <span className="w-1.5 h-1.5 rounded-full bg-green animate-pulse" />
-        {t("status.liveShort")}
+        {t('status.liveShort')}
       </div>
     );
   }
 
-  if (status === "connecting") {
+  if (status === 'connecting') {
     return (
       <div
         className="flex items-center gap-1.5 font-mono text-[11px] text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
         role="status"
-        aria-label={t("status.stale")}
-        title={t("status.staleTitle", { age: staleStr })}
+        aria-label={t('status.stale')}
+        title={t('status.staleTitle', { age: staleStr })}
       >
-        {t("status.staleShort", { age: staleStr })}
+        {t('status.staleShort', { age: staleStr })}
       </div>
     );
   }
@@ -64,10 +70,10 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
     <div
       className="flex items-center gap-1.5 font-mono text-[11px] text-danger bg-danger/8 border border-danger/15 px-2 py-0.5 rounded-sm"
       role="status"
-      aria-label={t("status.offline")}
-      title={t("status.offline")}
+      aria-label={t('status.offline')}
+      title={t('status.offline')}
     >
-      {t("status.offlineShort")}
+      {t('status.offlineShort')}
     </div>
   );
 }
@@ -75,12 +81,21 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
 // checkbox indicator, matching MultiSelectDropdown's style
 function CheckBox({ checked }: { checked: boolean }) {
   return (
-    <span className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
-      checked ? "border-primary bg-primary/20" : "border-border"
-    }`}>
+    <span
+      className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+        checked ? 'border-primary bg-primary/20' : 'border-border'
+      }`}
+    >
       {checked && (
         <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-          <path d="M1.5 4L3 5.5L6.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-primary" />
+          <path
+            d="M1.5 4L3 5.5L6.5 2"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-primary"
+          />
         </svg>
       )}
     </span>
@@ -89,15 +104,19 @@ function CheckBox({ checked }: { checked: boolean }) {
 
 // Compact header summary of the active selection, e.g. "ALL", "YVR, YYJ", "2 regions", "1 region · 3 IATA".
 function regionSummaryLabel(selection: RegionSelection, t: TFunction): string {
-  if (isAllRegions(selection)) return t("region.allShort");
+  if (isAllRegions(selection)) return t('region.allShort');
   const parts: string[] = [];
   if (selection.regions.length > 0) {
-    parts.push(t("region.region", { count: selection.regions.length }));
+    parts.push(t('region.region', { count: selection.regions.length }));
   }
   if (selection.iatas.length > 0) {
-    parts.push(selection.iatas.length <= 2 ? selection.iatas.join(", ") : t("region.iataCount", { count: selection.iatas.length }));
+    parts.push(
+      selection.iatas.length <= 2
+        ? selection.iatas.join(', ')
+        : t('region.iataCount', { count: selection.iatas.length }),
+    );
   }
-  return parts.join(" · ");
+  return parts.join(' · ');
 }
 
 // Grouped multi-select: regions (each expands to its member IATAs) on top, then individual IATAs.
@@ -117,7 +136,7 @@ function RegionSelector() {
           className="flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden bg-bg-raised border border-border rounded px-2 sm:px-3 py-1 text-text-bright font-mono text-xs font-semibold hover:border-text-dim/30 transition-colors"
           onClick={toggle}
         >
-          <span className="text-text-muted font-normal text-[11px]">{t("region.label")}</span>
+          <span className="text-text-muted font-normal text-[11px]">{t('region.label')}</span>
           <span className="truncate">{regionSummaryLabel(selection, t)}</span>
           <span className="text-text-dim text-[11px] shrink-0">▾</span>
         </button>
@@ -133,7 +152,7 @@ function RegionSelectorPanel() {
   const { t } = useTranslation();
   const { selection, setSelection } = useRegionSelection();
   const { regions } = useRegions();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Take focus when a physical keyboard is likely available, then hand it back on close. Avoiding
@@ -141,10 +160,11 @@ function RegionSelectorPanel() {
   // the page around this compact input.
   useEffect(() => {
     const restoreTo = document.activeElement as HTMLElement | null;
-    const hasPrecisePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    const hasPrecisePointer = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     if (hasPrecisePointer) inputRef.current?.focus();
     return () => {
-      if (restoreTo && restoreTo !== document.body && document.contains(restoreTo)) restoreTo.focus();
+      if (restoreTo && restoreTo !== document.body && document.contains(restoreTo))
+        restoreTo.focus();
     };
   }, []);
 
@@ -184,11 +204,11 @@ function RegionSelectorPanel() {
   const shownIatas = useMemo(() => {
     if (!iatas || !q) return iatas ?? [];
     return iatas.filter(
-      (i) => i.iata.toLowerCase().includes(q) || (i.displayName ?? "").toLowerCase().includes(q),
+      (i) => i.iata.toLowerCase().includes(q) || (i.displayName ?? '').toLowerCase().includes(q),
     );
   }, [iatas, q]);
 
-  const showAll = !q || t("region.all").toLowerCase().includes(q);
+  const showAll = !q || t('region.all').toLowerCase().includes(q);
   const showIataGroup = !iatas || shownIatas.length > 0; // keep the group while loading/failed
   const hasRowsAbove = showAll || shownRegions.length > 0;
 
@@ -202,12 +222,12 @@ function RegionSelectorPanel() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             // Escape empties the box first; only a second press reaches Dropdown's close handler.
-            if (e.key === "Escape" && query) {
+            if (e.key === 'Escape' && query) {
               e.stopPropagation();
-              setQuery("");
+              setQuery('');
             }
           }}
-          placeholder={t("region.filterPlaceholder")}
+          placeholder={t('region.filterPlaceholder')}
           className="w-full text-base sm:text-[11px] font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
         />
       </div>
@@ -217,21 +237,23 @@ function RegionSelectorPanel() {
           type="button"
           className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono transition-colors ${
             isAllRegions(selection)
-              ? "text-text-bright bg-primary/10"
-              : "text-text-muted hover:text-text-normal hover:bg-text-normal/3"
+              ? 'text-text-bright bg-primary/10'
+              : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
           }`}
           onClick={() => setSelection(ALL_REGIONS)}
         >
           {/* spacer matching the checkbox column so ALL/code/name align with the rows below */}
           <span className="w-3 shrink-0" aria-hidden="true" />
-          <span className="font-semibold text-primary w-8 shrink-0">{t("region.allShort")}</span>
-          <span className="text-text-dim">{t("region.all")}</span>
+          <span className="font-semibold text-primary w-8 shrink-0">{t('region.allShort')}</span>
+          <span className="text-text-dim">{t('region.all')}</span>
         </button>
       )}
 
       {shownRegions.length > 0 && (
         <>
-          <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim">{t("region.regions")}</div>
+          <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim">
+            {t('region.regions')}
+          </div>
           {shownRegions.map(({ region, matched }) => {
             const checked = selection.regions.includes(region.slug);
             return (
@@ -239,13 +261,17 @@ function RegionSelectorPanel() {
                 key={region.slug}
                 type="button"
                 className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono transition-colors ${
-                  checked ? "text-text-bright bg-primary/10" : "text-text-muted hover:text-text-normal hover:bg-text-normal/3"
+                  checked
+                    ? 'text-text-bright bg-primary/10'
+                    : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
                 }`}
                 onClick={() => toggleRegion(region.slug)}
               >
                 <CheckBox checked={checked} />
                 <span className="truncate">{region.name}</span>
-                {matched.length > 0 && <span className="text-text-dim shrink-0">· {matched.join(", ")}</span>}
+                {matched.length > 0 && (
+                  <span className="text-text-dim shrink-0">· {matched.join(', ')}</span>
+                )}
               </button>
             );
           })}
@@ -254,9 +280,13 @@ function RegionSelectorPanel() {
 
       {showIataGroup && (
         <>
-          <div className={`px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim ${
-            hasRowsAbove ? "border-t border-border-subtle mt-1" : ""
-          }`}>IATA</div>
+          <div
+            className={`px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim ${
+              hasRowsAbove ? 'border-t border-border-subtle mt-1' : ''
+            }`}
+          >
+            IATA
+          </div>
           {iatas ? (
             shownIatas.map((i) => {
               const checked = selection.iatas.includes(i.iata);
@@ -265,7 +295,9 @@ function RegionSelectorPanel() {
                   key={i.iata}
                   type="button"
                   className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono transition-colors ${
-                    checked ? "text-text-bright bg-primary/10" : "text-text-muted hover:text-text-normal hover:bg-text-normal/3"
+                    checked
+                      ? 'text-text-bright bg-primary/10'
+                      : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
                   }`}
                   onClick={() => toggleIata(i.iata)}
                 >
@@ -276,28 +308,51 @@ function RegionSelectorPanel() {
               );
             })
           ) : iatasError ? (
-            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">{t("common.failedToLoad")}</div>
+            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">
+              {t('common.failedToLoad')}
+            </div>
           ) : (
-            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">{t("common.loading")}</div>
+            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">
+              {t('common.loading')}
+            </div>
           )}
         </>
       )}
 
       {!hasRowsAbove && !showIataGroup && (
-        <div className="px-3 py-2 text-[11px] font-mono text-text-dim">{t("common.noMatches")}</div>
+        <div className="px-3 py-2 text-[11px] font-mono text-text-dim">{t('common.noMatches')}</div>
       )}
     </>
   );
 }
 
-function ThemeToggleIcon({ variant }: { variant: "sun" | "moon" }) {
-  return variant === "sun" ? (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+function ThemeToggleIcon({ variant }: { variant: 'sun' | 'moon' }) {
+  return variant === 'sun' ? (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      aria-hidden
+    >
       <circle cx="12" cy="12" r="4" />
       <path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
     </svg>
   ) : (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
       <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
     </svg>
   );
@@ -315,7 +370,7 @@ function ThemePicker() {
   // a picker. Any other theme set falls back to the full dropdown.
   if (list.length === 2 && dark && light) {
     const target = isDark ? light : dark;
-    const label = t(isDark ? "theme.switchToLight" : "theme.switchToDark");
+    const label = t(isDark ? 'theme.switchToLight' : 'theme.switchToDark');
     return (
       <button
         type="button"
@@ -324,7 +379,7 @@ function ThemePicker() {
         className="flex items-center justify-center bg-bg-raised border border-border rounded px-2 py-1.5 text-text-muted hover:text-text-normal hover:border-text-dim transition-colors"
         onClick={() => setThemeId(target.id)}
       >
-        <ThemeToggleIcon variant={isDark ? "sun" : "moon"} />
+        <ThemeToggleIcon variant={isDark ? 'sun' : 'moon'} />
       </button>
     );
   }
@@ -335,14 +390,14 @@ function ThemePicker() {
       renderTrigger={({ toggle }) => (
         <button
           type="button"
-          aria-label={t("theme.label")}
-          title={t("theme.label")}
+          aria-label={t('theme.label')}
+          title={t('theme.label')}
           className="flex items-center gap-1.5 bg-bg-raised border border-border rounded px-2 py-1 text-text-muted font-mono text-[11px] hover:text-text-normal hover:border-text-dim transition-colors"
           onClick={toggle}
         >
           <span
             className="w-2.5 h-2.5 rounded-full shrink-0 border border-text-normal/20"
-            style={{ background: current?.vars["--palette-primary"] }}
+            style={{ background: current?.vars['--palette-primary'] }}
           />
           <span className="text-text-dim text-[11px]">▾</span>
         </button>
@@ -356,8 +411,8 @@ function ThemePicker() {
               type="button"
               className={`w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs font-mono transition-colors ${
                 t.id === themeId
-                  ? "text-text-bright bg-primary/10"
-                  : "text-text-muted hover:text-text-normal hover:bg-text-normal/3"
+                  ? 'text-text-bright bg-primary/10'
+                  : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
               }`}
               onClick={() => {
                 setThemeId(t.id);
@@ -366,7 +421,7 @@ function ThemePicker() {
             >
               <span
                 className="w-3 h-3 rounded-full shrink-0 border border-text-normal/20"
-                style={{ background: t.vars["--palette-primary"] }}
+                style={{ background: t.vars['--palette-primary'] }}
               />
               {t.name}
             </button>
@@ -414,7 +469,10 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
         </div>
       </header>
 
-      <nav className="hidden lg:flex bg-bg-surface border-b border-border px-4 shrink-0" role="tablist">
+      <nav
+        className="hidden lg:flex bg-bg-surface border-b border-border px-4 shrink-0"
+        role="tablist"
+      >
         {ENABLED_TABS.map((tab) => (
           <button
             key={tab}
@@ -423,8 +481,8 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
             aria-selected={activeTab === tab}
             className={`px-[18px] py-2.5 text-xs font-medium tracking-wider border-b-2 cursor-pointer transition-colors ${
               activeTab === tab
-                ? "text-primary border-primary"
-                : "text-text-muted border-transparent hover:text-text-normal"
+                ? 'text-primary border-primary'
+                : 'text-text-muted border-transparent hover:text-text-normal'
             }`}
             onClick={() => onTabChange(tab)}
           >
@@ -438,7 +496,9 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
       </main>
 
       <footer className="hidden lg:flex items-center px-4 py-1.5 bg-bg-surface border-t border-border font-mono text-[11px] text-text-dim shrink-0">
-        <span>{APP_NAME} v{__APP_VERSION__}</span>
+        <span>
+          {APP_NAME} v{__APP_VERSION__}
+        </span>
       </footer>
 
       <BottomNav activeTab={activeTab} onTabChange={onTabChange} />

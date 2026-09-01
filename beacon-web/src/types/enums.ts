@@ -19,19 +19,19 @@ export const PayloadType = {
 export type PayloadTypeValue = (typeof PayloadType)[keyof typeof PayloadType];
 
 export const PAYLOAD_TYPE_NAMES: Record<PayloadTypeValue, string> = {
-  [PayloadType.REQUEST]: "REQ",
-  [PayloadType.RESPONSE]: "RESPONSE",
-  [PayloadType.TEXT]: "TXT_MSG",
-  [PayloadType.ACK]: "ACK",
-  [PayloadType.ADVERT]: "ADVERT",
-  [PayloadType.GROUP_TEXT]: "GRP_TXT",
-  [PayloadType.GROUP_DATA]: "GRP_DATA",
-  [PayloadType.ANON_REQ]: "ANON_REQ",
-  [PayloadType.PATH]: "PATH",
-  [PayloadType.TRACE]: "TRACE",
-  [PayloadType.MULTI_PART]: "MULTI_PART",
-  [PayloadType.CONTROL]: "CONTROL",
-  [PayloadType.CUSTOM]: "CUSTOM",
+  [PayloadType.REQUEST]: 'REQ',
+  [PayloadType.RESPONSE]: 'RESPONSE',
+  [PayloadType.TEXT]: 'TXT_MSG',
+  [PayloadType.ACK]: 'ACK',
+  [PayloadType.ADVERT]: 'ADVERT',
+  [PayloadType.GROUP_TEXT]: 'GRP_TXT',
+  [PayloadType.GROUP_DATA]: 'GRP_DATA',
+  [PayloadType.ANON_REQ]: 'ANON_REQ',
+  [PayloadType.PATH]: 'PATH',
+  [PayloadType.TRACE]: 'TRACE',
+  [PayloadType.MULTI_PART]: 'MULTI_PART',
+  [PayloadType.CONTROL]: 'CONTROL',
+  [PayloadType.CUSTOM]: 'CUSTOM',
 };
 
 // routing modes (header bits 1-0) and path confidence
@@ -46,10 +46,10 @@ export const RouteType = {
 export type RouteTypeValue = (typeof RouteType)[keyof typeof RouteType];
 
 export const ROUTE_TYPE_NAMES: Record<RouteTypeValue, string> = {
-  [RouteType.TRANSPORT_FLOOD]: "TRANSPORT_FLOOD",
-  [RouteType.FLOOD]: "FLOOD",
-  [RouteType.DIRECT]: "DIRECT",
-  [RouteType.TRANSPORT_DIRECT]: "TRANSPORT_DIRECT",
+  [RouteType.TRANSPORT_FLOOD]: 'TRANSPORT_FLOOD',
+  [RouteType.FLOOD]: 'FLOOD',
+  [RouteType.DIRECT]: 'DIRECT',
+  [RouteType.TRANSPORT_DIRECT]: 'TRANSPORT_DIRECT',
 };
 
-export type PathConfidence = "high" | "ambiguous" | "none";
+export type PathConfidence = 'high' | 'ambiguous' | 'none';

@@ -2,8 +2,8 @@
 // bundle only pulls the chart types + components the Stats page actually uses. We deliberately avoid
 // the `echarts-for-react` wrapper (it was hit by a supply-chain attack 2026-05-19); EChart.tsx wraps
 // the core API directly instead.
-import * as echarts from "echarts/core";
-import { LineChart, BarChart, PieChart, GaugeChart, GraphChart } from "echarts/charts";
+import * as echarts from 'echarts/core';
+import { LineChart, BarChart, PieChart, GaugeChart, GraphChart } from 'echarts/charts';
 import {
   GridComponent,
   TitleComponent,
@@ -12,8 +12,8 @@ import {
   GraphicComponent,
   DataZoomComponent,
   MarkLineComponent,
-} from "echarts/components";
-import { CanvasRenderer } from "echarts/renderers";
+} from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
 
 echarts.use([
   LineChart,
@@ -33,4 +33,4 @@ echarts.use([
 
 export { echarts };
 export type EChartsInstance = ReturnType<typeof echarts.init>;
-export type EChartsOption = Parameters<EChartsInstance["setOption"]>[0];
+export type EChartsOption = Parameters<EChartsInstance['setOption']>[0];

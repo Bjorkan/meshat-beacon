@@ -1,8 +1,8 @@
 // Deep-link map view <-> URL params. Pure and maplibre-free so it stays unit-testable; mirrors the
 // region-selection.ts pattern. Inbound parsing is lenient — any invalid/unknown value is dropped so a
 // malformed link degrades to the normal view rather than breaking.
-import { MAP_STYLES, type NeighborLinesMode } from "./types";
-import { NODE_TYPE_NAMES } from "../../lib/node-types";
+import { MAP_STYLES, type NeighborLinesMode } from './types';
+import { NODE_TYPE_NAMES } from '../../lib/node-types';
 
 // A parsed view carries only the fields whose params were present AND valid.
 export interface ParsedMapView {
@@ -28,12 +28,9 @@ export interface MapViewSnapshot {
   borders: boolean;
 }
 
-const NEIGHBOR_MODES: NeighborLinesMode[] = ["on", "selected", "off"];
+const NEIGHBOR_MODES: NeighborLinesMode[] = ['on', 'selected', 'off'];
 
-function parseCoord(
-  lat: string | null,
-  lng: string | null,
-): [number, number] | undefined {
+function parseCoord(lat: string | null, lng: string | null): [number, number] | undefined {
   if (lat === null || lng === null) return undefined;
   const latN = Number.parseFloat(lat);
   const lngN = Number.parseFloat(lng);
@@ -56,58 +53,51 @@ function parseZoom(raw: string | null): number | undefined {
 
 function parseBool(raw: string | null): boolean | undefined {
   const v = raw?.toLowerCase();
-  if (v === "on") return true;
-  if (v === "off") return false;
+  if (v === 'on') return true;
+  if (v === 'off') return false;
   return undefined;
 }
 
 // Lenient parsing over the plain search object TanStack Router hands to the /map route.
-export function parseMapViewSearch(
-  search: Record<string, unknown>,
-): ParsedMapView {
+export function parseMapViewSearch(search: Record<string, unknown>): ParsedMapView {
   const get = (key: string) => {
     const value = search[key];
-    if (typeof value === "string" || typeof value === "number") return String(value);
-    if (typeof value === "boolean") return value ? "on" : "off";
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (typeof value === 'boolean') return value ? 'on' : 'off';
     return null;
   };
   return parseMapViewValues(get);
 }
 
-function parseMapViewValues(
-  get: (key: string) => string | null,
-): ParsedMapView {
+function parseMapViewValues(get: (key: string) => string | null): ParsedMapView {
   const view: ParsedMapView = {};
 
-  const center = parseCoord(get("lat"), get("lng"));
+  const center = parseCoord(get('lat'), get('lng'));
   if (center) view.center = center;
 
-  const zoom = parseZoom(get("zoom"));
+  const zoom = parseZoom(get('zoom'));
   if (zoom !== undefined) view.zoom = zoom;
 
-  const clustered = parseBool(get("clustering"));
+  const clustered = parseBool(get('clustering'));
   if (clustered !== undefined) view.clustered = clustered;
 
-  const type = get("node_type")?.toLowerCase();
-  if (
-    type &&
-    NODE_TYPE_NAMES.includes(type as (typeof NODE_TYPE_NAMES)[number])
-  )
+  const type = get('node_type')?.toLowerCase();
+  if (type && NODE_TYPE_NAMES.includes(type as (typeof NODE_TYPE_NAMES)[number]))
     view.nodeType = type;
 
-  const neighbor = get("neighbor_lines")?.toLowerCase();
+  const neighbor = get('neighbor_lines')?.toLowerCase();
   if (neighbor && NEIGHBOR_MODES.includes(neighbor as NeighborLinesMode)) {
     view.neighborLines = neighbor as NeighborLinesMode;
   }
 
-  const style = get("style")?.toLowerCase();
+  const style = get('style')?.toLowerCase();
   const match = style && MAP_STYLES.find((s) => s.id.toLowerCase() === style);
   if (match) view.styleId = match.id;
 
-  const flow = parseBool(get("flow"));
+  const flow = parseBool(get('flow'));
   if (flow !== undefined) view.flow = flow;
 
-  const borders = parseBool(get("borders"));
+  const borders = parseBool(get('borders'));
   if (borders !== undefined) view.borders = borders;
 
   return view;
@@ -122,18 +112,16 @@ function round(n: number, dp: number): string {
 // Authoritative param map for a copy-link snapshot: every managed key set to its current value, with
 // node_type deleted (null) when All so a stale ?node_type can't survive. Region/tab are handled by the
 // caller (the URL is built from the address bar, which already carries ?iata).
-export function buildMapParams(
-  view: MapViewSnapshot,
-): Record<string, string | null> {
+export function buildMapParams(view: MapViewSnapshot): Record<string, string | null> {
   return {
     lat: round(view.center[1], 5),
     lng: round(view.center[0], 5),
     zoom: round(view.zoom, 2),
-    clustering: view.clustered ? "on" : "off",
+    clustering: view.clustered ? 'on' : 'off',
     node_type: view.nodeType || null,
     neighbor_lines: view.neighborLines,
     style: view.styleId,
-    flow: view.flow ? "on" : "off",
-    borders: view.borders ? "on" : "off",
+    flow: view.flow ? 'on' : 'off',
+    borders: view.borders ? 'on' : 'off',
   };
 }

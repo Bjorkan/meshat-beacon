@@ -1,6 +1,14 @@
 export const PACKET_FLOW_COLORS = [
-  "#22C55E", "#38BDF8", "#F97316", "#A78BFA", "#F43F5E",
-  "#EAB308", "#2DD4BF", "#60A5FA", "#E879F9", "#84CC16",
+  '#22C55E',
+  '#38BDF8',
+  '#F97316',
+  '#A78BFA',
+  '#F43F5E',
+  '#EAB308',
+  '#2DD4BF',
+  '#60A5FA',
+  '#E879F9',
+  '#84CC16',
 ] as const;
 
 // FNV-1a: tiny deterministic hash, sufficient to choose a stable palette bucket without state.

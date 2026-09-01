@@ -1,6 +1,6 @@
-import type { Feature, FeatureCollection, LineString, Point } from "geojson";
-import type { NodeSummary, NodeNeighbor } from "../nodes/types";
-import type { NeighborLinesMode } from "./types";
+import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
+import type { NodeSummary, NodeNeighbor } from '../nodes/types';
+import type { NeighborLinesMode } from './types';
 
 // Build the maplibre GeoJSON source from the nodes API response. Properties stay primitive because
 // clustering serializes them, and there's no maplibre import, so this stays unit-testable.
@@ -20,9 +20,9 @@ export function nodesToFeatureCollection(
     // != null keeps 0 (a valid coordinate) while dropping null/undefined
     if (n.lat == null || n.lng == null) continue;
     features.push({
-      type: "Feature",
+      type: 'Feature',
       // GeoJSON/maplibre order is [lng, lat]; the API sends decimal degrees as-is
-      geometry: { type: "Point", coordinates: [n.lng, n.lat] },
+      geometry: { type: 'Point', coordinates: [n.lng, n.lat] },
       properties: {
         id: n.id,
         name: n.name,
@@ -31,7 +31,7 @@ export function nodesToFeatureCollection(
       },
     });
   }
-  return { type: "FeatureCollection", features };
+  return { type: 'FeatureCollection', features };
 }
 
 export interface NeighborEdgeProps {
@@ -50,7 +50,7 @@ export interface FocusedNeighborPointProps {
   selected?: boolean;
 }
 
-export type NeighborRenderMode = "ambient" | "focused" | "off";
+export type NeighborRenderMode = 'ambient' | 'focused' | 'off';
 
 // Selection is an explicit inspection task: once a node is selected, both visible neighbor modes
 // collapse to that node's detailed edge set. Live suppresses the ambient mesh so packet paths stay
@@ -60,10 +60,10 @@ export function neighborRenderMode(
   selectedId: string | null,
   liveMode: boolean,
 ): NeighborRenderMode {
-  if (mode === "off") return "off";
-  if (selectedId) return "focused";
-  if (mode === "selected" || liveMode) return "off";
-  return "ambient";
+  if (mode === 'off') return 'off';
+  if (selectedId) return 'focused';
+  if (mode === 'selected' || liveMode) return 'off';
+  return 'ambient';
 }
 
 // LineString edges between located nodes and their neighbors (from each node's neighborIds). Each
@@ -71,7 +71,7 @@ export function neighborRenderMode(
 // keeps just the selected node's edges; "on" emits all and flags its edges with the `selected` prop.
 export function buildNeighborEdges(
   nodes: NodeSummary[],
-  mode: "on" | "selected",
+  mode: 'on' | 'selected',
   selectedId: string | null,
 ): FeatureCollection<LineString, NeighborEdgeProps> {
   const located = new Map<string, NodeSummary>();
@@ -90,16 +90,22 @@ export function buildNeighborEdges(
       const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
       if (seen.has(key)) continue;
       const incident = n.id === selectedId || otherId === selectedId;
-      if (mode === "selected" && !incident) continue;
+      if (mode === 'selected' && !incident) continue;
       seen.add(key);
       features.push({
-        type: "Feature",
-        geometry: { type: "LineString", coordinates: [[n.lng, n.lat], [other.lng!, other.lat!]] },
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [n.lng, n.lat],
+            [other.lng!, other.lat!],
+          ],
+        },
         properties: { selected: incident },
       });
     }
   }
-  return { type: "FeatureCollection", features };
+  return { type: 'FeatureCollection', features };
 }
 
 // The selected node's edges, coloured by observation count and freshness. Data comes from the node
@@ -108,11 +114,14 @@ export function buildNeighborEdges(
 // are folded per neighbor: obs summed, lastSeen taken at its freshest. `now` defaults to the current
 // time; tests pass it explicitly so the age stays deterministic.
 export function buildFocusedNeighborEdges(
-  selected: Pick<NodeSummary, "id" | "lat" | "lng"> | null | undefined,
+  selected: Pick<NodeSummary, 'id' | 'lat' | 'lng'> | null | undefined,
   neighbors: NodeNeighbor[],
   now: number = Date.now(),
 ): FeatureCollection<LineString, NeighborEdgeProps> {
-  const empty: FeatureCollection<LineString, NeighborEdgeProps> = { type: "FeatureCollection", features: [] };
+  const empty: FeatureCollection<LineString, NeighborEdgeProps> = {
+    type: 'FeatureCollection',
+    features: [],
+  };
   if (!selected || selected.lat == null || selected.lng == null) return empty;
   const from: [number, number] = [selected.lng, selected.lat];
 
@@ -124,19 +133,28 @@ export function buildFocusedNeighborEdges(
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
     } else {
-      byId.set(nb.id, { lng: nb.lng, lat: nb.lat, obs: nb.observationCount, lastSeen: nb.lastSeen });
+      byId.set(nb.id, {
+        lng: nb.lng,
+        lat: nb.lat,
+        obs: nb.observationCount,
+        lastSeen: nb.lastSeen,
+      });
     }
   }
 
   const features: Feature<LineString, NeighborEdgeProps>[] = [];
   for (const n of byId.values()) {
     features.push({
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [from, [n.lng, n.lat]] },
-      properties: { selected: true, obs: n.obs, ageDays: Math.max(0, (now - n.lastSeen) / 86400000) },
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [from, [n.lng, n.lat]] },
+      properties: {
+        selected: true,
+        obs: n.obs,
+        ageDays: Math.max(0, (now - n.lastSeen) / 86400000),
+      },
     });
   }
-  return { type: "FeatureCollection", features };
+  return { type: 'FeatureCollection', features };
 }
 
 // Detailed neighbor rows may repeat the same node for several IATAs. Keep one stable, unclustered
@@ -147,27 +165,45 @@ export function buildFocusedNeighborPoints(
 ): FeatureCollection<Point, FocusedNeighborPointProps> {
   const byId = new Map<string, Feature<Point, FocusedNeighborPointProps>>();
   for (const neighbor of neighbors) {
-    if (neighbor.id === selectedId || neighbor.lat == null || neighbor.lng == null || byId.has(neighbor.id)) continue;
+    if (
+      neighbor.id === selectedId ||
+      neighbor.lat == null ||
+      neighbor.lng == null ||
+      byId.has(neighbor.id)
+    )
+      continue;
     byId.set(neighbor.id, {
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [neighbor.lng, neighbor.lat] },
-      properties: { id: neighbor.id, name: neighbor.name ?? null, nodeTypeName: neighbor.nodeTypeName },
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [neighbor.lng, neighbor.lat] },
+      properties: {
+        id: neighbor.id,
+        name: neighbor.name ?? null,
+        nodeTypeName: neighbor.nodeTypeName,
+      },
     });
   }
-  return { type: "FeatureCollection", features: [...byId.values()] };
+  return { type: 'FeatureCollection', features: [...byId.values()] };
 }
 
 export function buildFocusedSelectedPoint(
-  selected: Pick<NodeSummary, "id" | "name" | "nodeTypeName" | "lat" | "lng"> | undefined,
+  selected: Pick<NodeSummary, 'id' | 'name' | 'nodeTypeName' | 'lat' | 'lng'> | undefined,
 ): FeatureCollection<Point, FocusedNeighborPointProps> {
-  if (!selected || selected.lat == null || selected.lng == null) return { type: "FeatureCollection", features: [] };
+  if (!selected || selected.lat == null || selected.lng == null)
+    return { type: 'FeatureCollection', features: [] };
   return {
-    type: "FeatureCollection",
-    features: [{
-      type: "Feature",
-      geometry: { type: "Point", coordinates: [selected.lng, selected.lat] },
-      properties: { id: selected.id, name: selected.name, nodeTypeName: selected.nodeTypeName, selected: true },
-    }],
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [selected.lng, selected.lat] },
+        properties: {
+          id: selected.id,
+          name: selected.name,
+          nodeTypeName: selected.nodeTypeName,
+          selected: true,
+        },
+      },
+    ],
   };
 }
 
@@ -177,6 +213,6 @@ export function filterByNodeType(
   fc: FeatureCollection<Point, NodeFeatureProps>,
   typeName: string,
 ): FeatureCollection<Point, NodeFeatureProps> {
-  if (typeName === "") return fc;
+  if (typeName === '') return fc;
   return { ...fc, features: fc.features.filter((f) => f.properties.nodeTypeName === typeName) };
 }

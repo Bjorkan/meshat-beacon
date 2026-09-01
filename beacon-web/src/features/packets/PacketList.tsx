@@ -1,20 +1,20 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
-import { useTranslation } from "react-i18next";
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { usePackets } from "./usePackets";
-import { usePacketDetail } from "./usePacketDetail";
-import { usePacketFilters, matchesFilters, toServerFilter } from "./usePacketFilters";
-import { useScopes } from "../../hooks/useScopes";
-import { useRegion } from "../../hooks/useRegion";
-import { useWsPacketHandler, useWsLaggedHandler } from "../../hooks/useWsHandlers";
-import { PacketVirtualList } from "./PacketVirtualList";
-import { FilterBar } from "../../components/FilterBar";
-import { LoadingPill } from "../../components/LoadingPill";
-import { SkeletonRows } from "../../components/SkeletonRows";
-import { PAYLOAD_TYPE_NAMES, ROUTE_TYPE_NAMES } from "../../types/enums";
-import type { WsManager } from "../../api/ws-manager";
-import type { PacketDetail, PacketSummary } from "../../types/api";
-import type { WsPacketObservation } from "../../types/ws";
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { usePackets } from './usePackets';
+import { usePacketDetail } from './usePacketDetail';
+import { usePacketFilters, matchesFilters, toServerFilter } from './usePacketFilters';
+import { useScopes } from '../../hooks/useScopes';
+import { useRegion } from '../../hooks/useRegion';
+import { useWsPacketHandler, useWsLaggedHandler } from '../../hooks/useWsHandlers';
+import { PacketVirtualList } from './PacketVirtualList';
+import { FilterBar } from '../../components/FilterBar';
+import { LoadingPill } from '../../components/LoadingPill';
+import { SkeletonRows } from '../../components/SkeletonRows';
+import { PAYLOAD_TYPE_NAMES, ROUTE_TYPE_NAMES } from '../../types/enums';
+import type { WsManager } from '../../api/ws-manager';
+import type { PacketDetail, PacketSummary } from '../../types/api';
+import type { WsPacketObservation } from '../../types/ws';
 
 // filter options and storage keys
 
@@ -38,7 +38,8 @@ interface PacketListProps {
 
 function summaryFromDetail(detail: PacketDetail): PacketSummary {
   const latest = detail.observations.reduce<(typeof detail.observations)[number] | undefined>(
-    (current, observation) => !current || observation.heardAt > current.heardAt ? observation : current,
+    (current, observation) =>
+      !current || observation.heardAt > current.heardAt ? observation : current,
     undefined,
   );
 
@@ -52,24 +53,32 @@ function summaryFromDetail(detail: PacketDetail): PacketSummary {
     lastHeardAt: detail.lastHeardAt,
     observationCount: detail.observationCount,
     scope: detail.scope,
-    latestObserver: latest ? {
-      id: latest.observerId,
-      displayName: latest.observerName,
-      iata: latest.iata,
-      pathLength: latest.pathLength,
-      pathBytes: latest.pathBytes,
-      resolvedPath: latest.resolvedPath,
-      resolvedSource: latest.resolvedSource,
-      resolvedDestination: latest.resolvedDestination,
-    } : undefined,
+    latestObserver: latest
+      ? {
+          id: latest.observerId,
+          displayName: latest.observerName,
+          iata: latest.iata,
+          pathLength: latest.pathLength,
+          pathBytes: latest.pathBytes,
+          resolvedPath: latest.resolvedPath,
+          resolvedSource: latest.resolvedSource,
+          resolvedDestination: latest.resolvedDestination,
+        }
+      : undefined,
   };
 }
 
 // main packet view: filters, banner, virtual list
 
-export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservationId, onSelectObservation }: PacketListProps) {
+export function PacketList({
+  wsManager,
+  onAnalyze,
+  onViewPath,
+  selectedObservationId,
+  onSelectObservation,
+}: PacketListProps) {
   const { t } = useTranslation();
-  const search = useSearch({ from: "__root__" });
+  const search = useSearch({ from: '__root__' });
   const navigate = useNavigate();
   const { filters, setFilter, setSearch, setSearchField, clearFilters } = usePacketFilters();
   // single-value selections go to the server so scrolling pages through matching history
@@ -109,7 +118,10 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
 
   const packets = useMemo(() => {
     const matching = allPackets.filter((p) => matchesFilters(p, filters, observersByHash));
-    if (!expandedDetail || matching.some((packet) => packet.packetHash === expandedDetail.packetHash)) {
+    if (
+      !expandedDetail ||
+      matching.some((packet) => packet.packetHash === expandedDetail.packetHash)
+    ) {
       return matching;
     }
 
@@ -118,18 +130,22 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
     return [summaryFromDetail(expandedDetail), ...matching];
   }, [allPackets, expandedDetail, filters, observersByHash]);
 
-  const handleToggleExpand = useCallback((hash: string) => {
-    const next = expandedHash === hash ? null : hash;
-    navigate({
-      to: ".",
-      search: (prev: Record<string, unknown>) => {
-        const n = { ...prev };
-        if (next) n.hash = next; else n.hash = undefined;
-        return n;
-      },
-      replace: true,
-    });
-  }, [expandedHash, navigate]);
+  const handleToggleExpand = useCallback(
+    (hash: string) => {
+      const next = expandedHash === hash ? null : hash;
+      navigate({
+        to: '.',
+        search: (prev: Record<string, unknown>) => {
+          const n = { ...prev };
+          if (next) n.hash = next;
+          else n.hash = undefined;
+          return n;
+        },
+        replace: true,
+      });
+    },
+    [expandedHash, navigate],
+  );
 
   const handleOpenAnalyzer = useCallback(() => {
     if (expandedHash) onAnalyze(expandedHash);
@@ -141,9 +157,12 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
 
   // Shared packet-detail cache invalidation lives in QueryWsBridge. This route listener only feeds
   // the ephemeral live buffer used by the scrolling packet UX.
-  const handleObservation = useCallback((data: WsPacketObservation["data"]) => {
-    handlePacketObservation(data);
-  }, [handlePacketObservation]);
+  const handleObservation = useCallback(
+    (data: WsPacketObservation['data']) => {
+      handlePacketObservation(data);
+    },
+    [handlePacketObservation],
+  );
 
   useWsPacketHandler(wsManager, handleObservation);
   useWsLaggedHandler(wsManager, handleLagged);
@@ -200,10 +219,10 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
           activeRoutes={filters.routeTypes.map(String)}
           activeObservers={filters.observers}
           activeScopes={filters.scopes}
-          onTypesChange={(v) => setFilter("payloadTypes", v.map(Number))}
-          onRoutesChange={(v) => setFilter("routeTypes", v.map(Number))}
-          onObserversChange={(v) => setFilter("observers", v)}
-          onScopesChange={(v) => setFilter("scopes", v)}
+          onTypesChange={(v) => setFilter('payloadTypes', v.map(Number))}
+          onRoutesChange={(v) => setFilter('routeTypes', v.map(Number))}
+          onObserversChange={(v) => setFilter('observers', v)}
+          onScopesChange={(v) => setFilter('scopes', v)}
           search={filters.search}
           onSearchChange={setSearch}
           searchField={filters.searchField}
@@ -213,8 +232,10 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
 
         {laggedCount > 0 && (
           <div className="mx-4 px-3 py-1.5 bg-warn/6 border border-warn/12 text-warn text-xs font-medium font-mono rounded-b flex items-center justify-between">
-            <span>{t("packets.dropped", { count: laggedCount })}</span>
-            <button type="button" className="underline cursor-pointer" onClick={dismissLagged}>{t("common.dismiss")}</button>
+            <span>{t('packets.dropped', { count: laggedCount })}</span>
+            <button type="button" className="underline cursor-pointer" onClick={dismissLagged}>
+              {t('common.dismiss')}
+            </button>
           </div>
         )}
 
@@ -225,8 +246,8 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
             onClick={handleScrollToTop}
           >
             <span aria-hidden>▲</span>
-            {t("packets.new", { count: bannerCount })}
-            <span className="text-primary/60 font-normal">· {t("packets.scrollTop")}</span>
+            {t('packets.new', { count: bannerCount })}
+            <span className="text-primary/60 font-normal">· {t('packets.scrollTop')}</span>
           </button>
         )}
 
@@ -253,7 +274,7 @@ export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservati
           loading={isLoading || isFetchingNextPage}
           error={isError}
           count={packets.length}
-          noun={t("packets.noun")}
+          noun={t('packets.noun')}
           position="bottom-3 right-3"
         />
       </div>

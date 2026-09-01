@@ -1,5 +1,5 @@
-import { useSyncExternalStore } from "react";
-import type { WsManager, WsStatus } from "../api/ws-manager";
+import { useSyncExternalStore } from 'react';
+import type { WsManager, WsStatus } from '../api/ws-manager';
 
 export function useWsStatus(manager: WsManager): { status: WsStatus } {
   const status = useSyncExternalStore(

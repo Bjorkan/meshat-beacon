@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { VARIANT_CLASSES, type BadgeVariant } from "./badge-utils";
+import type { ReactNode } from 'react';
+import { VARIANT_CLASSES, type BadgeVariant } from './badge-utils';
 
 export function Badge({ variant, children }: { variant: BadgeVariant; children: ReactNode }) {
   return (

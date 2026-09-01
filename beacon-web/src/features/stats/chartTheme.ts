@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useTheme } from "../../hooks/useTheme";
+import { useMemo } from 'react';
+import { useTheme } from '../../hooks/useTheme';
 
 // ECharts paints to a canvas and can't inherit our CSS variables, so we read the active palette's
 // resolved `--color-*` tokens (defined in index.css `@theme`, which always resolve — palette value or
@@ -34,15 +34,19 @@ type RGB = [number, number, number];
 
 function parseColor(c: string): RGB {
   const s = c.trim();
-  if (s.startsWith("#")) {
+  if (s.startsWith('#')) {
     let h = s.slice(1);
-    if (h.length === 3) h = h.split("").map((ch) => ch + ch).join("");
+    if (h.length === 3)
+      h = h
+        .split('')
+        .map((ch) => ch + ch)
+        .join('');
     const n = parseInt(h, 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   const m = s.match(/rgba?\(([^)]+)\)/i);
   if (m && m[1]) {
-    const parts = m[1].split(",").map((p) => parseFloat(p) || 0);
+    const parts = m[1].split(',').map((p) => parseFloat(p) || 0);
     return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
   }
   return [128, 128, 128];
@@ -62,21 +66,21 @@ export function blend(a: string, b: string, t = 0.5): string {
 
 export function readChartColors(): ChartColors {
   const c = {
-    primary: readVar("--color-primary") || "#3B82F6",
-    primaryDim: readVar("--color-primary-dim") || "#1D4ED8",
-    secondary: readVar("--color-secondary") || "#A78BFA",
-    green: readVar("--color-green") || "#22C55E",
-    warn: readVar("--color-warn") || "#EAB308",
-    danger: readVar("--color-danger") || "#EF4444",
-    textBright: readVar("--color-text-bright") || "#FAFAFA",
-    textNormal: readVar("--color-text-normal") || "#A1A1AA",
-    textMuted: readVar("--color-text-muted") || "#73737B",
-    textDim: readVar("--color-text-dim") || "#5F5F65",
-    bgBase: readVar("--color-bg-base") || "#09090B",
-    bgSurface: readVar("--color-bg-surface") || "#111114",
-    bgRaised: readVar("--color-bg-raised") || "#1A1A1F",
-    border: readVar("--color-border") || "#27272A",
-    borderSubtle: readVar("--color-border-subtle") || "#1E1E22",
+    primary: readVar('--color-primary') || '#3B82F6',
+    primaryDim: readVar('--color-primary-dim') || '#1D4ED8',
+    secondary: readVar('--color-secondary') || '#A78BFA',
+    green: readVar('--color-green') || '#22C55E',
+    warn: readVar('--color-warn') || '#EAB308',
+    danger: readVar('--color-danger') || '#EF4444',
+    textBright: readVar('--color-text-bright') || '#FAFAFA',
+    textNormal: readVar('--color-text-normal') || '#A1A1AA',
+    textMuted: readVar('--color-text-muted') || '#73737B',
+    textDim: readVar('--color-text-dim') || '#5F5F65',
+    bgBase: readVar('--color-bg-base') || '#09090B',
+    bgSurface: readVar('--color-bg-surface') || '#111114',
+    bgRaised: readVar('--color-bg-raised') || '#1A1A1F',
+    border: readVar('--color-border') || '#27272A',
+    borderSubtle: readVar('--color-border-subtle') || '#1E1E22',
   };
   // 8 categorical colors blended from the palette so any theme stays cohesive.
   const series = [
@@ -104,11 +108,16 @@ export function useChartColors(): ChartColors {
 // views stay in sync. Unknown types fall back to a dim primary.
 export function nodeTypeColor(typeName: string, c: ChartColors): string {
   switch (typeName) {
-    case "companion": return c.primary;
-    case "repeater": return c.green;
-    case "room_server": return c.secondary;
-    case "sensor": return c.warn;
-    default: return c.primaryDim;
+    case 'companion':
+      return c.primary;
+    case 'repeater':
+      return c.green;
+    case 'room_server':
+      return c.secondary;
+    case 'sensor':
+      return c.warn;
+    default:
+      return c.primaryDim;
   }
 }
 
@@ -119,6 +128,6 @@ export function tooltipStyle(c: ChartColors) {
     borderColor: c.border,
     borderWidth: 1,
     padding: [7, 11] as [number, number],
-    textStyle: { color: c.textBright, fontFamily: "JetBrains Mono, monospace", fontSize: 11 },
+    textStyle: { color: c.textBright, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 },
   };
 }

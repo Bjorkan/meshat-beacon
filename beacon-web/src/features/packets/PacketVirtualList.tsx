@@ -1,17 +1,17 @@
-import { useRef, useCallback, useLayoutEffect } from "react";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import type { PacketSummary } from "../../types/api";
-import { PacketTableHeader } from "./PacketTableHeader";
-import { PacketTableRow } from "./PacketTableRow";
-import { PacketRow } from "./PacketRow";
-import { PacketExpansion } from "./PacketExpansion";
-import { useFreshHashes } from "./useFreshHashes";
-import { useIsMobile } from "../../hooks/useMediaQuery";
+import { useRef, useCallback, useLayoutEffect } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import type { PacketSummary } from '../../types/api';
+import { PacketTableHeader } from './PacketTableHeader';
+import { PacketTableRow } from './PacketTableRow';
+import { PacketRow } from './PacketRow';
+import { PacketExpansion } from './PacketExpansion';
+import { useFreshHashes } from './useFreshHashes';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import {
   SCROLL_TOP_THRESHOLD_PX,
   SCROLL_BOTTOM_THRESHOLD_PX,
   SCROLL_REVEAL_EPSILON_PX,
-} from "../../lib/constants";
+} from '../../lib/constants';
 
 interface PacketVirtualListProps {
   packets: PacketSummary[];
@@ -90,21 +90,15 @@ export function PacketVirtualList({
     const firstChanged = firstKey !== prevFirstKeyRef.current;
     prevFirstKeyRef.current = firstKey;
     if (firstChanged && atTopRef.current) {
-      virtualizer.scrollToIndex(0, { align: "start" });
+      virtualizer.scrollToIndex(0, { align: 'start' });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on packet-list change; virtualizer is stable
   }, [packets]);
 
   return (
-    <div
-      ref={parentRef}
-      className="flex-1 overflow-y-auto px-4 pb-10"
-      onScroll={handleScroll}
-    >
+    <div ref={parentRef} className="flex-1 overflow-y-auto px-4 pb-10" onScroll={handleScroll}>
       <PacketTableHeader />
-      <div
-        style={{ height: virtualizer.getTotalSize(), position: "relative" }}
-      >
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {
           const packet = packets[virtualRow.index];
           if (!packet) return null;
@@ -116,15 +110,15 @@ export function PacketVirtualList({
               data-testid={`packet-item-${packet.packetHash}`}
               ref={virtualizer.measureElement}
               style={{
-                position: "absolute",
+                position: 'absolute',
                 top: 0,
                 left: 0,
-                width: "100%",
+                width: '100%',
                 transform: `translateY(${virtualRow.start}px)`,
               }}
             >
               {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
-              <div className={isMobile ? "pt-1.5" : ""}>
+              <div className={isMobile ? 'pt-1.5' : ''}>
                 {isMobile ? (
                   <PacketRow
                     packet={packet}

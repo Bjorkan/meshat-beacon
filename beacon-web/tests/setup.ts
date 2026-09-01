@@ -1,11 +1,11 @@
-import "@testing-library/jest-dom/vitest";
-import i18n from "../src/i18n";
-import { cleanup } from "@testing-library/react";
-import { afterEach, vi } from "vitest";
+import '@testing-library/jest-dom/vitest';
+import i18n from '../src/i18n';
+import { cleanup } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
 
 // Production defaults to Swedish (src/i18n.ts), but the component suites assert on English copy.
 // Pin the test language to English up front; tests that exercise language switching set their own.
-await i18n.changeLanguage("en");
+await i18n.changeLanguage('en');
 
 // jsdom doesn't implement matchMedia. Provide a default stub so components that read media queries
 // mount as "desktop" by default — a hover-capable pointer, not below the mobile width. Individual

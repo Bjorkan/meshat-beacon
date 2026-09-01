@@ -1,0 +1,7 @@
+# Generated API contract and client
+openapi/beacon-server.swagger.json
+src/api/generated/
+
+# Design prototypes and generated logo previews
+colour-palettes/
+logo/

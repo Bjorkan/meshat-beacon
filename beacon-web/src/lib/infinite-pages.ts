@@ -1,5 +1,5 @@
-import type { InfiniteData } from "@tanstack/react-query";
-import type { CursorPage } from "../types/api";
+import type { InfiniteData } from '@tanstack/react-query';
+import type { CursorPage } from '../types/api';
 
 // Apply a per-page item patch to a paginated react-query cache (e.g. a WS live update), preserving
 // references when nothing changed: an unchanged page keeps its object, and if no page changed the

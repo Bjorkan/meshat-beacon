@@ -1,46 +1,46 @@
-import type { ChannelMessage } from "../features/channels/types";
-import type { NodeIATA } from "../features/nodes/types";
-import type { PathLength, ResolvedHop } from "./api";
+import type { ChannelMessage } from '../features/channels/types';
+import type { NodeIATA } from '../features/nodes/types';
+import type { PathLength, ResolvedHop } from './api';
 
 // individual server-sent message shapes
 
 export interface WsHello {
   v: 1;
-  type: "hello";
+  type: 'hello';
   serverTime: number;
   connectionId: string;
 }
 
 export interface WsSubscribed {
   v: 1;
-  type: "subscribed";
+  type: 'subscribed';
   id: string;
   subscriptionId: string;
 }
 
 export interface WsUnsubscribed {
   v: 1;
-  type: "unsubscribed";
+  type: 'unsubscribed';
   id: string;
 }
 
 export interface WsPong {
   v: 1;
-  type: "pong";
+  type: 'pong';
   id: string;
 }
 
 export interface WsConfigured {
   v: 1;
-  type: "configured";
+  type: 'configured';
   id: string;
   resolvePath: boolean;
 }
 
 export interface WsPacketObservation {
   v: 1;
-  type: "event";
-  event: "packetObservation";
+  type: 'event';
+  event: 'packetObservation';
   data: {
     packetHash: string;
     packet: {
@@ -74,8 +74,8 @@ export interface WsPacketObservation {
 
 export interface WsObserverStatus {
   v: 1;
-  type: "event";
-  event: "observerStatus";
+  type: 'event';
+  event: 'observerStatus';
   data: {
     observerId: string;
     displayName: string;
@@ -92,8 +92,8 @@ export interface WsObserverStatus {
 
 export interface WsNodeUpdate {
   v: 1;
-  type: "event";
-  event: "nodeUpdate";
+  type: 'event';
+  event: 'nodeUpdate';
   data: {
     nodeId: string;
     publicKey: string;
@@ -113,14 +113,14 @@ export interface WsNodeUpdate {
 
 export interface WsChannelMessage {
   v: 1;
-  type: "event";
-  event: "channelMessage";
+  type: 'event';
+  event: 'channelMessage';
   data: ChannelMessage;
 }
 
 export interface WsLagged {
   v: 1;
-  type: "lagged";
+  type: 'lagged';
   droppedCount: number;
   since: number;
   lastObservationId?: number; // declared in the protocol but not sent today
@@ -128,7 +128,7 @@ export interface WsLagged {
 
 export interface WsError {
   v: 1;
-  type: "error";
+  type: 'error';
   code: string;
   message: string;
 }

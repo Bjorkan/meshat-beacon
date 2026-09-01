@@ -1,11 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
-import { type Theme, DEFAULT_THEME_ID, loadThemes, applyTheme } from "../lib/themes";
-import { ENABLED_THEME_IDS, selectableThemes } from "../lib/constants";
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
+import { type Theme, DEFAULT_THEME_ID, loadThemes, applyTheme } from '../lib/themes';
+import { ENABLED_THEME_IDS, selectableThemes } from '../lib/constants';
 
 // loads themes from JSON, persists selection, applies CSS vars
 
-const STORAGE_KEY = "beacon-theme";
+const STORAGE_KEY = 'beacon-theme';
 
 interface ThemeCtx {
   themeId: string;

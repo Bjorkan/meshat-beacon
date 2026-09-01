@@ -1,6 +1,6 @@
-import { useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { scopeQueries } from "../api/queries";
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { scopeQueries } from '../api/queries';
 
 // The configured transport scope names (e.g. "#bc", "#west"), from /scopes. This is the authoritative
 // list — the scope filters use it for their options so they show every configured scope even before any

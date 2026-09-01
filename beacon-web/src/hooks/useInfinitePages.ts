@@ -1,6 +1,12 @@
-import { useCallback, useEffect, useMemo } from "react";
-import { useInfiniteQuery, keepPreviousData, type UseInfiniteQueryOptions, type InfiniteData, type QueryKey } from "@tanstack/react-query";
-import type { CursorPage } from "../types/api";
+import { useCallback, useEffect, useMemo } from 'react';
+import {
+  useInfiniteQuery,
+  keepPreviousData,
+  type UseInfiniteQueryOptions,
+  type InfiniteData,
+  type QueryKey,
+} from '@tanstack/react-query';
+import type { CursorPage } from '../types/api';
 
 interface UseInfinitePagesOptions<T, TPageParam = number | undefined> {
   // centralized factory output (src/api/queries.ts) — key + fn + pagination mechanics in one object
@@ -28,13 +34,27 @@ interface UseInfinitePagesOptions<T, TPageParam = number | undefined> {
 // load only the first page and pull the rest on demand via loadMore(). Loads once per key (staleTime
 // Infinity, no maxPages); dedupes by id because a non-unique cursor can repeat a row across a page
 // boundary. Shared by the map and the entity tables.
-export function useInfinitePages<T, TPageParam = number | undefined>({ options, getId, keepPrevious, auto = true, enabled = true }: UseInfinitePagesOptions<T, TPageParam>) {
-  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isError, isFetchNextPageError, isLoading } =
-    useInfiniteQuery({
-      ...options,
-      enabled,
-      placeholderData: keepPrevious ? keepPreviousData : undefined,
-    });
+export function useInfinitePages<T, TPageParam = number | undefined>({
+  options,
+  getId,
+  keepPrevious,
+  auto = true,
+  enabled = true,
+}: UseInfinitePagesOptions<T, TPageParam>) {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetching,
+    isFetchingNextPage,
+    isError,
+    isFetchNextPageError,
+    isLoading,
+  } = useInfiniteQuery({
+    ...options,
+    enabled,
+    placeholderData: keepPrevious ? keepPreviousData : undefined,
+  });
 
   // Fetch the next page only when it's safe to: there's more, nothing in flight, and the last attempt
   // didn't fail. The error guard matters because a failed fetchNextPage adds no page, so hasNextPage

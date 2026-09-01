@@ -1,11 +1,11 @@
-import type { NodeSummary, NodeNeighbor } from "../nodes/types";
-import { NODE_TYPE_NAMES, NODE_TYPES } from "../../lib/node-types";
-import { blend, nodeTypeColor, tooltipStyle, withAlpha, type ChartColors } from "./chartTheme";
-import { OBS_STOPS, AGE } from "../map/neighbor-thresholds";
-import type { EChartsOption } from "./echarts-setup";
-import type { TFunction } from "i18next";
+import type { NodeSummary, NodeNeighbor } from '../nodes/types';
+import { NODE_TYPE_NAMES, NODE_TYPES } from '../../lib/node-types';
+import { blend, nodeTypeColor, tooltipStyle, withAlpha, type ChartColors } from './chartTheme';
+import { OBS_STOPS, AGE } from '../map/neighbor-thresholds';
+import type { EChartsOption } from './echarts-setup';
+import type { TFunction } from 'i18next';
 
-const MONO = "JetBrains Mono, monospace";
+const MONO = 'JetBrains Mono, monospace';
 
 // Pure, render-free transform from the region's nodes into an ECharts force-graph shape. Kept
 // maplibre- and echarts-free so it stays unit-testable (mirrors features/map/node-geojson.ts).
@@ -60,7 +60,8 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
   const total = nodes.length;
   // rank by neighbour count, id tie-break so the kept set + indices are stable across re-renders
   const ranked = [...nodes].sort(
-    (a, b) => b.knownNeighborCount - a.knownNeighborCount || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    (a, b) =>
+      b.knownNeighborCount - a.knownNeighborCount || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   const kept = ranked.slice(0, cap);
   const capped = total > kept.length;
@@ -128,7 +129,13 @@ export function ageOpacity(ageDays: number): number {
 const CENTER_SIZE = 30;
 const NEIGHBOUR_SIZE = 14;
 
-function egoNode(id: string, name: string | null, nodeTypeName: string, size: number, degree: number): GraphNode {
+function egoNode(
+  id: string,
+  name: string | null,
+  nodeTypeName: string,
+  size: number,
+  degree: number,
+): GraphNode {
   const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(nodeTypeName);
   return {
     id,
@@ -149,7 +156,10 @@ export function buildEgoGraph(
   neighbors: NodeNeighbor[],
   now: number,
 ): NeighbourGraph {
-  const folded = new Map<string, { name: string | null; nodeTypeName: string; obs: number; lastSeen: number }>();
+  const folded = new Map<
+    string,
+    { name: string | null; nodeTypeName: string; obs: number; lastSeen: number }
+  >();
   for (const nb of neighbors) {
     if (nb.id === center.id) continue;
     const prev = folded.get(nb.id);
@@ -157,15 +167,27 @@ export function buildEgoGraph(
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
     } else {
-      folded.set(nb.id, { name: nb.name ?? null, nodeTypeName: nb.nodeTypeName, obs: nb.observationCount, lastSeen: nb.lastSeen });
+      folded.set(nb.id, {
+        name: nb.name ?? null,
+        nodeTypeName: nb.nodeTypeName,
+        obs: nb.observationCount,
+        lastSeen: nb.lastSeen,
+      });
     }
   }
 
-  const nodes: GraphNode[] = [egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size)];
+  const nodes: GraphNode[] = [
+    egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size),
+  ];
   const links: GraphLink[] = [];
   for (const [id, n] of folded) {
     // push the link first so target points at the node's about-to-be index
-    links.push({ source: 0, target: nodes.length, obs: n.obs, ageDays: Math.max(0, (now - n.lastSeen) / 86_400_000) });
+    links.push({
+      source: 0,
+      target: nodes.length,
+      obs: n.obs,
+      ageDays: Math.max(0, (now - n.lastSeen) / 86_400_000),
+    });
     nodes.push(egoNode(id, n.name, n.nodeTypeName, NEIGHBOUR_SIZE, 0));
   }
   return { nodes, links, total: nodes.length, capped: false };
@@ -176,7 +198,7 @@ export function buildEgoGraph(
 function graphCategories(c: ChartColors, t?: TFunction) {
   return [
     ...NODE_TYPES.map((t) => ({ name: t.label, itemStyle: { color: nodeTypeColor(t.name, c) } })),
-    { name: t?.("common.other") ?? "Other", itemStyle: { color: c.primaryDim } },
+    { name: t?.('common.other') ?? 'Other', itemStyle: { color: c.primaryDim } },
   ];
 }
 
@@ -193,31 +215,37 @@ export function neighbourGraphOption(
   // weighted edges (ego view) get an obs→colour, freshness→opacity line; plain mesh edges stay uniform
   const links = graph.links.map((l) =>
     l.obs != null
-      ? { ...l, lineStyle: { color: obsColor(l.obs, c), opacity: ageOpacity(l.ageDays ?? 0), width: 1.8 } }
+      ? {
+          ...l,
+          lineStyle: { color: obsColor(l.obs, c), opacity: ageOpacity(l.ageDays ?? 0), width: 1.8 },
+        }
       : l,
   );
   return {
     animation: false,
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
     tooltip: {
       ...tooltipStyle(c),
-      trigger: "item",
+      trigger: 'item',
       formatter: (p: unknown) => {
         const param = p as { dataType?: string; data: Record<string, unknown> };
-        if (param.dataType === "edge") {
+        if (param.dataType === 'edge') {
           const obs = param.data.obs as number | undefined;
-          if (obs == null) return ""; // uniform mesh edge — nothing to show
+          if (obs == null) return ''; // uniform mesh edge — nothing to show
           const days = Math.round((param.data.ageDays as number) ?? 0);
-          const observationLabel = opts.t?.("stats.observationAbbrev", { count: obs }) ?? `${obs} obs`;
-          const seenLabel = days === 0
-            ? (opts.t?.("stats.seenToday") ?? "seen today")
-            : (opts.t?.("stats.seenDaysAgo", { count: days }) ?? `seen ${days}d ago`);
+          const observationLabel =
+            opts.t?.('stats.observationAbbrev', { count: obs }) ?? `${obs} obs`;
+          const seenLabel =
+            days === 0
+              ? (opts.t?.('stats.seenToday') ?? 'seen today')
+              : (opts.t?.('stats.seenDaysAgo', { count: days }) ?? `seen ${days}d ago`);
           return `${observationLabel} · ${seenLabel}`;
         }
         const d = param.data as unknown as GraphNode;
-        const type = d.nodeTypeName || (opts.t?.("options.unknown") ?? "unknown");
-        const neighbours = opts.t?.("entities.neighborCount", { count: d.degree })
-          ?? `${d.degree} neighbour${d.degree === 1 ? "" : "s"}`;
+        const type = d.nodeTypeName || (opts.t?.('options.unknown') ?? 'unknown');
+        const neighbours =
+          opts.t?.('entities.neighborCount', { count: d.degree }) ??
+          `${d.degree} neighbour${d.degree === 1 ? '' : 's'}`;
         return d.degree > 0 ? `${d.name}\n${type} · ${neighbours}` : `${d.name}\n${type}`;
       },
     },
@@ -225,8 +253,8 @@ export function neighbourGraphOption(
       {
         data: graphCategories(c, opts.t).map((cat) => cat.name),
         bottom: 4,
-        left: "center",
-        icon: "circle",
+        left: 'center',
+        icon: 'circle',
         itemWidth: 9,
         itemHeight: 9,
         textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
@@ -235,17 +263,35 @@ export function neighbourGraphOption(
     ],
     series: [
       {
-        type: "graph",
-        layout: "force",
+        type: 'graph',
+        layout: 'force',
         roam: true,
         draggable: true,
         scaleLimit: { min: 0.2, max: 8 },
-      categories: graphCategories(c, opts.t),
+        categories: graphCategories(c, opts.t),
         force: ego
-          ? { repulsion: 320, edgeLength: 120, gravity: 0.05, friction: 0.15, layoutAnimation: true }
-          : { repulsion: big ? 60 : 120, edgeLength: big ? [20, 60] : [40, 90], gravity: 0.08, friction: 0.2, layoutAnimation: !big },
-        emphasis: { focus: "none", scale: false },
-        label: { show: false, position: "right", color: c.textNormal, fontFamily: MONO, fontSize: 9 },
+          ? {
+              repulsion: 320,
+              edgeLength: 120,
+              gravity: 0.05,
+              friction: 0.15,
+              layoutAnimation: true,
+            }
+          : {
+              repulsion: big ? 60 : 120,
+              edgeLength: big ? [20, 60] : [40, 90],
+              gravity: 0.08,
+              friction: 0.2,
+              layoutAnimation: !big,
+            },
+        emphasis: { focus: 'none', scale: false },
+        label: {
+          show: false,
+          position: 'right',
+          color: c.textNormal,
+          fontFamily: MONO,
+          fontSize: 9,
+        },
         labelLayout: { hideOverlap: true },
         lineStyle: { color: withAlpha(c.textMuted, 0.22), width: 0.6 },
         itemStyle: { borderColor: c.bgBase, borderWidth: 0.5 },

@@ -1,21 +1,27 @@
-import { useEffect, useMemo, useState } from "react";
-import { useTranslation } from "react-i18next";
-import { useQuery } from "@tanstack/react-query";
-import { Badge } from "../../components/Badge";
-import { EmptyState } from "../../components/EmptyState";
-import { formatBattery, formatCount, formatUptime } from "../../lib/formatters";
-import { statsQueries } from "../../api/queries";
-import { useRegion } from "../../hooks/useRegion";
-import { useChartColors } from "./chartTheme";
-import { useTopObservers } from "./useStats";
-import { useObserver, useObserverTelemetry } from "./useTelemetry";
-import { useTick } from "../../hooks/useTick";
-import { deriveObserverStatus } from "../observers/observer-status";
-import { airtimeOption, batteryOption, noiseFloorOption, queueOption, receiveErrorsOption } from "./chartOptions";
-import { Card, ChartCard } from "./cards";
-import { hasTelemetry } from "./transforms";
-import type { Observer } from "../observers/types";
-import type { StatsRange } from "./types";
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
+import { Badge } from '../../components/Badge';
+import { EmptyState } from '../../components/EmptyState';
+import { formatBattery, formatCount, formatUptime } from '../../lib/formatters';
+import { statsQueries } from '../../api/queries';
+import { useRegion } from '../../hooks/useRegion';
+import { useChartColors } from './chartTheme';
+import { useTopObservers } from './useStats';
+import { useObserver, useObserverTelemetry } from './useTelemetry';
+import { useTick } from '../../hooks/useTick';
+import { deriveObserverStatus } from '../observers/observer-status';
+import {
+  airtimeOption,
+  batteryOption,
+  noiseFloorOption,
+  queueOption,
+  receiveErrorsOption,
+} from './chartOptions';
+import { Card, ChartCard } from './cards';
+import { hasTelemetry } from './transforms';
+import type { Observer } from '../observers/types';
+import type { StatsRange } from './types';
 
 function ObserverList({
   range,
@@ -28,9 +34,9 @@ function ObserverList({
 }) {
   const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   // debounce so the server-side lookup fires once per pause, not once per keystroke
-  const [q, setQ] = useState("");
+  const [q, setQ] = useState('');
   useEffect(() => {
     const id = setTimeout(() => setQ(query.trim()), 250);
     return () => clearTimeout(id);
@@ -40,7 +46,10 @@ function ObserverList({
   // default: top observers by activity (with count + activity bar). Searching swaps to a server-side
   // name lookup across ALL observers in the region, not just the loaded top rows.
   const top = useTopObservers(range, 15);
-  const max = useMemo(() => Math.max(1, ...(top.data ?? []).map((o) => o.observationCount)), [top.data]);
+  const max = useMemo(
+    () => Math.max(1, ...(top.data ?? []).map((o) => o.observationCount)),
+    [top.data],
+  );
 
   const search = useQuery({
     ...statsQueries.observerSearch({ regionKey, iatas, q }),
@@ -49,27 +58,44 @@ function ObserverList({
 
   type Row = { id: string; name: string; count?: number; iata?: string; online?: boolean };
   const rows: Row[] = searching
-    ? (search.data?.items ?? []).map((o) => ({ id: o.id, name: o.displayName ?? o.id.slice(0, 8), iata: o.iata, online: o.status === "online" }))
-    : (top.data ?? []).map((o) => ({ id: o.observerId, name: o.displayName ?? o.observerId.slice(0, 8), count: o.observationCount }));
+    ? (search.data?.items ?? []).map((o) => ({
+        id: o.id,
+        name: o.displayName ?? o.id.slice(0, 8),
+        iata: o.iata,
+        online: o.status === 'online',
+      }))
+    : (top.data ?? []).map((o) => ({
+        id: o.observerId,
+        name: o.displayName ?? o.observerId.slice(0, 8),
+        count: o.observationCount,
+      }));
 
   const loading = searching ? search.isLoading : top.isLoading;
 
   return (
-    <Card title={t("stats.observers")} className="w-full">
+    <Card title={t('stats.observers')} className="w-full">
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        placeholder={t("stats.searchObservers")}
+        placeholder={t('stats.searchObservers')}
         className="mb-2 w-full rounded border border-border bg-bg-base px-2 py-1 font-mono text-[12px] text-text-normal placeholder:text-text-dim"
       />
       <div className="flex flex-col gap-0.5">
-        {loading && <div className="py-6 text-center font-mono text-[11px] text-text-dim">{t(searching ? "routes.searching" : "common.loading")}</div>}
+        {loading && (
+          <div className="py-6 text-center font-mono text-[11px] text-text-dim">
+            {t(searching ? 'routes.searching' : 'common.loading')}
+          </div>
+        )}
         {searching && search.isError && (
-          <div className="py-6 text-center font-mono text-[11px] text-danger">{t("stats.searchFailed")}</div>
+          <div className="py-6 text-center font-mono text-[11px] text-danger">
+            {t('stats.searchFailed')}
+          </div>
         )}
         {!loading && !(searching && search.isError) && rows.length === 0 && (
-          <div className="py-6 text-center font-mono text-[11px] text-text-dim">{t(searching ? "common.noMatches" : "entities.noObservers")}</div>
+          <div className="py-6 text-center font-mono text-[11px] text-text-dim">
+            {t(searching ? 'common.noMatches' : 'entities.noObservers')}
+          </div>
         )}
         {rows.map((r) => {
           const active = r.id === selectedId;
@@ -79,7 +105,9 @@ function ObserverList({
               type="button"
               onClick={() => onSelect(r.id)}
               className={`relative overflow-hidden rounded border-l-2 px-2.5 py-1.5 text-left transition-colors cursor-pointer ${
-                active ? "border-primary bg-primary/10" : "border-transparent hover:bg-text-normal/3"
+                active
+                  ? 'border-primary bg-primary/10'
+                  : 'border-transparent hover:bg-text-normal/3'
               }`}
             >
               {r.count != null && (
@@ -90,13 +118,22 @@ function ObserverList({
                 />
               )}
               <div className="relative flex items-center justify-between gap-2">
-                <span className={`truncate font-mono text-[12px] ${active ? "text-text-bright" : "text-text-normal"}`}>{r.name}</span>
+                <span
+                  className={`truncate font-mono text-[12px] ${active ? 'text-text-bright' : 'text-text-normal'}`}
+                >
+                  {r.name}
+                </span>
                 {r.count != null ? (
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-text-muted">{formatCount(r.count)}</span>
+                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-text-muted">
+                    {formatCount(r.count)}
+                  </span>
                 ) : (
                   <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-text-muted">
                     {r.iata}
-                    <span className={`h-1.5 w-1.5 rounded-full ${r.online ? "bg-green" : "bg-text-dim/30"}`} aria-hidden />
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${r.online ? 'bg-green' : 'bg-text-dim/30'}`}
+                      aria-hidden
+                    />
                   </span>
                 )}
               </div>
@@ -123,20 +160,33 @@ function ObserverHeader({ observer }: { observer: Observer }) {
     <Card
       title={
         <span className="flex items-center gap-2">
-          <span className="text-text-bright normal-case">{observer.displayName ?? observer.id.slice(0, 8)}</span>
-          <Badge variant={status === "online" ? "live" : "offline"}>{t(`options.${status}`)}</Badge>
+          <span className="text-text-bright normal-case">
+            {observer.displayName ?? observer.id.slice(0, 8)}
+          </span>
+          <Badge variant={status === 'online' ? 'live' : 'offline'}>{t(`options.${status}`)}</Badge>
           {observer.observerType && <Badge variant="default">{observer.observerType}</Badge>}
         </span>
       }
       right={
-        <span className="rounded-sm bg-primary/6 px-1.5 py-px font-mono text-[12px] font-semibold text-primary">{observer.iata}</span>
+        <span className="rounded-sm bg-primary/6 px-1.5 py-px font-mono text-[12px] font-semibold text-primary">
+          {observer.iata}
+        </span>
       }
     >
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 font-mono text-[12px]">
-        <Metric label={t("details.battery")} value={observer.batteryLevel != null ? formatBattery(observer.batteryLevel) : "—"} />
-        <Metric label={t("details.uptime")} value={observer.uptimeSeconds != null ? formatUptime(observer.uptimeSeconds) : "—"} />
-        <Metric label={t("details.observations")} value={observer.observationCount.toLocaleString()} />
-        {radio.length > 0 && <Metric label={t("entities.radio")} value={radio.join(" · ")} />}
+        <Metric
+          label={t('details.battery')}
+          value={observer.batteryLevel != null ? formatBattery(observer.batteryLevel) : '—'}
+        />
+        <Metric
+          label={t('details.uptime')}
+          value={observer.uptimeSeconds != null ? formatUptime(observer.uptimeSeconds) : '—'}
+        />
+        <Metric
+          label={t('details.observations')}
+          value={observer.observationCount.toLocaleString()}
+        />
+        {radio.length > 0 && <Metric label={t('entities.radio')} value={radio.join(' · ')} />}
       </div>
     </Card>
   );
@@ -173,12 +223,24 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
 
   const points = useMemo(() => telemetry.data?.points ?? [], [telemetry.data]);
   // use the response's interval, not the range prop — keepPreviousData can briefly show the old range's points
-  const bucketed = telemetry.data != null && telemetry.data.interval !== "1h";
-  const airtime = useMemo(() => airtimeOption(points, colors, bucketed), [points, colors, bucketed]);
-  const battery = useMemo(() => batteryOption(points, colors, `${t("details.battery")} V`), [points, colors, t]);
-  const noise = useMemo(() => noiseFloorOption(points, colors, `${t("details.noiseFloor")} dBm`), [points, colors, t]);
-  const queue = useMemo(() => queueOption(points, colors, t("details.queue")), [points, colors, t]);
-  const recvErrors = useMemo(() => receiveErrorsOption(points, colors, bucketed, t("details.receiveErrors")), [points, colors, bucketed, t]);
+  const bucketed = telemetry.data != null && telemetry.data.interval !== '1h';
+  const airtime = useMemo(
+    () => airtimeOption(points, colors, bucketed),
+    [points, colors, bucketed],
+  );
+  const battery = useMemo(
+    () => batteryOption(points, colors, `${t('details.battery')} V`),
+    [points, colors, t],
+  );
+  const noise = useMemo(
+    () => noiseFloorOption(points, colors, `${t('details.noiseFloor')} dBm`),
+    [points, colors, t],
+  );
+  const queue = useMemo(() => queueOption(points, colors, t('details.queue')), [points, colors, t]);
+  const recvErrors = useMemo(
+    () => receiveErrorsOption(points, colors, bucketed, t('details.receiveErrors')),
+    [points, colors, bucketed, t],
+  );
 
   // Bots / MQTT bridges report status but no device telemetry — show one clear empty state rather
   // than five flat-zero charts. When some telemetry exists, gate each chart on its own metric.
@@ -196,31 +258,65 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
 
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
         {!selectedObserverId ? (
-          <Card title={t("stats.telemetry")}>
-            <EmptyState title={t("stats.selectObserver")} subtitle={t("stats.selectObserverHint")} />
+          <Card title={t('stats.telemetry')}>
+            <EmptyState
+              title={t('stats.selectObserver')}
+              subtitle={t('stats.selectObserverHint')}
+            />
           </Card>
         ) : (
           <>
             {observer.data && <ObserverHeader observer={observer.data} />}
             {noTelemetry ? (
-              <Card title={t("stats.telemetry")}>
-                <EmptyState title={t("stats.noTelemetry")} subtitle={t("stats.noTelemetryHint")} />
+              <Card title={t('stats.telemetry')}>
+                <EmptyState title={t('stats.noTelemetry')} subtitle={t('stats.noTelemetryHint')} />
               </Card>
             ) : (
               <>
                 <ChartCard
-                  title={t("stats.airtimeTxRx", { range })}
+                  title={t('stats.airtimeTxRx', { range })}
                   height={180}
                   option={airtime}
                   isLoading={telemetry.isLoading}
                   isError={telemetry.isError}
-                  isEmpty={missing((p) => p.airtimeTxPct, (p) => p.airtimeRxPct)}
+                  isEmpty={missing(
+                    (p) => p.airtimeTxPct,
+                    (p) => p.airtimeRxPct,
+                  )}
                 />
                 <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-                  <ChartCard title={t("details.battery")} height={168} option={battery} isLoading={telemetry.isLoading} isError={telemetry.isError} isEmpty={missing((p) => p.batteryMv)} />
-                  <ChartCard title={t("details.noiseFloor")} height={168} option={noise} isLoading={telemetry.isLoading} isError={telemetry.isError} isEmpty={missing((p) => p.noiseFloorDb)} />
-                  <ChartCard title={t("stats.queueLength")} height={168} option={queue} isLoading={telemetry.isLoading} isError={telemetry.isError} isEmpty={missing((p) => p.queueLength)} />
-                  <ChartCard title={t("stats.receiveErrors")} height={168} option={recvErrors} isLoading={telemetry.isLoading} isError={telemetry.isError} isEmpty={missing((p) => p.receiveErrors)} />
+                  <ChartCard
+                    title={t('details.battery')}
+                    height={168}
+                    option={battery}
+                    isLoading={telemetry.isLoading}
+                    isError={telemetry.isError}
+                    isEmpty={missing((p) => p.batteryMv)}
+                  />
+                  <ChartCard
+                    title={t('details.noiseFloor')}
+                    height={168}
+                    option={noise}
+                    isLoading={telemetry.isLoading}
+                    isError={telemetry.isError}
+                    isEmpty={missing((p) => p.noiseFloorDb)}
+                  />
+                  <ChartCard
+                    title={t('stats.queueLength')}
+                    height={168}
+                    option={queue}
+                    isLoading={telemetry.isLoading}
+                    isError={telemetry.isError}
+                    isEmpty={missing((p) => p.queueLength)}
+                  />
+                  <ChartCard
+                    title={t('stats.receiveErrors')}
+                    height={168}
+                    option={recvErrors}
+                    isLoading={telemetry.isLoading}
+                    isError={telemetry.isError}
+                    isEmpty={missing((p) => p.receiveErrors)}
+                  />
                 </div>
               </>
             )}

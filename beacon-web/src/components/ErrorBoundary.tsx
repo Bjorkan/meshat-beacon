@@ -1,5 +1,5 @@
-import { Component, type ReactNode } from "react";
-import i18n from "../i18n";
+import { Component, type ReactNode } from 'react';
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -22,16 +22,20 @@ export class ErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
       // React.lazy caches a rejected import, so remounting can't recover a failed chunk load
       // (e.g. a deploy swapped the hashed assets out from under us) — only a real reload can
-      const chunkFailure = /dynamically imported module|Loading chunk|error loading/i.test(this.state.error.message);
+      const chunkFailure = /dynamically imported module|Loading chunk|error loading/i.test(
+        this.state.error.message,
+      );
       return (
         <div className="flex flex-col items-center justify-center flex-1 gap-3 p-8 text-text-dim">
-          <p className="text-sm font-mono">{i18n.t("errors.render")}</p>
+          <p className="text-sm font-mono">{i18n.t('errors.render')}</p>
           <button
             type="button"
             className="text-xs font-mono underline cursor-pointer text-primary"
-            onClick={() => (chunkFailure ? window.location.reload() : this.setState({ error: null }))}
+            onClick={() =>
+              chunkFailure ? window.location.reload() : this.setState({ error: null })
+            }
           >
-            {chunkFailure ? i18n.t("common.reload") : i18n.t("common.tryAgain")}
+            {chunkFailure ? i18n.t('common.reload') : i18n.t('common.tryAgain')}
           </button>
         </div>
       );

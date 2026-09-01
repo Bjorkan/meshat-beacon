@@ -1,16 +1,20 @@
-import { useState, useCallback, useMemo, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { channelQueries } from "../../api/queries";
-import { useRegion } from "../../hooks/useRegion";
-import { useIsMobile } from "../../hooks/useMediaQuery";
-import { useWsChannelMessageHandler } from "../../hooks/useWsHandlers";
-import { SkeletonRows } from "../../components/SkeletonRows";
-import { ChannelSidebar } from "./ChannelSidebar";
-import { ChannelFilterBar } from "./ChannelFilterBar";
-import { MessagePanel } from "./MessagePanel";
-import { filterChannels, type ChannelKeyFilter, type ChannelHashtagFilter } from "./channel-filters";
-import type { ChannelMessage } from "./types";
-import type { WsManager } from "../../api/ws-manager";
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { channelQueries } from '../../api/queries';
+import { useRegion } from '../../hooks/useRegion';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { useWsChannelMessageHandler } from '../../hooks/useWsHandlers';
+import { SkeletonRows } from '../../components/SkeletonRows';
+import { ChannelSidebar } from './ChannelSidebar';
+import { ChannelFilterBar } from './ChannelFilterBar';
+import { MessagePanel } from './MessagePanel';
+import {
+  filterChannels,
+  type ChannelKeyFilter,
+  type ChannelHashtagFilter,
+} from './channel-filters';
+import type { ChannelMessage } from './types';
+import type { WsManager } from '../../api/ws-manager';
 
 export interface ChannelListViewState {
   search: string;
@@ -23,10 +27,18 @@ interface ChannelListProps {
   wsManager: WsManager;
   onAnalyze: (hash: string | null) => void;
   viewState: ChannelListViewState;
-  onViewStateChange: (patch: Partial<ChannelListViewState>, options?: { replace?: boolean }) => void;
+  onViewStateChange: (
+    patch: Partial<ChannelListViewState>,
+    options?: { replace?: boolean },
+  ) => void;
 }
 
-export function ChannelList({ wsManager, onAnalyze, viewState, onViewStateChange }: ChannelListProps) {
+export function ChannelList({
+  wsManager,
+  onAnalyze,
+  viewState,
+  onViewStateChange,
+}: ChannelListProps) {
   const { iatas, regionKey } = useRegion();
   const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -53,8 +65,8 @@ export function ChannelList({ wsManager, onAnalyze, viewState, onViewStateChange
   const sortedChannels = useMemo(
     () =>
       [...(channels ?? [])].sort((a, b) => {
-        const aPub = a.name === "Public" ? 1 : 0;
-        const bPub = b.name === "Public" ? 1 : 0;
+        const aPub = a.name === 'Public' ? 1 : 0;
+        const bPub = b.name === 'Public' ? 1 : 0;
         if (aPub !== bPub) return bPub - aPub;
         if (a.name && !b.name) return -1;
         if (!a.name && b.name) return 1;
@@ -97,7 +109,7 @@ export function ChannelList({ wsManager, onAnalyze, viewState, onViewStateChange
           search={search}
           onSearchChange={(value) => onViewStateChange({ search: value }, { replace: true })}
           searchField={searchField}
-          onSearchFieldChange={(value) => onViewStateChange({ searchField: value, search: "" })}
+          onSearchFieldChange={(value) => onViewStateChange({ searchField: value, search: '' })}
           keyFilter={keyFilter}
           onKeyChange={(value) => onViewStateChange({ keyFilter: value })}
           hashtagFilter={hashtagFilter}

@@ -1,7 +1,7 @@
-import { useQuery } from "@tanstack/react-query";
-import { useRegion } from "../../hooks/useRegion";
-import { statsQueries } from "../../api/queries";
-import type { StatsRange } from "./types";
+import { useQuery } from '@tanstack/react-query';
+import { useRegion } from '../../hooks/useRegion';
+import { statsQueries } from '../../api/queries';
+import type { StatsRange } from './types';
 
 export function useStatsOverview() {
   const { iatas, regionKey } = useRegion();

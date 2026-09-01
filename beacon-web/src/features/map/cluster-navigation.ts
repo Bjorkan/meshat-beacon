@@ -2,9 +2,7 @@
 // always prefer that camera move. Spiderfy is reserved for the terminal case where even the deepest
 // clustered zoom cannot separate the members (typically identical/near-identical coordinates).
 
-export type ClusterClickDecision =
-  | { type: "zoom"; zoom: number }
-  | { type: "spiderfy" };
+export type ClusterClickDecision = { type: 'zoom'; zoom: number } | { type: 'spiderfy' };
 
 export const CLUSTER_ZOOM_DURATION_MS = 420;
 export const CLUSTER_FALLBACK_ZOOM_STEP = 2;
@@ -16,8 +14,8 @@ export function clusterClickDecision(
   maxExpansionZoom: number,
 ): ClusterClickDecision {
   const targetZoom = Math.min(expansionZoom, maxExpansionZoom);
-  if (targetZoom > currentZoom + ZOOM_EPSILON) return { type: "zoom", zoom: targetZoom };
-  return { type: "spiderfy" };
+  if (targetZoom > currentZoom + ZOOM_EPSILON) return { type: 'zoom', zoom: targetZoom };
+  return { type: 'spiderfy' };
 }
 
 // If MapLibre cannot resolve the expansion zoom because the source/style changed mid-click, move a

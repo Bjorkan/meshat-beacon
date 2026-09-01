@@ -1,4 +1,4 @@
-export type PacketPulseDirection = "outbound" | "inbound";
+export type PacketPulseDirection = 'outbound' | 'inbound';
 
 export interface PacketPulseFrame {
   radius: number;
@@ -32,7 +32,7 @@ export function packetPulseFrame(
   if (elapsedMs < 0 || elapsedMs >= PACKET_PULSE_DURATION_MS) return null;
   const t = clamp01(elapsedMs / PACKET_PULSE_DURATION_MS);
 
-  if (direction === "outbound") {
+  if (direction === 'outbound') {
     const radius = lerp(PACKET_PULSE_MIN_RADIUS_PX, PACKET_PULSE_MAX_RADIUS_PX, t);
     const opacity = 0.92 * Math.pow(1 - t, 1.25);
     return {

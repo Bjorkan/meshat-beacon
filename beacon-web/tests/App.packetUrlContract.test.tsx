@@ -1,35 +1,51 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
-import { createMemoryHistory } from "@tanstack/react-router";
-import { App } from "../src/App";
-import { createAppRouter } from "../src/router";
-import type { PacketSummary, PacketDetail } from "../src/types/api";
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { createMemoryHistory } from '@tanstack/react-router';
+import { App } from '../src/App';
+import { createAppRouter } from '../src/router';
+import type { PacketSummary, PacketDetail } from '../src/types/api';
 
 // The Packets tab's URL contract, exercised through a real App: ?hash expands a row, ?analyze=1 adds
 // the drawer on top of it, and a mobile tab change leaves neither behind. Only the network boundary
 // and the virtualizer (needs layout/ResizeObserver jsdom doesn't have) are faked.
 
-vi.mock("../src/api/ws-manager", () => {
+vi.mock('../src/api/ws-manager', () => {
   class WsManager {
     connect() {}
     disconnect() {}
     updateSubscription() {}
     setResolvePath() {}
-    onPacketObservation() { return () => {}; }
-    onLagged() { return () => {}; }
-    onChannelMessage() { return () => {}; }
-    onObserverStatus() { return () => {}; }
-    onNodeUpdate() { return () => {}; }
-    onStatusChange() { return () => {}; }
-    getStatus() { return "disconnected"; }
-    getLastEventTimestamp() { return Date.now(); }
+    onPacketObservation() {
+      return () => {};
+    }
+    onLagged() {
+      return () => {};
+    }
+    onChannelMessage() {
+      return () => {};
+    }
+    onObserverStatus() {
+      return () => {};
+    }
+    onNodeUpdate() {
+      return () => {};
+    }
+    onStatusChange() {
+      return () => {};
+    }
+    getStatus() {
+      return 'disconnected';
+    }
+    getLastEventTimestamp() {
+      return Date.now();
+    }
   }
   return { WsManager };
 });
 
-vi.mock("../src/api/client", () => ({
+vi.mock('../src/api/client', () => ({
   getRegions: async () => [],
-  getRegion: async () => ({ id: 0, slug: "", displayName: "", iatas: [] }),
+  getRegion: async () => ({ id: 0, slug: '', displayName: '', iatas: [] }),
   getIatas: async () => [],
   getScopes: async () => [],
   getChannels: async () => [],
@@ -37,22 +53,47 @@ vi.mock("../src/api/client", () => ({
 }));
 
 const packet: PacketSummary = {
-  packetHash: "AA11", payloadType: 1, payloadTypeName: "ADVERT",
-  routeType: 1, routeTypeName: "FLOOD",
-  firstHeardAt: 1700000000000, lastHeardAt: 1700000002000, observationCount: 1,
+  packetHash: 'AA11',
+  payloadType: 1,
+  payloadTypeName: 'ADVERT',
+  routeType: 1,
+  routeTypeName: 'FLOOD',
+  firstHeardAt: 1700000000000,
+  lastHeardAt: 1700000002000,
+  observationCount: 1,
 };
 
 const detail = {
-  packetHash: "AA11",
-  header: { raw: "12", routeType: 1, routeTypeName: "FLOOD", payloadType: 1, payloadTypeName: "ADVERT", payloadVersion: 1 },
-  firstHeardAt: 1700000000000, lastHeardAt: 1700000002000, firstToLastMs: 2000, observationCount: 1,
-  rawPayload: "", decrypted: false,
+  packetHash: 'AA11',
+  header: {
+    raw: '12',
+    routeType: 1,
+    routeTypeName: 'FLOOD',
+    payloadType: 1,
+    payloadTypeName: 'ADVERT',
+    payloadVersion: 1,
+  },
+  firstHeardAt: 1700000000000,
+  lastHeardAt: 1700000002000,
+  firstToLastMs: 2000,
+  observationCount: 1,
+  rawPayload: '',
+  decrypted: false,
   observations: [
-    { id: 1, observerId: "obs1", observerName: "Observer One", iata: "YOW", heardAt: 1700000000000, sourceBroker: "b1", pathLength: { raw: "00", hashSize: 1, hopCount: 0 }, resolvedPath: [] },
+    {
+      id: 1,
+      observerId: 'obs1',
+      observerName: 'Observer One',
+      iata: 'YOW',
+      heardAt: 1700000000000,
+      sourceBroker: 'b1',
+      pathLength: { raw: '00', hashSize: 1, hopCount: 0 },
+      resolvedPath: [],
+    },
   ],
 } as unknown as PacketDetail;
 
-vi.mock("../src/features/packets/usePackets", () => ({
+vi.mock('../src/features/packets/usePackets', () => ({
   usePackets: () => ({
     allPackets: [packet],
     observerOptions: [],
@@ -71,9 +112,9 @@ vi.mock("../src/features/packets/usePackets", () => ({
   }),
 }));
 
-vi.mock("../src/features/packets/usePacketDetail", () => ({
+vi.mock('../src/features/packets/usePacketDetail', () => ({
   usePacketDetail: (hash: string | null) => ({
-    data: hash === "AA11" ? detail : undefined,
+    data: hash === 'AA11' ? detail : undefined,
     isLoading: false,
     isError: false,
     refetch: () => {},
@@ -92,14 +133,24 @@ interface MockVirtualListProps {
 
 // Stands in for the virtualizer while keeping the real PacketExpansion mounted, so what ?hash
 // expands is the genuine component and not a test stub.
-vi.mock("../src/features/packets/PacketVirtualList", async () => {
-  const { PacketExpansion } = await import("../src/features/packets/PacketExpansion");
+vi.mock('../src/features/packets/PacketVirtualList', async () => {
+  const { PacketExpansion } = await import('../src/features/packets/PacketExpansion');
   return {
-    PacketVirtualList: ({ packets, expandedHash, onToggleExpand, onOpenAnalyzer, onViewPath, selectedObservationId, onSelectObservation }: MockVirtualListProps) => (
+    PacketVirtualList: ({
+      packets,
+      expandedHash,
+      onToggleExpand,
+      onOpenAnalyzer,
+      onViewPath,
+      selectedObservationId,
+      onSelectObservation,
+    }: MockVirtualListProps) => (
       <div>
         {packets.map((p) => (
           <div key={p.packetHash}>
-            <button type="button" onClick={() => onToggleExpand(p.packetHash)}>{p.packetHash}</button>
+            <button type="button" onClick={() => onToggleExpand(p.packetHash)}>
+              {p.packetHash}
+            </button>
             {expandedHash === p.packetHash && (
               <PacketExpansion
                 packet={p}
@@ -130,7 +181,12 @@ function setMobile(matches: boolean) {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {}, removeItem: () => {}, clear: () => {} });
+  vi.stubGlobal('localStorage', {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+  });
 });
 
 afterEach(() => {
@@ -144,50 +200,56 @@ function renderApp(url: string) {
   return appRouter;
 }
 
-describe("Packets deep links", () => {
-  it("restores the expanded row and the drawer from ?hash&analyze=1", async () => {
-    renderApp("/?tab=Packets&hash=AA11&analyze=1");
+describe('Packets deep links', () => {
+  it('restores the expanded row and the drawer from ?hash&analyze=1', async () => {
+    renderApp('/?tab=Packets&hash=AA11&analyze=1');
 
-    expect(await screen.findByTestId("packet-expansion")).toBeInTheDocument();
-    expect(screen.getByTestId("packet-analyzer-drawer")).toBeInTheDocument();
+    expect(await screen.findByTestId('packet-expansion')).toBeInTheDocument();
+    expect(screen.getByTestId('packet-analyzer-drawer')).toBeInTheDocument();
   });
 
-  it("expands the row without the drawer from ?hash alone", async () => {
-    renderApp("/?tab=Packets&hash=AA11");
+  it('expands the row without the drawer from ?hash alone', async () => {
+    renderApp('/?tab=Packets&hash=AA11');
 
-    expect(await screen.findByTestId("packet-expansion")).toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId("packet-analyzer-drawer")).not.toBeInTheDocument());
+    expect(await screen.findByTestId('packet-expansion')).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('packet-analyzer-drawer')).not.toBeInTheDocument(),
+    );
   });
 
-  it("opens nothing when ?analyze=1 arrives without a hash", async () => {
-    renderApp("/?tab=Packets&analyze=1");
+  it('opens nothing when ?analyze=1 arrives without a hash', async () => {
+    renderApp('/?tab=Packets&analyze=1');
 
-    expect(await screen.findByRole("button", { name: "AA11" })).toBeInTheDocument();
-    expect(screen.queryByTestId("packet-expansion")).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.queryByTestId("packet-analyzer-drawer")).not.toBeInTheDocument());
+    expect(await screen.findByRole('button', { name: 'AA11' })).toBeInTheDocument();
+    expect(screen.queryByTestId('packet-expansion')).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.queryByTestId('packet-analyzer-drawer')).not.toBeInTheDocument(),
+    );
   });
 });
 
-describe("leaving the Packets tab", () => {
+describe('leaving the Packets tab', () => {
   // The drawer is full-screen below lg, and it renders on Channels too — so a mobile tab change has
   // to drop ?analyze or the analyzer covers the tab the user just asked for.
-  it("closes the analyzer on mobile", async () => {
+  it('closes the analyzer on mobile', async () => {
     setMobile(true);
-    renderApp("/?tab=Packets&hash=AA11&analyze=1");
-    expect(await screen.findByTestId("packet-analyzer-drawer")).toBeInTheDocument();
+    renderApp('/?tab=Packets&hash=AA11&analyze=1');
+    expect(await screen.findByTestId('packet-analyzer-drawer')).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("tab", { name: "Channels" })[0]!);
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Channels' })[0]!);
 
-    await waitFor(() => expect(screen.queryByTestId("packet-analyzer-drawer")).not.toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.queryByTestId('packet-analyzer-drawer')).not.toBeInTheDocument(),
+    );
   });
 
-  it("keeps the analyzer open on desktop", async () => {
+  it('keeps the analyzer open on desktop', async () => {
     setMobile(false);
-    renderApp("/?tab=Packets&hash=AA11&analyze=1");
-    expect(await screen.findByTestId("packet-analyzer-drawer")).toBeInTheDocument();
+    renderApp('/?tab=Packets&hash=AA11&analyze=1');
+    expect(await screen.findByTestId('packet-analyzer-drawer')).toBeInTheDocument();
 
-    fireEvent.click(screen.getAllByRole("tab", { name: "Channels" })[0]!);
+    fireEvent.click(screen.getAllByRole('tab', { name: 'Channels' })[0]!);
 
-    await waitFor(() => expect(screen.getByTestId("packet-analyzer-drawer")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId('packet-analyzer-drawer')).toBeInTheDocument());
   });
 });

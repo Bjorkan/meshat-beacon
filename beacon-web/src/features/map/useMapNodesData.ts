@@ -1,6 +1,6 @@
-import { useInfinitePages } from "../../hooks/useInfinitePages";
-import { nodeQueries } from "../../api/queries";
-import type { NodeSummary } from "../nodes/types";
+import { useInfinitePages } from '../../hooks/useInfinitePages';
+import { nodeQueries } from '../../api/queries';
+import type { NodeSummary } from '../nodes/types';
 
 const nodeId = (n: NodeSummary) => n.id;
 
@@ -14,11 +14,13 @@ export function useMapNodesData(
   regionKey: string,
   opts?: { enabled?: boolean },
 ) {
-  const { items, loadedCount, isPaging, isError } =
-    useInfinitePages<NodeSummary, string | number | undefined>({
-      options: nodeQueries.mapList({ regionKey, iatas: selectedIatas }),
-      getId: nodeId,
-      enabled: opts?.enabled,
-    });
+  const { items, loadedCount, isPaging, isError } = useInfinitePages<
+    NodeSummary,
+    string | number | undefined
+  >({
+    options: nodeQueries.mapList({ regionKey, iatas: selectedIatas }),
+    getId: nodeId,
+    enabled: opts?.enabled,
+  });
   return { nodes: items, loadedCount, isPaging, isError };
 }

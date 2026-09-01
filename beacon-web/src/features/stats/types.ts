@@ -1,6 +1,6 @@
 // Response shapes for the /stats/* endpoints and observer telemetry. Verified against beacon-server.
 
-import type { NodeIATA } from "../nodes/types";
+import type { NodeIATA } from '../nodes/types';
 
 export interface StatsOverview {
   totalPackets: number;
@@ -113,11 +113,11 @@ export interface ObserverTelemetry {
 }
 
 // Sub-tab + time-range identifiers shared across the Stats page.
-export type StatsTab = "mesh" | "talkers" | "clockdrift" | "observer" | "graph";
-export type StatsRange = "24h" | "7d" | "30d";
+export type StatsTab = 'mesh' | 'talkers' | 'clockdrift' | 'observer' | 'graph';
+export type StatsRange = '24h' | '7d' | '30d';
 
 export const RANGE_MS: Record<StatsRange, number> = {
-  "24h": 24 * 60 * 60 * 1000,
-  "7d": 7 * 24 * 60 * 60 * 1000,
-  "30d": 30 * 24 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
 };

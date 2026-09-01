@@ -1,4 +1,4 @@
-import type { Map as MapLibreMap } from "maplibre-gl";
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
   FOCUSED_NEIGHBORS_LAYER_ID,
   FOCUSED_NEIGHBORS_BASE_LAYER_ID,
@@ -19,7 +19,7 @@ import {
   PACKET_FLOW_PULSE_GLOW_LAYER_ID,
   PACKET_FLOW_PULSE_RING_LAYER_ID,
   PACKET_FLOW_TRAIL_LAYER_ID,
-} from "./types";
+} from './types';
 
 // Bottom-to-top order for Beacon-owned map layers. Hooks can run again independently after a style
 // switch, so creation-time `beforeId` alone is not enough: moving every layer that currently exists
@@ -46,7 +46,7 @@ export const MAP_OVERLAY_LAYER_ORDER = [
   PACKET_FLOW_PULSE_RING_LAYER_ID,
 ] as const;
 
-export function syncMapOverlayLayerOrder(map: Pick<MapLibreMap, "getLayer" | "moveLayer">): void {
+export function syncMapOverlayLayerOrder(map: Pick<MapLibreMap, 'getLayer' | 'moveLayer'>): void {
   for (const layerId of MAP_OVERLAY_LAYER_ORDER) {
     if (map.getLayer(layerId)) map.moveLayer(layerId);
   }

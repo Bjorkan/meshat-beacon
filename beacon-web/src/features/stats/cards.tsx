@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
-import { EChart } from "./EChart";
-import type { EChartsOption } from "./echarts-setup";
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { EChart } from './EChart';
+import type { EChartsOption } from './echarts-setup';
 
 // Titled surface card matching the app's panel language.
 export function Card({
@@ -16,9 +16,11 @@ export function Card({
   className?: string;
 }) {
   return (
-    <div className={`rounded-lg border border-border bg-bg-surface p-3.5 ${className ?? ""}`}>
+    <div className={`rounded-lg border border-border bg-bg-surface p-3.5 ${className ?? ''}`}>
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-text-normal">{title}</div>
+        <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-text-normal">
+          {title}
+        </div>
         {right}
       </div>
       {children}
@@ -35,9 +37,16 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   const range = max - min || 1;
   const pts = values
     .map((v, i) => `${(i / (values.length - 1)) * w},${h - 1 - ((v - min) / range) * (h - 2)}`)
-    .join(" ");
+    .join(' ');
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-1.5" aria-hidden>
+    <svg
+      width="100%"
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      className="mt-1.5"
+      aria-hidden
+    >
       <polyline fill="none" stroke={color} strokeWidth="1.5" points={pts} />
     </svg>
   );
@@ -60,10 +69,14 @@ export function StatCard({
   return (
     <div className="rounded-lg border border-border bg-bg-surface px-3.5 py-3">
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-muted">{label}</span>
+        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+          {label}
+        </span>
         {sublabel && <span className="font-mono text-[9px] text-text-dim">{sublabel}</span>}
       </div>
-      <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-text-bright">{value}</div>
+      <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-text-bright">
+        {value}
+      </div>
       {spark ? <Sparkline values={spark} color={accent} /> : <div className="mt-1.5 h-[20px]" />}
     </div>
   );
@@ -71,7 +84,9 @@ export function StatCard({
 
 function Centered({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full items-center justify-center font-mono text-[11px] text-text-dim">{children}</div>
+    <div className="flex h-full items-center justify-center font-mono text-[11px] text-text-dim">
+      {children}
+    </div>
   );
 }
 
@@ -102,11 +117,11 @@ export function ChartCard({
     <Card title={title} right={right} className={className}>
       <div style={{ height }}>
         {isError ? (
-          <Centered>{t("common.failedToLoad")}</Centered>
+          <Centered>{t('common.failedToLoad')}</Centered>
         ) : isLoading ? (
-          <Centered>{t("common.loading")}</Centered>
+          <Centered>{t('common.loading')}</Centered>
         ) : isEmpty ? (
-          <Centered>{t("common.noData")}</Centered>
+          <Centered>{t('common.noData')}</Centered>
         ) : (
           <EChart option={option} onEvents={onEvents} />
         )}

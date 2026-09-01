@@ -1,10 +1,15 @@
-import { useEffect, useRef } from "react";
-import type { Map as MapLibreMap, GeoJSONSource, LineLayerSpecification, ExpressionSpecification } from "maplibre-gl";
-import type { FeatureCollection, LineString } from "geojson";
-import type { NeighborEdgeProps } from "./node-geojson";
-import { OBS_STOPS, AGE } from "./neighbor-thresholds";
-import { NEIGHBORS_SOURCE_ID, NEIGHBORS_LINE_LAYER_ID } from "./types";
-import { syncMapOverlayLayerOrder } from "./map-layer-order";
+import { useEffect, useRef } from 'react';
+import type {
+  Map as MapLibreMap,
+  GeoJSONSource,
+  LineLayerSpecification,
+  ExpressionSpecification,
+} from 'maplibre-gl';
+import type { FeatureCollection, LineString } from 'geojson';
+import type { NeighborEdgeProps } from './node-geojson';
+import { OBS_STOPS, AGE } from './neighbor-thresholds';
+import { NEIGHBORS_SOURCE_ID, NEIGHBORS_LINE_LAYER_ID } from './types';
+import { syncMapOverlayLayerOrder } from './map-layer-order';
 
 type EdgeFC = FeatureCollection<LineString, NeighborEdgeProps>;
 
@@ -15,17 +20,42 @@ function paletteVar(name: string, fallback: string): string {
 // Opacity: the selected node's coloured edges (they carry `obs`) fade with age — solid when fresh,
 // faint by ~4 weeks (matches the 30-day retention). Ambient "on" edges keep the flat selected/dim split.
 const NEIGHBOR_OPACITY = [
-  "case", ["has", "obs"],
-  ["interpolate", ["linear"], ["get", "ageDays"], AGE.freshDays, AGE.freshOp, AGE.staleDays, AGE.staleOp],
-  ["case", ["get", "selected"], 0.9, 0.3],
+  'case',
+  ['has', 'obs'],
+  [
+    'interpolate',
+    ['linear'],
+    ['get', 'ageDays'],
+    AGE.freshDays,
+    AGE.freshOp,
+    AGE.staleDays,
+    AGE.staleOp,
+  ],
+  ['case', ['get', 'selected'], 0.9, 0.3],
 ] as ExpressionSpecification;
 
 // Colour by observation count on a log axis (counts are heavily right-skewed): ~1 red, ~20 yellow,
 // ~150+ green, clamped past the ends. Edges without a count (the ambient mesh) fall back to primary.
-function neighborLineColor(danger: string, warn: string, green: string, primary: string): ExpressionSpecification {
+function neighborLineColor(
+  danger: string,
+  warn: string,
+  green: string,
+  primary: string,
+): ExpressionSpecification {
   return [
-    "case", ["has", "obs"],
-    ["interpolate", ["linear"], ["log10", ["max", 1, ["get", "obs"]]], OBS_STOPS.danger, danger, OBS_STOPS.warn, warn, OBS_STOPS.green, green],
+    'case',
+    ['has', 'obs'],
+    [
+      'interpolate',
+      ['linear'],
+      ['log10', ['max', 1, ['get', 'obs']]],
+      OBS_STOPS.danger,
+      danger,
+      OBS_STOPS.warn,
+      warn,
+      OBS_STOPS.green,
+      green,
+    ],
     primary,
   ] as ExpressionSpecification;
 }
@@ -50,30 +80,30 @@ export function useMapNeighbors(
     if (!map || !isReady) return;
 
     const lineColor = neighborLineColor(
-      paletteVar("--palette-danger", "#EF4444"),
-      paletteVar("--palette-warn", "#EAB308"),
-      paletteVar("--palette-green", "#22C55E"),
-      paletteVar("--palette-primary", "#3B82F6"),
+      paletteVar('--palette-danger', '#EF4444'),
+      paletteVar('--palette-warn', '#EAB308'),
+      paletteVar('--palette-green', '#22C55E'),
+      paletteVar('--palette-primary', '#3B82F6'),
     );
 
     if (!map.getSource(NEIGHBORS_SOURCE_ID)) {
-      map.addSource(NEIGHBORS_SOURCE_ID, { type: "geojson", data: edgesRef.current });
+      map.addSource(NEIGHBORS_SOURCE_ID, { type: 'geojson', data: edgesRef.current });
     }
     if (!map.getLayer(NEIGHBORS_LINE_LAYER_ID)) {
       map.addLayer({
-          id: NEIGHBORS_LINE_LAYER_ID,
-          type: "line",
-          source: NEIGHBORS_SOURCE_ID,
-          layout: { "line-cap": "round", "line-join": "round" },
-          paint: {
-            "line-color": lineColor,
-            // edges touching the selected node read stronger than the ambient mesh
-            "line-width": ["case", ["get", "selected"], 2, 1],
-            "line-opacity": NEIGHBOR_OPACITY,
-          },
-        } as LineLayerSpecification);
+        id: NEIGHBORS_LINE_LAYER_ID,
+        type: 'line',
+        source: NEIGHBORS_SOURCE_ID,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-color': lineColor,
+          // edges touching the selected node read stronger than the ambient mesh
+          'line-width': ['case', ['get', 'selected'], 2, 1],
+          'line-opacity': NEIGHBOR_OPACITY,
+        },
+      } as LineLayerSpecification);
     }
-    map.setPaintProperty(NEIGHBORS_LINE_LAYER_ID, "line-color", lineColor);
+    map.setPaintProperty(NEIGHBORS_LINE_LAYER_ID, 'line-color', lineColor);
     (map.getSource(NEIGHBORS_SOURCE_ID) as GeoJSONSource).setData(edgesRef.current);
     syncMapOverlayLayerOrder(map);
   }, [mapRef, isReady, themeKey]);

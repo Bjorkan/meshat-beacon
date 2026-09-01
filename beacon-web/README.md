@@ -23,11 +23,11 @@ VITE_WS_URL=wss://dev.meshcore.ca/ws
 EOF
 ```
 
-| Variable | Description |
-|---|---|
-| `DOMAIN` | Domain for HTTPS (Caddy auto-provisions Let's Encrypt certs) |
-| `VITE_API_BASE` | Backend REST API base URL |
-| `VITE_WS_URL` | Backend WebSocket URL |
+| Variable        | Description                                                  |
+| --------------- | ------------------------------------------------------------ |
+| `DOMAIN`        | Domain for HTTPS (Caddy auto-provisions Let's Encrypt certs) |
+| `VITE_API_BASE` | Backend REST API base URL                                    |
+| `VITE_WS_URL`   | Backend WebSocket URL                                        |
 
 ### 3. Start the services
 
@@ -56,14 +56,14 @@ npm run dev             # starts Vite dev server at http://localhost:5173
 
 ### Commands
 
-| Command | Description |
-|---|---|
-| `npm run dev` | Start dev server |
-| `npm run build` | Type-check and build for production |
-| `npm run preview` | Preview production build locally |
-| `npm run lint` | Run ESLint |
-| `npx vitest run` | Run tests |
-| `npx tsc --noEmit` | Type-check without emitting |
+| Command            | Description                         |
+| ------------------ | ----------------------------------- |
+| `npm run dev`      | Start dev server                    |
+| `npm run build`    | Type-check and build for production |
+| `npm run preview`  | Preview production build locally    |
+| `npm run lint`     | Run ESLint                          |
+| `npx vitest run`   | Run tests                           |
+| `npx tsc --noEmit` | Type-check without emitting         |
 
 ## Project Structure
 

@@ -1,4 +1,4 @@
-import { BeaconLogo } from "./BeaconLogo";
+import { BeaconLogo } from './BeaconLogo';
 
 // shared empty/placeholder state: faint on-brand beacon mark + message
 

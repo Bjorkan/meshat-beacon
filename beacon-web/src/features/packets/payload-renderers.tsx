@@ -1,12 +1,18 @@
-import type { ReactNode } from "react";
-import { useTranslation } from "react-i18next";
-import { Badge } from "../../components/Badge";
-import { formatSnr, snrLevel, SIGNAL_LEVEL_CLASSES } from "../../lib/formatters";
-import { Timestamp } from "../../components/Timestamp";
-import { ColorAccentField, AdvertFlagsBitBreakdown, PathLengthBitBreakdown, FIELD_COLORS, DEVICE_ROLE_NAMES } from "./packet-structure";
-import type { FieldId } from "./packet-structure";
-import { ResolvedHopBlock } from "./PathData";
-import type { ResolvedHop } from "../../types/api";
+import type { ReactNode } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Badge } from '../../components/Badge';
+import { formatSnr, snrLevel, SIGNAL_LEVEL_CLASSES } from '../../lib/formatters';
+import { Timestamp } from '../../components/Timestamp';
+import {
+  ColorAccentField,
+  AdvertFlagsBitBreakdown,
+  PathLengthBitBreakdown,
+  FIELD_COLORS,
+  DEVICE_ROLE_NAMES,
+} from './packet-structure';
+import type { FieldId } from './packet-structure';
+import { ResolvedHopBlock } from './PathData';
+import type { ResolvedHop } from '../../types/api';
 
 // shared layout primitives for payload fields
 
@@ -23,7 +29,11 @@ interface EndpointProps {
 }
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
-  return <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">{children}</div>;
+  return (
+    <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">
+      {children}
+    </div>
+  );
 }
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
@@ -35,16 +45,24 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
   );
 }
 
-function TruncatedHex({ label, value, maxChars = 16, accentClass }: {
+function TruncatedHex({
+  label,
+  value,
+  maxChars = 16,
+  accentClass,
+}: {
   label: string;
   value: string;
   maxChars?: number;
   accentClass?: string;
 }) {
-  const display = value.length > maxChars ? value.slice(0, maxChars).toUpperCase() + "…" : value.toUpperCase();
+  const display =
+    value.length > maxChars ? value.slice(0, maxChars).toUpperCase() + '…' : value.toUpperCase();
   const bytes = value.length / 2;
   return (
-    <div className={`pl-2 -mx-1 py-0.5 -my-0.5 border-l-2 ${accentClass ?? "border-l-secondary/50"}`}>
+    <div
+      className={`pl-2 -mx-1 py-0.5 -my-0.5 border-l-2 ${accentClass ?? 'border-l-secondary/50'}`}
+    >
       <span className="text-text-dim">{label} </span>
       <span className="text-text-normal">{display}</span>
       <span className="text-text-dim"> ({bytes}B)</span>
@@ -62,17 +80,32 @@ function HexBadge({ value }: { value: string }) {
 
 function BooleanValue({ value }: { value: boolean }) {
   const { t } = useTranslation();
-  return <span className={value ? "text-green" : "text-text-muted"}>{t(value ? "common.yes" : "common.no")}</span>;
+  return (
+    <span className={value ? 'text-green' : 'text-text-muted'}>
+      {t(value ? 'common.yes' : 'common.no')}
+    </span>
+  );
 }
 
-function FlagChip({ label, active, variant = "green" }: { label: string; active: boolean; variant?: "green" | "danger" }) {
-  const activeClasses = variant === "danger"
-    ? "bg-danger/8 text-danger border-danger/15"
-    : "bg-green/8 text-green border-green/15";
+function FlagChip({
+  label,
+  active,
+  variant = 'green',
+}: {
+  label: string;
+  active: boolean;
+  variant?: 'green' | 'danger';
+}) {
+  const activeClasses =
+    variant === 'danger'
+      ? 'bg-danger/8 text-danger border-danger/15'
+      : 'bg-green/8 text-green border-green/15';
   return (
-    <span className={`text-xs px-1.5 py-px rounded-sm border font-medium ${
-      active ? activeClasses : "bg-bg-base text-text-dim border-border-subtle"
-    }`}>
+    <span
+      className={`text-xs px-1.5 py-px rounded-sm border font-medium ${
+        active ? activeClasses : 'bg-bg-base text-text-dim border-border-subtle'
+      }`}
+    >
       {label}
     </span>
   );
@@ -84,14 +117,26 @@ function EncryptedIndicator() {
     <div className="flex items-center gap-1.5 text-text-muted text-xs bg-text-muted/5 border border-text-muted/10 rounded px-2 py-1">
       <svg width="10" height="10" viewBox="0 0 16 16" fill="none" className="shrink-0">
         <rect x="3" y="8" width="10" height="6" rx="1" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M5 8V5.5C5 3.567 6.567 2 8.5 2V2C10.433 2 12 3.567 12 5.5V8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+        <path
+          d="M5 8V5.5C5 3.567 6.567 2 8.5 2V2C10.433 2 12 3.567 12 5.5V8"
+          stroke="currentColor"
+          strokeWidth="1.3"
+          strokeLinecap="round"
+        />
       </svg>
-      <span className="italic">{t("packets.encryptedKeyUnavailable")}</span>
+      <span className="italic">{t('packets.encryptedKeyUnavailable')}</span>
     </div>
   );
 }
 
-function EncryptedEnvelope({ payload, headerSlot, children, resolvedSource, resolvedDestination, onViewNode }: {
+function EncryptedEnvelope({
+  payload,
+  headerSlot,
+  children,
+  resolvedSource,
+  resolvedDestination,
+  onViewNode,
+}: {
   payload: Record<string, unknown>;
   headerSlot?: ReactNode;
   children: (decrypted: Record<string, unknown>) => ReactNode;
@@ -108,30 +153,57 @@ function EncryptedEnvelope({ payload, headerSlot, children, resolvedSource, reso
       <div className="flex flex-col gap-1">
         {destinationHash && (
           <ColorAccentField field="destinationHash">
-            <span className="text-text-dim">{t("packets.to")} </span>
-            {resolvedDestination
-              ? <ResolvedHopBlock hop={resolvedDestination} label={destinationHash.toUpperCase()} onViewNode={onViewNode} showSnr={false} />
-              : <HexBadge value={destinationHash} />}
+            <span className="text-text-dim">{t('packets.to')} </span>
+            {resolvedDestination ? (
+              <ResolvedHopBlock
+                hop={resolvedDestination}
+                label={destinationHash.toUpperCase()}
+                onViewNode={onViewNode}
+                showSnr={false}
+              />
+            ) : (
+              <HexBadge value={destinationHash} />
+            )}
             <span className="text-text-dim"> ({destinationHash.length / 2}B)</span>
           </ColorAccentField>
         )}
         {sourceHash && (
           <ColorAccentField field="sourceHash">
-            <span className="text-text-dim">{t("packets.from")} </span>
-            {resolvedSource
-              ? <ResolvedHopBlock hop={resolvedSource} label={sourceHash.toUpperCase()} onViewNode={onViewNode} showSnr={false} />
-              : <HexBadge value={sourceHash} />}
+            <span className="text-text-dim">{t('packets.from')} </span>
+            {resolvedSource ? (
+              <ResolvedHopBlock
+                hop={resolvedSource}
+                label={sourceHash.toUpperCase()}
+                onViewNode={onViewNode}
+                showSnr={false}
+              />
+            ) : (
+              <HexBadge value={sourceHash} />
+            )}
             <span className="text-text-dim"> ({sourceHash.length / 2}B)</span>
           </ColorAccentField>
         )}
         {headerSlot}
-        {cipherMac && <TruncatedHex label="MAC" value={cipherMac} maxChars={32} accentClass={FIELD_COLORS.cipherMac.accent} />}
-        {ciphertext && <TruncatedHex label={t("fields.ciphertext")} value={ciphertext} accentClass={FIELD_COLORS.ciphertext.accent} />}
+        {cipherMac && (
+          <TruncatedHex
+            label="MAC"
+            value={cipherMac}
+            maxChars={32}
+            accentClass={FIELD_COLORS.cipherMac.accent}
+          />
+        )}
+        {ciphertext && (
+          <TruncatedHex
+            label={t('fields.ciphertext')}
+            value={ciphertext}
+            accentClass={FIELD_COLORS.ciphertext.accent}
+          />
+        )}
       </div>
 
       {decrypted ? (
         <div>
-          <SectionLabel>{t("packets.decrypted")}</SectionLabel>
+          <SectionLabel>{t('packets.decrypted')}</SectionLabel>
           {children(decrypted)}
         </div>
       ) : (
@@ -151,7 +223,7 @@ function AdvertPayload({ payload }: PayloadProps) {
   const timestamp = p.timestamp as number | undefined;
   const appData = (p.appData ?? {}) as Record<string, unknown>;
   const flags = (appData.flags ?? {}) as Record<string, unknown>;
-  const flagsByte = typeof flags.raw === "string" ? parseInt(flags.raw, 16) : undefined;
+  const flagsByte = typeof flags.raw === 'string' ? parseInt(flags.raw, 16) : undefined;
   const latitude = appData.latitude as number | null | undefined;
   const longitude = appData.longitude as number | null | undefined;
   const hasLocation = flags.hasLocation as boolean | undefined;
@@ -161,7 +233,7 @@ function AdvertPayload({ payload }: PayloadProps) {
     <div className="flex flex-col gap-2.5">
       {publicKey && (
         <ColorAccentField field="publicKey">
-          <span className="text-text-dim">{t("fields.publicKey")} </span>
+          <span className="text-text-dim">{t('fields.publicKey')} </span>
           <span className="text-text-normal">{publicKey.slice(0, 16).toUpperCase()}…</span>
           <span className="text-text-dim"> ({publicKey.length / 2}B)</span>
         </ColorAccentField>
@@ -169,7 +241,7 @@ function AdvertPayload({ payload }: PayloadProps) {
 
       {timestamp != null && (
         <ColorAccentField field="advertTimestamp">
-          <span className="text-text-dim">{t("fields.timestamp")} </span>
+          <span className="text-text-dim">{t('fields.timestamp')} </span>
           <Timestamp value={timestamp * 1000} className="text-text-normal" />
           <span className="text-text-dim"> (4B LE)</span>
         </ColorAccentField>
@@ -177,32 +249,51 @@ function AdvertPayload({ payload }: PayloadProps) {
 
       {signature && (
         <ColorAccentField field="signature">
-          <span className="text-text-dim">{t("fields.signature")} </span>
+          <span className="text-text-dim">{t('fields.signature')} </span>
           <span className="text-text-normal">{signature.slice(0, 16).toUpperCase()}…</span>
           <span className="text-text-dim"> ({signature.length / 2}B)</span>
         </ColorAccentField>
       )}
 
       <ColorAccentField field="flags">
-        <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">App Flags</div>
-        <div className="flex gap-x-4">
-          <span><span className="text-text-dim">{t("fields.role")} </span><span className="text-text-normal">{String(flags.deviceRoleName ?? "?")}</span></span>
-          <span><span className="text-text-dim">Loc </span><BooleanValue value={!!flags.hasLocation} /></span>
-          <span><span className="text-text-dim">F1 </span><BooleanValue value={!!flags.hasFeature1} /></span>
-          <span><span className="text-text-dim">F2 </span><BooleanValue value={!!flags.hasFeature2} /></span>
-          <span><span className="text-text-dim">{t("fields.name")} </span><BooleanValue value={!!flags.hasName} /></span>
+        <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">
+          App Flags
         </div>
-        {flagsByte != null && !Number.isNaN(flagsByte) && <AdvertFlagsBitBreakdown flagsByte={flagsByte} />}
+        <div className="flex gap-x-4">
+          <span>
+            <span className="text-text-dim">{t('fields.role')} </span>
+            <span className="text-text-normal">{String(flags.deviceRoleName ?? '?')}</span>
+          </span>
+          <span>
+            <span className="text-text-dim">Loc </span>
+            <BooleanValue value={!!flags.hasLocation} />
+          </span>
+          <span>
+            <span className="text-text-dim">F1 </span>
+            <BooleanValue value={!!flags.hasFeature1} />
+          </span>
+          <span>
+            <span className="text-text-dim">F2 </span>
+            <BooleanValue value={!!flags.hasFeature2} />
+          </span>
+          <span>
+            <span className="text-text-dim">{t('fields.name')} </span>
+            <BooleanValue value={!!flags.hasName} />
+          </span>
+        </div>
+        {flagsByte != null && !Number.isNaN(flagsByte) && (
+          <AdvertFlagsBitBreakdown flagsByte={flagsByte} />
+        )}
       </ColorAccentField>
 
       {/* Coordinates render as raw decimal degrees by design — intentionally not D°M' / N·S·E·W formatted. */}
       {hasLocation && (latitude != null || longitude != null) && (
         <ColorAccentField field="location">
-          <span className="text-text-dim">{t("fields.location")} </span>
+          <span className="text-text-dim">{t('fields.location')} </span>
           <span className="text-text-normal">
-            {latitude != null ? latitude.toFixed(5) : "—"}
-            {", "}
-            {longitude != null ? longitude.toFixed(5) : "—"}
+            {latitude != null ? latitude.toFixed(5) : '—'}
+            {', '}
+            {longitude != null ? longitude.toFixed(5) : '—'}
           </span>
           <span className="text-text-dim"> (8B LE)</span>
         </ColorAccentField>
@@ -210,7 +301,7 @@ function AdvertPayload({ payload }: PayloadProps) {
 
       {name && (
         <ColorAccentField field="advertName">
-          <span className="text-text-dim">{t("fields.name")} </span>
+          <span className="text-text-dim">{t('fields.name')} </span>
           <span className="text-text-normal">{name}</span>
           <span className="text-text-dim"> ({new TextEncoder().encode(name).length}B UTF-8)</span>
         </ColorAccentField>
@@ -219,7 +310,11 @@ function AdvertPayload({ payload }: PayloadProps) {
   );
 }
 
-function TracePayload({ payload, resolvedRoute, onViewNode }: PayloadProps & {
+function TracePayload({
+  payload,
+  resolvedRoute,
+  onViewNode,
+}: PayloadProps & {
   resolvedRoute?: ResolvedHop[];
   onViewNode?: (nodeId: string) => void;
 }) {
@@ -251,28 +346,41 @@ function TracePayload({ payload, resolvedRoute, onViewNode }: PayloadProps & {
       {flags != null && (
         <ColorAccentField field="flags">
           <span className="text-text-dim">Flags </span>
-          <span className="text-text-normal">0x{flags.toString(16).toUpperCase().padStart(2, "0")}</span>
+          <span className="text-text-normal">
+            0x{flags.toString(16).toUpperCase().padStart(2, '0')}
+          </span>
         </ColorAccentField>
       )}
 
       {pathHashes && pathHashes.length > 0 && (
         <ColorAccentField field="tracePath">
-          <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">{t("packets.tracePath")}</div>
+          <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">
+            {t('packets.tracePath')}
+          </div>
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-[13px]">
             {pathHashes.map((hash, i) => {
               const snr = snrValues?.[i];
               const level = snr != null ? snrLevel(snr) : null;
-              const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : "text-text-normal";
+              const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
               // When the packet detail resolved this trace's route, overlay it onto each hash block:
               // tint by match confidence and reveal the resolved node(s) on hover. Falls back to the
               // plain hash badge when there's no resolution (e.g. live/WS view).
               const resolved = resolvedRoute?.[i];
               return (
                 <span key={i} className="contents">
-                  {i > 0 && <span className="text-text-dim" aria-hidden>→</span>}
+                  {i > 0 && (
+                    <span className="text-text-dim" aria-hidden>
+                      →
+                    </span>
+                  )}
                   <span className="inline-flex flex-col items-center gap-0.5">
                     {resolvedRoute ? (
-                      <ResolvedHopBlock hop={resolved} label={hash.toUpperCase()} onViewNode={onViewNode} showSnr={false} />
+                      <ResolvedHopBlock
+                        hop={resolved}
+                        label={hash.toUpperCase()}
+                        onViewNode={onViewNode}
+                        showSnr={false}
+                      />
                     ) : (
                       <HexBadge value={hash} />
                     )}
@@ -281,7 +389,9 @@ function TracePayload({ payload, resolvedRoute, onViewNode }: PayloadProps & {
                     {snr != null ? (
                       <span className={`text-[11px] ${sigClass}`}>{formatSnr(snr)} dB</span>
                     ) : (
-                      <span className="text-[11px] text-text-dim" aria-hidden>-</span>
+                      <span className="text-[11px] text-text-dim" aria-hidden>
+                        -
+                      </span>
                     )}
                   </span>
                 </span>
@@ -304,30 +414,54 @@ function GroupTextPayload({ payload }: PayloadProps) {
   return (
     <div className="flex flex-col gap-2.5">
       <div className="flex flex-col gap-1">
-        {channelHash && <TruncatedHex label={t("fields.channel")} value={channelHash} maxChars={32} accentClass={FIELD_COLORS.channelHash.accent} />}
-        {cipherMac && <TruncatedHex label="MAC" value={cipherMac} maxChars={32} accentClass={FIELD_COLORS.cipherMac.accent} />}
-        {ciphertext && <TruncatedHex label={t("fields.ciphertext")} value={ciphertext} accentClass={FIELD_COLORS.ciphertext.accent} />}
+        {channelHash && (
+          <TruncatedHex
+            label={t('fields.channel')}
+            value={channelHash}
+            maxChars={32}
+            accentClass={FIELD_COLORS.channelHash.accent}
+          />
+        )}
+        {cipherMac && (
+          <TruncatedHex
+            label="MAC"
+            value={cipherMac}
+            maxChars={32}
+            accentClass={FIELD_COLORS.cipherMac.accent}
+          />
+        )}
+        {ciphertext && (
+          <TruncatedHex
+            label={t('fields.ciphertext')}
+            value={ciphertext}
+            accentClass={FIELD_COLORS.ciphertext.accent}
+          />
+        )}
       </div>
 
       {decrypted ? (
         <div>
-          <SectionLabel>{t("packets.decrypted")}</SectionLabel>
+          <SectionLabel>{t('packets.decrypted')}</SectionLabel>
           <div className="flex flex-col gap-1">
             {decrypted.sender != null && (
               <div>
-                <span className="text-text-dim">{t("fields.sender")} </span>
+                <span className="text-text-dim">{t('fields.sender')} </span>
                 <span className="text-text-normal font-semibold">{String(decrypted.sender)}</span>
               </div>
             )}
             {decrypted.content != null && (
               <div>
                 {/* label sits above the body so every line of a multi-line message shares a left edge */}
-                <div className="text-text-dim">{t("fields.message")}</div>
-                <div className="text-text-bright whitespace-pre-wrap break-words pl-2">{String(decrypted.content)}</div>
+                <div className="text-text-dim">{t('fields.message')}</div>
+                <div className="text-text-bright whitespace-pre-wrap break-words pl-2">
+                  {String(decrypted.content)}
+                </div>
               </div>
             )}
             {decrypted.sentAt != null && (
-              <div className="text-text-dim"><Timestamp value={decrypted.sentAt as number} /></div>
+              <div className="text-text-dim">
+                <Timestamp value={decrypted.sentAt as number} />
+              </div>
             )}
           </div>
         </div>
@@ -345,11 +479,17 @@ function TextPayload({ payload, ...endpoints }: PayloadProps & EndpointProps) {
       {(d) => (
         <div className="flex flex-col gap-1">
           {d.message != null && (
-            <div className="text-text-bright whitespace-pre-wrap break-words">{String(d.message)}</div>
+            <div className="text-text-bright whitespace-pre-wrap break-words">
+              {String(d.message)}
+            </div>
           )}
           <div className="flex gap-x-4 text-text-dim">
             {d.timestamp != null && <Timestamp value={(d.timestamp as number) * 1000} />}
-            {d.attempt != null && <span>{t("packets.attempt")} {String(d.attempt)}</span>}
+            {d.attempt != null && (
+              <span>
+                {t('packets.attempt')} {String(d.attempt)}
+              </span>
+            )}
             {d.flags != null && <span>Flags {String(d.flags)}</span>}
           </div>
         </div>
@@ -365,13 +505,15 @@ function RequestPayload({ payload, ...endpoints }: PayloadProps & EndpointProps)
       {(d) => (
         <div className="flex flex-col gap-1.5">
           {d.requestTypeName != null && (
-            <div><Badge variant="request">{String(d.requestTypeName)}</Badge></div>
+            <div>
+              <Badge variant="request">{String(d.requestTypeName)}</Badge>
+            </div>
           )}
           {d.requestData != null && (
-            <TruncatedHex label={t("fields.data")} value={String(d.requestData)} />
+            <TruncatedHex label={t('fields.data')} value={String(d.requestData)} />
           )}
           {d.timestamp != null && (
-            <FieldRow label={t("fields.time")}>
+            <FieldRow label={t('fields.time')}>
               <Timestamp value={(d.timestamp as number) * 1000} className="text-text-normal" />
             </FieldRow>
           )}
@@ -388,10 +530,14 @@ function ResponsePayload({ payload, ...endpoints }: PayloadProps & EndpointProps
       {(d) => (
         <div className="flex flex-col gap-1">
           {d.tag != null && (
-            <FieldRow label={t("fields.tag")}><span className="text-text-normal">{String(d.tag)}</span></FieldRow>
+            <FieldRow label={t('fields.tag')}>
+              <span className="text-text-normal">{String(d.tag)}</span>
+            </FieldRow>
           )}
           {d.content != null && (
-            <div className="text-text-bright whitespace-pre-wrap break-words">{String(d.content)}</div>
+            <div className="text-text-bright whitespace-pre-wrap break-words">
+              {String(d.content)}
+            </div>
           )}
         </div>
       )}
@@ -406,7 +552,7 @@ function AckPayload({ payload }: PayloadProps) {
 
   return (
     <ColorAccentField field="checksum">
-      <span className="text-text-dim">{t("fields.checksum")} </span>
+      <span className="text-text-dim">{t('fields.checksum')} </span>
       <HexBadge value={checksum} />
       <span className="text-text-dim"> ({checksum.length / 2}B)</span>
     </ColorAccentField>
@@ -429,19 +575,24 @@ function PathDecryptedContent({ decrypted }: { decrypted: Record<string, unknown
   const extraTypeName = decrypted.extraTypeName as string | undefined;
   const extraData = decrypted.extraData as string | undefined;
 
-  const pathLenByte = pathLength != null && pathHashSize != null
-    ? ((pathHashSize - 1) << 6) | (pathLength & 0x3f)
-    : null;
+  const pathLenByte =
+    pathLength != null && pathHashSize != null
+      ? ((pathHashSize - 1) << 6) | (pathLength & 0x3f)
+      : null;
 
   return (
     <div className="flex flex-col gap-2.5">
       <div>
         <div className="flex gap-x-4">
           {pathLength != null && (
-            <FieldRow label={t("packets.hops")}><span className="text-text-normal">{pathLength}</span></FieldRow>
+            <FieldRow label={t('packets.hops')}>
+              <span className="text-text-normal">{pathLength}</span>
+            </FieldRow>
           )}
           {pathHashSize != null && (
-            <FieldRow label={t("packets.hashSize")}><span className="text-text-normal">{pathHashSize}B</span></FieldRow>
+            <FieldRow label={t('packets.hashSize')}>
+              <span className="text-text-normal">{pathHashSize}B</span>
+            </FieldRow>
           )}
         </div>
         {pathLenByte != null && <PathLengthBitBreakdown pathLengthByte={pathLenByte} />}
@@ -449,11 +600,15 @@ function PathDecryptedContent({ decrypted }: { decrypted: Record<string, unknown
 
       {pathHashes && pathHashes.length > 0 && (
         <div>
-          <SectionLabel>{t("fields.path")}</SectionLabel>
+          <SectionLabel>{t('fields.path')}</SectionLabel>
           <div className="flex flex-wrap items-center gap-1">
             {pathHashes.map((hash, i) => (
               <span key={i} className="contents">
-                {i > 0 && <span className="text-text-dim text-xs" aria-hidden>→</span>}
+                {i > 0 && (
+                  <span className="text-text-dim text-xs" aria-hidden>
+                    →
+                  </span>
+                )}
                 <HexBadge value={hash} />
               </span>
             ))}
@@ -465,11 +620,11 @@ function PathDecryptedContent({ decrypted }: { decrypted: Record<string, unknown
         <div className="flex flex-col gap-1">
           {extraTypeName && (
             <div>
-              <span className="text-text-dim">{t("packets.bundledType")} </span>
+              <span className="text-text-dim">{t('packets.bundledType')} </span>
               <Badge variant="default">{extraTypeName}</Badge>
             </div>
           )}
-          {extraData && <TruncatedHex label={t("packets.bundledData")} value={extraData} />}
+          {extraData && <TruncatedHex label={t('packets.bundledData')} value={extraData} />}
         </div>
       )}
     </div>
@@ -484,20 +639,21 @@ function DiscoverReqPayload({ payload }: PayloadProps) {
   const prefixOnly = payload.prefixOnly as boolean | undefined;
 
   // typeFilter is a bitfield: bit n set means "wants responses from ADV_TYPE_n".
-  const roles = typeFilter != null
-    ? Array.from({ length: 8 }, (_, i) => i).filter((i) => (typeFilter >> i) & 1)
-    : [];
+  const roles =
+    typeFilter != null
+      ? Array.from({ length: 8 }, (_, i) => i).filter((i) => (typeFilter >> i) & 1)
+      : [];
 
   return (
     <div className="flex flex-col gap-1.5">
       {tag && (
-        <FieldRow label={t("fields.tag")}>
+        <FieldRow label={t('fields.tag')}>
           <span className="text-text-normal">0x{tag.toUpperCase()}</span>
         </FieldRow>
       )}
       {typeFilter != null && (
         <div>
-          <span className="text-text-dim">{t("packets.typeFilter")} </span>
+          <span className="text-text-dim">{t('packets.typeFilter')} </span>
           {roles.length > 0 ? (
             <span className="inline-flex gap-1 flex-wrap">
               {roles.map((i) => (
@@ -505,17 +661,19 @@ function DiscoverReqPayload({ payload }: PayloadProps) {
               ))}
             </span>
           ) : (
-            <span className="text-text-muted">{t("common.any")}</span>
+            <span className="text-text-muted">{t('common.any')}</span>
           )}
         </div>
       )}
       {since != null && (
-        <FieldRow label={t("packets.since")}>
+        <FieldRow label={t('packets.since')}>
           <Timestamp value={since * 1000} className="text-text-normal" />
         </FieldRow>
       )}
       {prefixOnly != null && (
-        <FieldRow label={t("packets.prefixOnly")}><BooleanValue value={prefixOnly} /></FieldRow>
+        <FieldRow label={t('packets.prefixOnly')}>
+          <BooleanValue value={prefixOnly} />
+        </FieldRow>
       )}
     </div>
   );
@@ -530,30 +688,30 @@ function DiscoverRespPayload({ payload }: PayloadProps) {
   const pubKeyPrefixOnly = payload.pubKeyPrefixOnly as boolean | undefined;
 
   const level = requestSnr != null ? snrLevel(requestSnr) : null;
-  const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : "text-text-normal";
+  const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
 
   return (
     <div className="flex flex-col gap-1.5">
       {tag && (
-        <FieldRow label={t("fields.tag")}>
+        <FieldRow label={t('fields.tag')}>
           <span className="text-text-normal">0x{tag.toUpperCase()}</span>
         </FieldRow>
       )}
       {nodeTypeName && (
         <div>
-          <span className="text-text-dim">{t("packets.nodeType")} </span>
+          <span className="text-text-dim">{t('packets.nodeType')} </span>
           <Badge variant="default">{nodeTypeName}</Badge>
         </div>
       )}
       {requestSnr != null && (
-        <FieldRow label={t("packets.requestSnr")}>
+        <FieldRow label={t('packets.requestSnr')}>
           <span className={sigClass}>{formatSnr(requestSnr)} dB</span>
-          <span className="text-text-dim"> ({t("packets.nodeToNode")})</span>
+          <span className="text-text-dim"> ({t('packets.nodeToNode')})</span>
         </FieldRow>
       )}
       {pubKey && (
         <TruncatedHex
-          label={pubKeyPrefixOnly ? t("packets.keyPrefix") : t("fields.publicKey")}
+          label={pubKeyPrefixOnly ? t('packets.keyPrefix') : t('fields.publicKey')}
           value={pubKey}
           maxChars={32}
           accentClass={FIELD_COLORS.publicKey.accent}
@@ -573,22 +731,25 @@ function RawPayload({ payload }: PayloadProps) {
   // RAW packets carry the bytes under `data`; older shapes used `raw`.
   const raw = (payload.raw ?? payload.data) as string | undefined;
   if (!raw) return null;
-  return <TruncatedHex label={t("packets.raw")} value={raw} maxChars={32} />;
+  return <TruncatedHex label={t('packets.raw')} value={raw} maxChars={32} />;
 }
 
 // generic key-value renderer for unknown payload types
 
 function humanizeKey(key: string): string {
-  return key.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase()).trim();
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/^./, (s) => s.toUpperCase())
+    .trim();
 }
 
 function GenericPayload({ payload }: PayloadProps) {
-  const hidden = new Set(["type", "ciphertextLength"]);
+  const hidden = new Set(['type', 'ciphertextLength']);
   for (const key of Object.keys(payload)) {
     if (payload[`${key}Name`] !== undefined) hidden.add(key);
   }
 
-  const isHex = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F]+$/.test(v);
+  const isHex = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-fA-F]+$/.test(v);
   const entries = Object.entries(payload).filter(([key]) => !hidden.has(key));
 
   if (entries.length === 0) return null;
@@ -596,7 +757,7 @@ function GenericPayload({ payload }: PayloadProps) {
   return (
     <div className="flex flex-col gap-2.5">
       {entries.map(([key, value]) => {
-        if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
           return (
             <div key={key}>
               <SectionLabel>{humanizeKey(key)}</SectionLabel>
@@ -618,7 +779,7 @@ function GenericPayload({ payload }: PayloadProps) {
               <span className="text-text-dim">{humanizeKey(key)} </span>
               <span className="inline-flex flex-wrap items-center gap-1">
                 {(value as unknown[]).map((item, i) => {
-                  if (typeof item === "string" && /^[0-9a-fA-F]+$/.test(item)) {
+                  if (typeof item === 'string' && /^[0-9a-fA-F]+$/.test(item)) {
                     return (
                       <span key={i} className="contents">
                         {i > 0 && <span className="text-text-dim text-xs">→</span>}
@@ -626,14 +787,19 @@ function GenericPayload({ payload }: PayloadProps) {
                       </span>
                     );
                   }
-                  return <span key={i} className="text-text-normal">{i > 0 ? ", " : ""}{String(item)}</span>;
+                  return (
+                    <span key={i} className="text-text-normal">
+                      {i > 0 ? ', ' : ''}
+                      {String(item)}
+                    </span>
+                  );
                 })}
               </span>
             </div>
           );
         }
 
-        if (typeof value === "boolean") {
+        if (typeof value === 'boolean') {
           return (
             <div key={key}>
               <span className="text-text-dim">{humanizeKey(key)} </span>
@@ -644,7 +810,8 @@ function GenericPayload({ payload }: PayloadProps) {
 
         const fieldColor = key in FIELD_COLORS ? FIELD_COLORS[key as FieldId] : null;
         if (isHex(value) && fieldColor) {
-          const display = value.length > 16 ? value.slice(0, 16).toUpperCase() + "…" : value.toUpperCase();
+          const display =
+            value.length > 16 ? value.slice(0, 16).toUpperCase() + '…' : value.toUpperCase();
           return (
             <ColorAccentField key={key} field={key as FieldId}>
               <span className="text-text-dim">{humanizeKey(key)} </span>
@@ -659,9 +826,10 @@ function GenericPayload({ payload }: PayloadProps) {
         }
 
         if (
-          typeof value === "number" &&
-          (key.toLowerCase().includes("timestamp") || key === "since") &&
-          value > 1_000_000_000 && value < 10_000_000_000
+          typeof value === 'number' &&
+          (key.toLowerCase().includes('timestamp') || key === 'since') &&
+          value > 1_000_000_000 &&
+          value < 10_000_000_000
         ) {
           return (
             <div key={key}>
@@ -682,23 +850,39 @@ function GenericPayload({ payload }: PayloadProps) {
   );
 }
 
-function AnonReqPayload({ payload, resolvedDestination, onViewNode }: PayloadProps & EndpointProps) {
+function AnonReqPayload({
+  payload,
+  resolvedDestination,
+  onViewNode,
+}: PayloadProps & EndpointProps) {
   const { t } = useTranslation();
   const destination = payload.destination as number | undefined;
   const ephemeralPubKey = payload.ephemeralPubKey as string | undefined;
-  const destLabel = destination != null ? `0x${destination.toString(16).toUpperCase().padStart(2, "0")}` : "";
+  const destLabel =
+    destination != null ? `0x${destination.toString(16).toUpperCase().padStart(2, '0')}` : '';
 
   return (
     <div className="flex flex-col gap-2.5">
       {destination != null && (
-        <FieldRow label={t("packets.destinationHash")}>
-          {resolvedDestination
-            ? <ResolvedHopBlock hop={resolvedDestination} label={destLabel} onViewNode={onViewNode} showSnr={false} />
-            : <span className="text-text-normal">{destLabel}</span>}
+        <FieldRow label={t('packets.destinationHash')}>
+          {resolvedDestination ? (
+            <ResolvedHopBlock
+              hop={resolvedDestination}
+              label={destLabel}
+              onViewNode={onViewNode}
+              showSnr={false}
+            />
+          ) : (
+            <span className="text-text-normal">{destLabel}</span>
+          )}
         </FieldRow>
       )}
       {ephemeralPubKey && (
-        <TruncatedHex label={t("packets.ephemeralKey")} value={ephemeralPubKey} accentClass={FIELD_COLORS.senderPublicKey.accent} />
+        <TruncatedHex
+          label={t('packets.ephemeralKey')}
+          value={ephemeralPubKey}
+          accentClass={FIELD_COLORS.senderPublicKey.accent}
+        />
       )}
     </div>
   );
@@ -706,28 +890,51 @@ function AnonReqPayload({ payload, resolvedDestination, onViewNode }: PayloadPro
 
 // routes payload.type to the right renderer
 
-export function PayloadBreakdown({ payload, resolvedRoute, resolvedSource, resolvedDestination, onViewNode }: {
+export function PayloadBreakdown({
+  payload,
+  resolvedRoute,
+  resolvedSource,
+  resolvedDestination,
+  onViewNode,
+}: {
   payload: Record<string, unknown>;
   resolvedRoute?: ResolvedHop[]; // trace packets only — packet-level, not part of parsedPayload
 } & EndpointProps) {
   const endpoints: EndpointProps = { resolvedSource, resolvedDestination, onViewNode };
   switch (payload.type) {
-    case "ADVERT": return <AdvertPayload payload={payload} />;
-    case "TRACE": return <TracePayload payload={payload} resolvedRoute={resolvedRoute} onViewNode={onViewNode} />;
-    case "GROUP_TEXT": return <GroupTextPayload payload={payload} />;
-    case "TEXT_MESSAGE": return <TextPayload payload={payload} {...endpoints} />;
-    case "REQUEST": return <RequestPayload payload={payload} {...endpoints} />;
-    case "RESPONSE": return <ResponsePayload payload={payload} {...endpoints} />;
-    case "ANON_REQUEST": return <AnonReqPayload payload={payload} {...endpoints} />;
-    case "ACK": return <AckPayload payload={payload} />;
-    case "PATH": return <PathPayload payload={payload} {...endpoints} />;
-    case "CONTROL": return <ControlPayload payload={payload} />;
-    case "DISCOVER_REQ": return <DiscoverReqPayload payload={payload} />;
-    case "DISCOVER_RESP": return <DiscoverRespPayload payload={payload} />;
-    case "GROUP_DATA": return <GroupTextPayload payload={payload} />;
-    case "RAW": return <RawPayload payload={payload} />;
+    case 'ADVERT':
+      return <AdvertPayload payload={payload} />;
+    case 'TRACE':
+      return (
+        <TracePayload payload={payload} resolvedRoute={resolvedRoute} onViewNode={onViewNode} />
+      );
+    case 'GROUP_TEXT':
+      return <GroupTextPayload payload={payload} />;
+    case 'TEXT_MESSAGE':
+      return <TextPayload payload={payload} {...endpoints} />;
+    case 'REQUEST':
+      return <RequestPayload payload={payload} {...endpoints} />;
+    case 'RESPONSE':
+      return <ResponsePayload payload={payload} {...endpoints} />;
+    case 'ANON_REQUEST':
+      return <AnonReqPayload payload={payload} {...endpoints} />;
+    case 'ACK':
+      return <AckPayload payload={payload} />;
+    case 'PATH':
+      return <PathPayload payload={payload} {...endpoints} />;
+    case 'CONTROL':
+      return <ControlPayload payload={payload} />;
+    case 'DISCOVER_REQ':
+      return <DiscoverReqPayload payload={payload} />;
+    case 'DISCOVER_RESP':
+      return <DiscoverRespPayload payload={payload} />;
+    case 'GROUP_DATA':
+      return <GroupTextPayload payload={payload} />;
+    case 'RAW':
+      return <RawPayload payload={payload} />;
     // MULTIPART carries structured remaining/wrappedType/wrappedPayload fields, which the
     // generic key/value renderer shows verbatim.
-    default: return <GenericPayload payload={payload} />;
+    default:
+      return <GenericPayload payload={payload} />;
   }
 }

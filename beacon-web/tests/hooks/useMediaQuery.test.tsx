@@ -1,6 +1,6 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
-import { act, render, screen } from "@testing-library/react";
-import { useMediaQuery, useIsMobile } from "../../src/hooks/useMediaQuery";
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
+import { useMediaQuery, useIsMobile } from '../../src/hooks/useMediaQuery';
 
 // A controllable matchMedia mock: lets a test flip `matches` and fire the change event the hook
 // subscribes to, so we can assert the hook re-renders with the new value.
@@ -11,7 +11,7 @@ function installMatchMedia(initialMatches: boolean) {
     get matches() {
       return matches;
     },
-    media: "",
+    media: '',
     onchange: null,
     addEventListener: vi.fn((_type: string, cb: (e: MediaQueryListEvent) => void) => {
       listeners.add(cb);
@@ -35,30 +35,30 @@ function installMatchMedia(initialMatches: boolean) {
 
 function Probe({ query }: { query: string }) {
   const value = useMediaQuery(query);
-  return <span>{value ? "match" : "no-match"}</span>;
+  return <span>{value ? 'match' : 'no-match'}</span>;
 }
 
 afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("useMediaQuery", () => {
-  it("reflects the initial matches value", () => {
+describe('useMediaQuery', () => {
+  it('reflects the initial matches value', () => {
     installMatchMedia(true);
     render(<Probe query="(max-width: 767px)" />);
-    expect(screen.getByText("match")).toBeInTheDocument();
+    expect(screen.getByText('match')).toBeInTheDocument();
   });
 
-  it("updates when the media query changes", () => {
+  it('updates when the media query changes', () => {
     const ctl = installMatchMedia(false);
     render(<Probe query="(max-width: 767px)" />);
-    expect(screen.getByText("no-match")).toBeInTheDocument();
+    expect(screen.getByText('no-match')).toBeInTheDocument();
 
     act(() => ctl.set(true));
-    expect(screen.getByText("match")).toBeInTheDocument();
+    expect(screen.getByText('match')).toBeInTheDocument();
   });
 
-  it("removes its listener on unmount", () => {
+  it('removes its listener on unmount', () => {
     const ctl = installMatchMedia(false);
     const { unmount } = render(<Probe query="(max-width: 767px)" />);
     expect(ctl.mql.addEventListener).toHaveBeenCalledTimes(1);
@@ -66,29 +66,29 @@ describe("useMediaQuery", () => {
     expect(ctl.mql.removeEventListener).toHaveBeenCalledTimes(1);
   });
 
-  it("treats a missing matchMedia as desktop (no match)", () => {
+  it('treats a missing matchMedia as desktop (no match)', () => {
     // @ts-expect-error simulate an environment without matchMedia
     window.matchMedia = undefined;
     render(<Probe query="(max-width: 767px)" />);
-    expect(screen.getByText("no-match")).toBeInTheDocument();
+    expect(screen.getByText('no-match')).toBeInTheDocument();
   });
 });
 
-describe("useIsMobile", () => {
+describe('useIsMobile', () => {
   function MobileProbe() {
-    return <span>{useIsMobile() ? "mobile" : "desktop"}</span>;
+    return <span>{useIsMobile() ? 'mobile' : 'desktop'}</span>;
   }
 
-  it("is mobile when the viewport is at or below the breakpoint", () => {
+  it('is mobile when the viewport is at or below the breakpoint', () => {
     installMatchMedia(true);
     render(<MobileProbe />);
-    expect(screen.getByText("mobile")).toBeInTheDocument();
-    expect(window.matchMedia).toHaveBeenCalledWith("(max-width: 1023px)");
+    expect(screen.getByText('mobile')).toBeInTheDocument();
+    expect(window.matchMedia).toHaveBeenCalledWith('(max-width: 1023px)');
   });
 
-  it("is desktop when the viewport is above the breakpoint", () => {
+  it('is desktop when the viewport is above the breakpoint', () => {
     installMatchMedia(false);
     render(<MobileProbe />);
-    expect(screen.getByText("desktop")).toBeInTheDocument();
+    expect(screen.getByText('desktop')).toBeInTheDocument();
   });
 });

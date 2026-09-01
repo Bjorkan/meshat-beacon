@@ -1,10 +1,25 @@
-import { useState, useRef, useEffect, useLayoutEffect, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { useHasHover } from "../hooks/useMediaQuery";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useLayoutEffect,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
+import { createPortal } from 'react-dom';
+import { useHasHover } from '../hooks/useMediaQuery';
 
 // Portals to <body> with fixed positioning so overflow parents (the data tables) can't clip it.
 // Hover reveals with a mouse; on touch it toggles on tap and dismisses on an outside tap.
-export function Tooltip({ label, children, className = "" }: { label: ReactNode; children: ReactNode; className?: string }) {
+export function Tooltip({
+  label,
+  children,
+  className = '',
+}: {
+  label: ReactNode;
+  children: ReactNode;
+  className?: string;
+}) {
   const hasHover = useHasHover();
   const ref = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
@@ -20,17 +35,17 @@ export function Tooltip({ label, children, className = "" }: { label: ReactNode;
   // touch: tap toggles; stopPropagation so a badge tap doesn't also hit the row/button it sits in
   function toggle(e: ReactMouseEvent) {
     e.stopPropagation();
-    setAnchor((a) => (a ? null : ref.current?.getBoundingClientRect() ?? null));
+    setAnchor((a) => (a ? null : (ref.current?.getBoundingClientRect() ?? null)));
   }
 
   // A fixed-position tip would detach from its target on scroll/resize, so close it rather than track.
   useEffect(() => {
     if (!anchor) return;
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
+    window.addEventListener('scroll', hide, true);
+    window.addEventListener('resize', hide);
     return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
+      window.removeEventListener('scroll', hide, true);
+      window.removeEventListener('resize', hide);
     };
   }, [anchor]);
 
@@ -40,8 +55,8 @@ export function Tooltip({ label, children, className = "" }: { label: ReactNode;
     function onDown(e: PointerEvent) {
       if (!ref.current?.contains(e.target as Node)) setAnchor(null);
     }
-    document.addEventListener("pointerdown", onDown, true);
-    return () => document.removeEventListener("pointerdown", onDown, true);
+    document.addEventListener('pointerdown', onDown, true);
+    return () => document.removeEventListener('pointerdown', onDown, true);
   }, [anchor, hasHover]);
 
   // Center above the target, then clamp on-screen and flip below if it would clip the top edge.
@@ -49,7 +64,10 @@ export function Tooltip({ label, children, className = "" }: { label: ReactNode;
     if (!anchor || !tipRef.current) return;
     const { offsetWidth: w, offsetHeight: h } = tipRef.current;
     const m = 6;
-    const left = Math.min(Math.max(anchor.left + anchor.width / 2 - w / 2, m), window.innerWidth - w - m);
+    const left = Math.min(
+      Math.max(anchor.left + anchor.width / 2 - w / 2, m),
+      window.innerWidth - w - m,
+    );
     const above = anchor.top - m - h;
     setPos({ left, top: above >= m ? above : anchor.bottom + m });
   }, [anchor]);

@@ -36,11 +36,11 @@ Add the English value to `src/locales/en/translation.json`, then render it with
 `useTranslation`:
 
 ```tsx
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';
 
 export function EmptyList() {
   const { t } = useTranslation();
-  return <p>{t("packets.empty")}</p>;
+  return <p>{t('packets.empty')}</p>;
 }
 ```
 

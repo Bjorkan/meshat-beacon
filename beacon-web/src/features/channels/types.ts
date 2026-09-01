@@ -15,7 +15,7 @@ export interface ChannelDetail extends ChannelSummary {
 
 export function channelDisplayName(ch: ChannelSummary): string {
   if (!ch.name) return ch.channelHash;
-  if (ch.isHashtag || ch.name === "Public") return ch.name;
+  if (ch.isHashtag || ch.name === 'Public') return ch.name;
   return `#${ch.name}`;
 }
 

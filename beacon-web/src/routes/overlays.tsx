@@ -1,5 +1,5 @@
-import { createContext, useContext } from "react";
-import type { PacketDetail } from "../types/api";
+import { createContext, useContext } from 'react';
+import type { PacketDetail } from '../types/api';
 
 export interface Overlays {
   overlayPacketHash: string | null;
@@ -20,6 +20,6 @@ export const OverlaysContext = createContext<Overlays | null>(null);
 
 export function useOverlays(): Overlays {
   const ctx = useContext(OverlaysContext);
-  if (!ctx) throw new Error("useOverlays must be used within the route tree");
+  if (!ctx) throw new Error('useOverlays must be used within the route tree');
   return ctx;
 }

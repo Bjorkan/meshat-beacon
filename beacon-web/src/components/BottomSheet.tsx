@@ -1,9 +1,14 @@
-import { useEffect, useRef, type ReactNode } from "react";
-import { useFocusTrap } from "../hooks/useFocusTrap";
+import { useEffect, useRef, type ReactNode } from 'react';
+import { useFocusTrap } from '../hooks/useFocusTrap';
 
 // Mobile-only slide-up sheet. Mount it conditionally (don't toggle a prop) so the focus trap runs
 // fresh on open and restores focus on close.
-export function BottomSheet({ onClose, label, role = "dialog", children }: {
+export function BottomSheet({
+  onClose,
+  label,
+  role = 'dialog',
+  children,
+}: {
   onClose: () => void;
   label: string;
   role?: string;
@@ -14,10 +19,10 @@ export function BottomSheet({ onClose, label, role = "dialog", children }: {
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
   return (

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   flexRender,
   getCoreRowModel,
@@ -6,12 +6,12 @@ import {
   useReactTable,
   type ColumnDef,
   type SortingState,
-} from "@tanstack/react-table";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useTranslation } from "react-i18next";
-import { EmptyState } from "./EmptyState";
-import { SkeletonRows } from "./SkeletonRows";
-import { useIsMobile } from "../hooks/useMediaQuery";
+} from '@tanstack/react-table';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { useTranslation } from 'react-i18next';
+import { EmptyState } from './EmptyState';
+import { SkeletonRows } from './SkeletonRows';
+import { useIsMobile } from '../hooks/useMediaQuery';
 
 export interface Column<T> {
   header: string;
@@ -23,7 +23,7 @@ export interface Column<T> {
   size?: number;
 }
 
-export type SortDirection = "asc" | "desc";
+export type SortDirection = 'asc' | 'desc';
 export interface SortState {
   header: string;
   direction: SortDirection;
@@ -42,7 +42,7 @@ interface DataTableProps<T> {
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
   // Server mode keeps API order while TanStack retains the sortable header state.
-  sortMode?: "client" | "server";
+  sortMode?: 'client' | 'server';
   // A paged client table does not sort until all pages are ready.
   sortReady?: boolean;
   onEndReached?: () => void;
@@ -54,7 +54,7 @@ interface DataTableProps<T> {
 const END_REACHED_THRESHOLD_PX = 200;
 
 function sortStateToTanStack(sort: SortState): SortingState {
-  return sort.header ? [{ id: sort.header, desc: sort.direction === "desc" }] : [];
+  return sort.header ? [{ id: sort.header, desc: sort.direction === 'desc' }] : [];
 }
 
 // TanStack owns the column, row and sorting models. Desktop and mobile are two presentations of the
@@ -71,7 +71,7 @@ export function DataTable<T>({
   defaultSort,
   sort: controlledSort,
   onSortChange,
-  sortMode = "client",
+  sortMode = 'client',
   sortReady = true,
   onEndReached,
   virtualize = false,
@@ -81,23 +81,24 @@ export function DataTable<T>({
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [internalSort, setInternalSort] = useState<SortState>(() => ({
-    header: defaultSort?.header ?? "",
-    direction: defaultSort?.direction ?? "asc",
+    header: defaultSort?.header ?? '',
+    direction: defaultSort?.direction ?? 'asc',
   }));
   const sort = controlledSort ?? internalSort;
   const sorting = useMemo(() => sortStateToTanStack(sort), [sort]);
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
-    () => columns.map((column) => ({
-      id: column.header,
-      header: column.label ?? column.header,
-      accessorFn: column.sortValue,
-      cell: (context) => column.cell(context.row.original),
-      enableSorting: !!column.sortValue,
-      sortDescFirst: false,
-      sortUndefined: "last",
-      meta: { className: column.className },
-    })),
+    () =>
+      columns.map((column) => ({
+        id: column.header,
+        header: column.label ?? column.header,
+        accessorFn: column.sortValue,
+        cell: (context) => column.cell(context.row.original),
+        enableSorting: !!column.sortValue,
+        sortDescFirst: false,
+        sortUndefined: 'last',
+        meta: { className: column.className },
+      })),
     [columns],
   );
 
@@ -110,12 +111,12 @@ export function DataTable<T>({
     getRowId: (row) => rowKey(row),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    manualSorting: sortMode === "server" || !sortReady,
+    manualSorting: sortMode === 'server' || !sortReady,
     enableSortingRemoval: false,
     onSortingChange: (updater) => {
-      const next = typeof updater === "function" ? updater(sorting) : updater;
+      const next = typeof updater === 'function' ? updater(sorting) : updater;
       const nextSort: SortState = next[0]
-        ? { header: next[0].id, direction: next[0].desc ? "desc" : "asc" }
+        ? { header: next[0].id, direction: next[0].desc ? 'desc' : 'asc' }
         : sort;
       if (onSortChange) onSortChange(nextSort);
       else setInternalSort(nextSort);
@@ -157,7 +158,10 @@ export function DataTable<T>({
     return (
       <div className="flex min-h-0 flex-1 flex-col bg-bg-base">
         {sortableHeaders.length > 0 && (
-          <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider" aria-label={t("common.sort")}>
+          <div
+            className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
+            aria-label={t('common.sort')}
+          >
             {sortableHeaders.map((header) => {
               const direction = header.column.getIsSorted();
               return (
@@ -165,16 +169,18 @@ export function DataTable<T>({
                   key={header.id}
                   type="button"
                   onClick={header.column.getToggleSortingHandler()}
-                  aria-busy={sortMode === "client" && direction !== false && !sortReady ? true : undefined}
+                  aria-busy={
+                    sortMode === 'client' && direction !== false && !sortReady ? true : undefined
+                  }
                   className={`flex shrink-0 items-center gap-1 rounded-sm border px-2 py-1 transition-colors ${
                     direction
-                      ? "border-primary-dim bg-primary/10 text-text-normal"
-                      : "border-border text-text-muted hover:border-primary-dim hover:text-text-normal"
+                      ? 'border-primary-dim bg-primary/10 text-text-normal'
+                      : 'border-border text-text-muted hover:border-primary-dim hover:text-text-normal'
                   }`}
                 >
                   {flexRender(header.column.columnDef.header, header.getContext())}
-                  <span aria-hidden className={direction ? "text-primary" : "text-text-dim/50"}>
-                    {direction === "desc" ? "▼" : "▲"}
+                  <span aria-hidden className={direction ? 'text-primary' : 'text-text-dim/50'}>
+                    {direction === 'desc' ? '▼' : '▲'}
                   </span>
                 </button>
               );
@@ -182,10 +188,15 @@ export function DataTable<T>({
           </div>
         )}
 
-        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto" onScroll={handleScroll} data-virtualized={virtualize || undefined}>
+        <div
+          ref={scrollRef}
+          className="min-h-0 flex-1 overflow-y-auto"
+          onScroll={handleScroll}
+          data-virtualized={virtualize || undefined}
+        >
           {modelRows.length > 0 ? (
             <div
-              className={virtualize ? "relative" : "flex flex-col divide-y divide-border/50"}
+              className={virtualize ? 'relative' : 'flex flex-col divide-y divide-border/50'}
               style={virtualize ? { height: virtualizer.getTotalSize() } : undefined}
             >
               {renderedRows.map(({ row, item }) => {
@@ -196,29 +207,51 @@ export function DataTable<T>({
                     ref={item ? virtualizer.measureElement : undefined}
                     data-index={item?.index}
                     type="button"
-                    className={`w-full cursor-pointer border-l-2 px-3 py-3 text-left transition-colors ${virtualize ? "border-b border-b-border/50" : ""} ${
+                    className={`w-full cursor-pointer border-l-2 px-3 py-3 text-left transition-colors ${virtualize ? 'border-b border-b-border/50' : ''} ${
                       isSelected
-                        ? "border-l-primary bg-primary/10"
-                        : "border-l-transparent hover:border-l-primary/50 hover:bg-primary/5"
+                        ? 'border-l-primary bg-primary/10'
+                        : 'border-l-transparent hover:border-l-primary/50 hover:bg-primary/5'
                     }`}
-                    style={item ? { position: "absolute", top: 0, left: 0, transform: `translateY(${item.start}px)` } : undefined}
+                    style={
+                      item
+                        ? {
+                            position: 'absolute',
+                            top: 0,
+                            left: 0,
+                            transform: `translateY(${item.start}px)`,
+                          }
+                        : undefined
+                    }
                     onMouseEnter={() => onRowIntent?.(row.id)}
                     onFocus={() => onRowIntent?.(row.id)}
                     onTouchStart={() => onRowIntent?.(row.id)}
                     onClick={() => onSelect(isSelected ? null : row.id)}
                   >
-                    {renderCard ? renderCard(row.original) : (
+                    {renderCard ? (
+                      renderCard(row.original)
+                    ) : (
                       <dl className="grid grid-cols-2 gap-x-4 gap-y-2 font-mono text-xs">
                         {row.getVisibleCells().map((cell, index) => {
-                          const header = table.getFlatHeaders().find((candidate) => candidate.column.id === cell.column.id);
+                          const header = table
+                            .getFlatHeaders()
+                            .find((candidate) => candidate.column.id === cell.column.id);
                           return (
-                            <div key={cell.id} className={index === 0 ? "col-span-2 min-w-0" : "min-w-0"}>
+                            <div
+                              key={cell.id}
+                              className={index === 0 ? 'col-span-2 min-w-0' : 'min-w-0'}
+                            >
                               <dt className="mb-0.5 text-[9px] uppercase tracking-wider text-text-dim">
-                                {header ? flexRender(cell.column.columnDef.header, header.getContext()) : cell.column.id}
+                                {header
+                                  ? flexRender(cell.column.columnDef.header, header.getContext())
+                                  : cell.column.id}
                               </dt>
-                              <dd className={`min-w-0 ${typeof cell.column.columnDef.meta?.className === "function"
-                                ? cell.column.columnDef.meta.className(row.original)
-                                : (cell.column.columnDef.meta?.className ?? "")}`}>
+                              <dd
+                                className={`min-w-0 ${
+                                  typeof cell.column.columnDef.meta?.className === 'function'
+                                    ? cell.column.columnDef.meta.className(row.original)
+                                    : (cell.column.columnDef.meta?.className ?? '')
+                                }`}
+                              >
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                               </dd>
                             </div>
@@ -240,20 +273,29 @@ export function DataTable<T>({
 
   const virtualItems = virtualizer.getVirtualItems();
   const topPadding = virtualItems[0]?.start ?? 0;
-  const bottomPadding = virtualItems.length > 0
-    ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
-    : 0;
+  const bottomPadding =
+    virtualItems.length > 0
+      ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end
+      : 0;
   const renderedRows = virtualize
     ? virtualItems.map((item) => ({ row: modelRows[item.index]!, item }))
     : modelRows.map((row) => ({ row, item: null }));
 
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-x-auto overflow-y-auto" onScroll={handleScroll} data-virtualized={virtualize || undefined}>
+    <div
+      ref={scrollRef}
+      className="min-h-0 flex-1 overflow-x-auto overflow-y-auto"
+      onScroll={handleScroll}
+      data-virtualized={virtualize || undefined}
+    >
       {modelRows.length > 0 ? (
         <table className="h-fit w-full border-collapse font-mono text-xs">
           <thead className="sticky top-0 z-10 bg-bg-surface">
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="h-9 border-b border-border text-[11px] uppercase tracking-wider text-text-muted">
+              <tr
+                key={headerGroup.id}
+                className="h-9 border-b border-border text-[11px] uppercase tracking-wider text-text-muted"
+              >
                 {headerGroup.headers.map((header, index) => {
                   const direction = header.column.getIsSorted();
                   const sourceColumn = columns[index];
@@ -268,11 +310,18 @@ export function DataTable<T>({
                           type="button"
                           onClick={header.column.getToggleSortingHandler()}
                           className="flex cursor-pointer items-center gap-1 transition-colors hover:text-text-normal"
-                          aria-busy={sortMode === "client" && direction !== false && !sortReady ? true : undefined}
+                          aria-busy={
+                            sortMode === 'client' && direction !== false && !sortReady
+                              ? true
+                              : undefined
+                          }
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
-                          <span className={direction ? "text-primary" : "text-text-dim/40"} aria-hidden>
-                            {direction === "desc" ? "▼" : "▲"}
+                          <span
+                            className={direction ? 'text-primary' : 'text-text-dim/40'}
+                            aria-hidden
+                          >
+                            {direction === 'desc' ? '▼' : '▲'}
                           </span>
                         </button>
                       ) : (
@@ -286,7 +335,12 @@ export function DataTable<T>({
           </thead>
           <tbody>
             {virtualize && topPadding > 0 && (
-              <tr aria-hidden><td colSpan={columns.length} style={{ height: topPadding, padding: 0, border: 0 }} /></tr>
+              <tr aria-hidden>
+                <td
+                  colSpan={columns.length}
+                  style={{ height: topPadding, padding: 0, border: 0 }}
+                />
+              </tr>
             )}
             {renderedRows.map(({ row, item }) => {
               const isSelected = row.id === selectedKey;
@@ -297,8 +351,8 @@ export function DataTable<T>({
                   data-index={item?.index}
                   className={`h-10 cursor-pointer border-b border-l-2 border-b-border/50 transition-colors ${
                     isSelected
-                      ? "border-l-primary bg-primary/10"
-                      : "border-l-transparent hover:border-l-primary/50 hover:bg-primary/5"
+                      ? 'border-l-primary bg-primary/10'
+                      : 'border-l-transparent hover:border-l-primary/50 hover:bg-primary/5'
                   }`}
                   tabIndex={0}
                   aria-selected={isSelected}
@@ -306,7 +360,7 @@ export function DataTable<T>({
                   onFocus={() => onRowIntent?.(row.id)}
                   onTouchStart={() => onRowIntent?.(row.id)}
                   onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
+                    if (event.key === 'Enter' || event.key === ' ') {
                       event.preventDefault();
                       onSelect(isSelected ? null : row.id);
                     }
@@ -315,7 +369,8 @@ export function DataTable<T>({
                 >
                   {row.getVisibleCells().map((cell) => {
                     const metaClass = cell.column.columnDef.meta?.className;
-                    const cellClass = typeof metaClass === "function" ? metaClass(row.original) : (metaClass ?? "");
+                    const cellClass =
+                      typeof metaClass === 'function' ? metaClass(row.original) : (metaClass ?? '');
                     return (
                       <td key={cell.id} className={`px-4 py-2 align-middle ${cellClass}`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -326,7 +381,12 @@ export function DataTable<T>({
               );
             })}
             {virtualize && bottomPadding > 0 && (
-              <tr aria-hidden><td colSpan={columns.length} style={{ height: bottomPadding, padding: 0, border: 0 }} /></tr>
+              <tr aria-hidden>
+                <td
+                  colSpan={columns.length}
+                  style={{ height: bottomPadding, padding: 0, border: 0 }}
+                />
+              </tr>
             )}
           </tbody>
         </table>
@@ -337,7 +397,7 @@ export function DataTable<T>({
   );
 }
 
-declare module "@tanstack/react-table" {
+declare module '@tanstack/react-table' {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   interface ColumnMeta<TData, TValue> {
     className?: string | ((row: TData) => string);

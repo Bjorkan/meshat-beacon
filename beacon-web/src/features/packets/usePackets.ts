@@ -1,15 +1,17 @@
-import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { packetQueries } from "../../api/queries";
-import { useRegion } from "../../hooks/useRegion";
-import type { WsPacketObservation, WsLagged } from "../../types/ws";
-import type { PacketSummary } from "../../types/api";
-import type { PacketServerFilter } from "./types";
-import { LIVE_BUFFER_CAP, MAX_INFINITE_PAGES } from "../../lib/constants";
+import { useState, useCallback, useMemo, useSyncExternalStore } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { packetQueries } from '../../api/queries';
+import { useRegion } from '../../hooks/useRegion';
+import type { WsPacketObservation, WsLagged } from '../../types/ws';
+import type { PacketSummary } from '../../types/api';
+import type { PacketServerFilter } from './types';
+import { LIVE_BUFFER_CAP, MAX_INFINITE_PAGES } from '../../lib/constants';
 
 // merge and deduplicate live + paginated packets
 
-function flattenPages(data: { pages: Array<{ items: PacketSummary[] }> } | undefined): PacketSummary[] {
+function flattenPages(
+  data: { pages: Array<{ items: PacketSummary[] }> } | undefined,
+): PacketSummary[] {
   if (!data) return [];
   return data.pages.flatMap((p) => p.items);
 }
@@ -53,7 +55,11 @@ class LivePacketStore {
     if (this.rafId !== null) return;
     this.rafId = requestAnimationFrame(() => {
       this.rafId = null;
-      this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
+      this.snapshot = {
+        buffer: this.buffer,
+        acknowledgedCount: this.acknowledgedCount,
+        observersByHash: this.observersByHash,
+      };
       for (const l of this.listeners) l();
     });
   }
@@ -103,7 +109,11 @@ class LivePacketStore {
 
   acknowledge(): void {
     this.acknowledgedCount = this.buffer.length;
-    this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
+    this.snapshot = {
+      buffer: this.buffer,
+      acknowledgedCount: this.acknowledgedCount,
+      observersByHash: this.observersByHash,
+    };
     for (const l of this.listeners) l();
   }
 
@@ -122,7 +132,10 @@ class LivePacketStore {
 
 // combines live WS stream with paginated history
 
-export function usePackets(frozen: boolean = false, serverFilter: PacketServerFilter | null = null) {
+export function usePackets(
+  frozen: boolean = false,
+  serverFilter: PacketServerFilter | null = null,
+) {
   const { iatas, regionKey } = useRegion();
   const [store] = useState(() => new LivePacketStore());
   const [laggedCount, setLaggedCount] = useState(0);
@@ -135,10 +148,11 @@ export function usePackets(frozen: boolean = false, serverFilter: PacketServerFi
     setLaggedCount(0);
   }
 
-  const { buffer: liveBuffer, acknowledgedCount, observersByHash } = useSyncExternalStore(
-    store.subscribe,
-    store.getSnapshot,
-  );
+  const {
+    buffer: liveBuffer,
+    acknowledgedCount,
+    observersByHash,
+  } = useSyncExternalStore(store.subscribe, store.getSnapshot);
 
   // While scrolled away from the top, render a latched buffer so live prepends don't shift the
   // view; the held packets reveal when the user returns to the top. Latched by holding the last
@@ -150,7 +164,7 @@ export function usePackets(frozen: boolean = false, serverFilter: PacketServerFi
   }
 
   const handlePacketObservation = useCallback(
-    (data: WsPacketObservation["data"]) => {
+    (data: WsPacketObservation['data']) => {
       const summary: PacketSummary = {
         packetHash: data.packetHash,
         payloadType: data.packet.payloadType,
@@ -203,7 +217,7 @@ export function usePackets(frozen: boolean = false, serverFilter: PacketServerFi
 
   // WS summaries contain neither raw payload nor every observation path. During those searches the
   // REST result is authoritative; mixing the live buffer in would create false positives/negatives.
-  const includeLiveBuffer = !serverFilter?.search || serverFilter.searchField === "hash";
+  const includeLiveBuffer = !serverFilter?.search || serverFilter.searchField === 'hash';
   const allPackets = useMemo(
     () => dedup([...(includeLiveBuffer ? displayBuffer : []), ...flattenPages(history)]),
     [displayBuffer, history, includeLiveBuffer],
@@ -213,7 +227,10 @@ export function usePackets(frozen: boolean = false, serverFilter: PacketServerFi
     const map = new Map<string, string>();
     for (const p of allPackets) {
       if (p.latestObserver && !map.has(p.latestObserver.id)) {
-        map.set(p.latestObserver.id, p.latestObserver.displayName ?? p.latestObserver.id.slice(0, 8));
+        map.set(
+          p.latestObserver.id,
+          p.latestObserver.displayName ?? p.latestObserver.id.slice(0, 8),
+        );
       }
     }
     return Array.from(map.entries())

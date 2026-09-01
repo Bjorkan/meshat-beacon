@@ -1,6 +1,6 @@
-import { useState, useRef, useEffect } from "react";
-import { useTranslation } from "react-i18next";
-import { Dropdown } from "./Dropdown";
+import { useState, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Dropdown } from './Dropdown';
 
 export interface SearchFieldOption {
   value: string;
@@ -67,33 +67,35 @@ export function SearchBar({ value, onChange, fields, field, onFieldChange }: Sea
             className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-l-sm border border-r-0 border-border bg-bg-surface text-text-muted hover:text-text-normal transition-colors cursor-pointer"
             onClick={toggle}
           >
-            {currentField?.label ?? ""}
+            {currentField?.label ?? ''}
             <span className="text-text-dim text-[9px]">▾</span>
           </button>
         )}
       >
-        {(close) => fields.map((f) => (
-          <button
-            key={f.value}
-            type="button"
-            disabled={f.disabled}
-            className={`w-full text-left px-2.5 py-1 text-xs font-mono transition-colors ${
-              f.disabled
-                ? "text-text-dim/40 cursor-not-allowed"
-                : f.value === field
-                  ? "text-text-bright bg-primary/10"
-                  : "text-text-muted hover:text-text-normal hover:bg-text-normal/3 cursor-pointer"
-            }`}
-            onClick={() => {
-              if (!f.disabled) {
-                onFieldChange(f.value);
-                close();
-              }
-            }}
-          >
-            {f.label}
-          </button>
-        ))}
+        {(close) =>
+          fields.map((f) => (
+            <button
+              key={f.value}
+              type="button"
+              disabled={f.disabled}
+              className={`w-full text-left px-2.5 py-1 text-xs font-mono transition-colors ${
+                f.disabled
+                  ? 'text-text-dim/40 cursor-not-allowed'
+                  : f.value === field
+                    ? 'text-text-bright bg-primary/10'
+                    : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3 cursor-pointer'
+              }`}
+              onClick={() => {
+                if (!f.disabled) {
+                  onFieldChange(f.value);
+                  close();
+                }
+              }}
+            >
+              {f.label}
+            </button>
+          ))
+        }
       </Dropdown>
 
       <div className="relative flex-1 min-w-0">
@@ -105,20 +107,28 @@ export function SearchBar({ value, onChange, fields, field, onFieldChange }: Sea
           fill="none"
         >
           <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.5" />
-          <line x1="10.5" y1="10.5" x2="14.5" y2="14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          <line
+            x1="10.5"
+            y1="10.5"
+            x2="14.5"
+            y2="14.5"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
         </svg>
         <input
           type="text"
           value={localValue}
           onChange={(e) => handleChange(e.target.value)}
-          placeholder={t("common.searchBy", { field: (currentField?.label ?? "").toLowerCase() })}
+          placeholder={t('common.searchBy', { field: (currentField?.label ?? '').toLowerCase() })}
           className="w-full text-[11px] font-mono bg-bg-surface border border-border rounded-r-sm pl-7 pr-7 py-1 text-text-bright placeholder:text-text-dim transition-colors"
         />
         {localValue && (
           <button
             type="button"
             className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-normal text-[11px] cursor-pointer"
-            onClick={() => handleChange("")}
+            onClick={() => handleChange('')}
           >
             ×
           </button>

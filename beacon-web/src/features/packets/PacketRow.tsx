@@ -1,12 +1,12 @@
-import { formatHex } from "../../lib/formatters";
-import { useTranslation } from "react-i18next";
-import { Timestamp } from "../../components/Timestamp";
-import type { PacketSummary } from "../../types/api";
-import { Badge } from "../../components/Badge";
-import { Tooltip } from "../../components/Tooltip";
-import { payloadTypeVariant } from "../../components/badge-utils";
-import { ScopeTag } from "../../components/ScopeTag";
-import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from "../../types/enums";
+import { formatHex } from '../../lib/formatters';
+import { useTranslation } from 'react-i18next';
+import { Timestamp } from '../../components/Timestamp';
+import type { PacketSummary } from '../../types/api';
+import { Badge } from '../../components/Badge';
+import { Tooltip } from '../../components/Tooltip';
+import { payloadTypeVariant } from '../../components/badge-utils';
+import { ScopeTag } from '../../components/ScopeTag';
+import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
 
 interface PacketRowProps {
   packet: PacketSummary;
@@ -19,21 +19,21 @@ interface PacketRowProps {
 
 export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProps) {
   const { t } = useTranslation();
-  const heardBy = t("packets.heardBy", { count: packet.observationCount });
+  const heardBy = t('packets.heardBy', { count: packet.observationCount });
   return (
     <div
       className={`group bg-bg-surface border rounded-md px-3.5 py-2.5 cursor-pointer ${
         expanded
-          ? "border-primary bg-primary/10"
+          ? 'border-primary bg-primary/10'
           : isFresh
-            ? "packet-fresh"
-            : "border-border hover:border-text-dim/30 hover:bg-bg-raised/50"
+            ? 'packet-fresh'
+            : 'border-border hover:border-text-dim/30 hover:bg-bg-raised/50'
       }`}
       onClick={() => onToggle()}
       aria-pressed={expanded}
       tabIndex={0}
       onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
+        if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onToggle();
         }
@@ -58,21 +58,31 @@ export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProp
 
       <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px] text-text-dim">
         <span className="font-mono text-[11px] text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">
-          {packet.routeTypeName || t("packets.unknown")}
+          {packet.routeTypeName || t('packets.unknown')}
         </span>
         {packet.scope && (
           <>
-            <span className="text-[6px] text-border" aria-hidden>·</span>
+            <span className="text-[6px] text-border" aria-hidden>
+              ·
+            </span>
             <ScopeTag>{packet.scope}</ScopeTag>
           </>
         )}
-        <span className="text-[6px] text-border" aria-hidden>·</span>
+        <span className="text-[6px] text-border" aria-hidden>
+          ·
+        </span>
         <Timestamp value={packet.lastHeardAt} />
         {packet.latestObserver && (
           <>
-            <span className="text-[6px] text-border" aria-hidden>·</span>
-            <span className="text-text-normal">{packet.latestObserver.displayName ?? packet.latestObserver.id.slice(0, 8)}</span>
-            <span className="text-[6px] text-border" aria-hidden>·</span>
+            <span className="text-[6px] text-border" aria-hidden>
+              ·
+            </span>
+            <span className="text-text-normal">
+              {packet.latestObserver.displayName ?? packet.latestObserver.id.slice(0, 8)}
+            </span>
+            <span className="text-[6px] text-border" aria-hidden>
+              ·
+            </span>
             <span className="font-mono font-bold text-primary text-[11px] tracking-wider">
               {packet.latestObserver.iata}
             </span>

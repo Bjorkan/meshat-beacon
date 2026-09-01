@@ -1,20 +1,20 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useContext, useState, useMemo, useCallback, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { regionQueries } from "../api/queries";
+import { createContext, useContext, useState, useMemo, useCallback, type ReactNode } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { regionQueries } from '../api/queries';
 import {
   resolveIatas,
   regionKey as toRegionKey,
   serializeSelection,
   type RegionSelection,
-} from "./region-selection";
-import type { Region } from "../types/api";
+} from './region-selection';
+import type { Region } from '../types/api';
 
 // Region context: the shared geographic filter. The provider holds the raw selection (region slugs +
 // individual IATAs); useRegions() loads the slug→IATAs expansion, and useRegion() combines them into
 // the resolved IATA list + stable query key that the rest of the app filters on.
 
-const STORAGE_KEY = "beacon-region-selection";
+const STORAGE_KEY = 'beacon-region-selection';
 
 interface RegionContextValue {
   selection: RegionSelection;
@@ -23,7 +23,13 @@ interface RegionContextValue {
 
 const RegionContext = createContext<RegionContextValue | null>(null);
 
-export function RegionProvider({ defaultSelection, children }: { defaultSelection: RegionSelection; children: ReactNode }) {
+export function RegionProvider({
+  defaultSelection,
+  children,
+}: {
+  defaultSelection: RegionSelection;
+  children: ReactNode;
+}) {
   const [selection, setSelectionState] = useState(defaultSelection);
 
   const setSelection = useCallback((next: RegionSelection) => {
@@ -42,7 +48,7 @@ export function RegionProvider({ defaultSelection, children }: { defaultSelectio
 // Raw selection + setter, for the region selector UI.
 export function useRegionSelection(): RegionContextValue {
   const ctx = useContext(RegionContext);
-  if (!ctx) throw new Error("useRegionSelection must be used within RegionProvider");
+  if (!ctx) throw new Error('useRegionSelection must be used within RegionProvider');
   return ctx;
 }
 

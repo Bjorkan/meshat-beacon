@@ -1,20 +1,23 @@
-import { useEffect } from "react";
-import type { WsManager } from "../api/ws-manager";
-import type { WsPacketObservation, WsLagged, WsChannelMessage, WsObserverStatus, WsNodeUpdate } from "../types/ws";
+import { useEffect } from 'react';
+import type { WsManager } from '../api/ws-manager';
+import type {
+  WsPacketObservation,
+  WsLagged,
+  WsChannelMessage,
+  WsObserverStatus,
+  WsNodeUpdate,
+} from '../types/ws';
 
 export function useWsPacketHandler(
   manager: WsManager,
-  handler: (data: WsPacketObservation["data"]) => void,
+  handler: (data: WsPacketObservation['data']) => void,
 ): void {
   useEffect(() => {
     return manager.onPacketObservation(handler);
   }, [manager, handler]);
 }
 
-export function useWsLaggedHandler(
-  manager: WsManager,
-  handler: (data: WsLagged) => void,
-): void {
+export function useWsLaggedHandler(manager: WsManager, handler: (data: WsLagged) => void): void {
   useEffect(() => {
     return manager.onLagged(handler);
   }, [manager, handler]);
@@ -22,7 +25,7 @@ export function useWsLaggedHandler(
 
 export function useWsChannelMessageHandler(
   manager: WsManager,
-  handler: (data: WsChannelMessage["data"]) => void,
+  handler: (data: WsChannelMessage['data']) => void,
 ): void {
   useEffect(() => {
     return manager.onChannelMessage(handler);
@@ -31,7 +34,7 @@ export function useWsChannelMessageHandler(
 
 export function useWsObserverStatusHandler(
   manager: WsManager,
-  handler: (data: WsObserverStatus["data"]) => void,
+  handler: (data: WsObserverStatus['data']) => void,
 ): void {
   useEffect(() => {
     return manager.onObserverStatus(handler);
@@ -40,7 +43,7 @@ export function useWsObserverStatusHandler(
 
 export function useWsNodeUpdateHandler(
   manager: WsManager,
-  handler: (data: WsNodeUpdate["data"]) => void,
+  handler: (data: WsNodeUpdate['data']) => void,
 ): void {
   useEffect(() => {
     return manager.onNodeUpdate(handler);

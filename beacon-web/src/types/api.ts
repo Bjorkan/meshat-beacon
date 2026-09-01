@@ -1,4 +1,4 @@
-import type { PathConfidence } from "./enums";
+import type { PathConfidence } from './enums';
 
 // response wrappers
 
@@ -188,7 +188,7 @@ export interface CrossIATARoute {
 // trace tags — a trace series groups the packets that share a 4-byte trace tag. The list endpoint
 // returns per-tag summaries; the detail endpoint returns the tag's packets with their resolved routes.
 // Each tag is either a route TRACE or a PING (round-trip) — the backend tags which.
-export type TraceType = "TRACE" | "PING";
+export type TraceType = 'TRACE' | 'PING';
 
 export interface TraceTagSummary {
   traceTag: string; // hex-encoded 4-byte tag

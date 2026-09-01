@@ -1,4 +1,4 @@
-import type { WsPacketObservation } from "../../types/ws";
+import type { WsPacketObservation } from '../../types/ws';
 
 export const LIVE_PACKET_FEED_LIMIT = 5;
 
@@ -14,7 +14,7 @@ export interface LivePacketEntry {
   hopCount?: number;
 }
 
-export function livePacketEntry(data: WsPacketObservation["data"]): LivePacketEntry {
+export function livePacketEntry(data: WsPacketObservation['data']): LivePacketEntry {
   return {
     packetHash: data.packetHash,
     payloadType: data.packet.payloadType,

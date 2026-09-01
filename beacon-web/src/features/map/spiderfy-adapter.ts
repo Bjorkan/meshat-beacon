@@ -4,12 +4,12 @@
 // version-pinned compatibility detail isolated here.
 interface DirectSpiderfyCompatibilityTarget {
   clickedParentClusterStyle: {
-    type: "symbol";
+    type: 'symbol';
     layout: object;
     paint: object;
   } | null;
 }
 
 export function prepareSpiderfyForDirectUse(spider: DirectSpiderfyCompatibilityTarget): void {
-  spider.clickedParentClusterStyle = { type: "symbol", layout: {}, paint: {} };
+  spider.clickedParentClusterStyle = { type: 'symbol', layout: {}, paint: {} };
 }

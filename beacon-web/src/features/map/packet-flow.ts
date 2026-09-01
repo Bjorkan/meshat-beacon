@@ -1,4 +1,4 @@
-import type { ResolvedHop } from "../../types/api";
+import type { ResolvedHop } from '../../types/api';
 
 // Pure helpers for drawing a packet's path — the live flow animation (modelled on MeshMapper's
 // LiveViz) and the path map share them. No maplibre import, so they stay unit-testable; the hook
@@ -14,13 +14,18 @@ export function packetChain(
   path: ResolvedHop[],
   destination: ResolvedHop | null | undefined,
 ): ResolvedHop[] {
-  const confident = (hop: ResolvedHop | null | undefined) => (hop?.confidence === "high" ? hop : undefined);
-  return [confident(source), ...path, confident(destination)].filter((hop): hop is ResolvedHop => hop != null);
+  const confident = (hop: ResolvedHop | null | undefined) =>
+    hop?.confidence === 'high' ? hop : undefined;
+  return [confident(source), ...path, confident(destination)].filter(
+    (hop): hop is ResolvedHop => hop != null,
+  );
 }
 
 // The located nodes on a packet's resolved path — first candidate per hop, deduped by id. The dot
 // rides these coords and flashes each node as it crosses.
-export function resolvedPathNodes(resolvedPath: ResolvedHop[]): { id: string; lng: number; lat: number }[] {
+export function resolvedPathNodes(
+  resolvedPath: ResolvedHop[],
+): { id: string; lng: number; lat: number }[] {
   const seen = new Set<string>();
   const out: { id: string; lng: number; lat: number }[] = [];
   for (const hop of resolvedPath) {
@@ -66,8 +71,7 @@ export function haversineKm(a: [number, number], b: [number, number]): number {
   const phi2 = b[1] * rad;
   const dPhi = (b[1] - a[1]) * rad;
   const dLambda = (b[0] - a[0]) * rad;
-  const h =
-    Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
   return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
 }
 

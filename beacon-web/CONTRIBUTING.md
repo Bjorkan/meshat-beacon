@@ -74,7 +74,7 @@ because the root `tsconfig.json` has `files: []`.
 - Follow the existing patterns in each feature before introducing new ones
 - Reuse existing components, hooks, and theme tokens rather than adding new ones
 - Keep components small and single-purpose
-- Comments state the non-obvious *why* in one terse line; a wrong comment is
+- Comments state the non-obvious _why_ in one terse line; a wrong comment is
   worse than none
 - See [.claude/CLAUDE.md](.claude/CLAUDE.md) for the full project conventions
 

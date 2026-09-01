@@ -7,7 +7,7 @@ interface PacketFlowButtonProps {
 // a pulsing dot and accent styling. Bottom-center, clear of the corner map controls.
 export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
   const { t } = useTranslation();
-  const actionLabel = t(active ? "map.stopFlow" : "map.playFlow");
+  const actionLabel = t(active ? 'map.stopFlow' : 'map.playFlow');
   return (
     <button
       type="button"
@@ -17,8 +17,8 @@ export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
       title={actionLabel}
       className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
         active
-          ? "bg-primary/15 border-primary-dim text-text-bright"
-          : "bg-bg-raised border-border text-text-dim hover:text-text-normal"
+          ? 'bg-primary/15 border-primary-dim text-text-bright'
+          : 'bg-bg-raised border-border text-text-dim hover:text-text-normal'
       }`}
     >
       {active ? (
@@ -31,8 +31,8 @@ export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
           <path d="M2 1.5v7l6-3.5z" />
         </svg>
       )}
-      {t("map.live")}
+      {t('map.live')}
     </button>
   );
 }
-import { useTranslation } from "react-i18next";
+import { useTranslation } from 'react-i18next';

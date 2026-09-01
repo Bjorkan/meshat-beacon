@@ -1,32 +1,34 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 /* theme tokens from palette CSS vars */
 @theme {
-  --font-mono: "JetBrains Mono", monospace;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --font-sans: 'Inter', system-ui, sans-serif;
 
-  --color-bg-base: var(--palette-bg-base, #09090B);
+  --color-bg-base: var(--palette-bg-base, #09090b);
   --color-bg-surface: var(--palette-bg-surface, #111114);
-  --color-bg-raised: var(--palette-bg-raised, #1A1A1F);
-  --color-border: var(--palette-border, #27272A);
-  --color-border-subtle: var(--palette-border-subtle, #1E1E22);
+  --color-bg-raised: var(--palette-bg-raised, #1a1a1f);
+  --color-border: var(--palette-border, #27272a);
+  --color-border-subtle: var(--palette-border-subtle, #1e1e22);
 
-  --color-primary: var(--palette-primary, #3B82F6);
-  --color-primary-dim: var(--palette-primary-dim, #1D4ED8);
-  --color-secondary: var(--palette-secondary, #A78BFA);
-  --color-green: var(--palette-green, #22C55E);
-  --color-danger: var(--palette-danger, #EF4444);
-  --color-warn: var(--palette-warn, #EAB308);
+  --color-primary: var(--palette-primary, #3b82f6);
+  --color-primary-dim: var(--palette-primary-dim, #1d4ed8);
+  --color-secondary: var(--palette-secondary, #a78bfa);
+  --color-green: var(--palette-green, #22c55e);
+  --color-danger: var(--palette-danger, #ef4444);
+  --color-warn: var(--palette-warn, #eab308);
 
-  --color-text-bright: var(--palette-text-bright, #FAFAFA);
-  --color-text-normal: var(--palette-text-normal, #A1A1AA);
-  --color-text-muted: var(--palette-text-muted, #73737B);
-  --color-text-dim: var(--palette-text-dim, #5F5F65);
+  --color-text-bright: var(--palette-text-bright, #fafafa);
+  --color-text-normal: var(--palette-text-normal, #a1a1aa);
+  --color-text-muted: var(--palette-text-muted, #73737b);
+  --color-text-dim: var(--palette-text-dim, #5f5f65);
 }
 
 /* base resets */
 @layer base {
-  html, body, #root {
+  html,
+  body,
+  #root {
     @apply h-full;
   }
   body {
@@ -48,8 +50,14 @@
 
 /* animations and utilities */
 @keyframes packet-pulse {
-  0% { border-color: var(--color-secondary); box-shadow: 0 0 12px color-mix(in srgb, var(--color-secondary) 15%, transparent); }
-  100% { border-color: var(--color-border); box-shadow: none; }
+  0% {
+    border-color: var(--color-secondary);
+    box-shadow: 0 0 12px color-mix(in srgb, var(--color-secondary) 15%, transparent);
+  }
+  100% {
+    border-color: var(--color-border);
+    box-shadow: none;
+  }
 }
 
 .packet-fresh {
@@ -61,15 +69,35 @@
    radiates from the core. The resting state (0%/100%) matches the static logo,
    so the loop starts and repeats seamlessly with no pop. */
 @keyframes beacon-core-ping {
-  0%, 100% { transform: scale(1);    opacity: 1; }
-  16%      { transform: scale(1.25); opacity: 1; }
-  45%      { transform: scale(0.95); opacity: 0.85; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  16% {
+    transform: scale(1.25);
+    opacity: 1;
+  }
+  45% {
+    transform: scale(0.95);
+    opacity: 0.85;
+  }
 }
 
 @keyframes beacon-ring-ping {
-  0%, 100% { opacity: var(--ring-base); transform: scale(1); }
-  30%      { opacity: 1;                transform: scale(1.06); }
-  60%      { opacity: var(--ring-base); transform: scale(1); }
+  0%,
+  100% {
+    opacity: var(--ring-base);
+    transform: scale(1);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+  60% {
+    opacity: var(--ring-base);
+    transform: scale(1);
+  }
 }
 
 .beacon-core-pulse {
@@ -83,17 +111,38 @@
   transform-origin: center;
   animation: beacon-ring-ping 1.8s ease-in-out infinite both;
 }
-.beacon-ring-1 { --ring-base: 0.95; animation-delay: 0.08s; }
-.beacon-ring-2 { --ring-base: 0.6;  animation-delay: 0.30s; }
-.beacon-ring-3 { --ring-base: 0.3;  animation-delay: 0.52s; }
+.beacon-ring-1 {
+  --ring-base: 0.95;
+  animation-delay: 0.08s;
+}
+.beacon-ring-2 {
+  --ring-base: 0.6;
+  animation-delay: 0.3s;
+}
+.beacon-ring-3 {
+  --ring-base: 0.3;
+  animation-delay: 0.52s;
+}
 
 /* The splash uses the supplied Meshat tower geometry. Its paired arcs expand
    from the mast in sequence so the signal reads as travelling outwards. */
 @keyframes meshat-radio-wave {
-  0%, 12% { opacity: 0; transform: scale(0.82); }
-  32%     { opacity: 1; }
-  68%     { opacity: 0.75; }
-  86%, 100% { opacity: 0; transform: scale(1.12); }
+  0%,
+  12% {
+    opacity: 0;
+    transform: scale(0.82);
+  }
+  32% {
+    opacity: 1;
+  }
+  68% {
+    opacity: 0.75;
+  }
+  86%,
+  100% {
+    opacity: 0;
+    transform: scale(1.12);
+  }
 }
 
 .meshat-radio-wave-inner,
@@ -103,7 +152,9 @@
   animation: meshat-radio-wave 1.8s ease-out infinite both;
 }
 
-.meshat-radio-wave-outer { animation-delay: 0.3s; }
+.meshat-radio-wave-outer {
+  animation-delay: 0.3s;
+}
 
 @media (prefers-reduced-motion: reduce) {
   .beacon-core-pulse,
@@ -122,8 +173,12 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .fade-in {
@@ -131,9 +186,18 @@
 }
 
 @keyframes map-presentation-transition {
-  0% { opacity: 1; filter: saturate(1); }
-  38% { opacity: 0.78; filter: saturate(0.82); }
-  100% { opacity: 1; filter: saturate(1); }
+  0% {
+    opacity: 1;
+    filter: saturate(1);
+  }
+  38% {
+    opacity: 0.78;
+    filter: saturate(0.82);
+  }
+  100% {
+    opacity: 1;
+    filter: saturate(1);
+  }
 }
 
 .map-presentation-transition .maplibregl-canvas {
@@ -141,51 +205,68 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .map-presentation-transition .maplibregl-canvas { animation: none; }
+  .map-presentation-transition .maplibregl-canvas {
+    animation: none;
+  }
 }
 
 /* MapLibre controls ship light chrome; re-skin to the app's dark tokens when the active basemap
    is dark (data-dark set on each map container — MapView and the packet-path mini-map). Glyphs are baked-in dark SVGs, so they
    are inverted rather than recolored. Light basemaps (Liberty/Light) keep the default chrome. */
-[data-dark="true"] .maplibregl-ctrl-group {
+[data-dark='true'] .maplibregl-ctrl-group {
   background: var(--color-bg-raised);
   border: 1px solid var(--color-border);
   box-shadow: none;
 }
-[data-dark="true"] .maplibregl-ctrl-group button + button {
+[data-dark='true'] .maplibregl-ctrl-group button + button {
   border-top-color: var(--color-border);
 }
-[data-dark="true"] .maplibregl-ctrl-group button:hover {
+[data-dark='true'] .maplibregl-ctrl-group button:hover {
   background: color-mix(in srgb, var(--color-text-normal) 10%, transparent);
 }
-[data-dark="true"] .maplibregl-ctrl-icon {
+[data-dark='true'] .maplibregl-ctrl-icon {
   filter: invert(1) brightness(1.6);
 }
-[data-dark="true"] .maplibregl-ctrl-scale {
+[data-dark='true'] .maplibregl-ctrl-scale {
   background: color-mix(in srgb, var(--color-bg-raised) 78%, transparent);
   border-color: var(--color-border);
   color: var(--color-text-normal);
 }
-[data-dark="true"] .maplibregl-ctrl-attrib {
+[data-dark='true'] .maplibregl-ctrl-attrib {
   background: color-mix(in srgb, var(--color-bg-raised) 78%, transparent);
 }
-[data-dark="true"] .maplibregl-ctrl-attrib a {
+[data-dark='true'] .maplibregl-ctrl-attrib a {
   color: var(--color-text-muted);
 }
 /* Path-node popup: dark chrome to match the controls, plus name/coords typography. */
-[data-dark="true"] .maplibregl-popup-content {
+[data-dark='true'] .maplibregl-popup-content {
   background: var(--color-bg-raised);
   color: var(--color-text-normal);
   border: 1px solid var(--color-border);
   box-shadow: none;
 }
-[data-dark="true"] .maplibregl-popup-anchor-top .maplibregl-popup-tip,
-[data-dark="true"] .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
-[data-dark="true"] .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--color-bg-raised); }
-[data-dark="true"] .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
-[data-dark="true"] .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-[data-dark="true"] .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--color-bg-raised); }
-[data-dark="true"] .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--color-bg-raised); }
-[data-dark="true"] .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--color-bg-raised); }
-.pp-popup-name { font-weight: 600; }
-.pp-popup-coords { font-family: ui-monospace, monospace; font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }
+[data-dark='true'] .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+[data-dark='true'] .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+[data-dark='true'] .maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
+  border-bottom-color: var(--color-bg-raised);
+}
+[data-dark='true'] .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+[data-dark='true'] .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+[data-dark='true'] .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+  border-top-color: var(--color-bg-raised);
+}
+[data-dark='true'] .maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: var(--color-bg-raised);
+}
+[data-dark='true'] .maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: var(--color-bg-raised);
+}
+.pp-popup-name {
+  font-weight: 600;
+}
+.pp-popup-coords {
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}

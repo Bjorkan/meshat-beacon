@@ -1,17 +1,17 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
-import { StatsOverview } from "../features/stats/StatsOverview";
+import { useNavigate, useSearch } from '@tanstack/react-router';
+import { StatsOverview } from '../features/stats/StatsOverview';
 
 export function AnalyticsRoute() {
-  const search = useSearch({ from: "/analytics" });
-  const navigate = useNavigate({ from: "/analytics" });
+  const search = useSearch({ from: '/analytics' });
+  const navigate = useNavigate({ from: '/analytics' });
   return (
     <StatsOverview
-      statsTab={search.statsTab ?? "mesh"}
-      range={search.range ?? "7d"}
+      statsTab={search.statsTab ?? 'mesh'}
+      range={search.range ?? '7d'}
       observerId={search.observerId ?? null}
       onPatch={(updates) => {
         navigate({
-          to: ".",
+          to: '.',
           search: (prev) => {
             const next = { ...prev };
             for (const [key, value] of Object.entries(updates)) {
