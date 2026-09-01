@@ -249,7 +249,7 @@ export function RouteTable() {
     [rows, selectedKey],
   );
 
-  const searchIatas = iatas ?? [];
+  const searchIatas = useMemo(() => iatas ?? [], [iatas]);
   const canSearch = !!(from.trim() && to.trim() && searchIatas.length >= 1);
   // clear any selection when the visible list changes out from under it (search submit/clear)
   const submitSearch = useCallback(() => {

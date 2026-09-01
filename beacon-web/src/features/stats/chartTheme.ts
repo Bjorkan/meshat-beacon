@@ -107,7 +107,7 @@ export function useChartColors(): ChartColors {
 
 // Per-device-type colour, shared by the Mesh "Node types" donut and the neighbour graph so the two
 // views stay in sync. Unknown types fall back to a dim primary.
-export function nodeTypeColor(typeName: string, _colors: ChartColors): string {
+export function nodeTypeColor(typeName: string): string {
   return semanticNodeTypeColor(typeName);
 }
 
