@@ -1,6 +1,7 @@
 {
   "name": "meshcore-beacon",
   "private": true,
+  "repository": "github:Bjorkan/meshat-beacon",
   "workspaces": [
     "beacon-web"
   ],
