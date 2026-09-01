@@ -325,14 +325,14 @@ export function useMapNodes(
       'match',
       ['get', 'nodeTypeName'],
       'companion',
-      cssVar('--palette-primary', '#3B82F6'),
+      NODE_TYPE_COLORS.companion,
       'repeater',
-      cssVar('--palette-secondary', '#A78BFA'),
+      NODE_TYPE_COLORS.repeater,
       'room_server',
-      cssVar('--palette-green', '#22C55E'),
+      NODE_TYPE_COLORS.room_server,
       'sensor',
-      cssVar('--palette-warn', '#EAB308'),
-      cssVar('--palette-text-dim', '#71717A'),
+      NODE_TYPE_COLORS.sensor,
+      NODE_TYPE_COLORS.unknown,
     ] as unknown as ExpressionSpecification;
     const dotOutline = isDark ? 'rgba(9,9,11,0.92)' : 'rgba(255,255,255,0.96)';
     if (!map.getLayer(NODES_DOT_LAYER_ID)) {

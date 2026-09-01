@@ -14,6 +14,7 @@ import {
   FOCUSED_SELECTED_BACKDROP_LAYER_ID,
 } from './types';
 import { syncMapOverlayLayerOrder } from './map-layer-order';
+import { NODE_TYPE_COLORS } from '../node-type-colors';
 
 type Points = FeatureCollection<Point, FocusedNeighborPointProps>;
 
@@ -41,14 +42,14 @@ export function useMapFocusedNeighbors(
       'match',
       ['get', 'nodeTypeName'],
       'companion',
-      paletteVar('--palette-primary', '#3B82F6'),
+      NODE_TYPE_COLORS.companion,
       'repeater',
-      paletteVar('--palette-secondary', '#A78BFA'),
+      NODE_TYPE_COLORS.repeater,
       'room_server',
-      paletteVar('--palette-green', '#22C55E'),
+      NODE_TYPE_COLORS.room_server,
       'sensor',
-      paletteVar('--palette-warn', '#EAB308'),
-      paletteVar('--palette-text-muted', '#71717A'),
+      NODE_TYPE_COLORS.sensor,
+      NODE_TYPE_COLORS.unknown,
     ] as unknown as ExpressionSpecification;
     const accent = paletteVar('--palette-primary', '#3B82F6');
     const backdrop = paletteVar('--palette-bg-base', '#09090B');

@@ -1,4 +1,5 @@
 import type { GeoJSONSourceSpecification } from 'maplibre-gl';
+import { NODE_TYPE_COLORS } from '../node-type-colors';
 
 // Cluster presentation deliberately uses a neutral carrier with compact role counts. It borrows the
 // useful visual hierarchy from CoreScope (count first, composition second) without sharing its DOM/
@@ -12,10 +13,10 @@ export const CLUSTER_ROLE_KEYS = {
 } as const;
 
 export const CLUSTER_ROLE_COLORS = {
-  repeater: '#E4572E',
-  companion: '#56B4E9',
-  roomServer: '#22C55E',
-  sensor: '#F0C62E',
+  repeater: NODE_TYPE_COLORS.repeater,
+  companion: NODE_TYPE_COLORS.companion,
+  roomServer: NODE_TYPE_COLORS.room_server,
+  sensor: NODE_TYPE_COLORS.sensor,
   observer: '#C77DFF',
 } as const;
 
