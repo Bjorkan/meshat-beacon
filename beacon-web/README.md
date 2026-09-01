@@ -35,7 +35,7 @@ EOF
 docker compose up -d
 ```
 
-This fork publishes `ghcr.io/bjorkan/beacon-web:latest` to GitHub Container
+This monorepo publishes `ghcr.io/bjorkan/meshat-beacon-web:latest` to GitHub Container
 Registry. The Compose file uses that image by default; set `BEACON_WEB_IMAGE`
 to override it. No `docker login` is required while the package is public.
 If a pull fails with `403 Forbidden`, the package visibility has regressed to

@@ -21,10 +21,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: beacon-web
+          - image: meshat-beacon-web
             context: .
             dockerfile: beacon-web/.build/Dockerfile
-          - image: beacon-server
+          - image: meshat-beacon-server
             context: beacon-server
             dockerfile: beacon-server/.build/Dockerfile
     steps:

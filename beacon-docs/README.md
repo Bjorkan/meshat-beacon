@@ -106,7 +106,7 @@ Visit `https://<your-domain>` and you're off to the races. 🚀
 ### Container images
 
 The `app` and `web` services pull public images from GitHub Container Registry
-(`ghcr.io/bjorkan/beacon-server` and `…/beacon-web`) — **no `docker login`
+(`ghcr.io/bjorkan/meshat-beacon-server` and `…-web`) — **no `docker login`
 is required**.
 
 > **Troubleshooting — `403 Forbidden` on pull.** If `docker compose up` fails with a
@@ -129,8 +129,8 @@ Project-wide docs that describe the entire system live in [`app_documentation/`]
 
 ## Source packages
 
-- **Beacon Server (API):** [`../beacon-server/`](../beacon-server/) — image `ghcr.io/bjorkan/beacon-server`
-- **Beacon Web (Frontend):** [`../beacon-web/`](../beacon-web/) — image `ghcr.io/bjorkan/beacon-web`
+- **Beacon Server (API):** [`../beacon-server/`](../beacon-server/) — image `ghcr.io/bjorkan/meshat-beacon-server`
+- **Beacon Web (Frontend):** [`../beacon-web/`](../beacon-web/) — image `ghcr.io/bjorkan/meshat-beacon-web`
 
 ## Maintainers: publishing images
 
@@ -139,9 +139,9 @@ workflow on pushes to `main`/`dev` and on `v*` tags. **GHCR packages are Private
 default**, which makes anonymous `docker pull` fail with `403 Forbidden`. To make a
 package publicly pullable (one-time, per package):
 
-1. GitHub → **Bjorkan** → **Packages** → select `beacon-server`.
+1. GitHub → **Bjorkan** → **Packages** → select `meshat-beacon-server`.
 2. **Package settings** → **Danger Zone** → **Change visibility** → **Public**.
-3. Repeat for `beacon-web`.
+3. Repeat for `meshat-beacon-web`.
 
 Once a package is Public, every future CI push to it stays Public. `GITHUB_TOKEN`
 cannot change package visibility, so this step can't be automated in the workflow.
