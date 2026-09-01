@@ -2,14 +2,14 @@ import { useState, useMemo, useCallback, useEffect, useRef, memo } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { iataQueries, routeQueries } from '../../api/queries';
+import { routeQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
 import { Badge } from '../../components/Badge';
 import { Timestamp } from '../../components/Timestamp';
 import { DataTable, type Column, type SortState } from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
-import { MultiSelectDropdown } from '../../components/MultiSelectDropdown';
+
 import { RouteDetailPanel } from './RouteDetailPanel';
 import { ResolvedHopBlock } from '../packets/PathData';
 import { formatHex } from '../../lib/formatters';
@@ -203,7 +203,7 @@ export function RouteTable() {
   // /routes/search; two+ → /routes/cross across the directed pairs. Hashes + ≥1 IATA required.
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [searchIatas, setSearchIatas] = useState<string[]>([]);
+
   const [search, setSearch] = useState<SearchParams | null>(null);
   const isCross = search != null && search.iatas.length >= 2;
 
@@ -239,20 +239,6 @@ export function RouteTable() {
     ),
   );
 
-  // IATA options for the path-search multi-select, from /iatas (shares the region picker's cached
-  // query). The label carries the display name so the dropdown's search filter matches on it.
-  const { data: iataCodes } = useQuery({
-    ...iataQueries.list(),
-  });
-  const iataOptions = useMemo(
-    () =>
-      (iataCodes ?? []).map((i) => ({
-        value: i.iata,
-        label: i.displayName ? `${i.iata} — ${i.displayName}` : i.iata,
-      })),
-    [iataCodes],
-  );
-
   const rows = useMemo(
     () => (search ? (isCross ? [] : searchRoutes) : listRoutes),
     [search, isCross, searchRoutes, listRoutes],
@@ -263,6 +249,7 @@ export function RouteTable() {
     [rows, selectedKey],
   );
 
+  const searchIatas = iatas ?? [];
   const canSearch = !!(from.trim() && to.trim() && searchIatas.length >= 1);
   // clear any selection when the visible list changes out from under it (search submit/clear)
   const submitSearch = useCallback(() => {
@@ -306,13 +293,7 @@ export function RouteTable() {
           />
         </div>
         <div className="flex items-center gap-1.5">
-          <MultiSelectDropdown
-            label="IATA"
-            options={iataOptions}
-            selected={searchIatas}
-            onChange={setSearchIatas}
-            align="left"
-          />
+          {!iatas && <span className="text-[11px] text-text-dim">{t('routes.selectScope')}</span>}
           <button
             type="button"
             onClick={submitSearch}

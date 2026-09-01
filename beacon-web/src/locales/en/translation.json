@@ -249,6 +249,7 @@
     "firstSeen": "First seen",
     "lastSeen": "Last seen",
     "findPath": "Find path",
+    "selectScope": "Choose an IATA or region in the global selector to search routes.",
     "fromHash": "from hash",
     "toHash": "to hash",
     "search": "Search",
