@@ -19,13 +19,15 @@ export type IATA = { displayName?: string; iata?: string; lat?: number; lon?: nu
 
 export type KnownRoute = { firstSeen?: number; hopCount?: number; hops?: Array<RouteHop>; iata?: string; id?: number; lastSeen?: number; observationCount?: number; };
 
-export type Node = { clockCheckedAt?: number; clockDriftSeconds?: number; clockOutOfSync?: boolean; defaultScope?: string; firstSeen?: number; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lastAdvertAt?: number; lastSeen?: number; lat?: number; lng?: number; locationSource?: string; metadata?: unknown; minFirmwareVersion?: string; name?: string; neighborIds?: Array<string>; neighbors?: Array<NodeNeighbor>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; };
+export type Node = { clockCheckedAt?: number; clockDriftSeconds?: number; clockOutOfSync?: boolean; defaultScope?: string; firstSeen?: number; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lastAdvertAt?: number; lastSeen?: number; lat?: number; lng?: number; locationSource?: string; metadata?: unknown; minFirmwareVersion?: string; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; neighbors?: Array<NodeNeighbor>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; };
 
 export type NodeIATA = { iata?: string; lastHeard?: number; };
 
-export type NodeNeighbor = { firstSeen?: number; iata?: string; id?: string; lastSeen?: number; lat?: number; lng?: number; name?: string; nodeType?: number; nodeTypeName?: string; observationCount?: number; publicKey?: string; snr?: number; };
+export type NodeLinkMetric = { nodeId?: string; snr?: number; snrLastSeen?: number; snrSampleCount?: number; };
 
-export type NodeSummary = { defaultScope?: string; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lat?: number; lng?: number; name?: string; neighborIds?: Array<string>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; };
+export type NodeNeighbor = { firstSeen?: number; iata?: string; id?: string; lastSeen?: number; lat?: number; lng?: number; name?: string; nodeType?: number; nodeTypeName?: string; observationCount?: number; publicKey?: string; snr?: number; snrLastSeen?: number; snrSampleCount?: number; };
+
+export type NodeSummary = { defaultScope?: string; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lat?: number; lng?: number; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; };
 
 export type NodeTypeCount = { count?: number; nodeType?: number; nodeTypeName?: string; };
 
@@ -62,6 +64,8 @@ export type PacketTransportCodes = { regionCode?: number; subRegionCode?: number
 export type PageAdvertObservation = { hasMore?: boolean; items?: Array<AdvertObservation>; nextCursor?: number; nextPageToken?: string; };
 
 export type PageChannelSummary = { hasMore?: boolean; items?: Array<ChannelSummary>; nextCursor?: number; nextPageToken?: string; };
+
+export type PageChannelMessage = { hasMore?: boolean; items?: Array<ChannelMessage>; nextCursor?: number; nextPageToken?: string; };
 
 export type PageKnownRoute = { hasMore?: boolean; items?: Array<KnownRoute>; nextCursor?: number; nextPageToken?: string; };
 

@@ -124,6 +124,48 @@ describe('buildNeighborEdges', () => {
     const fc = buildNeighborEdges([selfRef, b], 'on', null);
     expect(fc.features).toHaveLength(1); // a<->b only, not a<->a
   });
+
+  it('carries bulk aggregate SNR onto ambient full-map edges, including zero', () => {
+    const withQuality = node({
+      id: 'a',
+      neighborIds: ['b'],
+      neighborLinks: [
+        { nodeId: 'b', snr: 0, snrSampleCount: 7, snrLastSeen: Date.now() - 86400000 },
+      ],
+    });
+    const fc = buildNeighborEdges([withQuality, b], 'on', null);
+    expect(fc.features[0]!.properties).toMatchObject({
+      snr: 0,
+      snrSampleCount: 7,
+    });
+    expect(fc.features[0]!.properties.ageDays).toBeGreaterThan(0.9);
+  });
+
+  it('leaves ambient edges without reliable samples unqualified for the blue fallback', () => {
+    const withoutQuality = node({
+      id: 'a',
+      neighborLinks: [{ nodeId: 'b', snrSampleCount: 0 }],
+    });
+    const fc = buildNeighborEdges([withoutQuality, b], 'on', null);
+    expect(fc.features[0]!.properties.snr).toBeUndefined();
+  });
+
+  it('combines reliable samples reported in both directions of an undirected edge', () => {
+    const forward = node({
+      id: 'a',
+      neighborLinks: [{ nodeId: 'b', snr: -10, snrSampleCount: 3, snrLastSeen: 1_000 }],
+    });
+    const reverse = node({
+      id: 'b',
+      neighborLinks: [{ nodeId: 'a', snr: 2, snrSampleCount: 1, snrLastSeen: 2_000 }],
+    });
+
+    const fc = buildNeighborEdges([forward, reverse], 'on', null);
+
+    expect(fc.features).toHaveLength(1);
+    expect(fc.features[0]!.properties.snr).toBe(-7);
+    expect(fc.features[0]!.properties.snrSampleCount).toBe(4);
+  });
 });
 
 describe('buildFocusedNeighborEdges', () => {

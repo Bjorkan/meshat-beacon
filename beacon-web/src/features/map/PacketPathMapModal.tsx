@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PacketDetail } from '../../types/api';
 import { ModalOverlay } from '../../components/ModalOverlay';
@@ -66,14 +66,6 @@ export function PacketPathMapModal({
   );
   const { themeId } = useTheme();
   const styleId = useMemo(() => mapStyleForTheme(themeId), [themeId]);
-
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
 
   return (
     <ModalOverlay label={t('map.packetPathLabel')} onClose={onClose}>

@@ -31,6 +31,7 @@ import type {
   ClockDriftEntry,
 } from '../features/stats/types';
 import type { Feature, Polygon, MultiPolygon } from 'geojson';
+import type * as Models from './generated/models';
 import {
   ApiError,
   rawGetBrokers,
@@ -78,6 +79,37 @@ export type IataBorder = Feature<Polygon | MultiPolygon>;
 // The region filter travels as the comma-separated `iatas` param; undefined/empty means all regions.
 function iatasParam(iatas?: string[]): string | undefined {
   return iatas && iatas.length > 0 ? iatas.join(',') : undefined;
+}
+
+function requiredField<T>(value: T | undefined, contract: string, field: string): T {
+  if (value === undefined) throw new Error(`Invalid ${contract} response: missing ${field}`);
+  return value;
+}
+
+// These endpoint adapters deliberately project generated wire models into the stricter UI models.
+// A schema rename now fails at compile time, while an unexpectedly omitted required field fails at
+// the transport boundary instead of leaking an unsafe assertion into feature code.
+function toChannelSummary(model: Models.ChannelSummary): ChannelSummary {
+  return {
+    id: requiredField(model.id, 'ChannelSummary', 'id'),
+    name: model.name ?? null,
+    channelHash: requiredField(model.channelHash, 'ChannelSummary', 'channelHash'),
+    lastSeen: requiredField(model.lastSeen, 'ChannelSummary', 'lastSeen'),
+    isHashtag: requiredField(model.isHashtag, 'ChannelSummary', 'isHashtag'),
+    keyKnown: requiredField(model.keyKnown, 'ChannelSummary', 'keyKnown'),
+  };
+}
+
+function toChannelMessage(model: Models.ChannelMessage): ChannelMessage {
+  return {
+    id: requiredField(model.id, 'ChannelMessage', 'id'),
+    packetHash: requiredField(model.packetHash, 'ChannelMessage', 'packetHash'),
+    channelHash: requiredField(model.channelHash, 'ChannelMessage', 'channelHash'),
+    senderName: requiredField(model.senderName, 'ChannelMessage', 'senderName'),
+    content: requiredField(model.content, 'ChannelMessage', 'content'),
+    sentAt: requiredField(model.sentAt, 'ChannelMessage', 'sentAt'),
+    observationCount: model.observationCount,
+  };
 }
 
 export function getPackets(
@@ -142,12 +174,12 @@ export async function getChannels(params?: {
   limit?: number;
 }): Promise<ChannelSummary[]> {
   const iatas = params?.iatas ?? [];
-  const page = (await rawGetChannels({
+  const page = await rawGetChannels({
     iata: iatas.length === 1 ? iatas[0] : undefined,
     iatas: iatas.length > 1 ? iatasParam(iatas) : undefined,
     limit: params?.limit,
-  })) as unknown as { items: ChannelSummary[] };
-  return page.items;
+  });
+  return requiredField(page.items, 'ChannelSummary page', 'items').map(toChannelSummary);
 }
 
 // Channel messages come back as { items } ordered id DESC, so the last row is the page's oldest
@@ -158,13 +190,14 @@ export async function getChannelMessagesPage(
   params?: { iatas?: string[]; cursor?: number; limit?: number },
 ): Promise<CursorPage<ChannelMessage>> {
   const limit = params?.limit ?? DEFAULT_PAGE_SIZE;
-  const page = (await rawGetChannelsChannelIDMessages({
+  const page = await rawGetChannelsChannelIDMessages({
     channelID: channelId,
     iatas: iatasParam(params?.iatas),
     cursor: params?.cursor,
     limit,
-  })) as unknown as { items: ChannelMessage[] };
-  return toCursorPage(page.items, limit, (m) => m.id);
+  });
+  const items = requiredField(page.items, 'ChannelMessage page', 'items').map(toChannelMessage);
+  return toCursorPage(items, limit, (m) => m.id);
 }
 
 export function getBrokers(): Promise<BrokerStatus[]> {

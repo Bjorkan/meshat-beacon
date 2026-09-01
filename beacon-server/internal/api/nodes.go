@@ -25,6 +25,15 @@ type NodeNeighbor struct {
 	LastSeen         int64     `json:"lastSeen"`  // epoch ms
 	SNR              *float32  `json:"snr,omitempty"`
 	SNRSampleCount   int64     `json:"snrSampleCount"`
+	SNRLastSeen      int64     `json:"snrLastSeen,omitempty"` // epoch ms of most recent reliable SNR sample
+}
+
+// NodeLinkMetric is the bulk, map-oriented quality summary for one known neighbor edge.
+type NodeLinkMetric struct {
+	NodeID         uuid.UUID `json:"nodeId"`
+	SNR            *float32  `json:"snr,omitempty"`
+	SNRSampleCount int64     `json:"snrSampleCount"`
+	SNRLastSeen    int64     `json:"snrLastSeen,omitempty"`
 }
 
 // NodeIATA represents a single IATA code and the last time the node was heard there.
@@ -35,20 +44,21 @@ type NodeIATA struct {
 
 // NodeSummary is the minimal node representation used in list responses.
 type NodeSummary struct {
-	ID                 uuid.UUID   `json:"id"`
-	PublicKey          string      `json:"publicKey"` // hex-encoded Ed25519 public key
-	NodeType           int16       `json:"nodeType"`  // 1=companion, 2=repeater, 3=room_server, 4=sensor
-	NodeTypeName       string      `json:"nodeTypeName"`
-	Name               *string     `json:"name,omitempty"`
-	IsObserver         bool        `json:"isObserver"`             // true if this node is also a known observer
-	ObserverID         *uuid.UUID  `json:"observerId,omitempty"`   // UUID of the associated observer row, if any
-	Latitude           *float64    `json:"lat,omitempty"`          // decimal degrees, from advert AppData
-	Longitude          *float64    `json:"lng,omitempty"`          // decimal degrees, from advert AppData
-	Radio              *string     `json:"radio,omitempty"`        // shorthand: "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
-	IATAs              []NodeIATA  `json:"iatas"`                  // IATAs where this node has been heard, with last heard timestamps
-	DefaultScope       *string     `json:"defaultScope,omitempty"` // most recently matched transport scope name e.g. "#bc"
-	KnownNeighborCount int64       `json:"knownNeighborCount"`
-	NeighborIDs        []uuid.UUID `json:"neighborIds,omitempty"` // only populated when the list request opts in; see ?neighbors=true
+	ID                 uuid.UUID        `json:"id"`
+	PublicKey          string           `json:"publicKey"` // hex-encoded Ed25519 public key
+	NodeType           int16            `json:"nodeType"`  // 1=companion, 2=repeater, 3=room_server, 4=sensor
+	NodeTypeName       string           `json:"nodeTypeName"`
+	Name               *string          `json:"name,omitempty"`
+	IsObserver         bool             `json:"isObserver"`             // true if this node is also a known observer
+	ObserverID         *uuid.UUID       `json:"observerId,omitempty"`   // UUID of the associated observer row, if any
+	Latitude           *float64         `json:"lat,omitempty"`          // decimal degrees, from advert AppData
+	Longitude          *float64         `json:"lng,omitempty"`          // decimal degrees, from advert AppData
+	Radio              *string          `json:"radio,omitempty"`        // shorthand: "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
+	IATAs              []NodeIATA       `json:"iatas"`                  // IATAs where this node has been heard, with last heard timestamps
+	DefaultScope       *string          `json:"defaultScope,omitempty"` // most recently matched transport scope name e.g. "#bc"
+	KnownNeighborCount int64            `json:"knownNeighborCount"`
+	NeighborIDs        []uuid.UUID      `json:"neighborIds,omitempty"`   // only populated when the list request opts in; see ?neighbors=true
+	NeighborLinks      []NodeLinkMetric `json:"neighborLinks,omitempty"` // bulk link quality for the same optional map topology
 	// Stale is true when the node hasn't been seen (last_seen) within the configured
 	// staleness window (default 24h; internal/config.ResolvedConfig.NodeStaleThreshold).
 	// Applies to every node type, unlike ClockDriftSeconds/ClockOutOfSync on Node, which

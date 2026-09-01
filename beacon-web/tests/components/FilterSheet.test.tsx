@@ -58,7 +58,7 @@ describe('FilterSheet', () => {
         <div />
       </FilterSheet>,
     );
-    fireEvent.keyDown(window, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Done' }), { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 

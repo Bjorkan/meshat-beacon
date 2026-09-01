@@ -38,7 +38,7 @@ func MessagesRouter(reader api.Reader) http.Handler {
 //	@Param		scope		query		string	false	"Filter by transport scope name e.g. %23bc (URL-encoded #bc)"
 //	@Param		cursor	query		int		false	"Message ID of last item for pagination (results ordered newest first)"
 //	@Param		limit		query		int		false	"Max results (default 50)"
-//	@Success	200			{object}	object
+//	@Success	200			{object}	api.Page[api.ChannelMessage]
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/messages [get]

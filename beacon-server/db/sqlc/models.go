@@ -169,6 +169,7 @@ type NodeNeighbor struct {
 	Snr              *float32           `json:"snr"`
 	RegionScope      *string            `json:"region_scope"`
 	SnrSampleCount   int64              `json:"snr_sample_count"`
+	SnrLastSeen      pgtype.Timestamptz `json:"snr_last_seen"`
 }
 
 type NodeShortID struct {

@@ -190,22 +190,24 @@ export function RouteTable() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [sort, setSort] = useState<SortState>({ header: 'Last seen', direction: 'desc' });
 
-  // drop the selection when the region changes — the selected route may not be in the new region
+  // Path search form: source→dest hashes, scoped exclusively by the global region picker. One IATA
+  // uses /routes/search; two+ use /routes/cross across directed pairs. Hashes + ≥1 IATA required.
+  const [from, setFrom] = useState('');
+  const [to, setTo] = useState('');
+  const [search, setSearch] = useState<SearchParams | null>(null);
+  const isCross = search != null && search.iatas.length >= 2;
+
+  // A result is only meaningful for the scope that produced it. Clear both the row selection and
+  // submitted path search when the global selection changes so stale cross-region results cannot
+  // remain on screen.
   const prevRegion = useRef(regionKey);
   useEffect(() => {
     if (prevRegion.current !== regionKey) {
       prevRegion.current = regionKey;
       setSelectedKey(null);
+      setSearch(null);
     }
   }, [regionKey]);
-
-  // path search form: source→dest hashes, scoped to a multi-select of IATAs. One IATA → within-IATA
-  // /routes/search; two+ → /routes/cross across the directed pairs. Hashes + ≥1 IATA required.
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-
-  const [search, setSearch] = useState<SearchParams | null>(null);
-  const isCross = search != null && search.iatas.length >= 2;
 
   // Region filtering and every sortable column are handled by the keyset-paginated endpoint. A sort
   // change creates a new query key and starts at the first correctly ordered page.

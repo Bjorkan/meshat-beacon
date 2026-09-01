@@ -3,24 +3,24 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { Timestamp } from '../../src/components/Timestamp';
 
 describe('Timestamp', () => {
-  it('shows relative text, revealing the absolute time on hover (instant tooltip)', () => {
+  it('shows relative text, revealing the absolute time on hover (instant tooltip)', async () => {
     const fiveMinAgo = Date.now() - 5 * 60_000;
     render(<Timestamp value={fiveMinAgo} />);
     const el = screen.getByText('5m ago');
     expect(el).toBeInTheDocument();
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument(); // hidden until hover
 
-    fireEvent.mouseEnter(el);
-    expect(screen.getByRole('tooltip').textContent).toMatch(
+    fireEvent.pointerMove(el, { pointerType: 'mouse' });
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(
       /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/,
     );
   });
 
-  it('renders the absolute string in absolute mode, relative on hover', () => {
+  it('renders the absolute string in absolute mode, relative on hover', async () => {
     render(<Timestamp value={1717689045123} mode="absolute" />);
     const el = screen.getByText(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
-    fireEvent.mouseEnter(el);
-    expect(screen.getByRole('tooltip').textContent).toMatch(/ago$/);
+    fireEvent.pointerMove(el, { pointerType: 'mouse' });
+    expect((await screen.findByRole('tooltip')).textContent).toMatch(/ago$/);
   });
 
   it('includes milliseconds when ms is set', () => {

@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useClickOutside } from '../hooks/useClickOutside';
+import * as Popover from '@radix-ui/react-popover';
+import { useHasHover } from '../hooks/useMediaQuery';
 
 interface Option {
   value: string;
   label: string;
+  disabled?: boolean;
 }
 
 interface MultiSelectDropdownProps {
@@ -14,10 +16,8 @@ interface MultiSelectDropdownProps {
   onChange: (selected: string[]) => void;
   searchable?: boolean;
   align?: 'left' | 'right';
-  fullWidth?: boolean; // stretch + inline panel for the mobile filter sheet
+  fullWidth?: boolean;
 }
-
-// checkbox dropdown with optional search filter
 
 export function MultiSelectDropdown({
   label,
@@ -31,73 +31,59 @@ export function MultiSelectDropdown({
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [filter, setFilter] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-
+  const hasHover = useHasHover();
   const showSearch = searchable ?? options.length > 6;
-
-  const closeDropdown = useCallback(() => setOpen(false), []);
-  useClickOutside(ref, open, closeDropdown);
-
-  useEffect(() => {
-    if (!open) return;
-    function handleKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setOpen(false);
-    }
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [open]);
-
-  useEffect(() => {
-    if (open && showSearch) {
-      inputRef.current?.focus();
-    }
-  }, [open, showSearch]);
-
+  const count = selected.length;
   const filtered = useMemo(() => {
-    if (!filter) return options;
-    const q = filter.toLowerCase();
-    return options.filter((o) => o.label.toLowerCase().includes(q));
+    const query = filter.toLowerCase();
+    return query ? options.filter((option) => option.label.toLowerCase().includes(query)) : options;
   }, [options, filter]);
 
-  const count = selected.length;
-
   return (
-    <div ref={ref} className={`relative ${fullWidth ? 'w-full' : ''}`}>
-      <button
-        type="button"
-        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all ${
-          fullWidth ? 'w-full justify-between' : ''
-        } ${
-          count > 0
-            ? 'border-primary-dim bg-primary/6 text-primary'
-            : 'border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal'
-        }`}
-        onClick={() => {
-          setOpen((prev) => {
-            if (prev) setFilter('');
-            return !prev;
-          });
-        }}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        {label}
-        <span
-          className={`text-[9px] px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? 'bg-primary/15' : 'invisible'}`}
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        if (!next) setFilter('');
+      }}
+    >
+      <Popover.Trigger asChild>
+        <button
+          type="button"
+          className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
+            fullWidth ? 'w-full justify-between' : ''
+          } ${
+            count > 0
+              ? 'border-primary-dim bg-primary/6 text-primary'
+              : 'border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal'
+          }`}
         >
-          {count || 0}
-        </span>
-        <span className="text-text-dim text-[9px]">{fullWidth && open ? '▴' : '▾'}</span>
-      </button>
-
-      {open && (
-        <div
-          className={
-            fullWidth
-              ? 'mt-1 w-full bg-bg-raised border border-border rounded-md py-1'
-              : `absolute top-full mt-1 w-52 ${align === 'right' ? 'right-0' : 'left-0'} max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1`
-          }
+          {label}
+          <span
+            className={`text-[9px] px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? 'bg-primary/15' : 'invisible'}`}
+          >
+            {count || 0}
+          </span>
+          <span className="text-text-dim text-[9px]">▾</span>
+        </button>
+      </Popover.Trigger>
+      <Popover.Portal>
+        <Popover.Content
+          align={align === 'right' ? 'end' : 'start'}
+          sideOffset={4}
+          collisionPadding={12}
+          onOpenAutoFocus={(event) => {
+            if (!showSearch) return;
+            event.preventDefault();
+            if (hasHover) inputRef.current?.focus();
+          }}
+          onEscapeKeyDown={(event) => {
+            if (!filter) return;
+            event.preventDefault();
+            setFilter('');
+          }}
+          className={`${fullWidth ? 'w-[var(--radix-popover-trigger-width)]' : 'w-52'} max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1 focus:outline-none`}
         >
           {showSearch && (
             <div className="px-2 pb-1">
@@ -105,77 +91,68 @@ export function MultiSelectDropdown({
                 ref={inputRef}
                 type="text"
                 value={filter}
-                onChange={(e) => setFilter(e.target.value)}
+                onChange={(event) => setFilter(event.target.value)}
                 placeholder={t('filters.filterPlaceholder')}
                 className="w-full text-[11px] font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
               />
             </div>
           )}
-
           <div className="flex items-center gap-1 px-2 py-1 border-b border-border-subtle mb-1">
             <button
               type="button"
-              className={`text-[11px] font-mono transition-colors ${
-                count === options.length ? 'text-primary' : 'text-text-muted hover:text-text-normal'
-              }`}
-              onClick={() => onChange(options.map((o) => o.value))}
+              className={
+                count === options.length
+                  ? 'text-primary text-[11px] font-mono'
+                  : 'text-text-muted hover:text-text-normal text-[11px] font-mono'
+              }
+              onClick={() =>
+                onChange(options.filter((option) => !option.disabled).map((option) => option.value))
+              }
             >
               {t('common.all')}
             </button>
             <span className="text-border text-[11px]">·</span>
             <button
               type="button"
-              className={`text-[11px] font-mono transition-colors ${
-                count === 0 ? 'text-primary' : 'text-text-muted hover:text-text-normal'
-              }`}
+              className={
+                count === 0
+                  ? 'text-primary text-[11px] font-mono'
+                  : 'text-text-muted hover:text-text-normal text-[11px] font-mono'
+              }
               onClick={() => onChange([])}
             >
               {t('common.none')}
             </button>
           </div>
-
-          <div className="max-h-64 overflow-y-auto" role="listbox" aria-multiselectable="true">
-            {filtered.map((opt) => {
-              const isSelected = selected.includes(opt.value);
+          <div className="max-h-64 overflow-y-auto" aria-label={label}>
+            {filtered.map((option) => {
+              const checked = selected.includes(option.value);
               return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
+                <label
+                  key={option.value}
                   className={`w-full flex items-center gap-2 px-2.5 py-1 text-left text-xs font-mono transition-colors ${
-                    isSelected
-                      ? 'text-text-bright bg-primary/10'
-                      : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
+                    option.disabled
+                      ? 'opacity-40'
+                      : checked
+                        ? 'text-text-bright bg-primary/10 cursor-pointer'
+                        : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3 cursor-pointer'
                   }`}
-                  onClick={() => {
-                    if (isSelected) {
-                      onChange(selected.filter((v) => v !== opt.value));
-                    } else {
-                      onChange([...selected, opt.value]);
-                    }
-                  }}
                 >
-                  <span
-                    className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
-                      isSelected ? 'border-primary bg-primary/20' : 'border-border'
-                    }`}
-                  >
-                    {isSelected && (
-                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                        <path
-                          d="M1.5 4L3 5.5L6.5 2"
-                          stroke="currentColor"
-                          strokeWidth="1.2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-primary"
-                        />
-                      </svg>
-                    )}
-                  </span>
-                  {opt.label}
-                </button>
+                  <input
+                    type="checkbox"
+                    disabled={option.disabled}
+                    checked={checked}
+                    onChange={() =>
+                      onChange(
+                        checked
+                          ? selected.filter((value) => value !== option.value)
+                          : [...selected, option.value],
+                      )
+                    }
+                    className="accent-primary"
+                  />
+                  {option.label}
+                </label>
               );
             })}
             {filtered.length === 0 && (
@@ -184,8 +161,8 @@ export function MultiSelectDropdown({
               </div>
             )}
           </div>
-        </div>
-      )}
-    </div>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
