@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/joho/godotenv v1.5.1
-	github.com/meshcore-go/meshcore-go v1.0.8
+	github.com/meshcore-go/meshcore-go v1.1.0
 	github.com/paulmach/orb v0.13.0
 	github.com/redis/go-redis/v9 v9.20.0
 	github.com/swaggo/http-swagger v1.3.4
