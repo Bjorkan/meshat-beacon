@@ -1,0 +1,14 @@
+# Type 2 Server: API-only, redirect other traffic to web host
+{$DOMAIN} {
+    handle /api/* {
+        reverse_proxy tower-app:8080
+    }
+
+    handle /ws {
+        reverse_proxy tower-app:8080
+    }
+
+    handle {
+        redir https://web.your.domain.com{uri} permanent
+    }
+}
