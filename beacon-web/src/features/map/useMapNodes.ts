@@ -9,6 +9,7 @@ import type {
 } from 'maplibre-gl';
 import Spiderfy from '@nazka/map-gl-js-spiderfy';
 import type { FeatureCollection, Point } from 'geojson';
+import { NODE_TYPE_COLORS } from '../node-type-colors';
 import {
   rasterizeNodeIcon,
   MAP_ICON_IDS,
