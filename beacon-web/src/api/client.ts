@@ -217,9 +217,7 @@ export function searchCrossIATARoutes(
   toHash: string,
   toIata: string,
 ): Promise<CrossIATARoute[]> {
-  return rawGetRoutesCross({ fromHash, fromIata, toHash, toIata }) as Promise<
-    CrossIATARoute[]
-  >;
+  return rawGetRoutesCross({ fromHash, fromIata, toHash, toIata }) as Promise<CrossIATARoute[]>;
 }
 
 // Trace tags. /traces returns a bare array of per-tag summaries (ordered newest-heard first, cursor is
@@ -412,9 +410,7 @@ export function getTopAdvertisers(
 }
 
 export function getTopTalkers(iatas?: string[], since?: number, limit = 10): Promise<TopTalker[]> {
-  return rawGetStatsTopTalkers({ iatas: iatasParam(iatas), since, limit }) as Promise<
-    TopTalker[]
-  >;
+  return rawGetStatsTopTalkers({ iatas: iatasParam(iatas), since, limit }) as Promise<TopTalker[]>;
 }
 
 export function getRadioPresets(iatas?: string[]): Promise<RadioPreset[]> {
@@ -428,9 +424,7 @@ export function getStatsNodeTypes(iatas?: string[]): Promise<NodeTypeCount[]> {
 // Repeaters/room servers whose clock has drifted past the server threshold, worst-first. Not
 // time-windowed and top-N only (no cursor), so callers pass a generous limit and page client-side.
 export function getClockDrift(iatas?: string[], limit = 100): Promise<ClockDriftEntry[]> {
-  return rawGetStatsClockDrift({ iatas: iatasParam(iatas), limit }) as Promise<
-    ClockDriftEntry[]
-  >;
+  return rawGetStatsClockDrift({ iatas: iatasParam(iatas), limit }) as Promise<ClockDriftEntry[]>;
 }
 
 // renamed from getScopes to avoid colliding with the /scopes name list; this is the /stats/scopes
