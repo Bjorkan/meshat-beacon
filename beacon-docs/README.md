@@ -43,6 +43,12 @@ docker-deployment-type1/
 
 > **`data/postgres/` and `data/redis/` are empty in git on purpose.** They're bind-mount targets: the `db` and `redis` containers write their data into them, so your database and cache **survive `docker compose down` and restarts**. Don't delete them unless you intend to wipe all data — `rm -rf data/postgres` resets the database. They populate automatically the first time you run `docker compose up -d`.
 
+> [!IMPORTANT]
+> Existing deployments upgrading from PostgreSQL 16 must migrate their database
+> before recreating the `db` container. PostgreSQL 18 uses a new volume layout and
+> cannot open PostgreSQL 16 data files directly. Follow the tested
+> [PostgreSQL 16 to 18 upgrade guide](docker-deployment-type1/POSTGRES-18-UPGRADE.md).
+
 **2. Create and fill in your `.env`**
 
 Copy the template from [`app_config/.env.example`](app_config/.env.example) and edit it:

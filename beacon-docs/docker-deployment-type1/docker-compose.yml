@@ -14,13 +14,13 @@ services:
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     environment:
       POSTGRES_USER: tower
       POSTGRES_PASSWORD: CHANGE_PASS
       POSTGRES_DB: tower
     volumes:
-      - ./data/postgres/:/var/lib/postgresql/data
+      - ./data/postgres/:/var/lib/postgresql
     ports:
       - "127.0.0.1:5432:5432"
     healthcheck:
