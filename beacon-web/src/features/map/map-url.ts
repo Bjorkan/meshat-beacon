@@ -1,7 +1,7 @@
 // Deep-link map view <-> URL params. Pure and maplibre-free so it stays unit-testable; mirrors the
 // region-selection.ts pattern. Inbound parsing is lenient — any invalid/unknown value is dropped so a
 // malformed link degrades to the normal view rather than breaking.
-import { MAP_STYLES, type NeighborLinesMode } from './types';
+import { type NeighborLinesMode } from './types';
 import { NODE_TYPE_NAMES } from '../../lib/node-types';
 
 // A parsed view carries only the fields whose params were present AND valid.
@@ -11,7 +11,6 @@ export interface ParsedMapView {
   clustered?: boolean;
   nodeType?: string;
   neighborLines?: NeighborLinesMode;
-  styleId?: string;
   flow?: boolean;
   borders?: boolean;
 }
@@ -23,7 +22,6 @@ export interface MapViewSnapshot {
   clustered: boolean;
   nodeType: string; // "" = All
   neighborLines: NeighborLinesMode;
-  styleId: string;
   flow: boolean;
   borders: boolean;
 }
@@ -90,10 +88,6 @@ function parseMapViewValues(get: (key: string) => string | null): ParsedMapView 
     view.neighborLines = neighbor as NeighborLinesMode;
   }
 
-  const style = get('style')?.toLowerCase();
-  const match = style && MAP_STYLES.find((s) => s.id.toLowerCase() === style);
-  if (match) view.styleId = match.id;
-
   const flow = parseBool(get('flow'));
   if (flow !== undefined) view.flow = flow;
 
@@ -120,7 +114,8 @@ export function buildMapParams(view: MapViewSnapshot): Record<string, string | n
     clustering: view.clustered ? 'on' : 'off',
     node_type: view.nodeType || null,
     neighbor_lines: view.neighborLines,
-    style: view.styleId,
+    // Historical ?style= links are deliberately cleared. The basemap always follows the app theme.
+    style: null,
     flow: view.flow ? 'on' : 'off',
     borders: view.borders ? 'on' : 'off',
   };

@@ -124,8 +124,9 @@ export function MapView({
   const { themeId, themes } = useTheme();
   const themeKey = themes.length ? themeId : '';
   // The basemap follows the app theme (Meshat Dark → dark tiles, Meshat Light → light tiles); a
-  // ?style= deep link still wins for the session. Nothing is persisted — switching theme swaps tiles.
-  const styleId = urlView.styleId ?? mapStyleForTheme(themeId);
+  // The basemap always follows the app theme. Historical ?style= links are ignored so they cannot
+  // pin the map to a dark style after a user selects the light theme.
+  const styleId = mapStyleForTheme(themeId);
   const { data: iatas } = useQuery(iataQueries.list());
 
   // nodes for the selected region (its own key, independent of the Nodes-table filters/page cap).
@@ -267,12 +268,12 @@ export function MapView({
       clustered,
       nodeType: typeFilter,
       neighborLines,
-      styleId,
+
       flow: packetFlow,
       borders,
     };
     return buildMapParams(snapshot);
-  }, [mapRef, clustered, typeFilter, neighborLines, styleId, packetFlow, borders]);
+  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders]);
 
   useMapNodes(
     mapRef,

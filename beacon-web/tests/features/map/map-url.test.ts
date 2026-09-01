@@ -78,10 +78,9 @@ describe('parseMapView', () => {
     expect(parseMapView(new URLSearchParams('neighbor_lines=nope'))).toEqual({});
   });
 
-  it('reads a known basemap style id and drops an unknown one', () => {
-    expect(parseMapView(new URLSearchParams('style=positron'))).toEqual({ styleId: 'positron' });
-    expect(parseMapView(new URLSearchParams('style=DARK'))).toEqual({ styleId: 'dark' });
-    expect(parseMapView(new URLSearchParams('style=does-not-exist'))).toEqual({});
+  it('ignores obsolete basemap URL overrides so the theme remains authoritative', () => {
+    expect(parseMapView(new URLSearchParams('style=positron'))).toEqual({});
+    expect(parseMapView(new URLSearchParams('style=dark'))).toEqual({});
   });
 
   it('reads the packet-flow toggle on/off', () => {
@@ -98,7 +97,7 @@ describe('parseMapView', () => {
 
   it('combines every param into one view', () => {
     const params = new URLSearchParams(
-      'lat=53.31&lng=-113.58&zoom=9&clustering=off&node_type=repeater&neighbor_lines=on&style=liberty&flow=on&borders=on',
+      'lat=53.31&lng=-113.58&zoom=9&clustering=off&node_type=repeater&neighbor_lines=on&flow=on&borders=on',
     );
     expect(parseMapView(params)).toEqual({
       center: [-113.58, 53.31],
@@ -106,7 +105,6 @@ describe('parseMapView', () => {
       clustered: false,
       nodeType: 'repeater',
       neighborLines: 'on',
-      styleId: 'liberty',
       flow: true,
       borders: true,
     });
@@ -133,7 +131,7 @@ describe('buildMapParams', () => {
       clustering: 'off',
       node_type: 'repeater',
       neighbor_lines: 'on',
-      style: 'liberty',
+      style: null,
       flow: 'on',
       borders: 'on',
     });
@@ -151,7 +149,6 @@ describe('buildMapParams', () => {
       clustered: false,
       nodeType: 'repeater',
       neighborLines: 'on',
-      styleId: 'liberty',
       flow: true,
       borders: true,
     });

@@ -89,7 +89,6 @@ export interface MapSearch {
   clustering?: boolean;
   node_type?: string;
   neighbor_lines?: 'on' | 'selected' | 'off';
-  style?: string;
   flow?: boolean;
   borders?: boolean;
 }
@@ -104,7 +103,6 @@ export function validateMapSearch(search: Record<string, unknown>): MapSearch {
     clustering: mapView.clustered,
     node_type: mapView.nodeType,
     neighbor_lines: mapView.neighborLines,
-    style: mapView.styleId,
     flow: mapView.flow,
     borders: mapView.borders,
   };
