@@ -1,0 +1,246 @@
+import { useState, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { packetQueries } from "../../api/queries";
+import { useRegion } from "../../hooks/useRegion";
+import type { WsPacketObservation, WsLagged } from "../../types/ws";
+import type { PacketSummary } from "../../types/api";
+import type { PacketServerFilter } from "./types";
+import { LIVE_BUFFER_CAP, MAX_INFINITE_PAGES } from "../../lib/constants";
+
+// merge and deduplicate live + paginated packets
+
+function flattenPages(data: { pages: Array<{ items: PacketSummary[] }> } | undefined): PacketSummary[] {
+  if (!data) return [];
+  return data.pages.flatMap((p) => p.items);
+}
+
+function dedup(packets: PacketSummary[]): PacketSummary[] {
+  const seen = new Set<string>();
+  return packets.filter((p) => {
+    if (seen.has(p.packetHash)) return false;
+    seen.add(p.packetHash);
+    return true;
+  });
+}
+
+interface LiveSnapshot {
+  buffer: readonly PacketSummary[];
+  acknowledgedCount: number;
+  observersByHash: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
+// RAF batching avoids re-rendering on every WS message -- can be 50+/sec during floods
+
+class LivePacketStore {
+  private buffer: PacketSummary[] = [];
+  private hashIndex = new Map<string, number>();
+  private observersByHash = new Map<string, Set<string>>();
+  private acknowledgedCount = 0;
+  private snapshot: LiveSnapshot = { buffer: [], acknowledgedCount: 0, observersByHash: new Map() };
+  private listeners = new Set<() => void>();
+  private rafId: number | null = null;
+
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  getSnapshot = (): LiveSnapshot => {
+    return this.snapshot;
+  };
+
+  private scheduleNotify(): void {
+    if (this.rafId !== null) return;
+    this.rafId = requestAnimationFrame(() => {
+      this.rafId = null;
+      this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
+      for (const l of this.listeners) l();
+    });
+  }
+
+  pushOrUpdate(summary: PacketSummary): void {
+    if (summary.latestObserver) {
+      const observers = this.observersByHash.get(summary.packetHash);
+      if (observers) {
+        observers.add(summary.latestObserver.id);
+      } else {
+        this.observersByHash.set(summary.packetHash, new Set([summary.latestObserver.id]));
+      }
+    }
+
+    const existing = this.hashIndex.get(summary.packetHash);
+    if (existing !== undefined) {
+      // A WS message only knows its own heardAt, so widen the window rather than replacing it —
+      // otherwise the expanded row's spread reads 0 for every re-heard packet.
+      const prev = this.buffer[existing]!;
+      this.buffer = [...this.buffer];
+      this.buffer[existing] = {
+        ...summary,
+        firstHeardAt: Math.min(prev.firstHeardAt, summary.firstHeardAt),
+        lastHeardAt: Math.max(prev.lastHeardAt, summary.lastHeardAt),
+      };
+    } else {
+      this.buffer = [summary, ...this.buffer];
+      this.rebuildIndex();
+      if (this.buffer.length > LIVE_BUFFER_CAP) {
+        // TODO: this splice mutates in-place after the spread copy above -- fine for now but sloppy
+        const removed = this.buffer.splice(LIVE_BUFFER_CAP);
+        for (const p of removed) {
+          this.hashIndex.delete(p.packetHash);
+          this.observersByHash.delete(p.packetHash);
+        }
+      }
+    }
+    this.scheduleNotify();
+  }
+
+  private rebuildIndex(): void {
+    this.hashIndex.clear();
+    for (let i = 0; i < this.buffer.length; i++) {
+      this.hashIndex.set(this.buffer[i]!.packetHash, i);
+    }
+  }
+
+  acknowledge(): void {
+    this.acknowledgedCount = this.buffer.length;
+    this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
+    for (const l of this.listeners) l();
+  }
+
+  reset(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    this.buffer = [];
+    this.hashIndex.clear();
+    this.observersByHash.clear();
+    this.acknowledgedCount = 0;
+    this.snapshot = { buffer: [], acknowledgedCount: 0, observersByHash: new Map() };
+  }
+}
+
+// combines live WS stream with paginated history
+
+export function usePackets(frozen: boolean = false, serverFilter: PacketServerFilter | null = null) {
+  const { iatas, regionKey } = useRegion();
+  const [store] = useState(() => new LivePacketStore());
+  const [laggedCount, setLaggedCount] = useState(0);
+
+  const [prevRegionKey, setPrevRegionKey] = useState(regionKey);
+  const regionChanged = prevRegionKey !== regionKey;
+  if (regionChanged) {
+    setPrevRegionKey(regionKey);
+    store.reset();
+    setLaggedCount(0);
+  }
+
+  const { buffer: liveBuffer, acknowledgedCount, observersByHash } = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+  );
+
+  // While scrolled away from the top, render a latched buffer so live prepends don't shift the
+  // view; the held packets reveal when the user returns to the top. Latched by holding the last
+  // value (set-state-during-render, this file's pattern — cf. prevRegionKey above). The
+  // regionChanged guard drops the latch so a region switch never shows the previous region.
+  const [displayBuffer, setDisplayBuffer] = useState(liveBuffer);
+  if ((!frozen || regionChanged) && displayBuffer !== liveBuffer) {
+    setDisplayBuffer(liveBuffer);
+  }
+
+  const handlePacketObservation = useCallback(
+    (data: WsPacketObservation["data"]) => {
+      const summary: PacketSummary = {
+        packetHash: data.packetHash,
+        payloadType: data.packet.payloadType,
+        payloadTypeName: data.packet.payloadTypeName,
+        routeType: data.packet.routeType,
+        routeTypeName: data.packet.routeTypeName,
+        firstHeardAt: data.observation.heardAt,
+        lastHeardAt: data.observation.heardAt,
+        observationCount: data.packet.observationCount,
+        scope: data.packet.scope,
+        latestObserver: {
+          id: data.observation.observerId,
+          displayName: data.observation.observerName,
+          iata: data.observation.iata,
+          pathLength: data.observation.pathLength,
+          pathBytes: data.observation.pathBytes,
+          resolvedPath: data.observation.resolvedPath ?? undefined,
+          // WS nulls these when the payload type carries no endpoint; the REST shape uses undefined
+          resolvedSource: data.observation.resolvedSource ?? undefined,
+          resolvedDestination: data.observation.resolvedDestination ?? undefined,
+        },
+      };
+
+      store.pushOrUpdate(summary);
+    },
+    [store],
+  );
+
+  // QueryWsBridge owns shared history healing on lag/reconnect. This route-local callback only
+  // maintains the user-visible dropped-event counter.
+  const handleLagged = useCallback((data: WsLagged) => {
+    setLaggedCount((prev) => prev + data.droppedCount);
+  }, []);
+
+  const dismissLagged = useCallback(() => setLaggedCount(0), []);
+
+  const {
+    data: history,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+  } = useInfiniteQuery({
+    // The unfiltered key must stay 2-element so its cached entry survives filter toggling; the
+    // lagged/mount resets above match both shapes by prefix.
+    ...packetQueries.list({ regionKey, iatas, filter: serverFilter }),
+    maxPages: MAX_INFINITE_PAGES,
+  });
+
+  // WS summaries contain neither raw payload nor every observation path. During those searches the
+  // REST result is authoritative; mixing the live buffer in would create false positives/negatives.
+  const includeLiveBuffer = !serverFilter?.search || serverFilter.searchField === "hash";
+  const allPackets = useMemo(
+    () => dedup([...(includeLiveBuffer ? displayBuffer : []), ...flattenPages(history)]),
+    [displayBuffer, history, includeLiveBuffer],
+  );
+
+  const observerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const p of allPackets) {
+      if (p.latestObserver && !map.has(p.latestObserver.id)) {
+        map.set(p.latestObserver.id, p.latestObserver.displayName ?? p.latestObserver.id.slice(0, 8));
+      }
+    }
+    return Array.from(map.entries())
+      .map(([id, name]) => ({ value: id, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [allPackets]);
+
+  const newPacketCount = liveBuffer.length - acknowledgedCount;
+
+  const acknowledgeNewPackets = useCallback(() => {
+    store.acknowledge();
+  }, [store]);
+
+  return {
+    allPackets,
+    observerOptions,
+    newPacketCount,
+    acknowledgeNewPackets,
+    fetchNextPage,
+    hasNextPage: hasNextPage ?? false,
+    isFetchingNextPage,
+    isLoading,
+    isError,
+    observersByHash,
+    handlePacketObservation,
+    handleLagged,
+    laggedCount,
+    dismissLagged,
+  };
+}

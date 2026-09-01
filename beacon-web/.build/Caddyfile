@@ -1,0 +1,20 @@
+:80 {
+	root * /srv
+	file_server
+	try_files {path} /index.html
+	encode gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	@hashed path /assets/*
+	header @hashed Cache-Control "public, max-age=31536000, immutable"
+
+	# index.html references the hashed assets and themes.json drives the theme
+	# picker — both must revalidate so renames/edits reach devices immediately.
+	@revalidate path /index.html /themes.json
+	header @revalidate Cache-Control "no-cache"
+}

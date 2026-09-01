@@ -1,0 +1,75 @@
+// Page-load splash: animated Meshat radio mark over a themed backdrop, shown once
+// per browser session, then faded out and removed from the DOM. Set VITE_SKIP_SPLASH
+// to skip it entirely for a deployment.
+//
+// To remove the splash entirely: delete this file and remove its import +
+// <SplashScreen /> line from src/App.tsx. Nothing else references it.
+
+import { useState, useEffect } from "react";
+import { MeshatSplashIcon } from "./MeshatSplashIcon";
+import { APP_NAME, SKIP_SPLASH } from "../lib/constants";
+import { useTranslation } from "react-i18next";
+
+const SPLASH_KEY = "meshat-splash-shown";
+const VISIBLE_MS = 2000;
+const FADE_MS = 400;
+
+export function SplashScreen() {
+  const { t } = useTranslation();
+  // Synchronous gate: decided before first paint so StrictMode's double-mount
+  // (and any same-session reload) never re-shows it.
+  const [render, setRender] = useState(() => {
+    if (SKIP_SPLASH) return false;
+    try {
+      if (typeof sessionStorage === "undefined") return false;
+      return sessionStorage.getItem(SPLASH_KEY) !== "1";
+    } catch {
+      return false;
+    }
+  });
+  const [fading, setFading] = useState(false);
+
+  useEffect(() => {
+    if (!render) return;
+    try {
+      sessionStorage.setItem(SPLASH_KEY, "1");
+    } catch {
+      // sessionStorage may throw under privacy/quota limits — harmless here.
+    }
+    const fadeTimer = setTimeout(() => setFading(true), VISIBLE_MS);
+    const doneTimer = setTimeout(() => setRender(false), VISIBLE_MS + FADE_MS);
+    return () => {
+      clearTimeout(fadeTimer);
+      clearTimeout(doneTimer);
+    };
+  }, [render]);
+
+  if (!render) return null;
+
+  return (
+    <div
+      aria-hidden="true"
+      className={`fixed inset-0 z-[9999] flex items-center justify-center bg-bg-base transition-opacity duration-[400ms] ease-out ${
+        fading ? "opacity-0 pointer-events-none" : "opacity-100"
+      }`}
+    >
+      <span className="inline-flex flex-col items-center gap-7">
+        <MeshatSplashIcon size={160} />
+        <span className="inline-flex flex-col items-center gap-2.5">
+          <span
+            className="text-text-bright text-5xl font-bold leading-none"
+            style={{ fontFamily: "Inter, system-ui, sans-serif" }}
+          >
+            {APP_NAME}
+          </span>
+          <span
+            className="text-text-muted text-xs tracking-[0.12em]"
+            style={{ fontFamily: "'Chakra Petch', sans-serif" }}
+          >
+            {t("app.tagline")}
+          </span>
+        </span>
+      </span>
+    </div>
+  );
+}

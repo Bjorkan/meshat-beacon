@@ -1,0 +1,44 @@
+[
+  {
+    "id": "meshat-dark",
+    "name": "Dark",
+    "vars": {
+      "--palette-bg-base": "#111827",
+      "--palette-bg-surface": "#1F2937",
+      "--palette-bg-raised": "#263243",
+      "--palette-border": "#374151",
+      "--palette-border-subtle": "#2C3844",
+      "--palette-primary": "#5CCE7A",
+      "--palette-primary-dim": "#349251",
+      "--palette-secondary": "#67EA94",
+      "--palette-green": "#5CCE7A",
+      "--palette-danger": "#FF8A80",
+      "--palette-warn": "#FCD34D",
+      "--palette-text-bright": "#FFFFFF",
+      "--palette-text-normal": "#E5E7EB",
+      "--palette-text-muted": "#9CA3AF",
+      "--palette-text-dim": "#6B7280"
+    }
+  },
+  {
+    "id": "meshat-light",
+    "name": "Light",
+    "vars": {
+      "--palette-bg-base": "#EEF2F7",
+      "--palette-bg-surface": "#FFFFFF",
+      "--palette-bg-raised": "#FFFFFF",
+      "--palette-border": "#D1D5DB",
+      "--palette-border-subtle": "#E5E7EB",
+      "--palette-primary": "#1F7A3D",
+      "--palette-primary-dim": "#166534",
+      "--palette-secondary": "#67EA94",
+      "--palette-green": "#1F7A3D",
+      "--palette-danger": "#B42318",
+      "--palette-warn": "#92400E",
+      "--palette-text-bright": "#111827",
+      "--palette-text-normal": "#1F2937",
+      "--palette-text-muted": "#4B5563",
+      "--palette-text-dim": "#6B7280"
+    }
+  }
+]

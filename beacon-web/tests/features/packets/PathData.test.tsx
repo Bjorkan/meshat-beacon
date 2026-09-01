@@ -1,0 +1,100 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, within } from "@testing-library/react";
+import { ResolvedHopBlock } from "../../../src/features/packets/PathData";
+import type { ResolvedHop } from "../../../src/types/api";
+
+// mobile/touch == no hover-capable pointer; desktop == has hover. Interaction modality keys off
+// (hover: hover), not viewport width.
+function setMobile(mobile: boolean) {
+  window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: /hover: hover/.test(query) ? !mobile : mobile,
+    media: query,
+    onchange: null,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })) as unknown as typeof window.matchMedia;
+}
+
+afterEach(() => vi.restoreAllMocks());
+
+const singleHop: ResolvedHop = {
+  confidence: "high",
+  nodes: [{ id: "node-1", name: "Repeater A", publicKey: "deadbeefcafe" }],
+};
+
+describe("ResolvedHopBlock per-hop SNR", () => {
+  it("shows the formatted SNR in the popover when the hop carries one", () => {
+    setMobile(true);
+    render(<ResolvedHopBlock hop={{ ...singleHop, snr: 10.75 }} label="ABC1" />);
+    fireEvent.click(screen.getByText("Repeater A"));
+    expect(screen.getByText(/SNR/)).toBeInTheDocument();
+    expect(screen.getByText("Hash ABC1")).toBeInTheDocument();
+    expect(screen.getByText("10.75")).toBeInTheDocument();
+  });
+
+  it("shows no SNR line when the hop has none", () => {
+    setMobile(true);
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" />);
+    fireEvent.click(screen.getByText("Repeater A"));
+    expect(screen.queryByText(/SNR/)).not.toBeInTheDocument();
+  });
+});
+
+describe("ResolvedHopBlock (desktop)", () => {
+  it("opens the node directly when the single-match block is clicked", () => {
+    setMobile(false);
+    const onViewNode = vi.fn();
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
+    fireEvent.click(screen.getByText("Repeater A"));
+    expect(onViewNode).toHaveBeenCalledWith("node-1");
+  });
+});
+
+describe("ResolvedHopBlock (mobile)", () => {
+  it("reveals the name popover on tap instead of navigating", () => {
+    setMobile(true);
+    const onViewNode = vi.fn();
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
+
+    fireEvent.click(screen.getByText("Repeater A"));
+    // popover shows the resolved name, and we did NOT jump straight into the node
+    const popover = screen.getByRole("tooltip");
+    expect(within(popover).getByText("Repeater A")).toBeInTheDocument();
+    expect(onViewNode).not.toHaveBeenCalled();
+  });
+
+  it("opens the node when the name in the popover is tapped", () => {
+    setMobile(true);
+    const onViewNode = vi.fn();
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
+
+    fireEvent.click(screen.getByText("Repeater A"));
+    fireEvent.click(within(screen.getByRole("tooltip")).getByRole("button", { name: "Repeater A" }));
+    expect(onViewNode).toHaveBeenCalledWith("node-1");
+  });
+
+  // A touch device wider than the mobile breakpoint (a tablet, or Chrome's device emulation, which
+  // reports no hover even at tablet widths) must still tap-to-toggle — not hover — so the popover
+  // doesn't dismiss before the resolved name can be tapped. Modality keys off (hover: hover), not width.
+  it("taps to open on a hover-less device even at desktop width", () => {
+    window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+      matches: false, // no hover, and not below the mobile width
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+    const onViewNode = vi.fn();
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
+
+    fireEvent.click(screen.getByText("Repeater A"));
+    expect(within(screen.getByRole("tooltip")).getByText("Repeater A")).toBeInTheDocument();
+    expect(onViewNode).not.toHaveBeenCalled();
+  });
+});

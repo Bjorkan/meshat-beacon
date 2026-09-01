@@ -1,0 +1,453 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { renderHook, waitFor, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { usePackets } from "../../../src/features/packets/usePackets";
+import type { PacketServerFilter } from "../../../src/features/packets/types";
+import type { PacketSummary } from "../../../src/types/api";
+import type { WsPacketObservation } from "../../../src/types/ws";
+
+vi.mock("../../../src/hooks/useRegion", () => ({
+  useRegion: () => ({ iatas: ["YOW"], regionKey: "YOW" }),
+}));
+
+const getPackets = vi.fn();
+vi.mock("../../../src/api/client", () => ({
+  getPackets: (...args: unknown[]) => getPackets(...args),
+}));
+
+function packet(hash: string): PacketSummary {
+  return {
+    packetHash: hash,
+    payloadType: 4,
+    payloadTypeName: "ADVERT",
+    routeType: 1,
+    routeTypeName: "FLOOD",
+    firstHeardAt: 1,
+    lastHeardAt: 1,
+    observationCount: 1,
+  } as PacketSummary;
+}
+
+function seedThreePages(qc: QueryClient) {
+  qc.setQueryData(["packets", "YOW"], {
+    pages: [
+      { items: [packet("a1")], nextCursor: 200 },
+      { items: [packet("b2")], nextCursor: 100 },
+      { items: [packet("c3")], nextCursor: null },
+    ],
+    pageParams: [undefined, 200, 100],
+  });
+}
+
+describe("usePackets cache ownership", () => {
+  let qc: QueryClient;
+
+  beforeEach(() => {
+    getPackets.mockReset();
+    // nextCursor stays truthy so an invalidate would replay every cached page — the behavior under test
+    getPackets.mockResolvedValue({ items: [packet("fresh")], nextCursor: 999 });
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+
+  it("leaves shared cached pages untouched on mount", async () => {
+    seedThreePages(qc);
+    renderHook(() => usePackets(), { wrapper });
+
+    // QueryWsBridge heals gaps globally. A route remount must not reset otherwise-fresh history.
+    await act(async () => {});
+    expect(getPackets).not.toHaveBeenCalled();
+    expect(qc.getQueryData<{ pages: unknown[] }>(["packets", "YOW"])?.pages).toHaveLength(3);
+  });
+
+  it("tracks the visible lag count without resetting shared history", async () => {
+    seedThreePages(qc);
+    const { result } = renderHook(() => usePackets(), { wrapper });
+    act(() => result.current.handleLagged({ v: 1, type: "lagged", droppedCount: 5, since: 0, lastObservationId: 0 }));
+
+    await act(async () => {});
+    expect(getPackets).not.toHaveBeenCalled();
+    expect(qc.getQueryData<{ pages: unknown[] }>(["packets", "YOW"])?.pages).toHaveLength(3);
+    expect(result.current.laggedCount).toBe(5);
+  });
+});
+
+describe("usePackets server filter", () => {
+  let qc: QueryClient;
+
+  beforeEach(() => {
+    getPackets.mockReset();
+    getPackets.mockResolvedValue({ items: [packet("fresh")], nextCursor: 999 });
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+
+  it("fetches filtered history under its own query key, leaving the unfiltered entry alone", async () => {
+    renderHook(() => usePackets(false, { payloadType: 4 }), { wrapper });
+
+    await waitFor(() => expect(getPackets).toHaveBeenCalledTimes(1));
+    expect(getPackets.mock.calls[0]![0]).toEqual(["YOW"]);
+    expect(getPackets.mock.calls[0]![1]).toEqual({ cursor: undefined, payloadType: 4, includeResolvedPath: true });
+    await waitFor(() => {
+      expect(qc.getQueryData(["packets", "YOW", { payloadType: 4 }])).toBeDefined();
+    });
+    expect(qc.getQueryData(["packets", "YOW"])).toBeUndefined();
+  });
+
+  it("carries the filter on subsequent pages", async () => {
+    const { result } = renderHook(() => usePackets(false, { payloadType: 4 }), { wrapper });
+    await waitFor(() => expect(getPackets).toHaveBeenCalledTimes(1));
+
+    await act(async () => {
+      await result.current.fetchNextPage();
+    });
+
+    expect(getPackets).toHaveBeenCalledTimes(2);
+    expect(getPackets.mock.calls[1]![1]).toEqual({ cursor: 999, payloadType: 4, includeResolvedPath: true });
+  });
+
+  it("reuses the cached unfiltered pages when the filter clears (no refetch)", async () => {
+    const { result, rerender } = renderHook(
+      ({ filter }: { filter: PacketServerFilter | null }) => usePackets(false, filter),
+      { initialProps: { filter: null as PacketServerFilter | null }, wrapper },
+    );
+    await waitFor(() => expect(getPackets).toHaveBeenCalledTimes(1));
+
+    rerender({ filter: { payloadType: 4 } });
+    await waitFor(() => expect(getPackets).toHaveBeenCalledTimes(2));
+
+    rerender({ filter: null });
+    await waitFor(() => expect(result.current.allPackets.length).toBeGreaterThan(0));
+    expect(getPackets).toHaveBeenCalledTimes(2); // staleTime Infinity + unchanged unfiltered key
+  });
+
+  it("keeps the live buffer when the filter changes", async () => {
+    const rafCallbacks: FrameRequestCallback[] = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+
+    const { result, rerender } = renderHook(
+      ({ filter }: { filter: PacketServerFilter | null }) => usePackets(false, filter),
+      { initialProps: { filter: null as PacketServerFilter | null }, wrapper },
+    );
+    await waitFor(() => expect(getPackets).toHaveBeenCalled());
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1"));
+      rafCallbacks.splice(0).forEach((cb) => cb(0));
+    });
+    expect(result.current.newPacketCount).toBe(1);
+
+    rerender({ filter: { payloadType: 4 } });
+
+    expect(result.current.allPackets.map((p) => p.packetHash)).toContain("p1");
+    expect(result.current.newPacketCount).toBe(1); // store untouched by the key switch
+  });
+
+  it("reports isLoading during the first fetch of a key and clears it after", async () => {
+    let resolveFetch!: (v: unknown) => void;
+    getPackets.mockReturnValueOnce(new Promise((r) => (resolveFetch = r)));
+
+    const { result } = renderHook(() => usePackets(false, { payloadType: 4 }), { wrapper });
+
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+
+    await act(async () => {
+      resolveFetch({ items: [packet("fresh")], nextCursor: null });
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+  });
+
+  it("reports isError when the history fetch fails", async () => {
+    getPackets.mockRejectedValue(new Error("boom"));
+
+    const { result } = renderHook(() => usePackets(), { wrapper });
+
+    await waitFor(() => expect(result.current.isError).toBe(true));
+  });
+
+  it("leaves filtered history to the global bridge when a lag notice arrives", async () => {
+    qc.setQueryData(["packets", "YOW", { payloadType: 4 }], {
+      pages: [
+        { items: [packet("a1")], nextCursor: 200 },
+        { items: [packet("b2")], nextCursor: 100 },
+        { items: [packet("c3")], nextCursor: null },
+      ],
+      pageParams: [undefined, 200, 100],
+    });
+    const { result } = renderHook(() => usePackets(false, { payloadType: 4 }), { wrapper });
+    act(() => result.current.handleLagged({ v: 1, type: "lagged", droppedCount: 5, since: 0, lastObservationId: 0 }));
+
+    await act(async () => {});
+    expect(getPackets).not.toHaveBeenCalled();
+    expect(qc.getQueryData<{ pages: unknown[] }>(["packets", "YOW", { payloadType: 4 }])?.pages).toHaveLength(3);
+    expect(result.current.laggedCount).toBe(5);
+  });
+});
+
+describe("usePackets path and endpoint fields", () => {
+  let qc: QueryClient;
+  let rafCallbacks: FrameRequestCallback[];
+
+  beforeEach(() => {
+    getPackets.mockReset();
+    getPackets.mockResolvedValue({ items: [], nextCursor: null });
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    rafCallbacks = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+
+  it("carries path and endpoint fields from the WS observation into latestObserver", () => {
+    const { result } = renderHook(() => usePackets(false, undefined), { wrapper });
+
+    act(() => {
+      result.current.handlePacketObservation({
+        packetHash: "AA11",
+        packet: {
+          payloadType: 1,
+          payloadTypeName: "ADVERT",
+          routeType: 1,
+          routeTypeName: "FLOOD",
+          isFirstObservation: true,
+          observationCount: 1,
+        },
+        observation: {
+          observerId: "obs-1",
+          observerName: "Raven",
+          iata: "YVR",
+          heardAt: 1700000000,
+          rssi: -94,
+          snr: -7.5,
+          sourceBroker: "b1",
+          pathLength: { raw: "42", hashSize: 1, hopCount: 2 },
+          pathBytes: "7fa4",
+          resolvedPath: [
+            { confidence: "high", nodes: [{ id: "r1", publicKey: "7f00", name: "Lambhov" }] },
+            { confidence: "none", nodes: [] },
+          ],
+          resolvedSource: { confidence: "high", nodes: [{ id: "n1", publicKey: "ab", name: "Salish" }] },
+          resolvedDestination: null,
+        },
+      });
+      rafCallbacks.splice(0).forEach((cb) => cb(0));
+    });
+
+    const obs = result.current.allPackets[0]!.latestObserver;
+    expect(obs?.pathLength).toEqual({ raw: "42", hashSize: 1, hopCount: 2 });
+    expect(obs?.pathBytes).toBe("7fa4");
+    expect(obs?.resolvedPath?.[0]?.nodes[0]?.name).toBe("Lambhov");
+    expect(obs?.resolvedSource?.nodes[0]!.name).toBe("Salish");
+    expect(obs?.resolvedDestination).toBeUndefined();
+  });
+});
+
+function observation(
+  hash: string,
+  over: { heardAt?: number; observerId?: string; observationCount?: number } = {},
+): WsPacketObservation["data"] {
+  return {
+    packetHash: hash,
+    packet: {
+      payloadType: 4,
+      payloadTypeName: "ADVERT",
+      routeType: 1,
+      routeTypeName: "FLOOD",
+      isFirstObservation: true,
+      observationCount: over.observationCount ?? 1,
+    },
+    observation: {
+      observerId: over.observerId ?? "o1",
+      observerName: "Obs",
+      iata: "YOW",
+      heardAt: over.heardAt ?? 1,
+      rssi: -80,
+      snr: 5,
+      sourceBroker: "b",
+    },
+  };
+}
+
+describe("usePackets live heard window", () => {
+  let qc: QueryClient;
+  let rafCallbacks: FrameRequestCallback[];
+
+  beforeEach(() => {
+    getPackets.mockReset();
+    getPackets.mockResolvedValue({ items: [], nextCursor: null });
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    rafCallbacks = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+
+  const flushRaf = () => rafCallbacks.splice(0).forEach((cb) => cb(0));
+
+  // Each WS message carries only its own heardAt, so a second observation of the same packet used to
+  // collapse the window to a single instant — the expanded row then read "spread 0.000s".
+  it("widens the heard window across observations instead of collapsing it", async () => {
+    const { result } = renderHook(() => usePackets(), { wrapper });
+    await waitFor(() => expect(getPackets).toHaveBeenCalled());
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1", { heardAt: 2000 }));
+      flushRaf();
+    });
+    act(() => {
+      result.current.handlePacketObservation(observation("p1", { heardAt: 5000 }));
+      flushRaf();
+    });
+    act(() => {
+      result.current.handlePacketObservation(observation("p1", { heardAt: 1000 }));
+      flushRaf();
+    });
+
+    const packet = result.current.allPackets.find((p) => p.packetHash === "p1")!;
+    expect(packet.firstHeardAt).toBe(1000);
+    expect(packet.lastHeardAt).toBe(5000);
+  });
+
+  it("still replaces every other field with the newest observation", async () => {
+    const { result } = renderHook(() => usePackets(), { wrapper });
+    await waitFor(() => expect(getPackets).toHaveBeenCalled());
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1", { heardAt: 2000, observerId: "o1", observationCount: 1 }));
+      flushRaf();
+    });
+    act(() => {
+      result.current.handlePacketObservation(observation("p1", { heardAt: 3000, observerId: "o2", observationCount: 2 }));
+      flushRaf();
+    });
+
+    const packet = result.current.allPackets.find((p) => p.packetHash === "p1")!;
+    expect(packet.latestObserver?.id).toBe("o2");
+    expect(packet.observationCount).toBe(2);
+  });
+});
+
+describe("usePackets freeze while scrolled away", () => {
+  let qc: QueryClient;
+  let rafCallbacks: FrameRequestCallback[];
+
+  beforeEach(() => {
+    getPackets.mockReset();
+    getPackets.mockResolvedValue({ items: [], nextCursor: null });
+    qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    rafCallbacks = [];
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+      rafCallbacks.push(cb);
+      return rafCallbacks.length;
+    });
+    vi.stubGlobal("cancelAnimationFrame", () => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={qc}>{children}</QueryClientProvider>
+  );
+
+  const flushRaf = () => rafCallbacks.splice(0).forEach((cb) => cb(0));
+
+  async function mount() {
+    const view = renderHook(({ frozen }) => usePackets(frozen), {
+      initialProps: { frozen: false },
+      wrapper,
+    });
+    await waitFor(() => expect(getPackets).toHaveBeenCalled());
+    return view;
+  }
+
+  it("withholds live packets prepended while frozen, but still counts them", async () => {
+    const { result, rerender } = await mount();
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1"));
+      flushRaf();
+    });
+    expect(result.current.allPackets.map((p) => p.packetHash)).toEqual(["p1"]);
+
+    rerender({ frozen: true });
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p2"));
+      flushRaf();
+    });
+    // frozen: the rendered list stays on p1; the banner still counts the held packet
+    expect(result.current.allPackets.map((p) => p.packetHash)).toEqual(["p1"]);
+    expect(result.current.newPacketCount).toBe(2);
+  });
+
+  it("reveals held packets once unfrozen", async () => {
+    const { result, rerender } = await mount();
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1"));
+      flushRaf();
+    });
+    rerender({ frozen: true });
+    act(() => {
+      result.current.handlePacketObservation(observation("p2"));
+      flushRaf();
+    });
+
+    rerender({ frozen: false });
+    expect(result.current.allPackets.map((p) => p.packetHash)).toEqual(["p2", "p1"]);
+  });
+
+  it("clears the new-packet count on acknowledge", async () => {
+    const { result } = await mount();
+
+    act(() => {
+      result.current.handlePacketObservation(observation("p1"));
+      result.current.handlePacketObservation(observation("p2"));
+      flushRaf();
+    });
+    expect(result.current.newPacketCount).toBe(2);
+
+    act(() => result.current.acknowledgeNewPackets());
+    expect(result.current.newPacketCount).toBe(0);
+  });
+});

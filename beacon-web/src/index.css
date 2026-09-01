@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+/* theme tokens from palette CSS vars */
+@theme {
+  --font-mono: "JetBrains Mono", monospace;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --color-bg-base: var(--palette-bg-base, #09090B);
+  --color-bg-surface: var(--palette-bg-surface, #111114);
+  --color-bg-raised: var(--palette-bg-raised, #1A1A1F);
+  --color-border: var(--palette-border, #27272A);
+  --color-border-subtle: var(--palette-border-subtle, #1E1E22);
+
+  --color-primary: var(--palette-primary, #3B82F6);
+  --color-primary-dim: var(--palette-primary-dim, #1D4ED8);
+  --color-secondary: var(--palette-secondary, #A78BFA);
+  --color-green: var(--palette-green, #22C55E);
+  --color-danger: var(--palette-danger, #EF4444);
+  --color-warn: var(--palette-warn, #EAB308);
+
+  --color-text-bright: var(--palette-text-bright, #FAFAFA);
+  --color-text-normal: var(--palette-text-normal, #A1A1AA);
+  --color-text-muted: var(--palette-text-muted, #73737B);
+  --color-text-dim: var(--palette-text-dim, #5F5F65);
+}
+
+/* base resets */
+@layer base {
+  html, body, #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-bg-base text-text-normal font-sans text-[13px] leading-relaxed m-0;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border) transparent;
+  }
+
+  /* one consistent keyboard-focus indicator for every interactive element. Inset so it isn't clipped
+     by scroll/overflow containers (table rows, panels) and matches the prior ring-inset look. */
+  :focus-visible {
+    outline: 2px solid var(--color-primary);
+    outline-offset: -1px;
+  }
+}
+
+/* animations and utilities */
+@keyframes packet-pulse {
+  0% { border-color: var(--color-secondary); box-shadow: 0 0 12px color-mix(in srgb, var(--color-secondary) 15%, transparent); }
+  100% { border-color: var(--color-border); box-shadow: none; }
+}
+
+.packet-fresh {
+  animation: packet-pulse 1s ease-out forwards;
+}
+
+/* RF beacon: each ring rests at its natural opacity and, as the wave passes,
+   brightens and swells before easing back — staggered outward so the signal
+   radiates from the core. The resting state (0%/100%) matches the static logo,
+   so the loop starts and repeats seamlessly with no pop. */
+@keyframes beacon-core-ping {
+  0%, 100% { transform: scale(1);    opacity: 1; }
+  16%      { transform: scale(1.25); opacity: 1; }
+  45%      { transform: scale(0.95); opacity: 0.85; }
+}
+
+@keyframes beacon-ring-ping {
+  0%, 100% { opacity: var(--ring-base); transform: scale(1); }
+  30%      { opacity: 1;                transform: scale(1.06); }
+  60%      { opacity: var(--ring-base); transform: scale(1); }
+}
+
+.beacon-core-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: beacon-core-ping 1.8s ease-in-out infinite both;
+}
+
+.beacon-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: beacon-ring-ping 1.8s ease-in-out infinite both;
+}
+.beacon-ring-1 { --ring-base: 0.95; animation-delay: 0.08s; }
+.beacon-ring-2 { --ring-base: 0.6;  animation-delay: 0.30s; }
+.beacon-ring-3 { --ring-base: 0.3;  animation-delay: 0.52s; }
+
+/* The splash uses the supplied Meshat tower geometry. Its paired arcs expand
+   from the mast in sequence so the signal reads as travelling outwards. */
+@keyframes meshat-radio-wave {
+  0%, 12% { opacity: 0; transform: scale(0.82); }
+  32%     { opacity: 1; }
+  68%     { opacity: 0.75; }
+  86%, 100% { opacity: 0; transform: scale(1.12); }
+}
+
+.meshat-radio-wave-inner,
+.meshat-radio-wave-outer {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: meshat-radio-wave 1.8s ease-out infinite both;
+}
+
+.meshat-radio-wave-outer { animation-delay: 0.3s; }
+
+@media (prefers-reduced-motion: reduce) {
+  .beacon-core-pulse,
+  .beacon-ring,
+  .meshat-radio-wave-inner,
+  .meshat-radio-wave-outer {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.writing-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.fade-in {
+  animation: fade-in 150ms ease-out;
+}
+
+@keyframes map-presentation-transition {
+  0% { opacity: 1; filter: saturate(1); }
+  38% { opacity: 0.78; filter: saturate(0.82); }
+  100% { opacity: 1; filter: saturate(1); }
+}
+
+.map-presentation-transition .maplibregl-canvas {
+  animation: map-presentation-transition 260ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-presentation-transition .maplibregl-canvas { animation: none; }
+}
+
+/* MapLibre controls ship light chrome; re-skin to the app's dark tokens when the active basemap
+   is dark (data-dark set on each map container — MapView and the packet-path mini-map). Glyphs are baked-in dark SVGs, so they
+   are inverted rather than recolored. Light basemaps (Liberty/Light) keep the default chrome. */
+[data-dark="true"] .maplibregl-ctrl-group {
+  background: var(--color-bg-raised);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+[data-dark="true"] .maplibregl-ctrl-group button + button {
+  border-top-color: var(--color-border);
+}
+[data-dark="true"] .maplibregl-ctrl-group button:hover {
+  background: color-mix(in srgb, var(--color-text-normal) 10%, transparent);
+}
+[data-dark="true"] .maplibregl-ctrl-icon {
+  filter: invert(1) brightness(1.6);
+}
+[data-dark="true"] .maplibregl-ctrl-scale {
+  background: color-mix(in srgb, var(--color-bg-raised) 78%, transparent);
+  border-color: var(--color-border);
+  color: var(--color-text-normal);
+}
+[data-dark="true"] .maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--color-bg-raised) 78%, transparent);
+}
+[data-dark="true"] .maplibregl-ctrl-attrib a {
+  color: var(--color-text-muted);
+}
+/* Path-node popup: dark chrome to match the controls, plus name/coords typography. */
+[data-dark="true"] .maplibregl-popup-content {
+  background: var(--color-bg-raised);
+  color: var(--color-text-normal);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+}
+[data-dark="true"] .maplibregl-popup-anchor-top .maplibregl-popup-tip,
+[data-dark="true"] .maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+[data-dark="true"] .maplibregl-popup-anchor-top-right .maplibregl-popup-tip { border-bottom-color: var(--color-bg-raised); }
+[data-dark="true"] .maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+[data-dark="true"] .maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+[data-dark="true"] .maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip { border-top-color: var(--color-bg-raised); }
+[data-dark="true"] .maplibregl-popup-anchor-left .maplibregl-popup-tip { border-right-color: var(--color-bg-raised); }
+[data-dark="true"] .maplibregl-popup-anchor-right .maplibregl-popup-tip { border-left-color: var(--color-bg-raised); }
+.pp-popup-name { font-weight: 600; }
+.pp-popup-coords { font-family: ui-monospace, monospace; font-size: 11px; color: var(--color-text-muted); margin-top: 2px; }

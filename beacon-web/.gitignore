@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+
+# Build
+dist/
+build/
+.next/
+.nuxt/
+
+# Dev server helper runtime files
+.scripts/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Testing
+coverage/
+.references/
+
+# Claude
+.claude/
+
+# OS
+.DS_Store
+Thumbs.db
+artifacts/
