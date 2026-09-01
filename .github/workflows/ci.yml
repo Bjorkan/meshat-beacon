@@ -1,0 +1,65 @@
+# Copyright 2026 Beacon Contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  web:
+    name: Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install
+        run: npm ci
+      - name: Generated API drift
+        run: npm run api:check --workspace=beacon-web
+      - name: Lint
+        run: npm run lint:web
+      - name: Test
+        run: npm run test:web
+      - name: Build
+        run: npm run build:web
+
+  server:
+    name: Server
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: beacon-server/go.mod
+          cache-dependency-path: beacon-server/go.sum
+      - name: Format check
+        run: |
+          files=$(gofmt -l beacon-server)
+          if [ -n "$files" ]; then
+            echo "The following files are not formatted:"
+            echo "$files"
+            exit 1
+          fi
+      - name: Vet
+        run: go -C beacon-server vet ./...
+      - name: Test
+        run: go -C beacon-server test ./...
+      - name: Build
+        run: go -C beacon-server build ./...
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+      - name: Swagger docs up to date
+        working-directory: beacon-server
+        run: |
+          cp docs/swagger.json docs/swagger.json.bak
+          swag init -g cmd/beacon/main.go -o docs --parseInternal --parseDependency
+          diff -q docs/swagger.json docs/swagger.json.bak

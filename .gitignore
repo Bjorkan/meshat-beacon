@@ -1,0 +1,30 @@
+# Dependencies and build output
+node_modules/
+dist/
+build/
+coverage/
+*.out
+binaries/
+
+# Local configuration and secrets
+**/.env
+**/.env.*
+!**/.env.example
+beacon-server/config.yaml
+
+# Runtime files
+.scripts/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Local tooling
+.claude/
+.references/
+notes.md
+roadmap.md

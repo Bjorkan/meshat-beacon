@@ -1,9 +1,5 @@
 # BEACON Web
 
-[![CodeQL](https://github.com/Bjorkan/beacon-web/actions/workflows/codeql.yml/badge.svg)](https://github.com/Bjorkan/beacon-web/actions/workflows/codeql.yml)
-[![CI](https://github.com/Bjorkan/beacon-web/actions/workflows/ci.yml/badge.svg)](https://github.com/Bjorkan/beacon-web/actions/workflows/ci.yml)
-[![Docker](https://github.com/Bjorkan/beacon-web/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/Bjorkan/beacon-web/actions/workflows/docker-publish.yml)
-
 Real-time LoRa mesh packet analyzer. Desktop-first, dark-mode-primary, dense information display for radio hobbyists.
 
 Built with React 19, TypeScript, Tailwind CSS 4, TanStack Query, and TanStack Virtual.
@@ -50,9 +46,11 @@ Caddy will automatically obtain a TLS certificate for your domain. Ensure DNS is
 
 ## Local Development
 
+From the monorepo root:
+
 ```bash
-npm install
-cp .env.example .env    # edit with your backend URLs
+npm ci
+cp beacon-web/.env.example beacon-web/.env  # edit with your backend URLs
 npm run dev             # starts Vite dev server at http://localhost:5173
 ```
 

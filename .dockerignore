@@ -1,0 +1,12 @@
+**/.git
+**/node_modules
+**/dist
+**/build
+**/coverage
+**/.env
+**/.env.*
+**/.DS_Store
+.agents
+.codex
+beacon-docs
+beacon-server

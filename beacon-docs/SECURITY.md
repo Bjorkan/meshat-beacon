@@ -4,8 +4,8 @@ This is the **documentation and deployment** repository for Beacon. If you have
 found a vulnerability in the Beacon application itself (server or web), please
 report it against the relevant code repository:
 
-- [beacon-server](https://github.com/MeshCore-Beacon/beacon-server)
-- [beacon-web](https://github.com/MeshCore-Beacon/beacon-web)
+- [`beacon-server`](../beacon-server/)
+- [`beacon-web`](../beacon-web/)
 
 ## Reporting a Vulnerability
 

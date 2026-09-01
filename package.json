@@ -1,0 +1,23 @@
+{
+  "name": "meshcore-beacon",
+  "private": true,
+  "workspaces": [
+    "beacon-web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=beacon-web",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "npm run build --workspace=beacon-web",
+    "build:server": "go -C beacon-server build ./...",
+    "lint": "npm run lint:web && npm run lint:server",
+    "lint:web": "npm run lint --workspace=beacon-web",
+    "lint:server": "go -C beacon-server vet ./...",
+    "test": "npm run test:web && npm run test:server",
+    "test:web": "npm test --workspace=beacon-web",
+    "test:server": "go -C beacon-server test ./...",
+    "check": "npm run lint && npm run test && npm run build"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

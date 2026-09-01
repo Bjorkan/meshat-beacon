@@ -22,10 +22,9 @@ Two deployment topologies are provided. Pick one, copy its folder to your server
 
 **1. Get the files onto your server**
 
-Clone the repo (you only need the deployment folder, but cloning is the simplest way to grab it):
+From a monorepo checkout (you only need the deployment folder):
 
 ```bash
-git clone https://github.com/MeshCore-Beacon/beacon-docs.git
 cd beacon-docs/docker-deployment-type1
 ```
 
@@ -128,10 +127,10 @@ Project-wide docs that describe the entire system live in [`app_documentation/`]
 - [**High Level Design**](app_documentation/high_level_design.md) — single source of truth. System overview, database schema, ingestion pipeline, and future features.
 - [**API Contract**](app_documentation/api_contract.md) — REST endpoints, WebSocket protocol, search, backpressure/reconnection, and mobile-specific concerns.
 
-## Source repositories
+## Source packages
 
-- **Beacon Server (API):** [github.com/MeshCore-Beacon/beacon-server](https://github.com/MeshCore-Beacon/beacon-server) — image `ghcr.io/meshcore-beacon/beacon-server`
-- **Beacon Web (Frontend):** [github.com/MeshCore-Beacon/beacon-web](https://github.com/MeshCore-Beacon/beacon-web) — image `ghcr.io/meshcore-beacon/beacon-web`
+- **Beacon Server (API):** [`../beacon-server/`](../beacon-server/) — image `ghcr.io/meshcore-beacon/beacon-server`
+- **Beacon Web (Frontend):** [`../beacon-web/`](../beacon-web/) — image `ghcr.io/meshcore-beacon/beacon-web`
 
 ## Maintainers: publishing images
 
@@ -166,4 +165,4 @@ through [SECURITY.md](SECURITY.md), not public channels.
 ## License
 
 Beacon is licensed under the [GNU Affero General Public License v3.0](LICENSE)
-(AGPL-3.0), the same license as [beacon-server](https://github.com/MeshCore-Beacon/beacon-server).
+(AGPL-3.0), the same license as [`beacon-server`](../beacon-server/).
