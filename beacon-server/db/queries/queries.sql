@@ -1281,14 +1281,19 @@ ORDER BY hop_count ASC, last_seen DESC;
 -- common case). regionScope is optional too; pass NULL whenever the OTA
 -- scope query for this neighbor didn't succeed (status != "responded"),
 -- so a failed/timed-out query doesn't erase a previously known scope.
--- On conflict, snr and region_scope are only overwritten when a new
--- non-null value is supplied.
-INSERT INTO node_neighbors (node_id, neighbor_id, iata, observation_count, snr, region_scope)
-VALUES ($1, $2, $3, 1, $4, $5)
+-- On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
+-- a stable map link quality while making recent RF conditions matter more than old samples.
+INSERT INTO node_neighbors (node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, region_scope)
+VALUES ($1, $2, $3, 1, $4, CASE WHEN $4 IS NULL THEN 0 ELSE 1 END, $5)
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
   observation_count = node_neighbors.observation_count + 1,
-  snr               = COALESCE(EXCLUDED.snr, node_neighbors.snr),
+  snr               = CASE
+                        WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr
+                        WHEN node_neighbors.snr IS NULL THEN EXCLUDED.snr
+                        ELSE node_neighbors.snr * 0.8 + EXCLUDED.snr * 0.2
+                      END,
+  snr_sample_count  = node_neighbors.snr_sample_count + CASE WHEN EXCLUDED.snr IS NULL THEN 0 ELSE 1 END,
   region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope);
 
 -- name: UpdateObserverRegionScope :exec
@@ -1301,7 +1306,7 @@ UPDATE observers SET region_scope = $2 WHERE id = $1;
 -- Returns the neighbors of a node with details, ordered by most recently seen.
 SELECT
     n.id, n.public_key, n.name, n.node_type, n.latitude, n.longitude,
-    nn.iata, nn.observation_count, nn.first_seen, nn.last_seen, nn.snr
+    nn.iata, nn.observation_count, nn.first_seen, nn.last_seen, nn.snr, nn.snr_sample_count
 FROM node_neighbors nn
 JOIN nodes n ON n.id = nn.neighbor_id
 WHERE nn.node_id = $1

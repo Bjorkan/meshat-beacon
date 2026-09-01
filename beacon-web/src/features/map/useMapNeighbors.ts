@@ -34,8 +34,8 @@ const NEIGHBOR_OPACITY = [
   ['case', ['get', 'selected'], 0.9, 0.3],
 ] as ExpressionSpecification;
 
-// Colour by observation count on a log axis (counts are heavily right-skewed): ~1 red, ~20 yellow,
-// ~150+ green, clamped past the ends. Edges without a count (the ambient mesh) fall back to primary.
+// Colour selected links by their aggregated, trusted SNR when available. Older edges keep
+// the observation-confidence scale, so sparse historical data does not masquerade as RF quality.
 function neighborLineColor(
   danger: string,
   warn: string,
@@ -44,6 +44,8 @@ function neighborLineColor(
 ): ExpressionSpecification {
   return [
     'case',
+    ['has', 'snr'],
+    ['interpolate', ['linear'], ['get', 'snr'], -20, danger, 0, warn, 10, green],
     ['has', 'obs'],
     [
       'interpolate',

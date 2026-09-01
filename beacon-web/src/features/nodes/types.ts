@@ -30,6 +30,8 @@ export interface Node extends NodeSummary {
   minFirmwareVersion: string | null;
   firstSeen: number; // epoch ms
   lastSeen: number; // epoch ms
+  snr?: number; // aggregated link SNR (dB), when trusted samples exist
+  snrSampleCount: number;
   metadata: Record<string, unknown> | null;
   // Clock drift, repeaters/room servers only; absent for other types or before a qualifying advert.
   // Device minus server time in seconds (+ve = device ahead). clockCheckedAt == lastAdvertAt.
@@ -52,6 +54,8 @@ export interface NodeNeighbor {
   observationCount: number;
   firstSeen: number; // epoch ms
   lastSeen: number; // epoch ms
+  snr?: number; // aggregated link SNR (dB), when trusted samples exist
+  snrSampleCount: number;
 }
 
 export interface NodeObservation {

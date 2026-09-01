@@ -41,6 +41,7 @@ export interface NeighborEdgeProps {
   // ambient "on" mesh) render uniform.
   obs?: number;
   ageDays?: number;
+  snr?: number;
 }
 
 export interface FocusedNeighborPointProps {
@@ -125,19 +126,36 @@ export function buildFocusedNeighborEdges(
   if (!selected || selected.lat == null || selected.lng == null) return empty;
   const from: [number, number] = [selected.lng, selected.lat];
 
-  const byId = new Map<string, { lng: number; lat: number; obs: number; lastSeen: number }>();
+  const byId = new Map<
+    string,
+    {
+      lng: number;
+      lat: number;
+      obs: number;
+      lastSeen: number;
+      snrTotal: number;
+      snrSamples: number;
+    }
+  >();
   for (const nb of neighbors) {
     if (nb.id === selected.id || nb.lat == null || nb.lng == null) continue;
     const prev = byId.get(nb.id);
     if (prev) {
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
+      if (nb.snr != null) {
+        const weight = Math.max(1, nb.snrSampleCount ?? 1);
+        prev.snrTotal += nb.snr * weight;
+        prev.snrSamples += weight;
+      }
     } else {
       byId.set(nb.id, {
         lng: nb.lng,
         lat: nb.lat,
         obs: nb.observationCount,
         lastSeen: nb.lastSeen,
+        snrTotal: nb.snr != null ? nb.snr * Math.max(1, nb.snrSampleCount ?? 1) : 0,
+        snrSamples: nb.snr != null ? Math.max(1, nb.snrSampleCount ?? 1) : 0,
       });
     }
   }
@@ -151,6 +169,7 @@ export function buildFocusedNeighborEdges(
         selected: true,
         obs: n.obs,
         ageDays: Math.max(0, (now - n.lastSeen) / 86400000),
+        ...(n.snrSamples > 0 ? { snr: n.snrTotal / n.snrSamples } : {}),
       },
     });
   }

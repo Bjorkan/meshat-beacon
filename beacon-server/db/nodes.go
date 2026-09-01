@@ -331,6 +331,7 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 			FirstSeen:        r.FirstSeen.Time.UnixMilli(),
 			LastSeen:         r.LastSeen.Time.UnixMilli(),
 			SNR:              r.Snr,
+			SNRSampleCount:   r.SnrSampleCount,
 		})
 	}
 	return items, nil
