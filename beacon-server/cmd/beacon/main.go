@@ -1,0 +1,306 @@
+// Copyright 2026 Beacon Contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package main
+
+import (
+	"context"
+	"encoding/hex"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"strconv"
+	"syscall"
+	"time"
+
+	"github.com/MeshCore-Beacon/beacon-server/db"
+	_ "github.com/MeshCore-Beacon/beacon-server/docs"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/router"
+	"github.com/MeshCore-Beacon/beacon-server/internal/background"
+	"github.com/MeshCore-Beacon/beacon-server/internal/cache"
+	"github.com/MeshCore-Beacon/beacon-server/internal/config"
+	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
+	"github.com/MeshCore-Beacon/beacon-server/internal/iatadb"
+	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
+	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
+	"github.com/MeshCore-Beacon/beacon-server/internal/presence"
+	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/joho/godotenv"
+)
+
+// version is set at build time via -ldflags "-X main.version=vX.Y.Z".
+// Falls back to "dev" when built without the flag.
+var version = "dev"
+
+//	@title			MeshCore Beacon API
+//	@version		1.6.0
+//	@description	MeshCore network observation backend. Ingests LoRa packets from MQTT brokers, stores in PostgreSQL, and streams live events via WebSocket.
+//	@termsOfService	https://github.com/MeshCore-Beacon/beacon-server
+
+//	@contact.name	MeshCore Beacon
+//	@contact.url	https://github.com/MeshCore-Beacon/beacon-server
+
+//	@license.name	AGPL-3-or-later
+
+//	@host		localhost:8080
+//	@BasePath	/api/v1
+
+//	@schemes	http https
+
+// @tag.name			IATAs
+// @tag.description	Airport/location codes that group observers and packets
+// @tag.name			Regions
+// @tag.description	Super-regions grouping multiple IATAs
+// @tag.name			Observers
+// @tag.description	MeshCore MQTT observers (gateways)
+// @tag.name			Nodes
+// @tag.description	MeshCore radio nodes
+// @tag.name			Packets
+// @tag.description	LoRa packets heard by observers
+// @tag.name			Channels
+// @tag.description	MeshCore group text channels
+// @tag.name			Messages
+// @tag.description	Decrypted channel messages
+// @tag.name			Brokers
+// @tag.description	MQTT broker connection status
+// @tag.name			Stats
+// @tag.description	Network statistics and time series
+func main() {
+	log.Printf("beacon version %s", version)
+	_ = godotenv.Load()
+	addr := os.Getenv("LISTEN_ADDR")
+	if addr == "" {
+		addr = ":8080"
+	}
+
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "config.yaml"
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	resolved := config.Resolve(cfg)
+
+	log.Printf("config: loaded — %s", resolved)
+
+	// ── Hub ──────────────────────────────────────────────────────────────────
+	h := hub.New()
+	go h.Run()
+
+	// ── MQTT ingest workers ──────────────────────────────────────────────────
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, getEnv("POSTGRES_DSN"))
+	if err != nil {
+		log.Fatalf("failed to connect to postgres at %s: %v", os.Getenv("POSTGRES_DSN_HOST"), err)
+	}
+	defer pool.Close()
+
+	if err := db.RunMigrations(ctx, pool); err != nil {
+		log.Fatalf("migrations failed: %v", err)
+	}
+
+	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm)
+
+	// ── Presence write coalescing ────────────────────────────────────────────
+	// Ingest writes go through the coalescer; reads keep using the store.
+	coalescer := presence.New(store, resolved.PresenceFlushInterval, resolved.PresencePacketTTL)
+	go coalescer.Run(ctx)
+
+	// ── Redis cache layer ────────────────────────────────────────────────────
+	var reader api.Reader = store
+	if redisAddr := os.Getenv("REDIS_ADDR"); redisAddr != "" {
+		redisClient := cache.NewClient(
+			redisAddr,
+			os.Getenv("REDIS_PASSWORD"),
+			func() int {
+				if db := os.Getenv("REDIS_DB"); db != "" {
+					n, err := strconv.Atoi(db)
+					if err == nil {
+						return n
+					}
+				}
+				return 0
+			}(),
+		)
+		if err := redisClient.Ping(ctx); err != nil {
+			log.Printf("warning: redis unavailable at %s, caching disabled: %v", redisAddr, err)
+		} else {
+			ttls := cache.ResolveTTLs(cfg.Cache)
+			reader = cache.NewCachedReader(store, redisClient, ttls)
+			defer redisClient.Close()
+			log.Printf("cache: Redis connected at %s (stats=%s reference=%s nodes=%s observers=%s)",
+				redisAddr, ttls.Stats, ttls.Reference, ttls.Nodes, ttls.Observers)
+		}
+	}
+
+	// ── Seed config data ─────────────────────────────────────────────────────
+	if err := config.Seed(ctx, cfg, store); err != nil {
+		log.Fatalf("failed to seed config: %v", err)
+	}
+
+	// ── Build transport scope keystore ───────────────────────────────────────
+	scopes := scopestore.New()
+	scopeEntries, err := store.GetTransportScopes(ctx)
+	if err != nil {
+		log.Fatalf("failed to load transport scopes: %v", err)
+	}
+	scopes.Load(scopeEntries)
+	log.Printf("loaded %d transport scopes", len(scopeEntries))
+
+	// ── Build channel keystore ──────────────────────────────────────────────
+	entries := make(map[string][]keystore.Entry)
+
+	// Hashtag-derived channels: secret = SHA256("#tag")[:16], hash = SHA256(secret)[0]
+	for _, tag := range cfg.ChannelKeys.Hashtags {
+		secret, channelHash, fingerprint := keystore.DeriveHashtagKey(tag)
+		hashHex := fmt.Sprintf("%02x", channelHash)
+		entry := keystore.Entry{
+			Key:         secret,
+			Fingerprint: fingerprint,
+			Hashtag:     tag,
+			Name:        "#" + tag,
+		}
+		if !keystore.EntryExists(entries[hashHex], entry) {
+			entries[hashHex] = append(entries[hashHex], entry)
+			log.Printf("config: loaded hashtag channel #%s (hash=%s)", tag, hashHex)
+		}
+	}
+
+	// Explicit keys: hash provided directly, key is hex-encoded
+	for hashHex, keyCfg := range cfg.ChannelKeys.Keys {
+		key, err := hex.DecodeString(keyCfg.Key)
+		if err != nil {
+			log.Printf("warning: invalid channel key for hash %s, skipping: %v", hashHex, err)
+			continue
+		}
+		entry := keystore.Entry{
+			Key:         key,
+			Fingerprint: keystore.Fingerprint(key),
+			Name:        keyCfg.Name,
+		}
+		if !keystore.EntryExists(entries[hashHex], entry) {
+			entries[hashHex] = append(entries[hashHex], entry)
+			log.Printf("config: loaded explicit channel key for hash %s name=%q", hashHex, keyCfg.Name)
+		}
+	}
+
+	keys := keystore.NewMapKeyStore(entries)
+
+	// ── Backfill channel messages ────────────────────────────────────────────
+	// Packets whose channel key wasn't yet configured at ingest time were stored as
+	// hash-only channels and never decrypted. Retry them now against the keystore we just
+	// built, so adding a channel key to the config surfaces its history on the next boot
+	// instead of leaving it stranded in the DB indefinitely.
+	if n, err := ingest.BackfillChannelMessages(ctx, store, keys); err != nil {
+		log.Printf("config: channel message backfill failed: %v", err)
+	} else if n > 0 {
+		log.Printf("config: backfilled %d previously-undecrypted channel message(s)", n)
+	}
+
+	// ── Build geographic ingest filter ───────────────────────────────────────────────────────────
+	allowedIATAs := iatadb.BuildAllowedSet(cfg.Ingest.AllowCountries, cfg.Ingest.AllowContinents)
+	if allowedIATAs != nil {
+		log.Printf("config: ingest filter active — %d allowed IATAs (countries=%v continents=%v)",
+			len(allowedIATAs), cfg.Ingest.AllowCountries, cfg.Ingest.AllowContinents)
+	} else {
+		log.Printf("config: ingest filter inactive — accepting all IATAs")
+	}
+
+	broker1 := ingest.New(
+		ingest.Config{
+			BrokerName:          "mqtt1",
+			URL:                 getEnv("MQTT_BROKER_1_URL"),
+			Username:            getEnv("MQTT_BROKER_1_USERNAME"),
+			Password:            getEnv("MQTT_BROKER_1_PASSWORD"),
+			TelemetryResolution: resolved.TelemetryResolution,
+			NeighborMaxKm:       resolved.NeighborMaxKm,
+			AllowedIATAs:        allowedIATAs,
+		},
+		coalescer,
+		h,
+		keys,
+		scopes,
+	)
+
+	broker2 := ingest.New(
+		ingest.Config{
+			BrokerName:          "mqtt2",
+			URL:                 getEnv("MQTT_BROKER_2_URL"),
+			Username:            getEnv("MQTT_BROKER_2_USERNAME"),
+			Password:            getEnv("MQTT_BROKER_2_PASSWORD"),
+			TelemetryResolution: resolved.TelemetryResolution,
+			NeighborMaxKm:       resolved.NeighborMaxKm,
+			AllowedIATAs:        allowedIATAs,
+		},
+		coalescer,
+		h,
+		keys,
+		scopes,
+	)
+
+	if cr, ok := reader.(*cache.CachedReader); ok {
+		broker1.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
+		broker2.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
+	}
+
+	go broker1.Start(ctx)
+	go broker2.Start(ctx)
+
+	scheduler := background.New([]background.Task{
+		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),
+		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.CleanupInterval),
+		background.ReconfirmTask(store, resolved.RouteRetention, resolved.RouteGrace, int64(resolved.RouteMinObservations), resolved.ReconfirmInterval),
+	})
+	go scheduler.Start(ctx)
+
+	// ── HTTP server ──────────────────────────────────────────────────────────
+	r := router.New(h, reader, []*ingest.Worker{broker1, broker2}, resolved.MaxConnsPerIP, cfg.CORS)
+
+	srv := &http.Server{
+		Addr:    addr,
+		Handler: r,
+	}
+
+	go func() {
+		fmt.Printf("Beacon listening on %s\n", addr)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("server error: %v", err)
+		}
+	}()
+
+	// ── Graceful shutdown ────────────────────────────────────────────────────
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	log.Println("shutting down...")
+	cancel() // stops ingest workers
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer shutdownCancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		log.Printf("server shutdown error: %v", err)
+	}
+	coalescer.Flush(shutdownCtx)
+}
+
+// getEnv returns the value of an env var and logs a warning if it is unset.
+// Callers that require the value to be non-empty should fatal themselves;
+// ingest workers tolerate missing broker config and will fail on connect instead.
+func getEnv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		log.Printf("warning: %s is not set", key)
+	}
+	return v
+}

@@ -1,0 +1,105 @@
+// Copyright 2026 Beacon Contributors
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+package background
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"time"
+
+	"github.com/MeshCore-Beacon/beacon-server/db"
+)
+
+// ViewRefreshTask returns a Task that refreshes all materialized views.
+func ViewRefreshTask(store *db.Store, interval time.Duration) Task {
+	return Task{
+		Name:     "view_refresh",
+		Interval: interval,
+		Run: func(ctx context.Context) error {
+			if err := store.RefreshHourlyStats(ctx); err != nil {
+				log.Printf("background[view_refresh]: hourly stats: %v", err)
+			}
+			if err := store.RefreshTopNodes(ctx); err != nil {
+				log.Printf("background[view_refresh]: top nodes: %v", err)
+			}
+			if err := store.RefreshTopObservers(ctx); err != nil {
+				log.Printf("background[view_refresh]: top observers: %v", err)
+			}
+			if err := store.RefreshPayloadBreakdown(ctx); err != nil {
+				log.Printf("background[view_refresh]: payload breakdown: %v", err)
+			}
+			if err := store.RefreshTopTalkers(ctx); err != nil {
+				log.Printf("background[view_refresh]: top talkers: %v", err)
+			}
+			if err := store.RefreshTopAdvertisers(ctx); err != nil {
+				log.Printf("background[view_refresh]: top advertisers: %v", err)
+			}
+			if err := store.RefreshRadioPresets(ctx); err != nil {
+				log.Printf("background[view_refresh]: radio presets: %v", err)
+			}
+			return nil
+		},
+	}
+}
+
+// CleanupTask returns a Task that prunes old telemetry, packet, and node rows,
+// plus neighbor edges that haven't been re-confirmed within the retention window.
+func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDeleteAfter, neighborRetention, interval time.Duration) Task {
+	return Task{
+		Name:     "cleanup",
+		Interval: interval,
+		Run: func(ctx context.Context) error {
+			if err := store.DeleteOldTelemetry(ctx, time.Now().Add(-telemetryRetention)); err != nil {
+				return err
+			}
+			// One cutoff for all three so the IATA tables stay in step
+			// with the packets they mirror.
+			cutoff := time.Now().Add(-packetRetention)
+			if err := store.DeleteOldPackets(ctx, cutoff); err != nil {
+				return err
+			}
+			if err := store.DeleteOldChannelIATAs(ctx, cutoff); err != nil {
+				return err
+			}
+			if err := store.DeleteOldTraceIATAs(ctx, cutoff); err != nil {
+				return err
+			}
+			if err := store.DeleteStaleNodeNeighbors(ctx, time.Now().Add(-neighborRetention)); err != nil {
+				return err
+			}
+			if err := store.DeleteOldNodes(ctx, time.Now().Add(-nodeDeleteAfter)); err != nil {
+				return err
+			}
+			return nil
+		},
+	}
+}
+
+// reconfirmBatchSize bounds per-tick reconfirm work; at hourly ticks a 16M-row
+// table gets fully re-checked roughly daily.
+const reconfirmBatchSize = 750_000
+
+// ReconfirmTask returns a Task that prunes aged routes first, then reconfirms
+// stale and ambiguous resolved paths and neighbors, so known_routes only ever
+// has one writer at a time.
+func ReconfirmTask(store *db.Store, routeRetention, routeGrace time.Duration, routeMinObservations int64, interval time.Duration) Task {
+	return Task{
+		Name:     "reconfirm",
+		Interval: interval,
+		Run: func(ctx context.Context) error {
+			now := time.Now()
+			if err := store.DeleteOldRoutes(ctx, now.Add(-routeRetention), routeMinObservations, now.Add(-routeGrace)); err != nil {
+				return fmt.Errorf("route retention: %w", err)
+			}
+			if err := store.ReconfirmRoutes(ctx, reconfirmBatchSize); err != nil {
+				return fmt.Errorf("routes: %w", err)
+			}
+			if err := store.ReconfirmNeighbors(ctx); err != nil {
+				return fmt.Errorf("neighbors: %w", err)
+			}
+			return nil
+		},
+	}
+}

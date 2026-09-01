@@ -1,0 +1,57 @@
+# Copyright 2026 Beacon Contributors
+# SPDX-License-Identifier: AGPL-3.0-or-later
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Build
+        run: go build ./...
+
+      - name: Format check
+        run: |
+          if [ -n "$(gofmt -l .)" ]; then
+            echo "The following files are not formatted:"
+            gofmt -l .
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./...
+
+      - name: Install govulncheck
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+
+      - name: Vulnerability check
+        run: govulncheck ./...
+
+      - name: Install swag
+        run: go install github.com/swaggo/swag/cmd/swag@latest
+
+      - name: Swagger docs up to date
+        run: |
+          cp docs/swagger.json docs/swagger.json.bak
+          swag init -g cmd/beacon/main.go -o docs --parseInternal --parseDependency
+          if ! diff -q docs/swagger.json docs/swagger.json.bak > /dev/null; then
+            echo "Swagger docs are out of date. Run swag init and commit the result."
+            rm docs/swagger.json.bak
+            exit 1
+          fi
+          rm docs/swagger.json.bak
+
