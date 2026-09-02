@@ -50,9 +50,7 @@ export function Dropdown({
           className={`${width} max-w-[calc(100vw-1.5rem)] ${
             fullWidth ? 'w-[var(--radix-popover-trigger-width)]' : ''
           } ${
-            mobileViewport
-              ? 'max-sm:fixed max-sm:top-[46px] max-sm:inset-x-3 max-sm:w-auto max-sm:max-w-none max-sm:max-h-[calc(100dvh-4rem)]'
-              : ''
+            mobileViewport ? 'max-sm:w-[calc(100vw-1.5rem)] max-sm:max-h-[calc(100dvh-4rem)]' : ''
           } bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto focus:outline-none`}
         >
           {children(close)}

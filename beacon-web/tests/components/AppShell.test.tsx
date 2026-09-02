@@ -135,7 +135,7 @@ describe('region picker filter', () => {
     expect(input).toHaveFocus();
   });
 
-  it('does not autofocus the filter input on a touch device', async () => {
+  it('opens a viewport-width Radix panel without autofocus on a touch device', async () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches:
         query === '(hover: hover) and (pointer: fine)' ? false : defaultMatchMedia(query).matches,
@@ -153,11 +153,15 @@ describe('region picker filter', () => {
 
     expect(input).not.toHaveFocus();
     expect(input).toHaveClass('text-base', 'sm:text-[11px]');
-    expect(input.parentElement?.parentElement).toHaveClass(
-      'max-sm:fixed',
-      'max-sm:inset-x-3',
-      'max-sm:w-auto',
+    const panel = input.parentElement?.parentElement;
+    expect(panel).toHaveClass(
+      'max-sm:w-[calc(100vw-1.5rem)]',
+      'max-w-[calc(100vw-1.5rem)]',
+      'max-sm:max-h-[calc(100dvh-4rem)]',
+      'overflow-y-auto',
+      'z-50',
     );
+    expect(panel).not.toHaveClass('max-sm:fixed', 'max-sm:inset-x-3', 'max-sm:w-auto');
     expect(screen.getByRole('button', { name: /REGION/ })).toHaveFocus();
   });
 
