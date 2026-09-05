@@ -89,6 +89,8 @@ export type RegionSummary = { id?: number; name?: string; slug?: string; };
 
 export type ResolvedHop = { confidence?: string; nodes?: Array<ResolvedNode>; snr?: number; };
 
+export type ResolvedHopLite = { confidence?: string; nodeId?: string; nodeName?: string; };
+
 export type ResolvedNode = { id?: string; latitude?: number; longitude?: number; name?: string; publicKey?: string; };
 
 export type RouteHop = { hashBytes?: string; node?: ResolvedNode; nodeId?: string; };
@@ -111,7 +113,7 @@ export type TraceDetail = { packets?: Array<TracePacket>; traceTag?: string; };
 
 export type TracePacket = { firstHeardAt?: number; lastHeardAt?: number; packetHash?: string; rawPath?: Array<RawHop>; resolvedRoute?: Array<ResolvedHop>; routeType?: number; routeTypeName?: string; scope?: string; };
 
-export type TraceTagSummary = { firstHeardAt?: number; iataCount?: number; lastHeardAt?: number; packetCount?: number; pathHashes?: Array<string>; snrValues?: Array<number>; traceTag?: string; traceType?: string; };
+export type TraceTagSummary = { firstHeardAt?: number; iataCount?: number; lastHeardAt?: number; packetCount?: number; pathHashes?: Array<string>; resolvedPath?: Array<ResolvedHopLite>; snrValues?: Array<number>; traceTag?: string; traceType?: string; };
 
 export type APIError = { code?: string; message?: string; };
 

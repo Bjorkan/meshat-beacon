@@ -56,7 +56,16 @@ func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceT
 		return nil, err
 	}
 	items := make([]api.TraceTagSummary, 0, len(rows))
-	for _, r := range rows {
+	// Batch global resolution across the page: one query per hash width, results mapped
+	// back per tag. Resolution stays global (not IATA-local) so a prefix that looks unique
+	// in one region but collides elsewhere still reports ambiguous.
+	type tagPayload struct {
+		idx  int
+		best tracePayload
+	}
+	payloads := make([]tagPayload, 0, len(rows))
+	uniqueByWidth := make(map[int]map[string][]byte)
+	for i, r := range rows {
 		var best tracePayload
 		if len(r.BestPayload) > 0 {
 			_ = json.Unmarshal(r.BestPayload, &best)
@@ -71,6 +80,78 @@ func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceT
 			PathHashes:   best.PathHashes,
 			SNRValues:    best.SNRValues,
 		})
+		if len(best.PathHashes) == 0 {
+			continue
+		}
+		payloads = append(payloads, tagPayload{idx: i, best: best})
+		hashSize := int(1 << (best.Flags & 0x03))
+		if hashSize < 1 || hashSize > 4 {
+			continue
+		}
+		if uniqueByWidth[hashSize] == nil {
+			uniqueByWidth[hashSize] = make(map[string][]byte)
+		}
+		for _, h := range best.PathHashes {
+			b, err := hex.DecodeString(h)
+			if err != nil || len(b) < hashSize {
+				continue
+			}
+			prefix := b[:hashSize]
+			key := hex.EncodeToString(prefix)
+			if _, exists := uniqueByWidth[hashSize][key]; !exists {
+				cp := make([]byte, hashSize)
+				copy(cp, prefix)
+				uniqueByWidth[hashSize][key] = cp
+			}
+		}
+	}
+	resolvedByWidth := make(map[int]map[string][]api.ResolvedPathEntry, len(uniqueByWidth))
+	for width := 1; width <= 4; width++ {
+		unique := uniqueByWidth[width]
+		if len(unique) == 0 {
+			continue
+		}
+		hashes := make([][]byte, 0, len(unique))
+		for _, h := range unique {
+			hashes = append(hashes, h)
+		}
+		resolved, err := s.ResolvePathHashes(ctx, hashes)
+		if err != nil {
+			return nil, err
+		}
+		resolvedByWidth[width] = resolved
+	}
+	for _, tp := range payloads {
+		hashSize := int(1 << (tp.best.Flags & 0x03))
+		if hashSize < 1 || hashSize > 4 {
+			continue
+		}
+		resolved := resolvedByWidth[hashSize]
+		lite := make([]api.ResolvedHopLite, 0, len(tp.best.PathHashes))
+		for _, h := range tp.best.PathHashes {
+			b, err := hex.DecodeString(h)
+			hop := api.ResolvedHopLite{Confidence: "none"}
+			if err == nil && len(b) >= hashSize {
+				key := hex.EncodeToString(b[:hashSize])
+				entries := resolved[key]
+				switch len(entries) {
+				case 0:
+					hop.Confidence = "none"
+				case 1:
+					hop.Confidence = "high"
+					id := entries[0].NodeID.String()
+					hop.NodeID = &id
+					if entries[0].Name != nil {
+						name := *entries[0].Name
+						hop.NodeName = &name
+					}
+				default:
+					hop.Confidence = "ambiguous"
+				}
+			}
+			lite = append(lite, hop)
+		}
+		items[tp.idx].ResolvedPath = lite
 	}
 	return items, nil
 }
