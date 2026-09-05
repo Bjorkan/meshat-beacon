@@ -301,7 +301,13 @@ describe('region picker root region', () => {
   beforeEach(() => {
     vi.mocked(getIatas).mockResolvedValue([{ iata: 'ARN', displayName: 'Stockholm' }]);
     vi.mocked(getRegions).mockResolvedValue(
-      ROOT_REGIONS.map(({ id, slug, name, shortCode, isRoot }) => ({ id, slug, name, shortCode, isRoot })),
+      ROOT_REGIONS.map(({ id, slug, name, shortCode, isRoot }) => ({
+        id,
+        slug,
+        name,
+        shortCode,
+        isRoot,
+      })),
     );
     vi.mocked(getRegion).mockImplementation(async (id: number) =>
       ROOT_REGIONS.find((r) => r.id === id)!,

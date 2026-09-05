@@ -27,7 +27,15 @@ interface TraceListProps {
 // The list now carries the most complete observation's path, so we can show the hops (and the SNR we
 // heard on each) right on the card instead of making people open the detail panel for a quick look.
 // Uniquely resolved hops show the node name; the raw prefix stays as secondary text for diagnostics.
-function TracePathPreview({ hashes, snrs, resolved }: { hashes: string[]; snrs: number[]; resolved?: { confidence: string; nodeName?: string }[] }) {
+function TracePathPreview({
+  hashes,
+  snrs,
+  resolved,
+}: {
+  hashes: string[];
+  snrs: number[];
+  resolved?: { confidence: string; nodeName?: string }[];
+}) {
   return (
     <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-1.5">
       {hashes.map((hash, i) => {
@@ -43,7 +51,10 @@ function TracePathPreview({ hashes, snrs, resolved }: { hashes: string[]; snrs: 
                 →
               </span>
             )}
-            <span className="inline-flex flex-col items-center gap-0.5" title={named ? hash.toUpperCase() : undefined}>
+            <span
+              className="inline-flex flex-col items-center gap-0.5"
+              title={named ? hash.toUpperCase() : undefined}
+            >
               <span className="px-1.5 py-px rounded-sm bg-primary/6 text-primary font-mono text-[11px] font-semibold">
                 {named ? hop.nodeName : hash.toUpperCase()}
               </span>
@@ -108,7 +119,11 @@ function TraceTagCard({
         {t('traces.summary', { packets: tag.packetCount, iatas: tag.iataCount })}
       </div>
       {tag.pathHashes?.length ? (
-        <TracePathPreview hashes={tag.pathHashes} snrs={tag.snrValues ?? []} resolved={tag.resolvedPath} />
+        <TracePathPreview
+          hashes={tag.pathHashes}
+          snrs={tag.snrValues ?? []}
+          resolved={tag.resolvedPath}
+        />
       ) : null}
     </div>
   );

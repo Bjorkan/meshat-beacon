@@ -66,10 +66,26 @@ function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
 // semantic labels spell that out rather than exposing a bare Drift arrow.
 function clockMobileSortOptions(t: TFunction): MobileSortOption[] {
   return [
-    { id: 'largest-drift', label: t('sort.largestDrift'), sort: { columnId: 'Drift', direction: 'desc' } },
-    { id: 'smallest-drift', label: t('sort.smallestDrift'), sort: { columnId: 'Drift', direction: 'asc' } },
-    { id: 'recently-checked', label: t('sort.recentlyChecked'), sort: { columnId: 'Checked', direction: 'desc' } },
-    { id: 'oldest-checked', label: t('sort.oldestChecked'), sort: { columnId: 'Checked', direction: 'asc' } },
+    {
+      id: 'largest-drift',
+      label: t('sort.largestDrift'),
+      sort: { columnId: 'Drift', direction: 'desc' },
+    },
+    {
+      id: 'smallest-drift',
+      label: t('sort.smallestDrift'),
+      sort: { columnId: 'Drift', direction: 'asc' },
+    },
+    {
+      id: 'recently-checked',
+      label: t('sort.recentlyChecked'),
+      sort: { columnId: 'Checked', direction: 'desc' },
+    },
+    {
+      id: 'oldest-checked',
+      label: t('sort.oldestChecked'),
+      sort: { columnId: 'Checked', direction: 'asc' },
+    },
   ];
 }
 

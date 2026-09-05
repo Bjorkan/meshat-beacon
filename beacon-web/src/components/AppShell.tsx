@@ -1,10 +1,15 @@
-import { type ReactNode, useState, useEffect, useMemo, useRef } from 'react';
+import { type ReactNode, useState, useEffect, useRef } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useQuery } from '@tanstack/react-query';
 import { useRegionSelection, useRegions } from '../hooks/useRegion';
-import { ALL_REGIONS, isAllRegions, normalizeSelection, type RegionSelection } from '../hooks/region-selection';
+import {
+  ALL_REGIONS,
+  isAllRegions,
+  normalizeSelection,
+  type RegionSelection,
+} from '../hooks/region-selection';
 import { useWsStatus } from '../hooks/useWsStatus';
 import { useTheme } from '../hooks/useTheme';
 import { Dropdown } from './Dropdown';
@@ -12,6 +17,7 @@ import { BottomNav } from './BottomNav';
 import { MeshatWordmark } from './MeshatWordmark';
 import { LanguageSelector } from './LanguageSelector';
 import { iataQueries } from '../api/queries';
+import type { Region } from '../types/api';
 import {
   ENABLED_TABS,
   ENABLED_THEME_IDS,
@@ -20,7 +26,6 @@ import {
   GITHUB_URL,
 } from '../lib/constants';
 import type { WsManager } from '../api/ws-manager';
-
 // header widgets: WS status, region picker, theme picker
 
 function LiveBadge({ wsManager }: { wsManager: WsManager }) {
@@ -76,6 +81,19 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
       {t('status.offlineShort')}
     </div>
   );
+}
+
+// A region matches on its name, short code, or on any member code. A code-only match carries
+// those codes so the row can show why it surfaced — otherwise it reads as a stray result.
+function matchRegions(candidates: Region[], q: string): { region: Region; matched: string[] }[] {
+  if (!q) return candidates.map((region) => ({ region, matched: [] as string[] }));
+  return candidates.flatMap((region) => {
+    if (region.name.toLowerCase().includes(q)) return [{ region, matched: [] as string[] }];
+    if ((region.shortCode ?? '').toLowerCase().includes(q))
+      return [{ region, matched: [] as string[] }];
+    const matched = region.iatas.filter((code) => code.toLowerCase().includes(q));
+    return matched.length > 0 ? [{ region, matched }] : [];
+  });
 }
 
 // checkbox indicator, matching MultiSelectDropdown's style
@@ -147,7 +165,9 @@ function RegionSelector() {
           onClick={toggle}
         >
           <span className="text-text-muted font-normal text-[11px]">{t('region.label')}</span>
-          <span className="truncate">{regionSummaryLabel(effectiveSelection, t, root?.shortCode)}</span>
+          <span className="truncate">
+            {regionSummaryLabel(effectiveSelection, t, root?.shortCode)}
+          </span>
           <span className="text-text-dim text-[11px] shrink-0">▾</span>
         </button>
       )}
@@ -201,28 +221,23 @@ function RegionSelectorPanel() {
   const root = regions.find((r) => r.isRoot) ?? null;
   const effectiveSelection = normalizeSelection(selection, root?.slug ?? null);
 
-  // A region matches on its name, short code, or on any member code. A code-only match carries
-  // those codes so the row can show why it surfaced — otherwise it reads as a stray result.
   // The root region never renders as its own row: the top choice already carries its identity.
-  const shownRegions = useMemo(() => {
-    const nonRoot = regions.filter((region) => region.slug !== root?.slug);
-    if (!q) return nonRoot.map((region) => ({ region, matched: [] as string[] }));
-    return nonRoot.flatMap((region) => {
-      if (region.name.toLowerCase().includes(q)) return [{ region, matched: [] as string[] }];
-      if ((region.shortCode ?? '').toLowerCase().includes(q)) return [{ region, matched: [] as string[] }];
-      const matched = region.iatas.filter((code) => code.toLowerCase().includes(q));
-      return matched.length > 0 ? [{ region, matched }] : [];
-    });
-  }, [regions, root, q]);
+  // Plain computation, not a useMemo: the list is tiny and the extra memo trips the compiler's
+  // manual-memo check without buying anything.
+  const rootSlug = root?.slug;
+  const nonRootRegions = rootSlug ? regions.filter((r) => r.slug !== rootSlug) : regions;
+  const shownRegions = matchRegions(nonRootRegions, q);
 
   // displayName is the closest thing to a city the API carries, and it's absent for IATAs the server
-  // auto-created from packet traffic — those stay reachable by code.
-  const shownIatas = useMemo(() => {
-    if (!iatas || !q) return iatas ?? [];
-    return iatas.filter(
-      (i) => i.iata.toLowerCase().includes(q) || (i.displayName ?? '').toLowerCase().includes(q),
-    );
-  }, [iatas, q]);
+  // auto-created from packet traffic — those stay reachable by code. Plain filter, not a useMemo:
+  // the list is small and an extra memo trips the compiler's manual-memo check.
+  const shownIatas =
+    !iatas || !q
+      ? (iatas ?? [])
+      : iatas.filter(
+          (i) =>
+            i.iata.toLowerCase().includes(q) || (i.displayName ?? '').toLowerCase().includes(q),
+        );
 
   const showAll = root
     ? !q ||

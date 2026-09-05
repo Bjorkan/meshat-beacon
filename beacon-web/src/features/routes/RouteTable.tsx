@@ -7,7 +7,12 @@ import { useRegion } from '../../hooks/useRegion';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
 import { Badge } from '../../components/Badge';
 import { Timestamp } from '../../components/Timestamp';
-import { DataTable, type Column, type MobileSortOption, type SortState } from '../../components/DataTable';
+import {
+  DataTable,
+  type Column,
+  type MobileSortOption,
+  type SortState,
+} from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
 
 import { RouteDetailPanel } from './RouteDetailPanel';
@@ -156,8 +161,16 @@ function routeMobileSortOptions(t: TFunction): MobileSortOption[] {
   return [
     { id: 'newest', label: t('sort.newest'), sort: { columnId: 'Last seen', direction: 'desc' } },
     { id: 'oldest', label: t('sort.oldest'), sort: { columnId: 'First seen', direction: 'asc' } },
-    { id: 'most-observed', label: t('sort.mostObserved'), sort: { columnId: 'Obs', direction: 'desc' } },
-    { id: 'shortest', label: t('sort.shortestRoute'), sort: { columnId: 'Hops', direction: 'asc' } },
+    {
+      id: 'most-observed',
+      label: t('sort.mostObserved'),
+      sort: { columnId: 'Obs', direction: 'desc' },
+    },
+    {
+      id: 'shortest',
+      label: t('sort.shortestRoute'),
+      sort: { columnId: 'Hops', direction: 'asc' },
+    },
     { id: 'longest', label: t('sort.longestRoute'), sort: { columnId: 'Hops', direction: 'desc' } },
   ];
 }

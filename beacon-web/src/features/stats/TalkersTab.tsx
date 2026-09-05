@@ -34,9 +34,21 @@ export function TalkersTab({ range }: TalkersTabProps) {
   // desktop column — so the mobile model carries its own advertCount accessor via a hidden column.
   const advertiserMobileSortOptions = useMemo<MobileSortOption[]>(
     () => [
-      { id: 'most-adverts', label: t('sort.mostAdverts'), sort: { columnId: '__advertCount', direction: 'desc' } },
-      { id: 'most-flood', label: t('sort.mostFlood'), sort: { columnId: 'Flood', direction: 'desc' } },
-      { id: 'most-direct', label: t('sort.mostDirect'), sort: { columnId: 'Direct', direction: 'desc' } },
+      {
+        id: 'most-adverts',
+        label: t('sort.mostAdverts'),
+        sort: { columnId: '__advertCount', direction: 'desc' },
+      },
+      {
+        id: 'most-flood',
+        label: t('sort.mostFlood'),
+        sort: { columnId: 'Flood', direction: 'desc' },
+      },
+      {
+        id: 'most-direct',
+        label: t('sort.mostDirect'),
+        sort: { columnId: 'Direct', direction: 'desc' },
+      },
       { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Node', direction: 'asc' } },
     ],
     [t],

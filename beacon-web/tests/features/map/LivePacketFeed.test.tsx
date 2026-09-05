@@ -2,11 +2,18 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { WsPacketObservation } from '../../../src/types/ws';
 import { LivePacketFeed } from '../../../src/features/map/LivePacketFeed';
-import { livePacketEntry, pushLivePacket, buildLiveFlowCandidate } from '../../../src/features/map/live-packet-feed';
+import {
+  livePacketEntry,
+  pushLivePacket,
+  buildLiveFlowCandidate,
+} from '../../../src/features/map/live-packet-feed';
 import { packetFlowColor } from '../../../src/features/map/packet-flow-colors';
 
 function locatedHop(id: string, lng: number, lat: number) {
-  return { confidence: 'high' as const, nodes: [{ id, publicKey: 'pk', longitude: lng, latitude: lat }] };
+  return {
+    confidence: 'high' as const,
+    nodes: [{ id, publicKey: 'pk', longitude: lng, latitude: lat }],
+  };
 }
 
 function eligibleObservation(
@@ -179,9 +186,24 @@ describe('LivePacketFeed', () => {
     );
 
     // missing resolved path
-    act(() => handler?.(eligibleObservation('no-path', { observation: { ...eligibleObservation('no-path').observation, resolvedPath: null } })));
+    act(() =>
+      handler?.(
+        eligibleObservation('no-path', {
+          observation: { ...eligibleObservation('no-path').observation, resolvedPath: null },
+        }),
+      ),
+    );
     // 1-byte hashes
-    act(() => handler?.(eligibleObservation('tiny', { observation: { ...eligibleObservation('tiny').observation, pathLength: { raw: '02', hashSize: 1, hopCount: 2 } } })));
+    act(() =>
+      handler?.(
+        eligibleObservation('tiny', {
+          observation: {
+            ...eligibleObservation('tiny').observation,
+            pathLength: { raw: '02', hashSize: 1, hopCount: 2 },
+          },
+        }),
+      ),
+    );
     // fewer than two located nodes
     act(() =>
       handler?.(
@@ -201,7 +223,14 @@ describe('LivePacketFeed', () => {
     // missing path / 1-byte hashes / single located node are all ineligible
     expect(buildLiveFlowCandidate(observation('x').observation)).toBeNull();
     expect(
-      buildLiveFlowCandidate(eligibleObservation('x', { observation: { ...eligibleObservation('x').observation, pathLength: { raw: '02', hashSize: 1, hopCount: 2 } } }).observation),
+      buildLiveFlowCandidate(
+        eligibleObservation('x', {
+          observation: {
+            ...eligibleObservation('x').observation,
+            pathLength: { raw: '02', hashSize: 1, hopCount: 2 },
+          },
+        }).observation,
+      ),
     ).toBeNull();
     // valid 2-byte path with two located nodes is eligible
     const candidate = buildLiveFlowCandidate(eligibleObservation('ok').observation);

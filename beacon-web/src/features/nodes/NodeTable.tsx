@@ -10,7 +10,12 @@ import { formatHex, timeAgoMs, formatRadio } from '../../lib/formatters';
 import { Badge } from '../../components/Badge';
 import { Tooltip } from '../../components/Tooltip';
 import { ObserverIcon } from '../../components/ObserverIcon';
-import { DataTable, type Column, type MobileSortOption, type SortState } from '../../components/DataTable';
+import {
+  DataTable,
+  type Column,
+  type MobileSortOption,
+  type SortState,
+} from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
 import { NodeFilterBar, type MultibyteFilter } from './NodeFilterBar';
 import { nodeSearchParams } from './node-search';
@@ -242,8 +247,16 @@ export function NodeTable({
     () => [
       { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Name', direction: 'asc' } },
       { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'Name', direction: 'desc' } },
-      { id: 'neighbors-most', label: t('sort.mostNeighbors'), sort: { columnId: 'Neighbors', direction: 'desc' } },
-      { id: 'neighbors-fewest', label: t('sort.fewestNeighbors'), sort: { columnId: 'Neighbors', direction: 'asc' } },
+      {
+        id: 'neighbors-most',
+        label: t('sort.mostNeighbors'),
+        sort: { columnId: 'Neighbors', direction: 'desc' },
+      },
+      {
+        id: 'neighbors-fewest',
+        label: t('sort.fewestNeighbors'),
+        sort: { columnId: 'Neighbors', direction: 'asc' },
+      },
     ],
     [t],
   );

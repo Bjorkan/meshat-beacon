@@ -217,9 +217,7 @@ export function DataTable<T>({
                   type="button"
                   onClick={() => applyMobileSort(option)}
                   aria-pressed={selected}
-                  aria-busy={
-                    sortMode === 'client' && selected && !sortReady ? true : undefined
-                  }
+                  aria-busy={sortMode === 'client' && selected && !sortReady ? true : undefined}
                   className={`flex shrink-0 items-center gap-1 rounded-sm border px-2 py-1 transition-colors ${
                     selected
                       ? 'border-primary-dim bg-primary/10 text-text-normal'

@@ -89,9 +89,21 @@ function scopeColumns(t: TFunction): Column<ScopeStats>[] {
 
 function scopeMobileSortOptions(t: TFunction): MobileSortOption[] {
   return [
-    { id: 'most-packets', label: t('sort.mostPackets'), sort: { columnId: 'Packets', direction: 'desc' } },
-    { id: 'most-observers', label: t('sort.mostObservers'), sort: { columnId: 'Observers', direction: 'desc' } },
-    { id: 'most-nodes', label: t('sort.mostNodes'), sort: { columnId: 'Nodes', direction: 'desc' } },
+    {
+      id: 'most-packets',
+      label: t('sort.mostPackets'),
+      sort: { columnId: 'Packets', direction: 'desc' },
+    },
+    {
+      id: 'most-observers',
+      label: t('sort.mostObservers'),
+      sort: { columnId: 'Observers', direction: 'desc' },
+    },
+    {
+      id: 'most-nodes',
+      label: t('sort.mostNodes'),
+      sort: { columnId: 'Nodes', direction: 'desc' },
+    },
     { id: 'scope-asc', label: t('sort.scopeAZ'), sort: { columnId: 'Scope', direction: 'asc' } },
   ];
 }

@@ -8,7 +8,12 @@ import { useScopes } from '../../hooks/useScopes';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
 import { formatHex, formatRadio } from '../../lib/formatters';
 import { Badge } from '../../components/Badge';
-import { DataTable, type Column, type MobileSortOption, type SortState } from '../../components/DataTable';
+import {
+  DataTable,
+  type Column,
+  type MobileSortOption,
+  type SortState,
+} from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
 import { ObserverFilterBar } from './ObserverFilterBar';
 import { deriveObserverStatus } from './observer-status';
@@ -206,8 +211,16 @@ export function ObserverTable({
     () => [
       { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Name', direction: 'asc' } },
       { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'Name', direction: 'desc' } },
-      { id: 'online-first', label: t('sort.onlineFirst'), sort: { columnId: 'Status', direction: 'desc' } },
-      { id: 'offline-first', label: t('sort.offlineFirst'), sort: { columnId: 'Status', direction: 'asc' } },
+      {
+        id: 'online-first',
+        label: t('sort.onlineFirst'),
+        sort: { columnId: 'Status', direction: 'desc' },
+      },
+      {
+        id: 'offline-first',
+        label: t('sort.offlineFirst'),
+        sort: { columnId: 'Status', direction: 'asc' },
+      },
     ],
     [t],
   );

@@ -8,7 +8,12 @@ import { payloadTypeVariant } from '../../components/badge-utils';
 import { useWsPacketHandler } from '../../hooks/useWsHandlers';
 import type { WsPacketObservation } from '../../types/ws';
 import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
-import { livePacketEntry, pushLivePacket, buildLiveFlowCandidate, type LivePacketEntry } from './live-packet-feed';
+import {
+  livePacketEntry,
+  pushLivePacket,
+  buildLiveFlowCandidate,
+  type LivePacketEntry,
+} from './live-packet-feed';
 import { packetFlowColor } from './packet-flow-colors';
 
 interface LivePacketFeedProps {
