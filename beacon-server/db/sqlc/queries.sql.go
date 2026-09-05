@@ -982,7 +982,7 @@ func (q *Queries) GetRadioPresets(ctx context.Context, arg GetRadioPresetsParams
 }
 
 const getRegion = `-- name: GetRegion :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE id = $1
 `
@@ -995,6 +995,8 @@ type GetRegionRow struct {
 	CenterLat   *float64 `json:"center_lat"`
 	CenterLng   *float64 `json:"center_lng"`
 	ZoomLevel   *int32   `json:"zoom_level"`
+	ShortCode   *string  `json:"short_code"`
+	IsRoot      bool     `json:"is_root"`
 }
 
 func (q *Queries) GetRegion(ctx context.Context, id int32) (GetRegionRow, error) {
@@ -1008,12 +1010,14 @@ func (q *Queries) GetRegion(ctx context.Context, id int32) (GetRegionRow, error)
 		&i.CenterLat,
 		&i.CenterLng,
 		&i.ZoomLevel,
+		&i.ShortCode,
+		&i.IsRoot,
 	)
 	return i, err
 }
 
 const getRegionBySlug = `-- name: GetRegionBySlug :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE slug = $1
 `
@@ -1026,6 +1030,8 @@ type GetRegionBySlugRow struct {
 	CenterLat   *float64 `json:"center_lat"`
 	CenterLng   *float64 `json:"center_lng"`
 	ZoomLevel   *int32   `json:"zoom_level"`
+	ShortCode   *string  `json:"short_code"`
+	IsRoot      bool     `json:"is_root"`
 }
 
 func (q *Queries) GetRegionBySlug(ctx context.Context, slug string) (GetRegionBySlugRow, error) {
@@ -1039,6 +1045,8 @@ func (q *Queries) GetRegionBySlug(ctx context.Context, slug string) (GetRegionBy
 		&i.CenterLat,
 		&i.CenterLng,
 		&i.ZoomLevel,
+		&i.ShortCode,
+		&i.IsRoot,
 	)
 	return i, err
 }
@@ -3316,15 +3324,17 @@ func (q *Queries) ListPacketsByIATAs(ctx context.Context, arg ListPacketsByIATAs
 
 const listRegions = `-- name: ListRegions :many
 
-SELECT id, slug, name
+SELECT id, slug, name, short_code, is_root
 FROM regions
 ORDER BY display_order, name
 `
 
 type ListRegionsRow struct {
-	ID   int32  `json:"id"`
-	Slug string `json:"slug"`
-	Name string `json:"name"`
+	ID        int32   `json:"id"`
+	Slug      string  `json:"slug"`
+	Name      string  `json:"name"`
+	ShortCode *string `json:"short_code"`
+	IsRoot    bool    `json:"is_root"`
 }
 
 // ============================================================
@@ -3339,7 +3349,13 @@ func (q *Queries) ListRegions(ctx context.Context) ([]ListRegionsRow, error) {
 	items := []ListRegionsRow{}
 	for rows.Next() {
 		var i ListRegionsRow
-		if err := rows.Scan(&i.ID, &i.Slug, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.ShortCode,
+			&i.IsRoot,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -4641,8 +4657,8 @@ func (q *Queries) UpsertPacket(ctx context.Context, arg UpsertPacketParams) (Ups
 }
 
 const upsertRegion = `-- name: UpsertRegion :one
-INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, short_code, is_root, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 ON CONFLICT (slug) DO UPDATE SET
     name          = EXCLUDED.name,
     description   = EXCLUDED.description,
@@ -4650,6 +4666,8 @@ ON CONFLICT (slug) DO UPDATE SET
     center_lat    = EXCLUDED.center_lat,
     center_lng    = EXCLUDED.center_lng,
     zoom_level    = EXCLUDED.zoom_level,
+    short_code    = EXCLUDED.short_code,
+    is_root       = EXCLUDED.is_root,
     updated_at    = NOW()
 RETURNING id
 `
@@ -4662,6 +4680,8 @@ type UpsertRegionParams struct {
 	CenterLat    *float64 `json:"center_lat"`
 	CenterLng    *float64 `json:"center_lng"`
 	ZoomLevel    *int32   `json:"zoom_level"`
+	ShortCode    *string  `json:"short_code"`
+	IsRoot       bool     `json:"is_root"`
 }
 
 func (q *Queries) UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int32, error) {
@@ -4673,6 +4693,8 @@ func (q *Queries) UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int
 		arg.CenterLat,
 		arg.CenterLng,
 		arg.ZoomLevel,
+		arg.ShortCode,
+		arg.IsRoot,
 	)
 	var id int32
 	err := row.Scan(&id)
@@ -4692,6 +4714,23 @@ type UpsertRegionIATAParams struct {
 
 func (q *Queries) UpsertRegionIATA(ctx context.Context, arg UpsertRegionIATAParams) error {
 	_, err := q.db.Exec(ctx, upsertRegionIATA, arg.RegionID, arg.Iata)
+	return err
+}
+
+const upsertRegionMeta = `-- name: UpsertRegionMeta :exec
+UPDATE regions SET short_code = $1, is_root = $2, updated_at = NOW() WHERE id = $3
+`
+
+type UpsertRegionMetaParams struct {
+	ShortCode *string `json:"short_code"`
+	IsRoot    bool    `json:"is_root"`
+	ID        int32   `json:"id"`
+}
+
+// Selector-facing root identity for an already-upserted region. Only the short code and the
+// explicit root flag live here so UpsertRegion keeps its existing signature.
+func (q *Queries) UpsertRegionMeta(ctx context.Context, arg UpsertRegionMetaParams) error {
+	_, err := q.db.Exec(ctx, upsertRegionMeta, arg.ShortCode, arg.IsRoot, arg.ID)
 	return err
 }
 

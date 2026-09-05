@@ -5,9 +5,11 @@ package api
 
 // RegionSummary is the minimal region representation used in list responses.
 type RegionSummary struct {
-	ID   int    `json:"id"`
-	Slug string `json:"slug"` // URL-safe identifier e.g. "western-canada"
-	Name string `json:"name"`
+	ID        int     `json:"id"`
+	Slug      string  `json:"slug"` // URL-safe identifier e.g. "western-canada"
+	Name      string  `json:"name"`
+	ShortCode *string `json:"shortCode,omitempty"` // compact display code e.g. "SWE"
+	IsRoot    bool    `json:"isRoot,omitempty"`    // deployment root scope for the no-filter state
 }
 
 // Region is the full region representation including map display hints and

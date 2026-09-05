@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { ErrorBoundary } from './ErrorBoundary';
 import { useQuery } from '@tanstack/react-query';
 import { useRegionSelection, useRegions } from '../hooks/useRegion';
-import { ALL_REGIONS, isAllRegions, type RegionSelection } from '../hooks/region-selection';
+import { ALL_REGIONS, isAllRegions, normalizeSelection, type RegionSelection } from '../hooks/region-selection';
 import { useWsStatus } from '../hooks/useWsStatus';
 import { useTheme } from '../hooks/useTheme';
 import { Dropdown } from './Dropdown';
@@ -103,8 +103,13 @@ function CheckBox({ checked }: { checked: boolean }) {
 }
 
 // Compact header summary of the active selection, e.g. "ALL", "YVR, YYJ", "2 regions", "1 region · 3 IATA".
-function regionSummaryLabel(selection: RegionSelection, t: TFunction): string {
-  if (isAllRegions(selection)) return t('region.allShort');
+// When a root region is configured, the empty no-filter state borrows its short code identity.
+function regionSummaryLabel(
+  selection: RegionSelection,
+  t: TFunction,
+  rootShort?: string | null,
+): string {
+  if (isAllRegions(selection)) return rootShort ?? t('region.allShort');
   const parts: string[] = [];
   if (selection.regions.length > 0) {
     parts.push(t('region.region', { count: selection.regions.length }));
@@ -121,9 +126,14 @@ function regionSummaryLabel(selection: RegionSelection, t: TFunction): string {
 
 // Grouped multi-select: regions (each expands to its member IATAs) on top, then individual IATAs.
 // Toggling keeps the dropdown open so several can be picked; "All Regions" clears the selection.
+// With a configured root region, the top choice borrows the root's SWE/Sverige identity while
+// keeping the empty no-filter semantics internally.
 function RegionSelector() {
   const { t } = useTranslation();
   const { selection } = useRegionSelection();
+  const { regions } = useRegions();
+  const root = regions.find((r) => r.isRoot) ?? null;
+  const effectiveSelection = normalizeSelection(selection, root?.slug ?? null);
 
   return (
     <Dropdown
@@ -137,7 +147,7 @@ function RegionSelector() {
           onClick={toggle}
         >
           <span className="text-text-muted font-normal text-[11px]">{t('region.label')}</span>
-          <span className="truncate">{regionSummaryLabel(selection, t)}</span>
+          <span className="truncate">{regionSummaryLabel(effectiveSelection, t, root?.shortCode)}</span>
           <span className="text-text-dim text-[11px] shrink-0">▾</span>
         </button>
       )}
@@ -188,16 +198,22 @@ function RegionSelectorPanel() {
 
   const q = query.trim().toLowerCase();
 
-  // A region matches on its name or on any member code. A code-only match carries those codes so the
-  // row can show why it surfaced — otherwise it reads as a stray result.
+  const root = regions.find((r) => r.isRoot) ?? null;
+  const effectiveSelection = normalizeSelection(selection, root?.slug ?? null);
+
+  // A region matches on its name, short code, or on any member code. A code-only match carries
+  // those codes so the row can show why it surfaced — otherwise it reads as a stray result.
+  // The root region never renders as its own row: the top choice already carries its identity.
   const shownRegions = useMemo(() => {
-    if (!q) return regions.map((region) => ({ region, matched: [] as string[] }));
-    return regions.flatMap((region) => {
+    const nonRoot = regions.filter((region) => region.slug !== root?.slug);
+    if (!q) return nonRoot.map((region) => ({ region, matched: [] as string[] }));
+    return nonRoot.flatMap((region) => {
       if (region.name.toLowerCase().includes(q)) return [{ region, matched: [] as string[] }];
+      if ((region.shortCode ?? '').toLowerCase().includes(q)) return [{ region, matched: [] as string[] }];
       const matched = region.iatas.filter((code) => code.toLowerCase().includes(q));
       return matched.length > 0 ? [{ region, matched }] : [];
     });
-  }, [regions, q]);
+  }, [regions, root, q]);
 
   // displayName is the closest thing to a city the API carries, and it's absent for IATAs the server
   // auto-created from packet traffic — those stay reachable by code.
@@ -208,7 +224,12 @@ function RegionSelectorPanel() {
     );
   }, [iatas, q]);
 
-  const showAll = !q || t('region.all').toLowerCase().includes(q);
+  const showAll = root
+    ? !q ||
+      root.name.toLowerCase().includes(q) ||
+      (root.shortCode ?? '').toLowerCase().includes(q) ||
+      t('region.all').toLowerCase().includes(q)
+    : !q || t('region.all').toLowerCase().includes(q);
   const showIataGroup = !iatas || shownIatas.length > 0; // keep the group while loading/failed
   const hasRowsAbove = showAll || shownRegions.length > 0;
 
@@ -236,7 +257,7 @@ function RegionSelectorPanel() {
         <button
           type="button"
           className={`w-full flex items-center gap-2.5 px-3 py-1.5 text-left text-xs font-mono transition-colors ${
-            isAllRegions(selection)
+            isAllRegions(effectiveSelection)
               ? 'text-text-bright bg-primary/10'
               : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'
           }`}
@@ -244,8 +265,10 @@ function RegionSelectorPanel() {
         >
           {/* spacer matching the checkbox column so ALL/code/name align with the rows below */}
           <span className="w-3 shrink-0" aria-hidden="true" />
-          <span className="font-semibold text-primary w-8 shrink-0">{t('region.allShort')}</span>
-          <span className="text-text-dim">{t('region.all')}</span>
+          <span className="font-semibold text-primary w-8 shrink-0">
+            {root?.shortCode ?? t('region.allShort')}
+          </span>
+          <span className="text-text-dim">{root?.name ?? t('region.all')}</span>
         </button>
       )}
 
@@ -255,7 +278,7 @@ function RegionSelectorPanel() {
             {t('region.regions')}
           </div>
           {shownRegions.map(({ region, matched }) => {
-            const checked = selection.regions.includes(region.slug);
+            const checked = effectiveSelection.regions.includes(region.slug);
             return (
               <button
                 key={region.slug}

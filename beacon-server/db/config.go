@@ -92,6 +92,17 @@ func (s *Store) UpsertRegion(ctx context.Context, slug, name, description string
 	})
 }
 
+// UpsertRegionMeta stores the selector-facing root identity for a region: an optional short
+// display code plus the explicit root designation. Kept separate from UpsertRegion so existing
+// callers (and their tests) keep their signature.
+func (s *Store) UpsertRegionMeta(ctx context.Context, regionID int32, shortCode *string, isRoot bool) error {
+	return s.q.UpsertRegionMeta(ctx, sqlc.UpsertRegionMetaParams{
+		ShortCode: shortCode,
+		IsRoot:    isRoot,
+		ID:        regionID,
+	})
+}
+
 func (s *Store) ListRegions(ctx context.Context) ([]api.RegionSummary, error) {
 	rows, err := s.q.ListRegions(ctx)
 	if err != nil {
@@ -100,9 +111,11 @@ func (s *Store) ListRegions(ctx context.Context) ([]api.RegionSummary, error) {
 	regions := make([]api.RegionSummary, 0, len(rows))
 	for _, v := range rows {
 		regions = append(regions, api.RegionSummary{
-			ID:   int(v.ID),
-			Slug: v.Slug,
-			Name: v.Name,
+			ID:        int(v.ID),
+			Slug:      v.Slug,
+			Name:      v.Name,
+			ShortCode: v.ShortCode,
+			IsRoot:    v.IsRoot,
 		})
 	}
 	return regions, nil
@@ -115,9 +128,11 @@ func (s *Store) GetRegion(ctx context.Context, regionID int32) (*api.Region, err
 	}
 	result := api.Region{
 		RegionSummary: api.RegionSummary{
-			ID:   int(region.ID),
-			Slug: region.Slug,
-			Name: region.Name,
+			ID:        int(region.ID),
+			Slug:      region.Slug,
+			Name:      region.Name,
+			ShortCode: region.ShortCode,
+			IsRoot:    region.IsRoot,
 		},
 		Description: region.Description,
 		CenterLat:   region.CenterLat,
@@ -144,9 +159,11 @@ func (s *Store) GetRegionBySlug(ctx context.Context, slug string) (*api.Region, 
 	}
 	result := api.Region{
 		RegionSummary: api.RegionSummary{
-			ID:   int(region.ID),
-			Slug: region.Slug,
-			Name: region.Name,
+			ID:        int(region.ID),
+			Slug:      region.Slug,
+			Name:      region.Name,
+			ShortCode: region.ShortCode,
+			IsRoot:    region.IsRoot,
 		},
 		Description: region.Description,
 		CenterLat:   region.CenterLat,

@@ -133,6 +133,8 @@ export interface RegionSummary {
   id: number;
   slug: string; // e.g. "western-canada"
   name: string;
+  shortCode?: string; // compact display code e.g. "SWE"
+  isRoot?: boolean; // deployment root scope for the no-filter state
 }
 
 export interface Region extends RegionSummary {

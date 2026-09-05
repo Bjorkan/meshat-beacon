@@ -1626,6 +1626,20 @@ func (mr *MockQuerierMockRecorder) UpsertRegionIATA(ctx, arg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertRegionIATA", reflect.TypeOf((*MockQuerier)(nil).UpsertRegionIATA), ctx, arg)
 }
 
+// UpsertRegionMeta mocks base method.
+func (m *MockQuerier) UpsertRegionMeta(ctx context.Context, arg db.UpsertRegionMetaParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertRegionMeta", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpsertRegionMeta indicates an expected call of UpsertRegionMeta.
+func (mr *MockQuerierMockRecorder) UpsertRegionMeta(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertRegionMeta", reflect.TypeOf((*MockQuerier)(nil).UpsertRegionMeta), ctx, arg)
+}
+
 // UpsertTraceIATA mocks base method.
 func (m *MockQuerier) UpsertTraceIATA(ctx context.Context, arg db.UpsertTraceIATAParams) error {
 	m.ctrl.T.Helper()

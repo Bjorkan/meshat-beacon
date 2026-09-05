@@ -289,6 +289,9 @@ type Querier interface {
 	UpsertPacket(ctx context.Context, arg UpsertPacketParams) (UpsertPacketRow, error)
 	UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int32, error)
 	UpsertRegionIATA(ctx context.Context, arg UpsertRegionIATAParams) error
+	// Selector-facing root identity for an already-upserted region. Only the short code and the
+	// explicit root flag live here so UpsertRegion keeps its existing signature.
+	UpsertRegionMeta(ctx context.Context, arg UpsertRegionMetaParams) error
 	// Refreshes at most hourly so repeat hears don't churn the row.
 	UpsertTraceIATA(ctx context.Context, arg UpsertTraceIATAParams) error
 	// ============================================================

@@ -1159,17 +1159,17 @@ ORDER BY ts.name;
 -- ============================================================
 
 -- name: ListRegions :many
-SELECT id, slug, name
+SELECT id, slug, name, short_code, is_root
 FROM regions
 ORDER BY display_order, name;
 
 -- name: GetRegion :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE id = $1;
 
 -- name: GetRegionBySlug :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE slug = $1;
 
@@ -1179,8 +1179,8 @@ WHERE region_id = $1
 ORDER BY iata;
 
 -- name: UpsertRegion :one
-INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, short_code, is_root, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 ON CONFLICT (slug) DO UPDATE SET
     name          = EXCLUDED.name,
     description   = EXCLUDED.description,
@@ -1188,6 +1188,8 @@ ON CONFLICT (slug) DO UPDATE SET
     center_lat    = EXCLUDED.center_lat,
     center_lng    = EXCLUDED.center_lng,
     zoom_level    = EXCLUDED.zoom_level,
+    short_code    = EXCLUDED.short_code,
+    is_root       = EXCLUDED.is_root,
     updated_at    = NOW()
 RETURNING id;
 
@@ -1195,6 +1197,11 @@ RETURNING id;
 INSERT INTO region_iatas (region_id, iata)
 VALUES ($1, $2)
 ON CONFLICT (region_id, iata) DO NOTHING;
+
+-- name: UpsertRegionMeta :exec
+-- Selector-facing root identity for an already-upserted region. Only the short code and the
+-- explicit root flag live here so UpsertRegion keeps its existing signature.
+UPDATE regions SET short_code = $1, is_root = $2, updated_at = NOW() WHERE id = $3;
 
 -- ============================================================
 -- TRACES
