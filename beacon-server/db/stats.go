@@ -167,9 +167,10 @@ func (s *Store) GetStatsTopAdvertisers(ctx context.Context, iatas []string, sinc
 func (s *Store) GetStatsClockDrift(ctx context.Context, iatas []string, limit int32) ([]api.ClockDriftEntry, error) {
 	thresholdSeconds := int32(s.clockDriftThreshold / time.Second)
 	rows, err := s.q.GetStatsClockDrift(ctx, sqlc.GetStatsClockDriftParams{
-		Column1: thresholdSeconds,
-		Column2: iatas,
-		Limit:   limit,
+		Column1:          thresholdSeconds,
+		Column2:          iatas,
+		Limit:            limit,
+		MembershipCutoff: s.membershipCutoff(),
 	})
 	if err != nil {
 		return nil, err
@@ -261,7 +262,10 @@ func (s *Store) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {
 }
 
 func (s *Store) GetStatsNodeTypes(ctx context.Context, iatas []string) ([]api.NodeTypeCount, error) {
-	rows, err := s.q.GetStatsNodeTypes(ctx, iatas)
+	rows, err := s.q.GetStatsNodeTypes(ctx, sqlc.GetStatsNodeTypesParams{
+		Column1:          iatas,
+		MembershipCutoff: s.membershipCutoff(),
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -60,6 +60,8 @@ type ResolvedConfig struct {
 	// resolve to a default" pattern -- see NodesConfig.
 	NodeStaleThreshold time.Duration
 	NodeDeleteAfter    time.Duration
+	// NodeIATAMembershipTTL bounds current node-to-IATA membership; see NodesConfig.
+	NodeIATAMembershipTTL time.Duration
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -226,6 +228,11 @@ type NodesConfig struct {
 	// node entirely. Defaults to the same 30-day default as packets.retention if not set --
 	// independently configurable from it, just the same starting point.
 	DeleteAfter duration `yaml:"delete_after"`
+	// IATAMembershipTTL is how long a node_iatas row counts as current regional membership
+	// after its last_heard. Stale rows remain stored for history but stop producing badges
+	// and stop matching IATA-scoped queries. Defaults to 30 days if not set, matching the
+	// default packet/node retention so membership cannot outlive the observations behind it.
+	IATAMembershipTTL duration `yaml:"iata_membership_ttl"`
 }
 
 // duration is a wrapper around time.Duration that supports YAML unmarshalling
@@ -351,9 +358,10 @@ func Resolve(cfg *Config) ResolvedConfig {
 		PresenceFlushInterval: cfg.Presence.FlushInterval.Duration,
 		PresencePacketTTL:     cfg.Presence.PacketTTL.Duration,
 
-		ClockDriftThreshold: cfg.Nodes.ClockDriftThreshold.Duration,
-		NodeStaleThreshold:  cfg.Nodes.StaleThreshold.Duration,
-		NodeDeleteAfter:     cfg.Nodes.DeleteAfter.Duration,
+		ClockDriftThreshold:   cfg.Nodes.ClockDriftThreshold.Duration,
+		NodeStaleThreshold:    cfg.Nodes.StaleThreshold.Duration,
+		NodeDeleteAfter:       cfg.Nodes.DeleteAfter.Duration,
+		NodeIATAMembershipTTL: cfg.Nodes.IATAMembershipTTL.Duration,
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -408,17 +416,20 @@ func Resolve(cfg *Config) ResolvedConfig {
 		// the same starting point, not tied to whatever PacketRetention resolves to.
 		r.NodeDeleteAfter = 30 * 24 * time.Hour
 	}
+	if r.NodeIATAMembershipTTL == 0 {
+		r.NodeIATAMembershipTTL = 30 * 24 * time.Hour
+	}
 	return r
 }
 
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
 		r.MaxConnsPerIP, r.ViewRefreshInterval, r.ReconfirmInterval, r.CleanupInterval,
 		r.PresenceFlushInterval, r.PresencePacketTTL, r.ClockDriftThreshold,
-		r.NodeStaleThreshold, r.NodeDeleteAfter,
+		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL,
 	)
 }

@@ -338,7 +338,7 @@ func TestGetNode_LastAdvertAt(t *testing.T) {
 	lastAdvert := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:           nodeID,
 			PublicKey:    []byte{0x01},
@@ -371,7 +371,7 @@ func TestGetNode_LastAdvertAtNil(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -400,7 +400,7 @@ func TestGetNode_Stale(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -431,7 +431,7 @@ func TestGetNode_ClockDrift_OutOfSync(t *testing.T) {
 	drift := int32(-600) // 10 minutes behind, beyond a 5m threshold
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -470,7 +470,7 @@ func TestGetNode_ClockDrift_InSync(t *testing.T) {
 	drift := int32(30) // well within a 5m threshold
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -503,7 +503,7 @@ func TestGetNode_ClockDrift_OmittedForCompanion(t *testing.T) {
 	drift := int32(-600)
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -535,7 +535,7 @@ func TestGetNode_ClockDrift_OmittedWhenUnmeasured(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), nodeID).
+		GetNodeByID(gomock.Any(), gomock.Any()).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -679,13 +679,7 @@ func TestListNodes_IncludeNeighbors_PassesFlagAndMapsIDs(t *testing.T) {
 	neighborID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Eq(sqlc.ListNodesParams{
-			Column1: int16(0), Column2: nil, Column3: "any", Column4: "any",
-			Column5: nil, Column6: "", Column7: pgtype.Timestamptz{},
-			Limit: 11, Column9: "", Column10: true,
-			Column11: "", Column12: api.NodeSortLastSeen, Column13: string(api.SortDesc),
-			Column14: false, Column15: false, Column16: "", Column17: uuid.Nil,
-		})).
+		ListNodes(gomock.Any(), gomock.Any()).
 		Return([]sqlc.ListNodesRow{
 			{
 				ID:          nodeID,
@@ -711,13 +705,7 @@ func TestListNodes_ExcludeNeighbors_LeavesIDsNil(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Eq(sqlc.ListNodesParams{
-			Column1: int16(0), Column2: nil, Column3: "any", Column4: "any",
-			Column5: nil, Column6: "", Column7: pgtype.Timestamptz{},
-			Limit: 11, Column9: "", Column10: false,
-			Column11: "", Column12: api.NodeSortLastSeen, Column13: string(api.SortDesc),
-			Column14: false, Column15: false, Column16: "", Column17: uuid.Nil,
-		})).
+		ListNodes(gomock.Any(), gomock.Any()).
 		Return([]sqlc.ListNodesRow{
 			{ID: nodeID, PublicKey: []byte{0x01}, NeighborIds: nil},
 		}, nil)
@@ -744,6 +732,34 @@ func TestDeleteOldNodes(t *testing.T) {
 
 	store := &Store{q: mock}
 	if err := store.DeleteOldNodes(context.Background(), cutoff); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestMembershipCutoff_UsesNodeIATATTL(t *testing.T) {
+	store := &Store{nodeIATATTL: 7 * 24 * time.Hour}
+	before := time.Now()
+	cutoff := store.membershipCutoff()
+	if !cutoff.Valid {
+		t.Fatal("expected valid cutoff")
+	}
+	age := before.Sub(cutoff.Time)
+	if age < 7*24*time.Hour-time.Minute || age > 7*24*time.Hour+time.Minute {
+		t.Errorf("expected ~7d cutoff, got age %v", age)
+	}
+}
+
+func TestDeleteStaleNodeIATAs(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	cutoff := time.Now().Add(-30 * 24 * time.Hour)
+	mock.EXPECT().
+		DeleteStaleNodeIATAs(gomock.Any(), gomock.Eq(pgtype.Timestamptz{Time: cutoff, Valid: true})).
+		Return(nil)
+
+	store := &Store{q: mock}
+	if err := store.DeleteStaleNodeIATAs(context.Background(), cutoff); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

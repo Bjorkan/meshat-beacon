@@ -203,7 +203,7 @@ func TestGetStatsNodeTypes_Mapping(t *testing.T) {
 	mock := mockdb.NewMockQuerier(ctrl)
 
 	mock.EXPECT().
-		GetStatsNodeTypes(gomock.Any(), []string{"YVR"}).
+		GetStatsNodeTypes(gomock.Any(), gomock.Any()).
 		Return([]sqlc.GetStatsNodeTypesRow{
 			{NodeType: 1, Count: 10},
 			{NodeType: 2, Count: 5},

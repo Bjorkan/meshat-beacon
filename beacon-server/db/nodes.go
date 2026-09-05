@@ -53,6 +53,12 @@ func (s *Store) UpsertNodeIATA(ctx context.Context, nodeID uuid.UUID, iata strin
 	return s.q.UpsertNodeIATA(ctx, params)
 }
 
+// DeleteStaleNodeIATAs prunes node-to-IATA memberships not refreshed since the cutoff. The node
+// row itself is untouched; only the stale regional association is dropped.
+func (s *Store) DeleteStaleNodeIATAs(ctx context.Context, cutoff time.Time) error {
+	return s.q.DeleteStaleNodeIATAs(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
+}
+
 func (s *Store) UpsertNodeShortID(ctx context.Context, nodeID uuid.UUID, iata string, prefix4 []byte) error {
 	return s.q.UpsertNodeShortID(ctx, sqlc.UpsertNodeShortIDParams{
 		NodeID:  nodeID,
@@ -129,23 +135,24 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 	}
 	cursorValid, cursorEmpty, cursorKey, cursorID := listCursorValues(params.PageToken)
 	rows, err := s.q.ListNodes(ctx, sqlc.ListNodesParams{
-		Column1:  params.NodeType,
-		Column2:  params.IATAs,
-		Column3:  tristate(params.SupportsMultibytePaths),
-		Column4:  tristate(params.SupportsMultibyteTraces),
-		Column5:  params.PublicKey,
-		Column6:  params.Name,
-		Column7:  cursorTS,
-		Limit:    params.Limit + 1,
-		Column9:  params.Scope,
-		Column10: params.IncludeNeighbors,
-		Column11: params.PubkeyPrefix,
-		Column12: params.Sort,
-		Column13: string(params.Direction),
-		Column14: cursorValid,
-		Column15: cursorEmpty,
-		Column16: cursorKey,
-		Column17: cursorID,
+		Column1:          params.NodeType,
+		Column2:          params.IATAs,
+		Column3:          tristate(params.SupportsMultibytePaths),
+		Column4:          tristate(params.SupportsMultibyteTraces),
+		Column5:          params.PublicKey,
+		Column6:          params.Name,
+		Column7:          cursorTS,
+		Limit:            params.Limit + 1,
+		Column9:          params.Scope,
+		Column10:         params.IncludeNeighbors,
+		Column11:         params.PubkeyPrefix,
+		Column12:         params.Sort,
+		Column13:         string(params.Direction),
+		Column14:         cursorValid,
+		Column15:         cursorEmpty,
+		Column16:         cursorKey,
+		Column17:         cursorID,
+		MembershipCutoff: s.membershipCutoff(),
 	})
 	if err != nil {
 		return api.Page[api.NodeSummary]{}, err
@@ -209,7 +216,10 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 }
 
 func (s *Store) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error) {
-	row, err := s.q.GetNodeByID(ctx, nodeID)
+	row, err := s.q.GetNodeByID(ctx, sqlc.GetNodeByIDParams{
+		ID:               nodeID,
+		MembershipCutoff: s.membershipCutoff(),
+	})
 	if err != nil {
 		return nil, err
 	}

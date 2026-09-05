@@ -110,7 +110,7 @@ func main() {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
-	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm)
+	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL)
 
 	// ── Presence write coalescing ────────────────────────────────────────────
 	// Ingest writes go through the coalescer; reads keep using the store.
@@ -259,7 +259,7 @@ func main() {
 
 	scheduler := background.New([]background.Task{
 		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),
-		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.CleanupInterval),
+		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.NodeIATAMembershipTTL, resolved.CleanupInterval),
 		background.ReconfirmTask(store, resolved.RouteRetention, resolved.RouteGrace, int64(resolved.RouteMinObservations), resolved.ReconfirmInterval),
 	})
 	go scheduler.Start(ctx)

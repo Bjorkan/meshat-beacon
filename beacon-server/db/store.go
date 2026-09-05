@@ -25,6 +25,7 @@ type Store struct {
 	clockDriftThreshold time.Duration // see api.Node.ClockOutOfSync
 	staleThreshold      time.Duration // see api.NodeSummary.Stale
 	neighborMaxKm       float64       // direct LoRa sanity cap for node_neighbors edges (0 = unlimited)
+	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
 }
 
 // New creates a Store backed by the given pgxpool connection pool. clockDriftThreshold is
@@ -34,8 +35,17 @@ type Store struct {
 // internal/config.ResolvedConfig.NodeStaleThreshold. neighborMaxKm is the great-circle
 // distance beyond which a node_neighbors edge is refused as physically impossible for a
 // direct LoRa hop (0 = unlimited); see internal/config.ResolvedConfig.NeighborMaxKm.
-func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, neighborMaxKm float64) *Store {
-	return &Store{q: sqlc.New(pool), clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold, neighborMaxKm: neighborMaxKm}
+// nodeIATATTL bounds current node-to-IATA membership; see
+// internal/config.ResolvedConfig.NodeIATAMembershipTTL.
+func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, neighborMaxKm float64, nodeIATATTL time.Duration) *Store {
+	return &Store{q: sqlc.New(pool), clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold, neighborMaxKm: neighborMaxKm, nodeIATATTL: nodeIATATTL}
+}
+
+// membershipCutoff is the oldest last_heard that still counts as current node-to-IATA
+// membership. Stale rows remain stored; every read path that interprets node_iatas as
+// current scope uses this same cutoff so badges, filters, and stats agree.
+func (s *Store) membershipCutoff() pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: time.Now().Add(-s.nodeIATATTL), Valid: true}
 }
 
 // ResolvePathHashes resolves path hash prefixes to nodes GLOBALLY — across

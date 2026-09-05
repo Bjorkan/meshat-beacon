@@ -127,6 +127,20 @@ func (mr *MockQuerierMockRecorder) DeleteOldTraceIATAs(ctx, lastHeard any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOldTraceIATAs", reflect.TypeOf((*MockQuerier)(nil).DeleteOldTraceIATAs), ctx, lastHeard)
 }
 
+// DeleteStaleNodeIATAs mocks base method.
+func (m *MockQuerier) DeleteStaleNodeIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteStaleNodeIATAs", ctx, lastHeard)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteStaleNodeIATAs indicates an expected call of DeleteStaleNodeIATAs.
+func (mr *MockQuerierMockRecorder) DeleteStaleNodeIATAs(ctx, lastHeard any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteStaleNodeIATAs", reflect.TypeOf((*MockQuerier)(nil).DeleteStaleNodeIATAs), ctx, lastHeard)
+}
+
 // DeleteStaleNodeNeighbors mocks base method.
 func (m *MockQuerier) DeleteStaleNodeNeighbors(ctx context.Context, lastSeen pgtype.Timestamptz) error {
 	m.ctrl.T.Helper()
@@ -232,18 +246,18 @@ func (mr *MockQuerierMockRecorder) GetKnownRoutesByNode(ctx, arg any) *gomock.Ca
 }
 
 // GetNodeByID mocks base method.
-func (m *MockQuerier) GetNodeByID(ctx context.Context, id uuid.UUID) (db.GetNodeByIDRow, error) {
+func (m *MockQuerier) GetNodeByID(ctx context.Context, arg db.GetNodeByIDParams) (db.GetNodeByIDRow, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetNodeByID", ctx, id)
+	ret := m.ctrl.Call(m, "GetNodeByID", ctx, arg)
 	ret0, _ := ret[0].(db.GetNodeByIDRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetNodeByID indicates an expected call of GetNodeByID.
-func (mr *MockQuerierMockRecorder) GetNodeByID(ctx, id any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) GetNodeByID(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeByID", reflect.TypeOf((*MockQuerier)(nil).GetNodeByID), ctx, id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeByID", reflect.TypeOf((*MockQuerier)(nil).GetNodeByID), ctx, arg)
 }
 
 // GetNodeByPubkey mocks base method.
@@ -592,18 +606,18 @@ func (mr *MockQuerierMockRecorder) GetStatsClockDrift(ctx, arg any) *gomock.Call
 }
 
 // GetStatsNodeTypes mocks base method.
-func (m *MockQuerier) GetStatsNodeTypes(ctx context.Context, dollar_1 []string) ([]db.GetStatsNodeTypesRow, error) {
+func (m *MockQuerier) GetStatsNodeTypes(ctx context.Context, arg db.GetStatsNodeTypesParams) ([]db.GetStatsNodeTypesRow, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetStatsNodeTypes", ctx, dollar_1)
+	ret := m.ctrl.Call(m, "GetStatsNodeTypes", ctx, arg)
 	ret0, _ := ret[0].([]db.GetStatsNodeTypesRow)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetStatsNodeTypes indicates an expected call of GetStatsNodeTypes.
-func (mr *MockQuerierMockRecorder) GetStatsNodeTypes(ctx, dollar_1 any) *gomock.Call {
+func (mr *MockQuerierMockRecorder) GetStatsNodeTypes(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatsNodeTypes", reflect.TypeOf((*MockQuerier)(nil).GetStatsNodeTypes), ctx, dollar_1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetStatsNodeTypes", reflect.TypeOf((*MockQuerier)(nil).GetStatsNodeTypes), ctx, arg)
 }
 
 // GetStatsOverview mocks base method.
