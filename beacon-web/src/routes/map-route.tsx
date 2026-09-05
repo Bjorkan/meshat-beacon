@@ -36,7 +36,7 @@ export function MapRoute() {
           onViewNode={selectMapNode}
           onAnalyzePacket={overlays.setOverlayPacketHash}
         />
-      )}
+      )}{' '}
     </>
   );
 }

@@ -12,6 +12,10 @@ vi.mock('../../../src/api/client', () => ({
   getNodeNeighbors: vi.fn(),
 }));
 
+vi.mock('../../../src/features/nodes/NodeLocationMap', () => ({
+  NodeLocationMap: () => <div data-testid="node-location-map" />,
+}));
+
 const mockGetNode = vi.mocked(getNode);
 const mockGetNodeObservations = vi.mocked(getNodeObservations);
 const mockGetNodeNeighbors = vi.mocked(getNodeNeighbors);
@@ -50,7 +54,7 @@ function neighbor(id: string, name: string): NodeNeighbor {
   };
 }
 
-function renderPanel(onViewNode = vi.fn()) {
+function renderPanel(onViewNode = vi.fn(), onViewOnMap?: (id: string) => void) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
@@ -61,6 +65,7 @@ function renderPanel(onViewNode = vi.fn()) {
       onClose={vi.fn()}
       onViewObserver={vi.fn()}
       onViewNode={onViewNode}
+      onViewOnMap={onViewOnMap}
     />,
     { wrapper },
   );
@@ -130,6 +135,30 @@ describe('NodeDetailPanel contact QR', () => {
     await screen.findByText('Timestamps');
     expect(screen.queryByRole('img', { name: /contact QR/i })).toBeNull();
     expect(screen.queryByRole('link', { name: /Add as contact/i })).toBeNull();
+  });
+});
+
+describe('NodeDetailPanel location', () => {
+  const located = { ...node, lat: 57.1, lng: 12.9, locationSource: 'advert' };
+
+  it('shows the mini map and a view-on-map link outside the map', async () => {
+    mockGetNode.mockResolvedValue(located);
+    const onViewOnMap = vi.fn();
+    renderPanel(vi.fn(), onViewOnMap);
+
+    await screen.findByTestId('node-location-map');
+    const link = screen.getByRole('button', { name: /view on map/i });
+    fireEvent.click(link);
+    expect(onViewOnMap).toHaveBeenCalledWith('node-self');
+  });
+
+  it('hides the mini map and the link when already shown on the map', async () => {
+    mockGetNode.mockResolvedValue(located);
+    renderPanel();
+
+    await screen.findByText('Timestamps');
+    expect(screen.queryByTestId('node-location-map')).toBeNull();
+    expect(screen.queryByRole('button', { name: /view on map/i })).toBeNull();
   });
 });
 

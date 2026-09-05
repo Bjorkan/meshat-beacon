@@ -390,6 +390,18 @@ function RootLayout() {
     [navigate],
   );
 
+  // Jump from a node detail panel shown outside the map to /map with that node preselected.
+  const viewNodeOnMap = useCallback(
+    (nodeId: string) => {
+      clearTransient();
+      navigate({
+        to: '/map',
+        search: (prev) => ({ ...rootSearch(prev), node: nodeId }),
+      });
+    },
+    [clearTransient, navigate],
+  );
+
   // Jump from an observer's detail panel to its telemetry on Analytics (preselected).
   const viewObserverStats = useCallback(
     (observerId: string) => {
@@ -419,6 +431,7 @@ function RootLayout() {
       selectNode,
       selectObserver,
       viewObserverStats,
+      viewNodeOnMap,
     }),
     [
       overlayPacketHash,
@@ -429,6 +442,7 @@ function RootLayout() {
       selectNode,
       selectObserver,
       viewObserverStats,
+      viewNodeOnMap,
     ],
   );
 
@@ -477,6 +491,7 @@ function RootLayout() {
                 onClose={() => setOverlayNodeId(null)}
                 onViewObserver={selectObserver}
                 onViewNode={setOverlayNodeId}
+                onViewOnMap={viewNodeOnMap}
               />
             )}
             {overlayPacketHash && (

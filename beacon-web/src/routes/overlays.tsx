@@ -14,6 +14,7 @@ export interface Overlays {
   selectNode: (id: string | null) => void;
   selectObserver: (id: string | null) => void;
   viewObserverStats: (observerId: string) => void;
+  viewNodeOnMap: (nodeId: string) => void;
 }
 
 export const OverlaysContext = createContext<Overlays | null>(null);

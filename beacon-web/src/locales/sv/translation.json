@@ -222,6 +222,7 @@
     "notFound": "Noden hittades inte",
     "copyPublicKey": "Kopiera publik nyckel",
     "viewObserver": "Visa observatör →",
+    "viewOnMap": "Visa på kartan →",
     "addAsContact": "Lägg till som kontakt",
     "contactQrLabel": "MeshCore-kontakt QR-kod",
     "neighbors": "Grannar",
