@@ -905,6 +905,8 @@ definitions:
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RadioPreset:
     properties:
+      codingRate:
+        type: integer
       count:
         description: number of observers or nodes on this preset in this IATA
         type: integer
@@ -915,6 +917,12 @@ definitions:
         type: string
       sourceType:
         description: '"observer" or "node"'
+        type: string
+      suggestedTitle:
+        description: |-
+          SuggestedTitle is the MeshCore suggested-settings title, set only for a confident
+          catalogue match. Absent when the match is ambiguous or unknown — callers keep the
+          raw preset label. CodingRate is known for observer-sourced rows; node rows omit it.
         type: string
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RawHop:
@@ -943,7 +951,13 @@ definitions:
         type: array
       id:
         type: integer
+      isRoot:
+        description: deployment root scope for the no-filter state
+        type: boolean
       name:
+        type: string
+      shortCode:
+        description: compact display code e.g. "SWE"
         type: string
       slug:
         description: URL-safe identifier e.g. "western-canada"
@@ -956,7 +970,13 @@ definitions:
     properties:
       id:
         type: integer
+      isRoot:
+        description: deployment root scope for the no-filter state
+        type: boolean
       name:
+        type: string
+      shortCode:
+        description: compact display code e.g. "SWE"
         type: string
       slug:
         description: URL-safe identifier e.g. "western-canada"
@@ -974,6 +994,16 @@ definitions:
         type: array
       snr:
         type: number
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite:
+    properties:
+      confidence:
+        description: '"high", "ambiguous", or "none"'
+        type: string
+      nodeId:
+        type: string
+      nodeName:
+        type: string
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedNode:
     properties:
@@ -1175,6 +1205,11 @@ definitions:
         description: hops from the most complete observation
         items:
           type: string
+        type: array
+      resolvedPath:
+        description: global resolution of PathHashes, index-aligned
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite'
         type: array
       snrValues:
         description: SNR per hop from the most complete observation

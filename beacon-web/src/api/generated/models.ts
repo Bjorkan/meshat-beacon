@@ -63,9 +63,9 @@ export type PacketTransportCodes = { regionCode?: number; subRegionCode?: number
 
 export type PageAdvertObservation = { hasMore?: boolean; items?: Array<AdvertObservation>; nextCursor?: number; nextPageToken?: string; };
 
-export type PageChannelSummary = { hasMore?: boolean; items?: Array<ChannelSummary>; nextCursor?: number; nextPageToken?: string; };
-
 export type PageChannelMessage = { hasMore?: boolean; items?: Array<ChannelMessage>; nextCursor?: number; nextPageToken?: string; };
+
+export type PageChannelSummary = { hasMore?: boolean; items?: Array<ChannelSummary>; nextCursor?: number; nextPageToken?: string; };
 
 export type PageKnownRoute = { hasMore?: boolean; items?: Array<KnownRoute>; nextCursor?: number; nextPageToken?: string; };
 
@@ -79,13 +79,13 @@ export type PagePacketSummary = { hasMore?: boolean; items?: Array<PacketSummary
 
 export type PayloadBreakdownItem = { count?: number; payloadType?: number; payloadTypeName?: string; };
 
-export type RadioPreset = { count?: number; iata?: string; preset?: string; sourceType?: string; };
+export type RadioPreset = { codingRate?: number; count?: number; iata?: string; preset?: string; sourceType?: string; suggestedTitle?: string; };
 
 export type RawHop = { hash?: string; snr?: number; };
 
-export type Region = { centerLat?: number; centerLng?: number; description?: string; iatas?: Array<string>; id?: number; name?: string; slug?: string; zoomLevel?: number; };
+export type Region = { centerLat?: number; centerLng?: number; description?: string; iatas?: Array<string>; id?: number; isRoot?: boolean; name?: string; shortCode?: string; slug?: string; zoomLevel?: number; };
 
-export type RegionSummary = { id?: number; name?: string; slug?: string; };
+export type RegionSummary = { id?: number; isRoot?: boolean; name?: string; shortCode?: string; slug?: string; };
 
 export type ResolvedHop = { confidence?: string; nodes?: Array<ResolvedNode>; snr?: number; };
 
