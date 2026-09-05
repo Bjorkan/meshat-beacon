@@ -67,7 +67,7 @@ export function LivePacketFeed({
         onClick={() => setPanelOpen(true)}
         aria-label={t('map.showLivePackets')}
         title={t('map.showLivePackets')}
-        className="relative flex shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
+        className="relative ml-auto flex w-fit max-w-full shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden>
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" />
@@ -81,7 +81,7 @@ export function LivePacketFeed({
   return (
     <section
       aria-label={t('map.livePackets')}
-      className="relative min-w-0 w-[360px] max-w-full overflow-hidden rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
+      className="relative ml-auto max-h-full min-w-0 w-[360px] max-w-full overflow-y-auto rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
     >
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-1.5">
         <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
