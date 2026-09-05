@@ -14,6 +14,7 @@ import type {
   TraceDetail,
 } from '../types/api';
 import type { ChannelSummary, ChannelMessage } from '../features/channels/types';
+import type { CoverageResponse } from '../features/map/coverage';
 import type { ObserverSummary, Observer, AdvertObservation } from '../features/observers/types';
 import type { NodeSummary, Node, NodeObservation, NodeNeighbor } from '../features/nodes/types';
 import type {
@@ -37,6 +38,7 @@ import {
   rawGetBrokers,
   rawGetChannels,
   rawGetChannelsChannelIDMessages,
+  rawGetCoverage,
   rawGetIatas,
   rawGetNodes,
   rawGetNodesNodeId,
@@ -165,6 +167,15 @@ export function getRegions(): Promise<RegionSummary[]> {
 
 export function getRegion(regionId: number): Promise<Region> {
   return rawGetRegionsRegionId({ regionId }) as Promise<Region>;
+}
+
+export function getCoverage(bbox: [number, number, number, number]): Promise<CoverageResponse> {
+  return rawGetCoverage({
+    minLat: bbox[0],
+    minLon: bbox[1],
+    maxLat: bbox[2],
+    maxLon: bbox[3],
+  }) as Promise<CoverageResponse>;
 }
 
 // /channels only honors a singular `iata`, so a one-IATA region goes through it; multi-IATA regions
