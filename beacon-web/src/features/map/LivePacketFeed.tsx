@@ -8,7 +8,7 @@ import { payloadTypeVariant } from '../../components/badge-utils';
 import { useWsPacketHandler } from '../../hooks/useWsHandlers';
 import type { WsPacketObservation } from '../../types/ws';
 import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
-import { livePacketEntry, pushLivePacket, type LivePacketEntry } from './live-packet-feed';
+import { livePacketEntry, pushLivePacket, buildLiveFlowCandidate, type LivePacketEntry } from './live-packet-feed';
 import { packetFlowColor } from './packet-flow-colors';
 
 interface LivePacketFeedProps {
@@ -37,6 +37,8 @@ export function LivePacketFeed({
     (data: WsPacketObservation['data']) => {
       if (!active) return;
       if (selectedIatas?.length && !selectedIatas.includes(data.observation.iata)) return;
+      // Same renderability gate as the map animation: ineligible packets never enter the feed.
+      if (!buildLiveFlowCandidate(data.observation)) return;
       setFeed((current) => ({
         key: resetKey,
         entries: pushLivePacket(
