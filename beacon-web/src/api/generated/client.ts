@@ -42,6 +42,10 @@ export async function rawGetChannelsChannelIDMessages(params: { channelID: numbe
   return request<Models.PageChannelMessage>(`/channels/${encodeURIComponent(String(params.channelID))}/messages`, { "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
 }
 
+export async function rawGetCoverage(params: { minLat?: number; minLon?: number; maxLat?: number; maxLon?: number; }): Promise<Models.CoverageResponse> {
+  return request<Models.CoverageResponse>("/coverage", { "minLat": params.minLat, "minLon": params.minLon, "maxLat": params.maxLat, "maxLon": params.maxLon });
+}
+
 export async function rawGetIatas(): Promise<Array<Models.IATA>> {
   return request<Array<Models.IATA>>("/iatas", undefined);
 }

@@ -26,6 +26,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/iatadb"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
+	"github.com/MeshCore-Beacon/beacon-server/internal/meshmapper"
 	"github.com/MeshCore-Beacon/beacon-server/internal/presence"
 	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
@@ -270,8 +271,19 @@ func main() {
 	})
 	go scheduler.Start(ctx)
 
+	// ── MeshMapper coverage provider (optional, server-side only) ────────────────
+	// Key comes from the MESH_MAPPER_COVERAGE_API_KEY env var and never leaves the
+	// server: it is only used for upstream fetches, never logged or returned.
+	// Empty key disables the provider; /coverage then reports disabled:true.
+	coverageProvider := meshmapper.New(getEnv("MESH_MAPPER_COVERAGE_API_KEY"), "SWE")
+	if enabled, cells, age := coverageProvider.Status(); enabled {
+		log.Printf("coverage: MeshMapper provider enabled (%d cached cells, age %s)", cells, age)
+	} else {
+		log.Printf("coverage: MeshMapper provider disabled (no API key configured)")
+	}
+
 	// ── HTTP server ──────────────────────────────────────────────────────────
-	r := router.New(h, reader, []*ingest.Worker{broker1, broker2}, resolved.MaxConnsPerIP, cfg.CORS)
+	r := router.New(h, reader, []*ingest.Worker{broker1, broker2}, resolved.MaxConnsPerIP, cfg.CORS, coverageProvider)
 
 	srv := &http.Server{
 		Addr:    addr,

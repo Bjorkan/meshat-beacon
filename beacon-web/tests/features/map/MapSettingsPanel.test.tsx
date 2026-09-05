@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import { MapSettingsPanel } from '../../../src/features/map/MapSettingsPanel';
 
 const baseProps = {
@@ -12,6 +12,9 @@ const baseProps = {
   onNeighborLinesChange: vi.fn(),
   borders: true,
   onBordersChange: vi.fn(),
+  coverage: 'off' as const,
+  onCoverageChange: vi.fn(),
+  coverageAvailable: true,
   buildShareParams: () => ({}),
 };
 
@@ -49,5 +52,20 @@ describe('MapSettingsPanel Live presentation', () => {
 
     rerender(<MapSettingsPanel {...baseProps} liveMode neighborLines="off" />);
     expect(screen.queryByText(/Live hides the ambient neighbor mesh/i)).not.toBeInTheDocument();
+  });
+});
+
+describe('MapSettingsPanel coverage', () => {
+  it('offers off/quality/ping-age choices and reports the selection', () => {
+    const onCoverageChange = vi.fn();
+    render(<MapSettingsPanel {...baseProps} onCoverageChange={onCoverageChange} />);
+    const group = screen.getByRole('group', { name: 'Coverage' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Quality' }));
+    expect(onCoverageChange).toHaveBeenCalledWith('effective');
+  });
+
+  it('notes when no coverage key is configured', () => {
+    render(<MapSettingsPanel {...baseProps} coverageAvailable={false} />);
+    expect(screen.getByText(/No coverage key configured/i)).toBeInTheDocument();
   });
 });

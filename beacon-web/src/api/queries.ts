@@ -16,6 +16,7 @@ import {
   getChannels,
   getChannelMessagesPage,
   getClockDrift,
+  getCoverage,
   getIatas,
   getIataBorder,
   getNode,
@@ -138,6 +139,14 @@ export const brokerQueries = {
       queryFn: getBrokers,
       staleTime: 60_000,
     }),
+};
+
+// ── MeshMapper coverage grid ─────────────────────────────────────────────────────────────
+// Query key is the snapped viewport bbox; the hook owns snapping so small pans reuse cache.
+
+export const coverageQueries = {
+  all: () => ['coverage'] as const,
+  fetch: (bbox: [number, number, number, number]) => getCoverage(bbox),
 };
 
 // ── nodes ────────────────────────────────────────────────────────────────────────────────────

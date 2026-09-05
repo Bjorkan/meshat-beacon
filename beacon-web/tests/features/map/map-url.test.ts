@@ -95,6 +95,14 @@ describe('parseMapView', () => {
     expect(parseMapView(new URLSearchParams('borders=x'))).toEqual({});
   });
 
+  it('reads the coverage mode, dropping invalid values', () => {
+    expect(parseMapView(new URLSearchParams('coverage=effective'))).toEqual({
+      coverage: 'effective',
+    });
+    expect(parseMapView(new URLSearchParams('coverage=age'))).toEqual({ coverage: 'age' });
+    expect(parseMapView(new URLSearchParams('coverage=x'))).toEqual({});
+  });
+
   it('combines every param into one view', () => {
     const params = new URLSearchParams(
       'lat=53.31&lng=-113.58&zoom=9&clustering=off&node_type=repeater&neighbor_lines=on&flow=on&borders=on',
@@ -118,9 +126,9 @@ describe('buildMapParams', () => {
     clustered: false,
     nodeType: 'repeater',
     neighborLines: 'on',
-    styleId: 'liberty',
     flow: true,
     borders: true,
+    coverage: 'effective',
   };
 
   it('emits every managed key with rounded camera values', () => {
@@ -134,6 +142,7 @@ describe('buildMapParams', () => {
       style: null,
       flow: 'on',
       borders: 'on',
+      coverage: 'effective',
     });
   });
 
@@ -151,7 +160,12 @@ describe('buildMapParams', () => {
       neighborLines: 'on',
       flow: true,
       borders: true,
+      coverage: 'effective',
     });
+  });
+
+  it('omits the coverage key when off', () => {
+    expect(buildMapParams({ ...snapshot, coverage: 'off' }).coverage).toBeNull();
   });
 
   it('round-trips an All-node-type snapshot (no node_type key survives)', () => {

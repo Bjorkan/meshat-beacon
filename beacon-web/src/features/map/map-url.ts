@@ -2,6 +2,7 @@
 // region-selection.ts pattern. Inbound parsing is lenient — any invalid/unknown value is dropped so a
 // malformed link degrades to the normal view rather than breaking.
 import { type NeighborLinesMode } from './types';
+import { type CoverageMode } from './coverage';
 import { NODE_TYPE_NAMES } from '../../lib/node-types';
 
 // A parsed view carries only the fields whose params were present AND valid.
@@ -13,6 +14,7 @@ export interface ParsedMapView {
   neighborLines?: NeighborLinesMode;
   flow?: boolean;
   borders?: boolean;
+  coverage?: CoverageMode;
 }
 
 // The live map state a copy-link snapshot is built from (every field concrete).
@@ -24,9 +26,11 @@ export interface MapViewSnapshot {
   neighborLines: NeighborLinesMode;
   flow: boolean;
   borders: boolean;
+  coverage: CoverageMode;
 }
 
 const NEIGHBOR_MODES: NeighborLinesMode[] = ['on', 'selected', 'off'];
+const COVERAGE_MODES: CoverageMode[] = ['off', 'effective', 'age'];
 
 function parseCoord(lat: string | null, lng: string | null): [number, number] | undefined {
   if (lat === null || lng === null) return undefined;
@@ -94,6 +98,11 @@ function parseMapViewValues(get: (key: string) => string | null): ParsedMapView 
   const borders = parseBool(get('borders'));
   if (borders !== undefined) view.borders = borders;
 
+  const coverage = get('coverage')?.toLowerCase();
+  if (coverage && COVERAGE_MODES.includes(coverage as CoverageMode)) {
+    view.coverage = coverage as CoverageMode;
+  }
+
   return view;
 }
 
@@ -118,5 +127,6 @@ export function buildMapParams(view: MapViewSnapshot): Record<string, string | n
     style: null,
     flow: view.flow ? 'on' : 'off',
     borders: view.borders ? 'on' : 'off',
+    coverage: view.coverage === 'off' ? null : view.coverage,
   };
 }

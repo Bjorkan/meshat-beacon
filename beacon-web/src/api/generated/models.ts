@@ -11,6 +11,12 @@ export type ChannelSummary = { channelHash?: string; id?: number; isHashtag?: bo
 
 export type ClockDriftEntry = { clockCheckedAt?: number; clockDriftSeconds?: number; iatas?: Array<NodeIATA>; nodeId?: string; nodeName?: string; nodeType?: number; nodeTypeName?: string; };
 
+export type CoverageCell = { bounds?: CoverageCellBounds; count?: number; coverageType?: string; effective?: number; firstSeen?: number; gridId?: string; snr?: number; snrMax?: number; snrMin?: number; statusMask?: number; timestamp?: number; };
+
+export type CoverageCellBounds = { east?: number; north?: number; south?: number; west?: number; };
+
+export type CoverageResponse = { cached?: boolean; cells?: Array<CoverageCell>; disabled?: boolean; generatedAt?: number; pingAgeSeconds?: number; pointCount?: number; region?: string; totalSquares?: number; typeCounts?: Record<string, number>; upstreamFresh?: boolean; };
+
 export type CrossIATAHop = { fromIata?: string; fromNode?: ResolvedNode; lastSeen?: number; toIata?: string; toNode?: ResolvedNode; };
 
 export type CrossIATARoute = { crossHop?: CrossIATAHop; sourceSegment?: Array<RouteHop>; targetSegment?: Array<RouteHop>; totalHops?: number; };

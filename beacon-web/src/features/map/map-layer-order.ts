@@ -1,5 +1,6 @@
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import {
+  COVERAGE_FILL_LAYER_ID,
   FOCUSED_NEIGHBORS_LAYER_ID,
   FOCUSED_NEIGHBORS_BASE_LAYER_ID,
   FOCUSED_SELECTED_BACKDROP_LAYER_ID,
@@ -25,6 +26,7 @@ import {
 // switch, so creation-time `beforeId` alone is not enough: moving every layer that currently exists
 // makes the final order deterministic regardless of which hook restored its layer last.
 export const MAP_OVERLAY_LAYER_ORDER = [
+  COVERAGE_FILL_LAYER_ID,
   IATA_BORDERS_LINE_LAYER_ID,
   NEIGHBORS_LINE_LAYER_ID,
   NODES_GLOW_LAYER_ID,

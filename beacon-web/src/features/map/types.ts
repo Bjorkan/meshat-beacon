@@ -133,6 +133,11 @@ export const IATA_BORDERS_SOURCE_ID = 'iata-borders';
 export const IATA_BORDERS_LINE_LAYER_ID = 'iata-borders-line'; // outline stroke beneath the markers
 export const MAP_BORDERS_STORAGE_KEY = 'beacon-map-borders';
 
+// --- MeshMapper coverage grid layer ---
+export const COVERAGE_SOURCE_ID = 'coverage';
+export const COVERAGE_FILL_LAYER_ID = 'coverage-fill';
+export const MAP_COVERAGE_STORAGE_KEY = 'beacon-map-coverage';
+
 // --- Live packet-flow: useMapNodes renders the network as uniform uncluttered dots, then each
 // observed packet shoots an orange dot along its real hop path with a fading dashed trail/glow. ---
 export const PACKET_FLOW_TRAIL_SOURCE_ID = 'packet-flow-trail';

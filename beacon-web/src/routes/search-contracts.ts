@@ -91,6 +91,7 @@ export interface MapSearch {
   neighbor_lines?: 'on' | 'selected' | 'off';
   flow?: boolean;
   borders?: boolean;
+  coverage?: 'off' | 'effective' | 'age';
 }
 
 export function validateMapSearch(search: Record<string, unknown>): MapSearch {
@@ -105,6 +106,7 @@ export function validateMapSearch(search: Record<string, unknown>): MapSearch {
     neighbor_lines: mapView.neighborLines,
     flow: mapView.flow,
     borders: mapView.borders,
+    coverage: mapView.coverage,
   };
 }
 

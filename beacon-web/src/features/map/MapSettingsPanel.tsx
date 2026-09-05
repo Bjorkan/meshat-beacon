@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from './SegmentedControl';
 import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
+import type { CoverageMode } from './coverage';
 import { Section } from '../../components/DetailPanel';
 import { CopyLinkButton } from '../../components/CopyLinkButton';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -65,6 +66,9 @@ interface MapSettingsPanelProps {
   onNeighborLinesChange: (mode: NeighborLinesMode) => void;
   borders: boolean;
   onBordersChange: (on: boolean) => void;
+  coverage: CoverageMode;
+  onCoverageChange: (mode: CoverageMode) => void;
+  coverageAvailable: boolean;
   // builds deep-link params for the current view, evaluated at copy time (reads the live camera)
   buildShareParams: () => Record<string, string | null>;
 }
@@ -79,6 +83,9 @@ export function MapSettingsPanel({
   onNeighborLinesChange,
   borders,
   onBordersChange,
+  coverage,
+  onCoverageChange,
+  coverageAvailable,
   buildShareParams,
 }: MapSettingsPanelProps) {
   const { t } = useTranslation();
@@ -92,6 +99,11 @@ export function MapSettingsPanel({
     { value: 'on', label: t('map.on') },
     { value: 'selected', label: t('map.selected') },
     { value: 'off', label: t('map.off') },
+  ];
+  const coverageOptions = [
+    { value: 'off', label: t('map.off') },
+    { value: 'effective', label: t('map.coverageEffective') },
+    { value: 'age', label: t('map.coverageAge') },
   ];
   // collapsed by default on mobile (the card would cover the map); a saved preference still wins
   const [open, setOpen] = useState(() => {
@@ -190,6 +202,25 @@ export function MapSettingsPanel({
               className="w-full"
             />
             {borders && <BorderLegend />}
+          </Section>
+          <Section title={t('map.coverage')}>
+            <SegmentedControl
+              ariaLabel={t('map.coverage')}
+              options={coverageOptions}
+              value={coverage}
+              onChange={(v) => onCoverageChange(v as CoverageMode)}
+              className="w-full"
+            />
+            {!coverageAvailable && (
+              <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+                {t('map.coverageUnavailable')}
+              </div>
+            )}
+            {coverage !== 'off' && coverageAvailable && (
+              <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+                {t(coverage === 'effective' ? 'map.coverageEffectiveHint' : 'map.coverageAgeHint')}
+              </div>
+            )}
           </Section>
           <div className="px-3 py-2.5 border-t border-border-subtle flex justify-end">
             <CopyLinkButton

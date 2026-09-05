@@ -23,9 +23,13 @@ import {
   type NeighborEdgeProps,
 } from './node-geojson';
 import { MapSettingsPanel } from './MapSettingsPanel';
+import type { CoverageMode } from './coverage';
+import { useMapCoverage } from './useMapCoverage';
+import { useMapCoverageLayer } from './useMapCoverageLayer';
 import { buildMapParams, type MapViewSnapshot, type ParsedMapView } from './map-url';
 import {
   MAP_BORDERS_STORAGE_KEY,
+  MAP_COVERAGE_STORAGE_KEY,
   mapStyleForTheme,
   resolveMapStyle,
   MAP_NEIGHBOR_LINES_STORAGE_KEY,
@@ -108,6 +112,18 @@ export function MapView({
   const handleBordersChange = useCallback((on: boolean) => {
     setBorders(on);
     localStorage.setItem(MAP_BORDERS_STORAGE_KEY, on ? 'on' : 'off');
+  }, []);
+
+  // MeshMapper coverage grid: off by default (heavy layer); seeded URL -> localStorage.
+  const [coverage, setCoverage] = useState<CoverageMode>(
+    () =>
+      urlView.coverage ??
+      (localStorage.getItem(MAP_COVERAGE_STORAGE_KEY) as CoverageMode | null) ??
+      'off',
+  );
+  const handleCoverageChange = useCallback((mode: CoverageMode) => {
+    setCoverage(mode);
+    localStorage.setItem(MAP_COVERAGE_STORAGE_KEY, mode);
   }, []);
 
   // A deep-link camera opens the map here and suppresses the initial region fit (see useMapLibre).
@@ -271,9 +287,34 @@ export function MapView({
 
       flow: packetFlow,
       borders,
+      coverage,
     };
     return buildMapParams(snapshot);
-  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders]);
+  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders, coverage]);
+
+  // MeshMapper coverage grid for the current viewport. Bbox follows the live camera
+  // (debounced inside the hook's key rounding); the layer draws beneath nodes/markers.
+  const [viewportBbox, setViewportBbox] = useState<[number, number, number, number] | null>(null);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady || coverage === 'off') return;
+    const update = () => {
+      try {
+        const b = map.getBounds();
+        setViewportBbox([b.getSouth(), b.getWest(), b.getNorth(), b.getEast()]);
+      } catch {
+        // style not ready
+      }
+    };
+    update();
+    map.on('moveend', update);
+    return () => {
+      map.off('moveend', update);
+    };
+  }, [mapRef, isReady, coverage]);
+  const coverageQuery = useMapCoverage(viewportBbox, coverage !== 'off');
+  const coverageCells = useMemo(() => coverageQuery.data?.cells ?? [], [coverageQuery.data]);
+  const coverageAvailable = coverageQuery.data != null || coverageQuery.isLoading;
 
   useMapNodes(
     mapRef,
@@ -297,6 +338,7 @@ export function MapView({
     onSelectNode,
   );
   useMapBorders(mapRef, isReady, borderData, mapThemeKey);
+  useMapCoverageLayer(mapRef, isReady, coverageCells, coverage, mapThemeKey);
   useMapPacketFlow(mapRef, isReady, packetFlow, wsManager, mapThemeKey, regionKey);
 
   return (
@@ -320,6 +362,9 @@ export function MapView({
             onNeighborLinesChange={handleNeighborLinesChange}
             borders={borders}
             onBordersChange={handleBordersChange}
+            coverage={coverage}
+            onCoverageChange={handleCoverageChange}
+            coverageAvailable={coverageAvailable}
             buildShareParams={buildShareParams}
           />
         </div>

@@ -229,6 +229,57 @@ const docTemplate = `{
                 }
             }
         },
+        "/coverage": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Coverage"
+                ],
+                "summary": "MeshMapper coverage grid (effective quality + ping age)",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "Viewport south edge",
+                        "name": "minLat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Viewport west edge",
+                        "name": "minLon",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Viewport north edge",
+                        "name": "maxLat",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "description": "Viewport east edge",
+                        "name": "maxLon",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageResponse"
+                        }
+                    },
+                    "502": {
+                        "description": "Bad Gateway",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/iatas": {
             "get": {
                 "produces": [
@@ -2543,6 +2594,110 @@ const docTemplate = `{
                 },
                 "nodeTypeName": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageCell": {
+            "type": "object",
+            "properties": {
+                "bounds": {
+                    "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageCellBounds"
+                },
+                "count": {
+                    "description": "pings aggregated (confidence)",
+                    "type": "integer"
+                },
+                "coverageType": {
+                    "description": "BIDIR/TX/RX/DISC/DEAD/DROP",
+                    "type": "string"
+                },
+                "effective": {
+                    "description": "0-3 average quality",
+                    "type": "number"
+                },
+                "firstSeen": {
+                    "description": "oldest ping, epoch s",
+                    "type": "integer"
+                },
+                "gridId": {
+                    "type": "string"
+                },
+                "snr": {
+                    "type": "number"
+                },
+                "snrMax": {
+                    "type": "number"
+                },
+                "snrMin": {
+                    "type": "number"
+                },
+                "statusMask": {
+                    "type": "integer"
+                },
+                "timestamp": {
+                    "description": "dominant (newest) ping, epoch s",
+                    "type": "integer"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageCellBounds": {
+            "type": "object",
+            "properties": {
+                "east": {
+                    "type": "number"
+                },
+                "north": {
+                    "type": "number"
+                },
+                "south": {
+                    "type": "number"
+                },
+                "west": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageResponse": {
+            "type": "object",
+            "properties": {
+                "cached": {
+                    "description": "true when served from Beacon's cache",
+                    "type": "boolean"
+                },
+                "cells": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.CoverageCell"
+                    }
+                },
+                "disabled": {
+                    "description": "true when no key configured",
+                    "type": "boolean"
+                },
+                "generatedAt": {
+                    "description": "epoch ms, when Beacon fetched upstream",
+                    "type": "integer"
+                },
+                "pingAgeSeconds": {
+                    "type": "integer"
+                },
+                "pointCount": {
+                    "type": "integer"
+                },
+                "region": {
+                    "type": "string"
+                },
+                "totalSquares": {
+                    "type": "integer"
+                },
+                "typeCounts": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "integer"
+                    }
+                },
+                "upstreamFresh": {
+                    "type": "boolean"
                 }
             }
         },

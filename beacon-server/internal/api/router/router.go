@@ -20,6 +20,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/config"
 	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
+	"github.com/MeshCore-Beacon/beacon-server/internal/meshmapper"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ws"
 	httpSwagger "github.com/swaggo/http-swagger"
 )
@@ -38,10 +39,11 @@ import (
 //	  /iatas           → iatas subrouter
 //	  /regions         → regions subrouter
 //	  /stats           → stats subrouter
+//	  /coverage        → coverage subrouter (MeshMapper-backed, optional)
 //
 // The private group is stubbed and ready for the auth middleware drop-in
 // described in Future Features → Admin authentication.
-func New(h *hub.Hub, reader api.Reader, workers []*ingest.Worker, maxConnsPerIP int, corsCfg config.CORSConfig) http.Handler {
+func New(h *hub.Hub, reader api.Reader, workers []*ingest.Worker, maxConnsPerIP int, corsCfg config.CORSConfig, coverage *meshmapper.Provider) http.Handler {
 	r := chi.NewRouter()
 
 	// ── CORS ─────────────────────────────────────────────────────────────────
@@ -105,6 +107,7 @@ func New(h *hub.Hub, reader api.Reader, workers []*ingest.Worker, maxConnsPerIP 
 			r.Mount("/scopes", handlers.ScopesRouter(reader))
 			r.Mount("/stats", handlers.StatsRouter(reader))
 			r.Mount("/traces", handlers.TracesRouter(reader))
+			r.Mount("/coverage", handlers.CoverageRouter(coverage))
 		})
 
 		// Private group — auth middleware applied.
