@@ -56,6 +56,8 @@ export function labelSize(degree: number, maxDegree: number): number {
 
 // Keep the top-`cap` most-connected nodes and their internal edges. Unlike the map's edge builder we
 // do NOT require coordinates — the graph is non-geographic, so unlocated nodes belong here too.
+// Full-graph invariant: every rendered node participates in at least one rendered edge. Retained
+// degree/sizing/labels are derived from the displayed edges, not the stored knownNeighborCount.
 export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): NeighbourGraph {
   const total = nodes.length;
   // rank by neighbour count, id tie-break so the kept set + indices are stable across re-renders
@@ -68,39 +70,64 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
 
   const indexById = new Map<string, number>();
   kept.forEach((n, i) => indexById.set(n.id, i));
-  const maxDegree = kept.reduce((m, n) => Math.max(m, n.knownNeighborCount), 0);
 
-  const graphNodes: GraphNode[] = kept.map((n, i) => {
+  const seen = new Set<string>();
+  const keptLinks: [string, string][] = [];
+  for (const n of kept) {
+    if (!n.neighborIds) continue;
+    for (const otherId of n.neighborIds) {
+      if (otherId === n.id) continue; // no self-loops
+      if (!indexById.has(otherId)) continue; // skip edges to capped-out / foreign nodes
+      const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
+      if (seen.has(key)) continue; // undirected — one line per pair
+      seen.add(key);
+      keptLinks.push([n.id, otherId]);
+    }
+  }
+
+  // Retained degree from displayed edges only; isolates (stored count > 0 but no visible edge)
+  // are phantom dots — drop them so every rendered node has degree > 0.
+  const retainedDegree = new Map<string, number>();
+  for (const [a, b] of keptLinks) {
+    retainedDegree.set(a, (retainedDegree.get(a) ?? 0) + 1);
+    retainedDegree.set(b, (retainedDegree.get(b) ?? 0) + 1);
+  }
+  const participants = kept.filter((n) => (retainedDegree.get(n.id) ?? 0) > 0);
+
+  const participantIndex = new Map<string, number>();
+  participants.forEach((n, i) => participantIndex.set(n.id, i));
+  const maxDegree = participants.reduce((m, n) => Math.max(m, retainedDegree.get(n.id) ?? 0), 0);
+
+  const labelIds = new Set(
+    [...participants]
+      .sort(
+        (a, b) =>
+          (retainedDegree.get(b.id) ?? 0) - (retainedDegree.get(a.id) ?? 0) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+      .slice(0, HUB_LABELS)
+      .map((n) => n.id),
+  );
+  const graphNodes: GraphNode[] = participants.map((n) => {
     const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(n.nodeTypeName);
+    const degree = retainedDegree.get(n.id) ?? 0;
     return {
       id: n.id,
       name: n.name ?? n.id.slice(0, 6),
       category: cat === -1 ? OTHER_CATEGORY : cat,
       nodeTypeName: n.nodeTypeName,
-      degree: n.knownNeighborCount,
-      symbolSize: symbolSize(n.knownNeighborCount, maxDegree),
-      label:
-        i < HUB_LABELS && n.knownNeighborCount > 0
-          ? { show: true, fontSize: labelSize(n.knownNeighborCount, maxDegree) }
-          : undefined,
+      degree,
+      symbolSize: symbolSize(degree, maxDegree),
+      label: labelIds.has(n.id)
+        ? { show: true, fontSize: labelSize(degree, maxDegree) }
+        : undefined,
     };
   });
 
-  const seen = new Set<string>();
-  const links: GraphLink[] = [];
-  for (const n of kept) {
-    if (!n.neighborIds) continue;
-    const from = indexById.get(n.id)!;
-    for (const otherId of n.neighborIds) {
-      if (otherId === n.id) continue; // no self-loops
-      const to = indexById.get(otherId);
-      if (to === undefined) continue; // skip edges to capped-out / foreign nodes
-      const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
-      if (seen.has(key)) continue; // undirected — one line per pair
-      seen.add(key);
-      links.push({ source: from, target: to });
-    }
-  }
+  const links: GraphLink[] = keptLinks.map(([a, b]) => ({
+    source: participantIndex.get(a)!,
+    target: participantIndex.get(b)!,
+  }));
 
   return { nodes: graphNodes, links, total, capped };
 }

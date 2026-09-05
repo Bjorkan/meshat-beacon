@@ -53,18 +53,29 @@ describe('buildNeighbourGraph', () => {
     });
   });
 
-  it("includes unlocated nodes (unlike the map's coordinate-gated edges)", () => {
+  it('includes unlocated nodes when they participate in a displayed edge', () => {
+    const g = buildNeighbourGraph(
+      [
+        node({ id: 'a', lat: null, lng: null, neighborIds: ['b'] }),
+        node({ id: 'b', lat: null, lng: null, neighborIds: ['a'] }),
+      ],
+      1000,
+    );
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+  });
+
+  it('drops isolated nodes with no displayed edge', () => {
     const g = buildNeighbourGraph([node({ id: 'a', lat: null, lng: null })], 1000);
-    expect(g.nodes).toHaveLength(1);
-    expect(g.nodes[0]!.id).toBe('a');
+    expect(g.nodes).toEqual([]);
+    expect(g.links).toEqual([]);
   });
 
   it('ranks by neighbour count and keeps only the top `cap`', () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'low', knownNeighborCount: 1 }),
-        node({ id: 'high', knownNeighborCount: 5 }),
-        node({ id: 'mid', knownNeighborCount: 3 }),
+        node({ id: 'low', knownNeighborCount: 1, neighborIds: ['mid'] }),
+        node({ id: 'high', knownNeighborCount: 5, neighborIds: ['mid'] }),
+        node({ id: 'mid', knownNeighborCount: 3, neighborIds: ['high', 'low'] }),
       ],
       2,
     );
@@ -74,14 +85,20 @@ describe('buildNeighbourGraph', () => {
   });
 
   it('is not capped when total <= cap', () => {
-    const g = buildNeighbourGraph([node({ id: 'a' }), node({ id: 'b' })], 5);
+    const g = buildNeighbourGraph(
+      [node({ id: 'a', neighborIds: ['b'] }), node({ id: 'b', neighborIds: ['a'] })],
+      5,
+    );
     expect(g.capped).toBe(false);
     expect(g.total).toBe(2);
   });
 
   it('breaks equal-degree ties by id so indices are deterministic', () => {
     const g = buildNeighbourGraph(
-      [node({ id: 'b', knownNeighborCount: 2 }), node({ id: 'a', knownNeighborCount: 2 })],
+      [
+        node({ id: 'b', knownNeighborCount: 2, neighborIds: ['a'] }),
+        node({ id: 'a', knownNeighborCount: 2, neighborIds: ['b'] }),
+      ],
       5,
     );
     expect(g.nodes.map((n) => n.id)).toEqual(['a', 'b']);
@@ -122,11 +139,11 @@ describe('buildNeighbourGraph', () => {
   it("maps node type to a category index, bucketing unknowns to 'Other'", () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'c', nodeTypeName: 'companion' }),
-        node({ id: 'r', nodeTypeName: 'repeater' }),
-        node({ id: 'rs', nodeTypeName: 'room_server' }),
-        node({ id: 's', nodeTypeName: 'sensor' }),
-        node({ id: 'x', nodeTypeName: 'mystery' }),
+        node({ id: 'c', nodeTypeName: 'companion', neighborIds: ['r'] }),
+        node({ id: 'r', nodeTypeName: 'repeater', neighborIds: ['c', 'rs'] }),
+        node({ id: 'rs', nodeTypeName: 'room_server', neighborIds: ['r', 's'] }),
+        node({ id: 's', nodeTypeName: 'sensor', neighborIds: ['rs', 'x'] }),
+        node({ id: 'x', nodeTypeName: 'mystery', neighborIds: ['s'] }),
       ],
       10,
     );
@@ -134,30 +151,42 @@ describe('buildNeighbourGraph', () => {
     expect(cat).toEqual({ c: 0, r: 1, rs: 2, s: 3, x: 4 });
   });
 
-  it('sizes nodes monotonically by degree, with a floor for degree 0', () => {
+  it('derives size from retained edges and drops degree-0 isolates', () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'hub', knownNeighborCount: 40 }),
-        node({ id: 'mid', knownNeighborCount: 8 }),
-        node({ id: 'leaf', knownNeighborCount: 0 }),
+        node({ id: 'hub', knownNeighborCount: 40, neighborIds: ['mid', 'leaf', 'x1', 'x2'] }),
+        node({ id: 'mid', knownNeighborCount: 8, neighborIds: ['hub'] }),
+        node({ id: 'leaf', knownNeighborCount: 0, neighborIds: ['hub'] }),
+        node({ id: 'x1', knownNeighborCount: 0, neighborIds: ['hub'] }),
+        node({ id: 'x2', knownNeighborCount: 0, neighborIds: ['hub'] }),
+        node({ id: 'isolated', knownNeighborCount: 30, neighborIds: ['missing'] }),
       ],
       10,
     );
+    const ids = g.nodes.map((n) => n.id);
+    expect(ids).not.toContain('isolated');
     const size = Object.fromEntries(g.nodes.map((n) => [n.id, n.symbolSize]));
     expect(size.hub).toBeGreaterThan(size.mid!);
-    expect(size.mid).toBeGreaterThan(size.leaf!);
+    expect(size.mid).toBeGreaterThanOrEqual(size.leaf!);
     expect(size.leaf).toBeGreaterThan(0);
+    const degree = Object.fromEntries(g.nodes.map((n) => [n.id, n.degree]));
+    expect(degree).toEqual({ hub: 4, mid: 1, leaf: 1, x1: 1, x2: 1 });
   });
 
-  it('keeps a node with no neighborIds but contributes no links', () => {
+  it('drops nodes whose only edges point outside the kept set', () => {
     const g = buildNeighbourGraph([node({ id: 'a', neighborIds: undefined })], 5);
-    expect(g.nodes).toHaveLength(1);
+    expect(g.nodes).toEqual([]);
     expect(g.links).toEqual([]);
   });
 
   it('gives busier hubs a larger label font than quieter ones', () => {
     const g = buildNeighbourGraph(
-      [node({ id: 'hub', knownNeighborCount: 40 }), node({ id: 'small', knownNeighborCount: 2 })],
+      [
+        node({ id: 'hub', knownNeighborCount: 40, neighborIds: ['small', 'e1', 'e2'] }),
+        node({ id: 'small', knownNeighborCount: 2, neighborIds: ['hub'] }),
+        node({ id: 'e1', knownNeighborCount: 1, neighborIds: ['hub'] }),
+        node({ id: 'e2', knownNeighborCount: 1, neighborIds: ['hub'] }),
+      ],
       10,
     );
     const hub = g.nodes.find((n) => n.id === 'hub')!;
@@ -165,6 +194,27 @@ describe('buildNeighbourGraph', () => {
     expect(hub.label?.show).toBe(true);
     expect(small.label?.show).toBe(true);
     expect(hub.label!.fontSize!).toBeGreaterThan(small.label!.fontSize!);
+  });
+
+  it('renders only nodes that participate in a displayed edge', () => {
+    const g = buildNeighbourGraph(
+      [
+        node({ id: 'a', knownNeighborCount: 5, neighborIds: ['b'] }),
+        node({ id: 'b', knownNeighborCount: 1, neighborIds: ['a'] }),
+        node({ id: 'phantom', knownNeighborCount: 9, neighborIds: ['missing'] }),
+        node({ id: 'lone', knownNeighborCount: 2 }),
+      ],
+      10,
+    );
+    expect(g.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
+    expect(g.links).toHaveLength(1);
+    const referenced = new Set<number>();
+    for (const l of g.links) {
+      referenced.add(l.source);
+      referenced.add(l.target);
+    }
+    expect([...referenced].sort()).toEqual(g.nodes.map((_, i) => i));
+    for (const n of g.nodes) expect(n.degree).toBeGreaterThan(0);
   });
 });
 
