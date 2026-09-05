@@ -9,11 +9,13 @@ export function NodeDetailOverlay({
   onClose,
   onViewObserver,
   onViewNode,
+  onViewOnMap,
 }: {
   nodeId: string;
   onClose: () => void;
   onViewObserver: (observerId: string) => void;
   onViewNode?: (nodeId: string) => void;
+  onViewOnMap?: (nodeId: string) => void;
 }) {
   const { t } = useTranslation();
   return (
@@ -23,6 +25,7 @@ export function NodeDetailOverlay({
         onClose={onClose}
         onViewObserver={onViewObserver}
         onViewNode={onViewNode}
+        onViewOnMap={onViewOnMap}
       />
     </ModalOverlay>
   );

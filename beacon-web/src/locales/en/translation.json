@@ -222,6 +222,7 @@
     "notFound": "Node not found",
     "copyPublicKey": "Copy public key",
     "viewObserver": "View observer →",
+    "viewOnMap": "View on map →",
     "addAsContact": "Add as contact",
     "contactQrLabel": "MeshCore contact QR code",
     "neighbors": "Neighbors",

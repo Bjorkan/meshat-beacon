@@ -103,6 +103,9 @@ interface NodeDetailPanelProps {
   onViewObserver: (observerId: string) => void;
   onViewNode?: (nodeId: string) => void;
   onAnalyzePacket?: (hash: string) => void;
+  // Navigate to /map with this node preselected. Omitted when the panel is already shown on
+  // the map — the node is visible there, so no mini map and no link is rendered.
+  onViewOnMap?: (nodeId: string) => void;
 }
 
 export function NodeDetailPanel({
@@ -111,6 +114,7 @@ export function NodeDetailPanel({
   onViewObserver,
   onViewNode,
   onAnalyzePacket,
+  onViewOnMap,
 }: NodeDetailPanelProps) {
   const { t } = useTranslation();
   const { data: node, isLoading } = useQuery(nodeQueries.detail(nodeId));
@@ -190,16 +194,23 @@ export function NodeDetailPanel({
             )}
           </Section>
 
-          {(hasLocation || node.locationSource) && (
+          {(hasLocation || node.locationSource) && !(hasLocation && !onViewOnMap) && (
             <Section title={t('details.location')}>
-              {hasLocation ? (
+              {hasLocation && onViewOnMap ? (
                 <div className="flex flex-col gap-1.5">
                   <NodeLocationMapLazy node={node} />
-                  {node.locationSource && (
-                    <div className="font-mono text-[11px] text-text-dim">
-                      {t('details.source')}: {node.locationSource}
-                    </div>
-                  )}
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-[13px]">
+                    {node.locationSource && (
+                      <Field label={t('details.source')} value={node.locationSource} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onViewOnMap(node.id)}
+                      className="font-mono text-[11px] text-primary hover:underline"
+                    >
+                      {t('nodes.viewOnMap')}
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">

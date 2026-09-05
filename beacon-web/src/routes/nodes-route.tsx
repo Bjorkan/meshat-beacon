@@ -133,6 +133,12 @@ export function NodeDetailRoute() {
     },
     [navigate],
   );
+  const viewOnMap = useCallback(
+    (id: string) => {
+      navigate({ to: '/map', search: (prev) => ({ ...prev, node: id }) });
+    },
+    [navigate],
+  );
 
   return (
     <NodeDetailPanel
@@ -141,6 +147,7 @@ export function NodeDetailRoute() {
       onViewObserver={overlays.selectObserver}
       onViewNode={selectNode}
       onAnalyzePacket={overlays.setOverlayPacketHash}
+      onViewOnMap={viewOnMap}
     />
   );
 }
