@@ -21,7 +21,7 @@ import {
   presetBarsOption,
 } from './chartOptions';
 import { Card, ChartCard, StatCard } from './cards';
-import { DataTable, type Column } from '../../components/DataTable';
+import { DataTable, type Column, type MobileSortOption } from '../../components/DataTable';
 import { aggregatePresets, formatPreset } from './transforms';
 import type { ObservationPoint, ScopeStats, StatsRange } from './types';
 
@@ -84,6 +84,15 @@ function scopeColumns(t: TFunction): Column<ScopeStats>[] {
       cell: (scope) => formatCount(scope.nodeCount),
       sortValue: (scope) => scope.nodeCount,
     },
+  ];
+}
+
+function scopeMobileSortOptions(t: TFunction): MobileSortOption[] {
+  return [
+    { id: 'most-packets', label: t('sort.mostPackets'), sort: { columnId: 'Packets', direction: 'desc' } },
+    { id: 'most-observers', label: t('sort.mostObservers'), sort: { columnId: 'Observers', direction: 'desc' } },
+    { id: 'most-nodes', label: t('sort.mostNodes'), sort: { columnId: 'Nodes', direction: 'desc' } },
+    { id: 'scope-asc', label: t('sort.scopeAZ'), sort: { columnId: 'Scope', direction: 'asc' } },
   ];
 }
 
@@ -320,6 +329,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
               onSelect={() => {}}
               emptyLabel={t('common.noData')}
               defaultSort={{ header: 'Packets', direction: 'desc' }}
+              mobileSortOptions={scopeMobileSortOptions(t)}
             />
           )}
         </Card>
