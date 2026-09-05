@@ -248,7 +248,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
         isEmpty={obs.length === 0}
       />
 
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-2">
         {/* range-driven charts lead the grid; the all-time ones follow below */}
         <ChartCard
           title={t('stats.topObservers', { range })}
