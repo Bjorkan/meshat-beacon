@@ -222,6 +222,8 @@
     "notFound": "Noden hittades inte",
     "copyPublicKey": "Kopiera publik nyckel",
     "viewObserver": "Visa observatör →",
+    "addAsContact": "Lägg till som kontakt",
+    "contactQrLabel": "MeshCore-kontakt QR-kod",
     "neighbors": "Grannar",
     "neighborsCount": "Grannar ({{count}})",
     "noKnownNeighbors": "Inga kända grannar",

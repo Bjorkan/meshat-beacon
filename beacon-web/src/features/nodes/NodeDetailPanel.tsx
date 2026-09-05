@@ -4,8 +4,10 @@ import { nodeQueries } from '../../api/queries';
 import { Badge } from '../../components/Badge';
 import { DetailPanel, Section, Field } from '../../components/DetailPanel';
 import { CopyButton } from '../../components/CopyButton';
-import { CopyLinkButton } from '../../components/CopyLinkButton';
 import { IataChip } from '../../components/IataChip';
+import { buildMeshcoreContactUri } from './meshcore-contact';
+import { MeshcoreContactQr } from './MeshcoreContactQr';
+import { NodeLocationMapLazy } from './NodeLocationMapLazy';
 import {
   formatHex,
   formatSnr,
@@ -124,13 +126,6 @@ export function NodeDetailPanel({
       title={t('nodes.detail')}
       onClose={onClose}
       collapsible
-      headerAction={
-        <CopyLinkButton
-          to={`/nodes/${encodeURIComponent(nodeId)}`}
-          params={{}}
-          ariaLabel={t('nodes.copyLink')}
-        />
-      }
       isLoading={isLoading}
       notFound={!node}
       notFoundLabel={t('nodes.notFound')}
@@ -143,27 +138,47 @@ export function NodeDetailPanel({
       {node && (
         <>
           <Section title={t('details.summary')} first>
-            <div className="flex items-center gap-2 mb-2">
-              <span
-                className={`font-mono text-xs font-semibold tracking-wider ${node.name ? 'text-primary' : 'text-text-dim italic'}`}
-              >
-                {node.name ?? formatHex(node.id)}
-              </span>
-              <Badge variant="default">{node.nodeTypeName}</Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <div
-                className="font-mono text-[13px] text-text-muted truncate min-w-0 flex-1"
-                title={node.publicKey}
-              >
-                {node.publicKey}
-              </div>
-              <CopyButton
-                value={node.publicKey}
-                ariaLabel={t('nodes.copyPublicKey')}
-                className="shrink-0"
-              />
-            </div>
+            {(() => {
+              const contactUri = buildMeshcoreContactUri(node);
+              return (
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span
+                        className={`font-mono text-xs font-semibold tracking-wider ${node.name ? 'text-primary' : 'text-text-dim italic'}`}
+                      >
+                        {node.name ?? formatHex(node.id)}
+                      </span>
+                      <Badge variant="default">{node.nodeTypeName}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="font-mono text-[13px] text-text-muted truncate min-w-0 flex-1"
+                        title={node.publicKey}
+                      >
+                        {node.publicKey}
+                      </div>
+                      <CopyButton
+                        value={node.publicKey}
+                        ariaLabel={t('nodes.copyPublicKey')}
+                        className="shrink-0"
+                      />
+                    </div>
+                  </div>
+                  {contactUri && (
+                    <div className="flex shrink-0 flex-col items-center gap-1.5">
+                      <MeshcoreContactQr uri={contactUri} label={t('nodes.contactQrLabel')} />
+                      <a
+                        href={contactUri}
+                        className="font-mono text-[11px] text-primary hover:underline"
+                      >
+                        {t('nodes.addAsContact')}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
             {node.observerId && (
               <button
                 type="button"
@@ -177,13 +192,22 @@ export function NodeDetailPanel({
 
           {(hasLocation || node.locationSource) && (
             <Section title={t('details.location')}>
-              <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">
-                {node.lat != null && <Field label="Lat" value={node.lat.toFixed(5)} />}
-                {node.lng != null && <Field label="Lng" value={node.lng.toFixed(5)} />}
-                {node.locationSource && (
-                  <Field label={t('details.source')} value={node.locationSource} />
-                )}
-              </div>
+              {hasLocation ? (
+                <div className="flex flex-col gap-1.5">
+                  <NodeLocationMapLazy node={node} />
+                  {node.locationSource && (
+                    <div className="font-mono text-[11px] text-text-dim">
+                      {t('details.source')}: {node.locationSource}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">
+                  {node.locationSource && (
+                    <Field label={t('details.source')} value={node.locationSource} />
+                  )}
+                </div>
+              )}
             </Section>
           )}
 
