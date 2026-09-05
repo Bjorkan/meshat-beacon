@@ -305,10 +305,11 @@ export function MapView({
           to this element, which overrides Tailwind's `absolute` and would collapse inset-0 to 0
           height. data-dark drives the maplibre control theming in index.css. */}
       <div ref={containerRef} data-dark={isDark} className="flex-1" />
-      {/* Shared responsive top-overlay row: settings + live feed share one flex owner so they can
-          never claim the same physical space. On narrow screens they stack vertically. */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex max-h-[calc(100%-4rem)] flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div className="pointer-events-auto flex min-w-0 max-w-full shrink-0 sm:max-w-[240px]">
+      {/* Top overlays: map settings dock top-left; the live feed docks top-right on wide
+          screens and stacks below settings on narrow ones. Separate absolute slots (not one
+          shared flex row) so each keeps its own anchor and they can never overlap. */}
+      <div className="pointer-events-none absolute inset-x-3 top-3 bottom-16 z-10 sm:inset-x-3">
+        <div className="pointer-events-auto absolute left-0 top-0 flex min-w-0 max-w-[calc(100%-3.5rem)] sm:max-w-[240px]">
           <MapSettingsPanel
             typeFilter={typeFilter}
             onTypeChange={handleTypeChange}
@@ -323,7 +324,7 @@ export function MapView({
           />
         </div>
         {packetFlow && (
-          <div className="pointer-events-auto flex min-w-0 max-w-full justify-end overflow-y-auto sm:max-w-[360px]">
+          <div className="pointer-events-auto absolute right-0 top-0 flex max-h-full min-w-0 max-w-full flex-col overflow-y-auto sm:left-auto sm:top-0 sm:max-w-[360px] max-sm:left-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[45%]">
             <LivePacketFeed
               active={packetFlow}
               resetKey={`${regionKey}:${packetFlowSession}`}

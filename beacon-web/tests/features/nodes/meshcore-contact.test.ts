@@ -5,7 +5,7 @@ import {
   isFullPublicKey,
   isMeshcoreContactType,
 } from '../../../src/features/nodes/meshcore-contact';
-import { qrMatrix } from '../../../src/features/nodes/meshcore-qr';
+import { qrIsDark, qrModuleCount } from '../../../src/features/nodes/meshcore-qr';
 
 const KEY = 'a'.repeat(64);
 
@@ -37,16 +37,30 @@ describe('buildMeshcoreContactUri', () => {
   });
 });
 
-describe('qrMatrix', () => {
+describe('qr encoding', () => {
   it('renders a square matrix with finder patterns for a contact URI', () => {
     const uri = buildMeshcoreContactUri({ name: 'Relay', publicKey: KEY, nodeType: 2 })!;
-    const matrix = qrMatrix(uri);
-    expect(matrix.length).toBeGreaterThanOrEqual(21);
-    expect(matrix.every((row) => row.length === matrix.length)).toBe(true);
+    const size = qrModuleCount(uri);
+    expect(size).toBeGreaterThanOrEqual(21);
+    expect(size % 4).toBe(1); // QR sizes are 21 + 4*(version-1)
     // top-left finder: 7x7 border dark, center 3x3 dark
-    expect(matrix[0]![0]).toBe(true);
-    expect(matrix[0]![6]).toBe(true);
-    expect(matrix[6]![6]).toBe(true);
-    expect(matrix[3]![3]).toBe(true);
+    expect(qrIsDark(uri, 0, 0)).toBe(true);
+    expect(qrIsDark(uri, 0, 6)).toBe(true);
+    expect(qrIsDark(uri, 6, 6)).toBe(true);
+    expect(qrIsDark(uri, 3, 3)).toBe(true);
+    // separator row/col around the finder is light
+    expect(qrIsDark(uri, 7, 0)).toBe(false);
+  });
+
+  it('encodes a real-length contact URI (131 chars) at version 8', () => {
+    const realKey = '52cf732836ee9f4d9e41f7d4ed94a728c6017864c78caa9b552470186467f268';
+    const uri = buildMeshcoreContactUri({
+      name: 'SE1275-TobbeWRepObs1',
+      publicKey: realKey,
+      nodeType: 2,
+    })!;
+    expect(uri.length).toBe(131);
+    // version 8 = 49x49 modules at error correction M
+    expect(qrModuleCount(uri)).toBe(49);
   });
 });
