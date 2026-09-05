@@ -27,6 +27,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
 	"github.com/MeshCore-Beacon/beacon-server/internal/presence"
+	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -111,6 +112,11 @@ func main() {
 	}
 
 	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL)
+
+	// ── MeshCore suggested radio settings (one fetch at startup, fail-open) ──────────────
+	presetCatalogue := radiopreset.Load(ctx, nil)
+	store.SetPresetCatalogue(presetCatalogue)
+	log.Printf("radiopreset: loaded %d suggested radio settings", presetCatalogue.Len())
 
 	// ── Presence write coalescing ────────────────────────────────────────────
 	// Ingest writes go through the coalescer; reads keep using the store.

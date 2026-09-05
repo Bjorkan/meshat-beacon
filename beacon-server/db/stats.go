@@ -7,6 +7,8 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strconv"
+	"strings"
 	"time"
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
@@ -234,14 +236,43 @@ func (s *Store) GetRadioPresets(ctx context.Context, preset string, iatas []stri
 	}
 	items := make([]api.RadioPreset, 0, len(rows))
 	for _, v := range rows {
-		items = append(items, api.RadioPreset{
+		item := api.RadioPreset{
 			Preset:     v.Preset,
 			IATA:       v.Iata,
 			SourceType: v.SourceType,
 			Count:      v.Count,
-		})
+		}
+		if title := s.resolvePresetTitle(v.Preset); title != "" {
+			t := title
+			item.SuggestedTitle = &t
+		}
+		items = append(items, item)
 	}
 	return items, nil
+}
+
+// resolvePresetTitle maps a "freqMhz,bwKhz,sf" preset to a MeshCore suggested-settings title,
+// or "" when the match is ambiguous or unknown. The preset key carries no coding rate, so a
+// title is only claimed when every catalogue candidate for the triple shares one title.
+func (s *Store) resolvePresetTitle(preset string) string {
+	if s.presetCatalogue == nil {
+		return ""
+	}
+	parts := strings.Split(preset, ",")
+	if len(parts) != 3 {
+		return ""
+	}
+	freq, err1 := strconv.ParseFloat(strings.TrimSpace(parts[0]), 64)
+	bw, err2 := strconv.ParseFloat(strings.TrimSpace(parts[1]), 64)
+	sf, err3 := strconv.Atoi(strings.TrimSpace(parts[2]))
+	if err1 != nil || err2 != nil || err3 != nil {
+		return ""
+	}
+	got := s.presetCatalogue.Match(freq, bw, sf, nil)
+	if got.Ambiguous {
+		return ""
+	}
+	return got.Title
 }
 
 func (s *Store) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {

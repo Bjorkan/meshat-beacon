@@ -13,6 +13,7 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/google/uuid"
 
 	"github.com/jackc/pgx/v5/pgtype"
@@ -26,6 +27,13 @@ type Store struct {
 	staleThreshold      time.Duration // see api.NodeSummary.Stale
 	neighborMaxKm       float64       // direct LoRa sanity cap for node_neighbors edges (0 = unlimited)
 	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
+	presetCatalogue     *radiopreset.Catalogue
+}
+
+// SetPresetCatalogue installs the startup-loaded MeshCore suggested-settings catalogue used to
+// resolve radio preset display titles. Nil (or empty) means raw preset labels.
+func (s *Store) SetPresetCatalogue(cat *radiopreset.Catalogue) {
+	s.presetCatalogue = cat
 }
 
 // New creates a Store backed by the given pgxpool connection pool. clockDriftThreshold is

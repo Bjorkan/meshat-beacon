@@ -1,12 +1,23 @@
 import { describe, it, expect } from 'vitest';
-import { aggregatePresets, formatPreset } from '../../../src/features/stats/transforms';
+import {
+  aggregatePresets,
+  formatPreset,
+  presetLabel,
+} from '../../../src/features/stats/transforms';
 import type { RadioPreset } from '../../../src/features/stats/types';
 
-const row = (preset: string, sourceType: string, iata: string, count: number): RadioPreset => ({
+const row = (
+  preset: string,
+  sourceType: string,
+  iata: string,
+  count: number,
+  suggestedTitle?: string,
+): RadioPreset => ({
   preset,
   sourceType,
   iata,
   count,
+  ...(suggestedTitle ? { suggestedTitle } : {}),
 });
 
 describe('aggregatePresets', () => {
@@ -43,6 +54,27 @@ describe('aggregatePresets', () => {
 
   it('handles an empty input', () => {
     expect(aggregatePresets([])).toEqual([]);
+  });
+
+  it('carries a unanimous suggested title and drops conflicting ones', () => {
+    const rows = [
+      row('869.618,62.5,8', 'observer', 'YVR', 3, 'EU/UK (Narrow)'),
+      row('869.618,62.5,8', 'node', 'YVR', 2, 'EU/UK (Narrow)'),
+      row('923.125,62.5,8', 'observer', 'YVR', 1),
+    ];
+    const out = aggregatePresets(rows);
+    expect(out.find((r) => r.preset === '869.618,62.5,8')?.title).toBe('EU/UK (Narrow)');
+    expect(out.find((r) => r.preset === '923.125,62.5,8')?.title).toBeUndefined();
+    expect(presetLabel(out.find((r) => r.preset === '869.618,62.5,8')!)).toBe('EU/UK (Narrow)');
+    expect(presetLabel(out.find((r) => r.preset === '923.125,62.5,8')!)).toBe(
+      '923.125 · 62.5k · SF8',
+    );
+
+    const conflict = aggregatePresets([
+      row('869.618,62.5,8', 'observer', 'YVR', 1, 'A'),
+      row('869.618,62.5,8', 'node', 'YVR', 1, 'B'),
+    ]);
+    expect(conflict[0]?.title).toBeUndefined();
   });
 });
 

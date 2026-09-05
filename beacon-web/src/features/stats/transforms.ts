@@ -1,20 +1,33 @@
 import type { RadioPreset, TelemetryPoint } from './types';
 
 // Collapse presets to one row each (keeping the node/observer split), dropping junk "0,0,0" configs.
+// A confident suggested title is carried through; ambiguous rows keep title undefined so callers
+// fall back to formatPreset.
 export function aggregatePresets(
   rows: RadioPreset[],
-): { preset: string; nodes: number; observers: number }[] {
-  const byPreset = new Map<string, { nodes: number; observers: number }>();
+): { preset: string; nodes: number; observers: number; title?: string }[] {
+  const byPreset = new Map<string, { nodes: number; observers: number; title?: string }>();
   for (const r of rows) {
     if (isJunkPreset(r.preset)) continue;
     const cur = byPreset.get(r.preset) ?? { nodes: 0, observers: 0 };
     if (r.sourceType === 'node') cur.nodes += r.count;
     else cur.observers += r.count;
+    // Titles only survive aggregation when every contributing row agrees; a conflicting or
+    // missing title drops back to the raw label rather than guessing.
+    if (r.suggestedTitle) {
+      if (cur.title === undefined) cur.title = r.suggestedTitle;
+      else if (cur.title !== r.suggestedTitle) cur.title = undefined;
+    }
     byPreset.set(r.preset, cur);
   }
   return [...byPreset.entries()]
     .map(([preset, counts]) => ({ preset, ...counts }))
     .sort((a, b) => b.nodes + b.observers - (a.nodes + a.observers));
+}
+
+// Display label for an aggregated preset row: the suggested title when confident, else raw.
+export function presetLabel(row: { preset: string; title?: string }): string {
+  return row.title ?? formatPreset(row.preset);
 }
 
 function isJunkPreset(preset: string): boolean {

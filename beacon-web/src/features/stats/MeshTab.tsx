@@ -22,7 +22,7 @@ import {
 } from './chartOptions';
 import { Card, ChartCard, StatCard } from './cards';
 import { DataTable, type Column, type MobileSortOption } from '../../components/DataTable';
-import { aggregatePresets, formatPreset } from './transforms';
+import { aggregatePresets, presetLabel } from './transforms';
 import type { ObservationPoint, ScopeStats, StatsRange } from './types';
 
 // The observations endpoint returns one row per hour+iata; collapse to one row per hour (a no-op for a
@@ -190,7 +190,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
     () =>
       aggregatePresets(radioPresets.data ?? [])
         .slice(0, 8)
-        .map((r) => ({ name: formatPreset(r.preset), nodes: r.nodes, observers: r.observers })),
+        .map((r) => ({ name: presetLabel(r), nodes: r.nodes, observers: r.observers })),
     [radioPresets.data],
   );
   const presetsOption = useMemo(
