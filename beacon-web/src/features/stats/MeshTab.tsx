@@ -21,8 +21,8 @@ import {
   presetBarsOption,
 } from './chartOptions';
 import { Card, ChartCard, StatCard } from './cards';
-import { DataTable, type Column } from '../../components/DataTable';
-import { aggregatePresets, formatPreset } from './transforms';
+import { DataTable, type Column, type MobileSortOption } from '../../components/DataTable';
+import { aggregatePresets, presetLabel } from './transforms';
 import type { ObservationPoint, ScopeStats, StatsRange } from './types';
 
 // The observations endpoint returns one row per hour+iata; collapse to one row per hour (a no-op for a
@@ -84,6 +84,27 @@ function scopeColumns(t: TFunction): Column<ScopeStats>[] {
       cell: (scope) => formatCount(scope.nodeCount),
       sortValue: (scope) => scope.nodeCount,
     },
+  ];
+}
+
+function scopeMobileSortOptions(t: TFunction): MobileSortOption[] {
+  return [
+    {
+      id: 'most-packets',
+      label: t('sort.mostPackets'),
+      sort: { columnId: 'Packets', direction: 'desc' },
+    },
+    {
+      id: 'most-observers',
+      label: t('sort.mostObservers'),
+      sort: { columnId: 'Observers', direction: 'desc' },
+    },
+    {
+      id: 'most-nodes',
+      label: t('sort.mostNodes'),
+      sort: { columnId: 'Nodes', direction: 'desc' },
+    },
+    { id: 'scope-asc', label: t('sort.scopeAZ'), sort: { columnId: 'Scope', direction: 'asc' } },
   ];
 }
 
@@ -181,7 +202,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
     () =>
       aggregatePresets(radioPresets.data ?? [])
         .slice(0, 8)
-        .map((r) => ({ name: formatPreset(r.preset), nodes: r.nodes, observers: r.observers })),
+        .map((r) => ({ name: presetLabel(r), nodes: r.nodes, observers: r.observers })),
     [radioPresets.data],
   );
   const presetsOption = useMemo(
@@ -248,7 +269,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
         isEmpty={obs.length === 0}
       />
 
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 items-start gap-3.5 lg:grid-cols-2">
         {/* range-driven charts lead the grid; the all-time ones follow below */}
         <ChartCard
           title={t('stats.topObservers', { range })}
@@ -320,6 +341,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
               onSelect={() => {}}
               emptyLabel={t('common.noData')}
               defaultSort={{ header: 'Packets', direction: 'desc' }}
+              mobileSortOptions={scopeMobileSortOptions(t)}
             />
           )}
         </Card>

@@ -921,10 +921,29 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		evt.Observation.RSSI = oParams.RSSI
 		evt.Observation.SNR = oParams.SNR
 		evt.Observation.SourceBroker = w.cfg.BrokerName
-		evt.Observation.PathBytes = hex.EncodeToString(packet.Path)
-		evt.Observation.PathLength.Raw = fmt.Sprintf("%02x", packet.PathLength)
-		evt.Observation.PathLength.HashSize = packet.PathHashSize()
-		evt.Observation.PathLength.HopCount = packet.PathHashCount()
+		// TRACE repurposes packet.Path for per-hop SNR bytes, not route hashes, so report the
+		// route that was actually resolved (traceRawHashes) rather than the SNR-byte metadata.
+		// REST detail already normalizes TRACE to the same route (see db/packets.go), so the WS
+		// event now agrees with REST on route width and hop count.
+		traceHashSize := uint8(0)
+		traceHopCount := uint8(0)
+		if packet.PayloadType() == meshcore.PayloadTypeTrace && len(traceRawHashes) > 0 {
+			traceHashSize = uint8(len(traceRawHashes[0]))
+			traceHopCount = uint8(len(traceRawHashes))
+			var tracePathBytes []byte
+			for _, h := range traceRawHashes {
+				tracePathBytes = append(tracePathBytes, h...)
+			}
+			evt.Observation.PathBytes = hex.EncodeToString(tracePathBytes)
+			evt.Observation.PathLength.Raw = fmt.Sprintf("%02x", (traceHashSize-1)<<6|traceHopCount)
+			evt.Observation.PathLength.HashSize = traceHashSize
+			evt.Observation.PathLength.HopCount = traceHopCount
+		} else {
+			evt.Observation.PathBytes = hex.EncodeToString(packet.Path)
+			evt.Observation.PathLength.Raw = fmt.Sprintf("%02x", packet.PathLength)
+			evt.Observation.PathLength.HashSize = packet.PathHashSize()
+			evt.Observation.PathLength.HopCount = packet.PathHashCount()
+		}
 		evt.Observation.PropagationTimeMs = 0 // not yet calculated
 		count, err := w.db.GetPacketObservationCount(ctx, packetHash[:])
 		if err != nil {

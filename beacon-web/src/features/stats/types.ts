@@ -80,6 +80,8 @@ export interface RadioPreset {
   iata: string;
   sourceType: string; // "observer" or "node"
   count: number;
+  suggestedTitle?: string; // MeshCore suggested-settings title, only on confident matches
+  codingRate?: number;
 }
 
 export interface NodeTypeCount {

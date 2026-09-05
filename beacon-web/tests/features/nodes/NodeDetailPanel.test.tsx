@@ -18,13 +18,14 @@ const mockGetNodeNeighbors = vi.mocked(getNodeNeighbors);
 
 const node: Node = {
   id: 'node-self',
-  publicKey: 'aabbccddeeff',
+  publicKey: 'a'.repeat(64),
   nodeType: 2,
   nodeTypeName: 'REPEATER',
   name: 'Self Node',
   lat: null,
   lng: null,
   iatas: [],
+  knownNeighborCount: 0,
   locationSource: null,
   lastAdvertAt: null,
   supportsMultibytePaths: false,
@@ -39,6 +40,7 @@ function neighbor(id: string, name: string): NodeNeighbor {
   return {
     id,
     name,
+    publicKey: 'b'.repeat(64),
     nodeType: 2,
     nodeTypeName: 'REPEATER',
     iata: 'YVR',
@@ -104,6 +106,30 @@ describe('NodeDetailPanel neighbors', () => {
     renderPanel();
 
     expect(await screen.findByText('No known neighbors')).toBeInTheDocument();
+  });
+});
+
+describe('NodeDetailPanel contact QR', () => {
+  it('renders the QR and Add-as-contact action with the same contact URI', async () => {
+    renderPanel();
+
+    const qr = await screen.findByRole('img', { name: /contact QR/i });
+    expect(qr.tagName).toBe('CANVAS');
+    const action = screen.getByRole('link', { name: /Add as contact/i });
+    expect(action.getAttribute('href')).toMatch(/^meshcore:\/\/contact\/add\?/);
+    expect(action.getAttribute('href')).toContain('type=2');
+    // no node-detail Copy link action anymore
+    expect(screen.queryByRole('button', { name: /Copy node link/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Copy node link/i })).toBeNull();
+  });
+
+  it('omits the QR for unknown node types', async () => {
+    mockGetNode.mockResolvedValue({ ...node, nodeType: 9 });
+    renderPanel();
+
+    await screen.findByText('Timestamps');
+    expect(screen.queryByRole('img', { name: /contact QR/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /Add as contact/i })).toBeNull();
   });
 });
 

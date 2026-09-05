@@ -19,6 +19,7 @@ type Seeder interface {
 	UpsertIATADetails(ctx context.Context, iata string, name string, lat, lng *float64) error
 	UpsertIATABorder(ctx context.Context, iata string, border json.RawMessage) error
 	UpsertRegion(ctx context.Context, slug, name, description string, displayOrder int, centerLat, centerLng *float64, zoomLevel *int) (int32, error)
+	UpsertRegionMeta(ctx context.Context, regionID int32, shortCode *string, isRoot bool) error
 	UpsertRegionIATA(ctx context.Context, regionID int32, iata string) error
 	UpsertTransportScope(ctx context.Context, name, displayName string, transportKey, keyFingerprint []byte) error
 }
@@ -50,6 +51,13 @@ func Seed(ctx context.Context, cfg *Config, db Seeder) error {
 	for _, r := range cfg.Regions {
 		id, err := db.UpsertRegion(ctx, r.Slug, r.Name, r.Description, r.DisplayOrder, r.CenterLat, r.CenterLng, r.ZoomLevel)
 		if err != nil {
+			return err
+		}
+		var shortCode *string
+		if r.ShortCode != "" {
+			shortCode = &r.ShortCode
+		}
+		if err := db.UpsertRegionMeta(ctx, id, shortCode, r.Root); err != nil {
 			return err
 		}
 		for _, iata := range r.IATAs {

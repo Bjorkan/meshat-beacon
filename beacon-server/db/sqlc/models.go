@@ -307,6 +307,8 @@ type Region struct {
 	ZoomLevel    *int32             `json:"zoom_level"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	ShortCode    *string            `json:"short_code"`
+	IsRoot       bool               `json:"is_root"`
 }
 
 type RegionIata struct {

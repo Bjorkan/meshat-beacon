@@ -133,6 +133,8 @@ export interface RegionSummary {
   id: number;
   slug: string; // e.g. "western-canada"
   name: string;
+  shortCode?: string; // compact display code e.g. "SWE"
+  isRoot?: boolean; // deployment root scope for the no-filter state
 }
 
 export interface Region extends RegionSummary {
@@ -199,6 +201,15 @@ export interface TraceTagSummary {
   traceType: TraceType;
   pathHashes: string[]; // hops from the most complete observation we've seen for this tag
   snrValues: number[]; // per-hop SNR (dB), index-aligned with pathHashes
+  resolvedPath?: ResolvedHopLite[]; // global resolution of pathHashes, index-aligned
+}
+
+// Compact per-hop identity for trace list summaries. Only high-confidence hops carry a name;
+// ambiguous/none hops must render the raw prefix.
+export interface ResolvedHopLite {
+  confidence: PathConfidence;
+  nodeId?: string;
+  nodeName?: string;
 }
 
 export interface RawHop {

@@ -91,6 +91,18 @@ func (q *Queries) DeleteOldTraceIATAs(ctx context.Context, lastHeard pgtype.Time
 	return err
 }
 
+const deleteStaleNodeIATAs = `-- name: DeleteStaleNodeIATAs :exec
+DELETE FROM node_iatas WHERE last_heard < $1
+`
+
+// Prunes node-to-IATA memberships not refreshed since the cutoff. The node row itself is
+// untouched; only the stale regional association is dropped. Kept rows (recently heard)
+// continue to badge and filter exactly as before.
+func (q *Queries) DeleteStaleNodeIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error {
+	_, err := q.db.Exec(ctx, deleteStaleNodeIATAs, lastHeard)
+	return err
+}
+
 const deleteStaleNodeNeighbors = `-- name: DeleteStaleNodeNeighbors :exec
 DELETE FROM node_neighbors WHERE last_seen < $1
 `
@@ -313,13 +325,20 @@ const getNodeByID = `-- name: GetNodeByID :one
 SELECT n.id, n.public_key, n.node_type, n.name, n.latitude, n.longitude, n.location_source, n.last_advert_at, n.supports_multibyte_paths, n.supports_multibyte_traces, n.default_scope_id, n.min_firmware_version, n.first_seen, n.last_seen, n.radio_freq_mhz, n.radio_sf, n.radio_bw_khz, n.metadata, n.device_clock_drift_seconds, ts.name AS default_scope_name,
   EXISTS (SELECT 1 FROM observers o WHERE o.public_key = n.public_key) AS is_observer,
   (SELECT o.id FROM observers o WHERE o.public_key = n.public_key LIMIT 1) AS observer_id,
+  -- Current membership only: node_iatas rows older than the freshness cutoff (sqlc.arg
+  -- membership_cutoff) remain stored for history but no longer produce badges.
   (SELECT json_agg(json_build_object('iata', ni.iata, 'lastHeard', (extract(epoch from ni.last_heard) * 1000)::bigint) ORDER BY ni.last_heard DESC)
-   FROM node_iatas ni WHERE ni.node_id = n.id) AS iatas,
+   FROM node_iatas ni WHERE ni.node_id = n.id AND ni.last_heard >= $2::timestamptz) AS iatas,
   (SELECT COUNT(DISTINCT nn.neighbor_id) FROM node_neighbors nn WHERE nn.node_id = n.id)::bigint AS known_neighbor_count
 FROM nodes n
 LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
 WHERE n.id = $1
 `
+
+type GetNodeByIDParams struct {
+	ID               uuid.UUID          `json:"id"`
+	MembershipCutoff pgtype.Timestamptz `json:"membership_cutoff"`
+}
 
 type GetNodeByIDRow struct {
 	ID                      uuid.UUID          `json:"id"`
@@ -348,8 +367,8 @@ type GetNodeByIDRow struct {
 	KnownNeighborCount      int64              `json:"known_neighbor_count"`
 }
 
-func (q *Queries) GetNodeByID(ctx context.Context, id uuid.UUID) (GetNodeByIDRow, error) {
-	row := q.db.QueryRow(ctx, getNodeByID, id)
+func (q *Queries) GetNodeByID(ctx context.Context, arg GetNodeByIDParams) (GetNodeByIDRow, error) {
+	row := q.db.QueryRow(ctx, getNodeByID, arg.ID, arg.MembershipCutoff)
 	var i GetNodeByIDRow
 	err := row.Scan(
 		&i.ID,
@@ -963,7 +982,7 @@ func (q *Queries) GetRadioPresets(ctx context.Context, arg GetRadioPresetsParams
 }
 
 const getRegion = `-- name: GetRegion :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE id = $1
 `
@@ -976,6 +995,8 @@ type GetRegionRow struct {
 	CenterLat   *float64 `json:"center_lat"`
 	CenterLng   *float64 `json:"center_lng"`
 	ZoomLevel   *int32   `json:"zoom_level"`
+	ShortCode   *string  `json:"short_code"`
+	IsRoot      bool     `json:"is_root"`
 }
 
 func (q *Queries) GetRegion(ctx context.Context, id int32) (GetRegionRow, error) {
@@ -989,12 +1010,14 @@ func (q *Queries) GetRegion(ctx context.Context, id int32) (GetRegionRow, error)
 		&i.CenterLat,
 		&i.CenterLng,
 		&i.ZoomLevel,
+		&i.ShortCode,
+		&i.IsRoot,
 	)
 	return i, err
 }
 
 const getRegionBySlug = `-- name: GetRegionBySlug :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE slug = $1
 `
@@ -1007,6 +1030,8 @@ type GetRegionBySlugRow struct {
 	CenterLat   *float64 `json:"center_lat"`
 	CenterLng   *float64 `json:"center_lng"`
 	ZoomLevel   *int32   `json:"zoom_level"`
+	ShortCode   *string  `json:"short_code"`
+	IsRoot      bool     `json:"is_root"`
 }
 
 func (q *Queries) GetRegionBySlug(ctx context.Context, slug string) (GetRegionBySlugRow, error) {
@@ -1020,6 +1045,8 @@ func (q *Queries) GetRegionBySlug(ctx context.Context, slug string) (GetRegionBy
 		&i.CenterLat,
 		&i.CenterLng,
 		&i.ZoomLevel,
+		&i.ShortCode,
+		&i.IsRoot,
 	)
 	return i, err
 }
@@ -1216,20 +1243,21 @@ SELECT
   n.last_advert_at,
   json_agg(json_build_object('iata', ni.iata, 'lastHeard', (extract(epoch from ni.last_heard) * 1000)::bigint) ORDER BY ni.last_heard DESC) FILTER (WHERE ni.iata IS NOT NULL) AS iatas
 FROM nodes n
-LEFT JOIN node_iatas ni ON ni.node_id = n.id
+LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $4::timestamptz
 WHERE n.node_type IN (2, 3)
   AND n.device_clock_drift_seconds IS NOT NULL
   AND ABS(n.device_clock_drift_seconds) > $1::int
-  AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[])))
+  AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= $4::timestamptz))
 GROUP BY n.id, n.name, n.node_type, n.device_clock_drift_seconds, n.last_advert_at
 ORDER BY ABS(n.device_clock_drift_seconds) DESC
 LIMIT $3
 `
 
 type GetStatsClockDriftParams struct {
-	Column1 int32    `json:"column_1"`
-	Column2 []string `json:"column_2"`
-	Limit   int32    `json:"limit"`
+	Column1          int32              `json:"column_1"`
+	Column2          []string           `json:"column_2"`
+	Limit            int32              `json:"limit"`
+	MembershipCutoff pgtype.Timestamptz `json:"membership_cutoff"`
 }
 
 type GetStatsClockDriftRow struct {
@@ -1244,8 +1272,14 @@ type GetStatsClockDriftRow struct {
 // Repeaters/room servers (node_type 2/3) whose current advert-derived clock drift exceeds
 // the given threshold in magnitude, worst first. Not time-windowed -- reflects each node's
 // latest measured drift, not an aggregate over a period.
+// Current membership only ($3): stale node_iatas rows neither badge nor filter.
 func (q *Queries) GetStatsClockDrift(ctx context.Context, arg GetStatsClockDriftParams) ([]GetStatsClockDriftRow, error) {
-	rows, err := q.db.Query(ctx, getStatsClockDrift, arg.Column1, arg.Column2, arg.Limit)
+	rows, err := q.db.Query(ctx, getStatsClockDrift,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.MembershipCutoff,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -1276,11 +1310,16 @@ SELECT
   n.node_type,
   COUNT(DISTINCT n.id)::bigint AS count
 FROM nodes n
-LEFT JOIN node_iatas ni ON ni.node_id = n.id
+LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $2::timestamptz
 WHERE (COALESCE(cardinality($1::bpchar[]), 0) = 0 OR ni.iata = ANY($1::bpchar[]))
 GROUP BY n.node_type
 ORDER BY count DESC
 `
+
+type GetStatsNodeTypesParams struct {
+	Column1          []string           `json:"column_1"`
+	MembershipCutoff pgtype.Timestamptz `json:"membership_cutoff"`
+}
 
 type GetStatsNodeTypesRow struct {
 	NodeType int16 `json:"node_type"`
@@ -1288,8 +1327,9 @@ type GetStatsNodeTypesRow struct {
 }
 
 // Returns node counts grouped by type, optionally filtered by IATA.
-func (q *Queries) GetStatsNodeTypes(ctx context.Context, dollar_1 []string) ([]GetStatsNodeTypesRow, error) {
-	rows, err := q.db.Query(ctx, getStatsNodeTypes, dollar_1)
+// Current membership only ($2): stale node_iatas rows do not count.
+func (q *Queries) GetStatsNodeTypes(ctx context.Context, arg GetStatsNodeTypesParams) ([]GetStatsNodeTypesRow, error) {
+	rows, err := q.db.Query(ctx, getStatsNodeTypes, arg.Column1, arg.MembershipCutoff)
 	if err != nil {
 		return nil, err
 	}
@@ -2383,11 +2423,11 @@ WITH node_base AS (
       ) link
     ) ELSE NULL END::jsonb AS neighbor_links
   FROM nodes n
-  LEFT JOIN node_iatas ni ON ni.node_id = n.id
+  LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $18::timestamptz
   LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
   WHERE
     ($1 = 0 OR n.node_type = $1)
-    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[])))
+    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= $18::timestamptz))
     AND (
       $3::text = 'any'
       OR ($3::text = 'true' AND n.supports_multibyte_paths = TRUE)
@@ -2456,23 +2496,24 @@ LIMIT $8
 `
 
 type ListNodesParams struct {
-	Column1  interface{}        `json:"column_1"`
-	Column2  []string           `json:"column_2"`
-	Column3  string             `json:"column_3"`
-	Column4  string             `json:"column_4"`
-	Column5  []byte             `json:"column_5"`
-	Column6  interface{}        `json:"column_6"`
-	Column7  pgtype.Timestamptz `json:"column_7"`
-	Limit    int32              `json:"limit"`
-	Column9  string             `json:"column_9"`
-	Column10 bool               `json:"column_10"`
-	Column11 string             `json:"column_11"`
-	Column12 string             `json:"column_12"`
-	Column13 string             `json:"column_13"`
-	Column14 bool               `json:"column_14"`
-	Column15 bool               `json:"column_15"`
-	Column16 string             `json:"column_16"`
-	Column17 uuid.UUID          `json:"column_17"`
+	Column1          interface{}        `json:"column_1"`
+	Column2          []string           `json:"column_2"`
+	Column3          string             `json:"column_3"`
+	Column4          string             `json:"column_4"`
+	Column5          []byte             `json:"column_5"`
+	Column6          interface{}        `json:"column_6"`
+	Column7          pgtype.Timestamptz `json:"column_7"`
+	Limit            int32              `json:"limit"`
+	Column9          string             `json:"column_9"`
+	Column10         bool               `json:"column_10"`
+	Column11         string             `json:"column_11"`
+	Column12         string             `json:"column_12"`
+	Column13         string             `json:"column_13"`
+	Column14         bool               `json:"column_14"`
+	Column15         bool               `json:"column_15"`
+	Column16         string             `json:"column_16"`
+	Column17         uuid.UUID          `json:"column_17"`
+	MembershipCutoff pgtype.Timestamptz `json:"membership_cutoff"`
 }
 
 type ListNodesRow struct {
@@ -2518,6 +2559,7 @@ func (q *Queries) ListNodes(ctx context.Context, arg ListNodesParams) ([]ListNod
 		arg.Column15,
 		arg.Column16,
 		arg.Column17,
+		arg.MembershipCutoff,
 	)
 	if err != nil {
 		return nil, err
@@ -3282,15 +3324,17 @@ func (q *Queries) ListPacketsByIATAs(ctx context.Context, arg ListPacketsByIATAs
 
 const listRegions = `-- name: ListRegions :many
 
-SELECT id, slug, name
+SELECT id, slug, name, short_code, is_root
 FROM regions
 ORDER BY display_order, name
 `
 
 type ListRegionsRow struct {
-	ID   int32  `json:"id"`
-	Slug string `json:"slug"`
-	Name string `json:"name"`
+	ID        int32   `json:"id"`
+	Slug      string  `json:"slug"`
+	Name      string  `json:"name"`
+	ShortCode *string `json:"short_code"`
+	IsRoot    bool    `json:"is_root"`
 }
 
 // ============================================================
@@ -3305,7 +3349,13 @@ func (q *Queries) ListRegions(ctx context.Context) ([]ListRegionsRow, error) {
 	items := []ListRegionsRow{}
 	for rows.Next() {
 		var i ListRegionsRow
-		if err := rows.Scan(&i.ID, &i.Slug, &i.Name); err != nil {
+		if err := rows.Scan(
+			&i.ID,
+			&i.Slug,
+			&i.Name,
+			&i.ShortCode,
+			&i.IsRoot,
+		); err != nil {
 			return nil, err
 		}
 		items = append(items, i)
@@ -4607,8 +4657,8 @@ func (q *Queries) UpsertPacket(ctx context.Context, arg UpsertPacketParams) (Ups
 }
 
 const upsertRegion = `-- name: UpsertRegion :one
-INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, short_code, is_root, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 ON CONFLICT (slug) DO UPDATE SET
     name          = EXCLUDED.name,
     description   = EXCLUDED.description,
@@ -4616,6 +4666,8 @@ ON CONFLICT (slug) DO UPDATE SET
     center_lat    = EXCLUDED.center_lat,
     center_lng    = EXCLUDED.center_lng,
     zoom_level    = EXCLUDED.zoom_level,
+    short_code    = EXCLUDED.short_code,
+    is_root       = EXCLUDED.is_root,
     updated_at    = NOW()
 RETURNING id
 `
@@ -4628,6 +4680,8 @@ type UpsertRegionParams struct {
 	CenterLat    *float64 `json:"center_lat"`
 	CenterLng    *float64 `json:"center_lng"`
 	ZoomLevel    *int32   `json:"zoom_level"`
+	ShortCode    *string  `json:"short_code"`
+	IsRoot       bool     `json:"is_root"`
 }
 
 func (q *Queries) UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int32, error) {
@@ -4639,6 +4693,8 @@ func (q *Queries) UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int
 		arg.CenterLat,
 		arg.CenterLng,
 		arg.ZoomLevel,
+		arg.ShortCode,
+		arg.IsRoot,
 	)
 	var id int32
 	err := row.Scan(&id)
@@ -4658,6 +4714,23 @@ type UpsertRegionIATAParams struct {
 
 func (q *Queries) UpsertRegionIATA(ctx context.Context, arg UpsertRegionIATAParams) error {
 	_, err := q.db.Exec(ctx, upsertRegionIATA, arg.RegionID, arg.Iata)
+	return err
+}
+
+const upsertRegionMeta = `-- name: UpsertRegionMeta :exec
+UPDATE regions SET short_code = $1, is_root = $2, updated_at = NOW() WHERE id = $3
+`
+
+type UpsertRegionMetaParams struct {
+	ShortCode *string `json:"short_code"`
+	IsRoot    bool    `json:"is_root"`
+	ID        int32   `json:"id"`
+}
+
+// Selector-facing root identity for an already-upserted region. Only the short code and the
+// explicit root flag live here so UpsertRegion keeps its existing signature.
+func (q *Queries) UpsertRegionMeta(ctx context.Context, arg UpsertRegionMetaParams) error {
+	_, err := q.db.Exec(ctx, upsertRegionMeta, arg.ShortCode, arg.IsRoot, arg.ID)
 	return err
 }
 

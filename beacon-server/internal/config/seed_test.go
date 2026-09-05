@@ -13,7 +13,11 @@ import (
 )
 
 type stubSeeder struct {
-	regions     map[string]int32
+	regions    map[string]int32
+	regionMeta map[int32]struct {
+		shortCode *string
+		isRoot    bool
+	}
 	iatas       []string
 	regionIATAs map[int32][]string
 	scopes      []string
@@ -23,7 +27,11 @@ type stubSeeder struct {
 
 func newStubSeeder() *stubSeeder {
 	return &stubSeeder{
-		regions:     make(map[string]int32),
+		regions: make(map[string]int32),
+		regionMeta: make(map[int32]struct {
+			shortCode *string
+			isRoot    bool
+		}),
 		regionIATAs: make(map[int32][]string),
 		borders:     make(map[string]json.RawMessage),
 	}
@@ -48,6 +56,14 @@ func (s *stubSeeder) UpsertRegion(_ context.Context, slug, _, _ string, _ int, _
 	id := int32(len(s.regions) + 1)
 	s.regions[slug] = id
 	return id, s.upsertErr
+}
+
+func (s *stubSeeder) UpsertRegionMeta(_ context.Context, regionID int32, shortCode *string, isRoot bool) error {
+	s.regionMeta[regionID] = struct {
+		shortCode *string
+		isRoot    bool
+	}{shortCode: shortCode, isRoot: isRoot}
+	return s.upsertErr
 }
 
 func (s *stubSeeder) UpsertRegionIATA(_ context.Context, regionID int32, iata string) error {
@@ -79,6 +95,52 @@ func TestSeed_IATAsAndRegions(t *testing.T) {
 	}
 	if len(db.regionIATAs[1]) != 2 {
 		t.Errorf("expected 2 IATAs for region 1, got %d", len(db.regionIATAs[1]))
+	}
+}
+
+func TestSeed_RootRegionMeta(t *testing.T) {
+	cfg := &Config{
+		Regions: []RegionConfig{
+			{Slug: "sweden", Name: "Sverige", ShortCode: "SWE", Root: true, IATAs: []string{"ARN"}},
+		},
+	}
+
+	db := newStubSeeder()
+	if err := Seed(context.Background(), cfg, db); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	meta, ok := db.regionMeta[1]
+	if !ok {
+		t.Fatal("expected region meta to be upserted")
+	}
+	if meta.shortCode == nil || *meta.shortCode != "SWE" {
+		t.Errorf("expected short code SWE, got %v", meta.shortCode)
+	}
+	if !meta.isRoot {
+		t.Error("expected root to be true")
+	}
+}
+
+func TestValidate_MultipleRoots(t *testing.T) {
+	cfg := &Config{
+		Regions: []RegionConfig{
+			{Slug: "a", Name: "A", Root: true},
+			{Slug: "b", Name: "B", Root: true},
+		},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error for multiple root regions, got nil")
+	}
+}
+
+func TestValidate_SingleRoot(t *testing.T) {
+	cfg := &Config{
+		Regions: []RegionConfig{
+			{Slug: "sweden", Name: "Sverige", ShortCode: "SWE", Root: true},
+		},
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

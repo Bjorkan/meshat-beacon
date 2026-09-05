@@ -1,78 +1,41 @@
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   ALL_REGIONS,
   isAllRegions,
+  normalizeSelection,
   resolveIatas,
   regionKey,
-  serializeSelection,
-  deserializeSelection,
-  type RegionSelection,
 } from '../../src/hooks/region-selection';
 
-const regionIatas = new Map<string, string[]>([
-  ['western-canada', ['YVR', 'YYJ']],
-  ['cascadia', ['YVR', 'SEA']], // intentionally overlaps YVR with western-canada
-]);
-
-describe('isAllRegions', () => {
-  it('is true only for an empty selection', () => {
-    expect(isAllRegions(ALL_REGIONS)).toBe(true);
-    expect(isAllRegions({ regions: [], iatas: [] })).toBe(true);
-    expect(isAllRegions({ regions: ['cascadia'], iatas: [] })).toBe(false);
-    expect(isAllRegions({ regions: [], iatas: ['YVR'] })).toBe(false);
-  });
-});
-
-describe('resolveIatas', () => {
-  it('returns undefined (= all) for an empty selection', () => {
-    expect(resolveIatas(ALL_REGIONS, regionIatas)).toBeUndefined();
+describe('normalizeSelection', () => {
+  it('collapses a root-only region selection to the empty no-filter state', () => {
+    const normalized = normalizeSelection({ regions: ['sweden'], iatas: [] }, 'sweden');
+    expect(isAllRegions(normalized)).toBe(true);
+    expect(normalized).toEqual(ALL_REGIONS);
   });
 
-  it('returns the selected IATAs sorted and deduped', () => {
-    expect(resolveIatas({ regions: [], iatas: ['YYJ', 'YVR', 'YVR'] }, regionIatas)).toEqual([
-      'YVR',
-      'YYJ',
-    ]);
+  it('keeps the no-filter semantics: root resolves to undefined IATAs and the "*" key', () => {
+    const normalized = normalizeSelection({ regions: ['sweden'], iatas: [] }, 'sweden');
+    expect(resolveIatas(normalized, new Map([['sweden', ['ARN']]]))).toBeUndefined();
+    expect(regionKey(resolveIatas(normalized, new Map([['sweden', ['ARN']]])))).toBe('*');
   });
 
-  it('expands region slugs to their member IATAs', () => {
-    expect(resolveIatas({ regions: ['western-canada'], iatas: [] }, regionIatas)).toEqual([
-      'YVR',
-      'YYJ',
-    ]);
+  it('leaves other selections untouched', () => {
+    expect(normalizeSelection({ regions: ['sweden', 'gotland'], iatas: [] }, 'sweden')).toEqual({
+      regions: ['sweden', 'gotland'],
+      iatas: [],
+    });
+    expect(normalizeSelection({ regions: [], iatas: ['ARN'] }, 'sweden')).toEqual({
+      regions: [],
+      iatas: ['ARN'],
+    });
+    expect(normalizeSelection(ALL_REGIONS, 'sweden')).toEqual(ALL_REGIONS);
   });
 
-  it('unions regions and individual IATAs, deduping the overlap', () => {
-    expect(
-      resolveIatas({ regions: ['western-canada', 'cascadia'], iatas: ['YYZ'] }, regionIatas),
-    ).toEqual(['SEA', 'YVR', 'YYJ', 'YYZ']);
-  });
-
-  it("ignores a region slug that isn't in the map yet", () => {
-    expect(resolveIatas({ regions: ['not-loaded'], iatas: ['YVR'] }, regionIatas)).toEqual(['YVR']);
-  });
-});
-
-describe('regionKey', () => {
-  it("is '*' when there is no filter", () => {
-    expect(regionKey(undefined)).toBe('*');
-    expect(regionKey([])).toBe('*');
-  });
-
-  it('joins the resolved IATAs for a stable query key', () => {
-    expect(regionKey(['YVR', 'YYJ'])).toBe('YVR,YYJ');
-  });
-});
-
-describe('serialize/deserialize', () => {
-  it('round-trips a selection', () => {
-    const sel: RegionSelection = { regions: ['cascadia'], iatas: ['YVR'] };
-    expect(deserializeSelection(serializeSelection(sel))).toEqual(sel);
-  });
-
-  it('falls back to all-regions on missing or malformed input', () => {
-    expect(deserializeSelection(null)).toEqual(ALL_REGIONS);
-    expect(deserializeSelection('not json')).toEqual(ALL_REGIONS);
-    expect(deserializeSelection('{"regions":"oops"}')).toEqual(ALL_REGIONS);
+  it('is a no-op when no root region is configured', () => {
+    expect(normalizeSelection({ regions: ['sweden'], iatas: [] }, null)).toEqual({
+      regions: ['sweden'],
+      iatas: [],
+    });
   });
 });

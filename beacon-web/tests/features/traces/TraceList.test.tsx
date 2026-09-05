@@ -206,6 +206,30 @@ describe('TraceList', () => {
     expect(screen.getByText('-7.50 dB')).toBeInTheDocument();
   });
 
+  it('shows resolved node names in the list preview only for high confidence', async () => {
+    mockGetTraces.mockResolvedValue([
+      tag('3f2a11c0', 4, {
+        traceType: 'TRACE',
+        pathHashes: ['a1', 'b2', 'c3'],
+        snrValues: [-7.5, -9, -8],
+        resolvedPath: [
+          { confidence: 'high', nodeName: 'GatewayX' },
+          { confidence: 'ambiguous' },
+          { confidence: 'none' },
+        ],
+      }),
+    ]);
+
+    renderTraces();
+
+    expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
+    // high-confidence hop shows the node name with the raw prefix retained below
+    expect(screen.getByText('GatewayX')).toBeInTheDocument();
+    // ambiguous and unresolved hops fall back to the raw prefix
+    expect(screen.getByText('B2')).toBeInTheDocument();
+    expect(screen.getByText('C3')).toBeInTheDocument();
+  });
+
   it('refetches with the type param when the trace-type filter changes', async () => {
     mockGetTraces.mockResolvedValue([tag('3f2a11c0', 1)]);
 

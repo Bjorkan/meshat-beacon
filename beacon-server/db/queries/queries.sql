@@ -624,6 +624,12 @@ DELETE FROM channel_iatas WHERE last_heard < $1;
 -- Keeps the trace IATA filter in step with packet retention.
 DELETE FROM trace_iatas WHERE last_heard < $1;
 
+-- name: DeleteStaleNodeIATAs :exec
+-- Prunes node-to-IATA memberships not refreshed since the cutoff. The node row itself is
+-- untouched; only the stale regional association is dropped. Kept rows (recently heard)
+-- continue to badge and filter exactly as before.
+DELETE FROM node_iatas WHERE last_heard < $1;
+
 -- ============================================================
 -- PACKET OBSERVATIONS
 -- ============================================================
@@ -712,8 +718,10 @@ UPDATE nodes SET default_scope_id = $2 WHERE id = $1;
 SELECT n.*, ts.name AS default_scope_name,
   EXISTS (SELECT 1 FROM observers o WHERE o.public_key = n.public_key) AS is_observer,
   (SELECT o.id FROM observers o WHERE o.public_key = n.public_key LIMIT 1) AS observer_id,
+  -- Current membership only: node_iatas rows older than the freshness cutoff (sqlc.arg
+  -- membership_cutoff) remain stored for history but no longer produce badges.
   (SELECT json_agg(json_build_object('iata', ni.iata, 'lastHeard', (extract(epoch from ni.last_heard) * 1000)::bigint) ORDER BY ni.last_heard DESC)
-   FROM node_iatas ni WHERE ni.node_id = n.id) AS iatas,
+   FROM node_iatas ni WHERE ni.node_id = n.id AND ni.last_heard >= sqlc.arg(membership_cutoff)::timestamptz) AS iatas,
   (SELECT COUNT(DISTINCT nn.neighbor_id) FROM node_neighbors nn WHERE nn.node_id = n.id)::bigint AS known_neighbor_count
 FROM nodes n
 LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
@@ -762,11 +770,11 @@ WITH node_base AS (
       ) link
     ) ELSE NULL END::jsonb AS neighbor_links
   FROM nodes n
-  LEFT JOIN node_iatas ni ON ni.node_id = n.id
+  LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= sqlc.arg(membership_cutoff)::timestamptz
   LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
   WHERE
     ($1 = 0 OR n.node_type = $1)
-    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[])))
+    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= sqlc.arg(membership_cutoff)::timestamptz))
     AND (
       $3::text = 'any'
       OR ($3::text = 'true' AND n.supports_multibyte_paths = TRUE)
@@ -1049,11 +1057,12 @@ ORDER BY count DESC;
 
 -- name: GetStatsNodeTypes :many
 -- Returns node counts grouped by type, optionally filtered by IATA.
+-- Current membership only ($2): stale node_iatas rows do not count.
 SELECT
   n.node_type,
   COUNT(DISTINCT n.id)::bigint AS count
 FROM nodes n
-LEFT JOIN node_iatas ni ON ni.node_id = n.id
+LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= sqlc.arg(membership_cutoff)::timestamptz
 WHERE (COALESCE(cardinality($1::bpchar[]), 0) = 0 OR ni.iata = ANY($1::bpchar[]))
 GROUP BY n.node_type
 ORDER BY count DESC;
@@ -1096,6 +1105,7 @@ LIMIT $3;
 -- Repeaters/room servers (node_type 2/3) whose current advert-derived clock drift exceeds
 -- the given threshold in magnitude, worst first. Not time-windowed -- reflects each node's
 -- latest measured drift, not an aggregate over a period.
+-- Current membership only ($3): stale node_iatas rows neither badge nor filter.
 SELECT
   n.id,
   n.name,
@@ -1104,11 +1114,11 @@ SELECT
   n.last_advert_at,
   json_agg(json_build_object('iata', ni.iata, 'lastHeard', (extract(epoch from ni.last_heard) * 1000)::bigint) ORDER BY ni.last_heard DESC) FILTER (WHERE ni.iata IS NOT NULL) AS iatas
 FROM nodes n
-LEFT JOIN node_iatas ni ON ni.node_id = n.id
+LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= sqlc.arg(membership_cutoff)::timestamptz
 WHERE n.node_type IN (2, 3)
   AND n.device_clock_drift_seconds IS NOT NULL
   AND ABS(n.device_clock_drift_seconds) > $1::int
-  AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[])))
+  AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= sqlc.arg(membership_cutoff)::timestamptz))
 GROUP BY n.id, n.name, n.node_type, n.device_clock_drift_seconds, n.last_advert_at
 ORDER BY ABS(n.device_clock_drift_seconds) DESC
 LIMIT $3;
@@ -1149,17 +1159,17 @@ ORDER BY ts.name;
 -- ============================================================
 
 -- name: ListRegions :many
-SELECT id, slug, name
+SELECT id, slug, name, short_code, is_root
 FROM regions
 ORDER BY display_order, name;
 
 -- name: GetRegion :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE id = $1;
 
 -- name: GetRegionBySlug :one
-SELECT id, slug, name, description, center_lat, center_lng, zoom_level
+SELECT id, slug, name, description, center_lat, center_lng, zoom_level, short_code, is_root
 FROM regions
 WHERE slug = $1;
 
@@ -1169,8 +1179,8 @@ WHERE region_id = $1
 ORDER BY iata;
 
 -- name: UpsertRegion :one
-INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+INSERT INTO regions (slug, name, description, display_order, center_lat, center_lng, zoom_level, short_code, is_root, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
 ON CONFLICT (slug) DO UPDATE SET
     name          = EXCLUDED.name,
     description   = EXCLUDED.description,
@@ -1178,6 +1188,8 @@ ON CONFLICT (slug) DO UPDATE SET
     center_lat    = EXCLUDED.center_lat,
     center_lng    = EXCLUDED.center_lng,
     zoom_level    = EXCLUDED.zoom_level,
+    short_code    = EXCLUDED.short_code,
+    is_root       = EXCLUDED.is_root,
     updated_at    = NOW()
 RETURNING id;
 
@@ -1185,6 +1197,11 @@ RETURNING id;
 INSERT INTO region_iatas (region_id, iata)
 VALUES ($1, $2)
 ON CONFLICT (region_id, iata) DO NOTHING;
+
+-- name: UpsertRegionMeta :exec
+-- Selector-facing root identity for an already-upserted region. Only the short code and the
+-- explicit root flag live here so UpsertRegion keeps its existing signature.
+UPDATE regions SET short_code = $1, is_root = $2, updated_at = NOW() WHERE id = $3;
 
 -- ============================================================
 -- TRACES

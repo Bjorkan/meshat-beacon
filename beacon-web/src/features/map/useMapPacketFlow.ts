@@ -7,7 +7,9 @@ import type {
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, Point, LineString } from 'geojson';
 import type { WsManager } from '../../api/ws-manager';
-import { packetChain, resolvedPathNodes, posAtHop, trailCoords } from './packet-flow';
+import { posAtHop, trailCoords } from './packet-flow';
+import { packetFlowColor } from './packet-flow-colors';
+import { buildLiveFlowCandidate } from './live-packet-feed';
 import {
   PACKET_FLOW_TRAIL_SOURCE_ID,
   PACKET_FLOW_TRAIL_LAYER_ID,
@@ -22,7 +24,6 @@ import {
   PACKET_FLOW_MAX,
   NODES_SOURCE_ID,
 } from './types';
-import { packetFlowColor } from './packet-flow-colors';
 import {
   PACKET_PULSE_MAX,
   PACKET_RELAY_FORWARD_DELAY_MS,
@@ -323,23 +324,18 @@ export function useMapPacketFlow(
     if (!enabled) return;
     const map = mapRef.current;
     const unsub = wsManager.onPacketObservation((data) => {
-      const obs = data.observation;
-      if (!obs?.resolvedPath) return;
-      if ((obs.pathLength?.hashSize ?? 0) < 2) return;
-      const nodes = resolvedPathNodes(
-        packetChain(obs.resolvedSource, obs.resolvedPath, obs.resolvedDestination),
-      );
-      if (nodes.length < 2) return;
+      const candidate = buildLiveFlowCandidate(data.observation);
+      if (!candidate) return;
 
       while (flowsRef.current.length >= PACKET_FLOW_MAX) flowsRef.current.shift();
       const color = packetFlowColor(data.packetHash);
       const start = performance.now();
-      const coords = nodes.map((node) => [node.lng, node.lat] as [number, number]);
+      const coords = candidate.coords;
       flowsRef.current.push({
         packetHash: data.packetHash,
         color,
         coords,
-        ids: nodes.map((node) => node.id),
+        ids: candidate.ids,
         start,
         lastNode: 0,
       });

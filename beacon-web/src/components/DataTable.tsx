@@ -21,12 +21,27 @@ export interface Column<T> {
   sortValue?: (row: T) => string | number | null | undefined;
   // Percentage of the available desktop width. Unspecified columns share the remainder.
   size?: number;
+  // Sort-only columns (e.g. a leaderboard total with no visible desktop column) are hidden
+  // from desktop headers but remain sortable and addressable by mobile options.
+  hidden?: boolean;
 }
 
 export type SortDirection = 'asc' | 'desc';
 export interface SortState {
   header: string;
   direction: SortDirection;
+}
+
+// One semantic mobile sort action: a user-facing label plus the desktop column + direction it
+// drives. Mobile renders only these explicit options — adding sortValue to a desktop column never
+// creates a mobile action by itself. Both presentations share the same underlying sort state.
+export interface MobileSortOption {
+  id: string;
+  label: string;
+  sort: {
+    columnId: string;
+    direction: SortDirection;
+  };
 }
 
 interface DataTableProps<T> {
@@ -45,6 +60,10 @@ interface DataTableProps<T> {
   sortMode?: 'client' | 'server';
   // A paged client table does not sort until all pages are ready.
   sortReady?: boolean;
+  // Explicit semantic mobile sort actions. When provided, mobile renders only these options
+  // (selected = the option matching the current sort state); otherwise no mobile sort bar
+  // is shown. Desktop headers keep sorting normally on shared state.
+  mobileSortOptions?: MobileSortOption[];
   onEndReached?: () => void;
   virtualize?: boolean;
   // Without a custom card, the TanStack cells become a labelled responsive card automatically.
@@ -73,6 +92,7 @@ export function DataTable<T>({
   onSortChange,
   sortMode = 'client',
   sortReady = true,
+  mobileSortOptions,
   onEndReached,
   virtualize = false,
   renderCard,
@@ -89,16 +109,36 @@ export function DataTable<T>({
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () =>
-      columns.map((column) => ({
-        id: column.header,
-        header: column.label ?? column.header,
-        accessorFn: column.sortValue,
-        cell: (context) => column.cell(context.row.original),
-        enableSorting: !!column.sortValue,
-        sortDescFirst: false,
-        sortUndefined: 'last',
-        meta: { className: column.className },
-      })),
+      columns
+        .filter((column) => !column.hidden)
+        .map((column) => ({
+          id: column.header,
+          header: column.label ?? column.header,
+          accessorFn: column.sortValue,
+          cell: (context) => column.cell(context.row.original),
+          enableSorting: !!column.sortValue,
+          sortDescFirst: false,
+          sortUndefined: 'last',
+          meta: { className: column.className },
+        })),
+    [columns],
+  );
+  // Hidden sort-only columns never render a desktop header, but TanStack still needs their
+  // accessor so mobile semantic options can sort by them. They are appended after visible ones.
+  const hiddenSortColumns = useMemo<ColumnDef<T>[]>(
+    () =>
+      columns
+        .filter((column) => column.hidden && column.sortValue)
+        .map((column) => ({
+          id: column.header,
+          header: column.label ?? column.header,
+          accessorFn: column.sortValue,
+          cell: () => null,
+          enableSorting: true,
+          sortDescFirst: false,
+          sortUndefined: 'last',
+          meta: {},
+        })),
     [columns],
   );
 
@@ -106,7 +146,7 @@ export function DataTable<T>({
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
     data: rows ?? [],
-    columns: tableColumns,
+    columns: [...tableColumns, ...hiddenSortColumns],
     state: { sorting },
     getRowId: (row) => rowKey(row),
     getCoreRowModel: getCoreRowModel(),
@@ -147,7 +187,13 @@ export function DataTable<T>({
     );
   }
 
-  const sortableHeaders = table.getFlatHeaders().filter((header) => header.column.getCanSort());
+  // Explicit semantic mobile sort: the selected option mirrors the shared sort state; tapping an
+  // option drives the same state (and server query mapping) as tapping a desktop header.
+  function applyMobileSort(option: MobileSortOption) {
+    const nextSort: SortState = { header: option.sort.columnId, direction: option.sort.direction };
+    if (onSortChange) onSortChange(nextSort);
+    else setInternalSort(nextSort);
+  }
 
   if (isMobile) {
     const virtualItems = virtualizer.getVirtualItems();
@@ -157,36 +203,33 @@ export function DataTable<T>({
 
     return (
       <div className="flex min-h-0 flex-1 flex-col bg-bg-base">
-        {sortableHeaders.length > 0 && (
+        {mobileSortOptions && mobileSortOptions.length > 0 ? (
           <div
             className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
             aria-label={t('common.sort')}
           >
-            {sortableHeaders.map((header) => {
-              const direction = header.column.getIsSorted();
+            {mobileSortOptions.map((option) => {
+              const selected =
+                sort.header === option.sort.columnId && sort.direction === option.sort.direction;
               return (
                 <button
-                  key={header.id}
+                  key={option.id}
                   type="button"
-                  onClick={header.column.getToggleSortingHandler()}
-                  aria-busy={
-                    sortMode === 'client' && direction !== false && !sortReady ? true : undefined
-                  }
+                  onClick={() => applyMobileSort(option)}
+                  aria-pressed={selected}
+                  aria-busy={sortMode === 'client' && selected && !sortReady ? true : undefined}
                   className={`flex shrink-0 items-center gap-1 rounded-sm border px-2 py-1 transition-colors ${
-                    direction
+                    selected
                       ? 'border-primary-dim bg-primary/10 text-text-normal'
                       : 'border-border text-text-muted hover:border-primary-dim hover:text-text-normal'
                   }`}
                 >
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                  <span aria-hidden className={direction ? 'text-primary' : 'text-text-dim/50'}>
-                    {direction === 'desc' ? '▼' : '▲'}
-                  </span>
+                  {option.label}
                 </button>
               );
             })}
           </div>
-        )}
+        ) : null}
 
         <div
           ref={scrollRef}
@@ -296,9 +339,9 @@ export function DataTable<T>({
                 key={headerGroup.id}
                 className="h-9 border-b border-border text-[11px] uppercase tracking-wider text-text-muted"
               >
-                {headerGroup.headers.map((header, index) => {
+                {headerGroup.headers.map((header) => {
                   const direction = header.column.getIsSorted();
-                  const sourceColumn = columns[index];
+                  const sourceColumn = columns.find((c) => c.header === header.column.id);
                   return (
                     <th
                       key={header.id}

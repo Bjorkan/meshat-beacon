@@ -11,6 +11,7 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	mockdb "github.com/MeshCore-Beacon/beacon-server/db/sqlc/mock"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/mock/gomock"
 )
@@ -55,6 +56,14 @@ func TestListTraceTags_WithPayload(t *testing.T) {
 			},
 		}, nil)
 
+	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+	name := "repeater-one"
+	mock.EXPECT().
+		ResolvePathHashesP1(gomock.Any(), gomock.Any()).
+		Return([]sqlc.ResolvePathHashesP1Row{
+			{Hash: []byte{0xaa}, NodeID: nodeID, Name: &name, PublicKey: []byte{0x01}},
+		}, nil)
+
 	store := &Store{q: mock}
 	items, err := store.ListTraceTags(context.Background(), []string{"YVR"}, "", "", time.Time{}, time.Time{}, time.Time{}, 10)
 	if err != nil {
@@ -71,6 +80,63 @@ func TestListTraceTags_WithPayload(t *testing.T) {
 	}
 	if items[0].SNRValues[0] != 10 {
 		t.Errorf("expected SNR 10, got %f", items[0].SNRValues[0])
+	}
+	if len(items[0].ResolvedPath) != 2 {
+		t.Fatalf("expected 2 resolved hops, got %d", len(items[0].ResolvedPath))
+	}
+	if items[0].ResolvedPath[0].Confidence != "high" {
+		t.Errorf("expected high confidence for uniquely resolved prefix, got %s", items[0].ResolvedPath[0].Confidence)
+	}
+	if items[0].ResolvedPath[0].NodeName == nil || *items[0].ResolvedPath[0].NodeName != "repeater-one" {
+		t.Errorf("expected node name repeater-one, got %v", items[0].ResolvedPath[0].NodeName)
+	}
+	if items[0].ResolvedPath[1].Confidence != "none" {
+		t.Errorf("expected none confidence for unresolved prefix, got %s", items[0].ResolvedPath[1].Confidence)
+	}
+}
+
+func TestListTraceTags_AmbiguousPrefix(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	firstHeard := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
+	lastHeard := pgtype.Timestamptz{Time: time.UnixMilli(1700000001000), Valid: true}
+	payload := []byte(`{"pathHashes":["aabb"],"snrValues":[10]}`)
+
+	mock.EXPECT().
+		ListTraceTags(gomock.Any(), gomock.Any()).
+		Return([]sqlc.ListTraceTagsRow{
+			{
+				TraceTag:     "trace-002",
+				FirstHeardAt: firstHeard,
+				LastHeardAt:  lastHeard,
+				PacketCount:  1,
+				IataCount:    1,
+				TraceType:    "trace",
+				BestPayload:  payload,
+			},
+		}, nil)
+
+	mock.EXPECT().
+		ResolvePathHashesP1(gomock.Any(), gomock.Any()).
+		Return([]sqlc.ResolvePathHashesP1Row{
+			{Hash: []byte{0xaa}, NodeID: uuid.MustParse("00000000-0000-0000-0000-000000000001"), PublicKey: []byte{0x01}},
+			{Hash: []byte{0xaa}, NodeID: uuid.MustParse("00000000-0000-0000-0000-000000000002"), PublicKey: []byte{0x02}},
+		}, nil)
+
+	store := &Store{q: mock}
+	items, err := store.ListTraceTags(context.Background(), []string{"YVR"}, "", "", time.Time{}, time.Time{}, time.Time{}, 10)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if items[0].ResolvedPath[0].Confidence != "ambiguous" {
+		t.Errorf("expected ambiguous confidence, got %s", items[0].ResolvedPath[0].Confidence)
+	}
+	if items[0].ResolvedPath[0].NodeName != nil {
+		t.Errorf("ambiguous hops must not claim a node name, got %v", items[0].ResolvedPath[0].NodeName)
 	}
 }
 

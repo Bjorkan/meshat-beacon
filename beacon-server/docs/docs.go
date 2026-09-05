@@ -3659,6 +3659,9 @@ const docTemplate = `{
         "github_com_MeshCore-Beacon_beacon-server_internal_api.RadioPreset": {
             "type": "object",
             "properties": {
+                "codingRate": {
+                    "type": "integer"
+                },
                 "count": {
                     "description": "number of observers or nodes on this preset in this IATA",
                     "type": "integer"
@@ -3672,6 +3675,10 @@ const docTemplate = `{
                 },
                 "sourceType": {
                     "description": "\"observer\" or \"node\"",
+                    "type": "string"
+                },
+                "suggestedTitle": {
+                    "description": "SuggestedTitle is the MeshCore suggested-settings title, set only for a confident\ncatalogue match. Absent when the match is ambiguous or unknown — callers keep the\nraw preset label. CodingRate is known for observer-sourced rows; node rows omit it.",
                     "type": "string"
                 }
             }
@@ -3713,7 +3720,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "isRoot": {
+                    "description": "deployment root scope for the no-filter state",
+                    "type": "boolean"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "shortCode": {
+                    "description": "compact display code e.g. \"SWE\"",
                     "type": "string"
                 },
                 "slug": {
@@ -3732,7 +3747,15 @@ const docTemplate = `{
                 "id": {
                     "type": "integer"
                 },
+                "isRoot": {
+                    "description": "deployment root scope for the no-filter state",
+                    "type": "boolean"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "shortCode": {
+                    "description": "compact display code e.g. \"SWE\"",
                     "type": "string"
                 },
                 "slug": {
@@ -3757,6 +3780,21 @@ const docTemplate = `{
                 },
                 "snr": {
                     "type": "number"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite": {
+            "type": "object",
+            "properties": {
+                "confidence": {
+                    "description": "\"high\", \"ambiguous\", or \"none\"",
+                    "type": "string"
+                },
+                "nodeId": {
+                    "type": "string"
+                },
+                "nodeName": {
+                    "type": "string"
                 }
             }
         },
@@ -4048,6 +4086,13 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "type": "string"
+                    }
+                },
+                "resolvedPath": {
+                    "description": "global resolution of PathHashes, index-aligned",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite"
                     }
                 },
                 "snrValues": {

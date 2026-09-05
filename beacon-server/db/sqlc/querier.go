@@ -32,6 +32,10 @@ type Querier interface {
 	DeleteOldTelemetry(ctx context.Context, reportedAt pgtype.Timestamptz) error
 	// Keeps the trace IATA filter in step with packet retention.
 	DeleteOldTraceIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error
+	// Prunes node-to-IATA memberships not refreshed since the cutoff. The node row itself is
+	// untouched; only the stale regional association is dropped. Kept rows (recently heard)
+	// continue to badge and filter exactly as before.
+	DeleteStaleNodeIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error
 	// A neighbor edge is only as good as its last confirmation (a 3-byte-path
 	// packet or a /neighbors report); the cleanup task drops edges that haven't
 	// been re-confirmed within the neighbor retention window.
@@ -46,7 +50,7 @@ type Querier interface {
 	// GetIATA already makes.
 	GetIATABorder(ctx context.Context, iata string) ([]byte, error)
 	GetKnownRoutesByNode(ctx context.Context, arg GetKnownRoutesByNodeParams) ([]GetKnownRoutesByNodeRow, error)
-	GetNodeByID(ctx context.Context, id uuid.UUID) (GetNodeByIDRow, error)
+	GetNodeByID(ctx context.Context, arg GetNodeByIDParams) (GetNodeByIDRow, error)
 	GetNodeByPubkey(ctx context.Context, publicKey []byte) (uuid.UUID, error)
 	// Returns the neighbors of a node with details, ordered by most recently seen.
 	GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]GetNodeNeighborsRow, error)
@@ -76,9 +80,11 @@ type Querier interface {
 	// Repeaters/room servers (node_type 2/3) whose current advert-derived clock drift exceeds
 	// the given threshold in magnitude, worst first. Not time-windowed -- reflects each node's
 	// latest measured drift, not an aggregate over a period.
+	// Current membership only ($3): stale node_iatas rows neither badge nor filter.
 	GetStatsClockDrift(ctx context.Context, arg GetStatsClockDriftParams) ([]GetStatsClockDriftRow, error)
 	// Returns node counts grouped by type, optionally filtered by IATA.
-	GetStatsNodeTypes(ctx context.Context, dollar_1 []string) ([]GetStatsNodeTypesRow, error)
+	// Current membership only ($2): stale node_iatas rows do not count.
+	GetStatsNodeTypes(ctx context.Context, arg GetStatsNodeTypesParams) ([]GetStatsNodeTypesRow, error)
 	// ============================================================
 	// STATS
 	// ============================================================
@@ -283,6 +289,9 @@ type Querier interface {
 	UpsertPacket(ctx context.Context, arg UpsertPacketParams) (UpsertPacketRow, error)
 	UpsertRegion(ctx context.Context, arg UpsertRegionParams) (int32, error)
 	UpsertRegionIATA(ctx context.Context, arg UpsertRegionIATAParams) error
+	// Selector-facing root identity for an already-upserted region. Only the short code and the
+	// explicit root flag live here so UpsertRegion keeps its existing signature.
+	UpsertRegionMeta(ctx context.Context, arg UpsertRegionMetaParams) error
 	// Refreshes at most hourly so repeat hears don't churn the row.
 	UpsertTraceIATA(ctx context.Context, arg UpsertTraceIATAParams) error
 	// ============================================================

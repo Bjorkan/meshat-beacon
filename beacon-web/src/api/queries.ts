@@ -78,7 +78,14 @@ export const regionQueries = {
       queryKey: regionQueries.all(),
       queryFn: async () => {
         const summaries = await getRegions();
-        return Promise.all(summaries.map((s) => getRegion(s.id)));
+        const details = await Promise.all(summaries.map((s) => getRegion(s.id)));
+        // Carry the summary's root identity onto the detail (the detail endpoint may lag
+        // behind the summary on shortCode/isRoot until swagger is regenerated).
+        return details.map((d, i) => ({
+          ...d,
+          shortCode: d.shortCode ?? summaries[i]?.shortCode,
+          isRoot: d.isRoot ?? summaries[i]?.isRoot,
+        }));
       },
       staleTime: 5 * 60_000,
     }),

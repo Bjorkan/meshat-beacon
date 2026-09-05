@@ -8,7 +8,12 @@ import { payloadTypeVariant } from '../../components/badge-utils';
 import { useWsPacketHandler } from '../../hooks/useWsHandlers';
 import type { WsPacketObservation } from '../../types/ws';
 import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
-import { livePacketEntry, pushLivePacket, type LivePacketEntry } from './live-packet-feed';
+import {
+  livePacketEntry,
+  pushLivePacket,
+  buildLiveFlowCandidate,
+  type LivePacketEntry,
+} from './live-packet-feed';
 import { packetFlowColor } from './packet-flow-colors';
 
 interface LivePacketFeedProps {
@@ -37,6 +42,8 @@ export function LivePacketFeed({
     (data: WsPacketObservation['data']) => {
       if (!active) return;
       if (selectedIatas?.length && !selectedIatas.includes(data.observation.iata)) return;
+      // Same renderability gate as the map animation: ineligible packets never enter the feed.
+      if (!buildLiveFlowCandidate(data.observation)) return;
       setFeed((current) => ({
         key: resetKey,
         entries: pushLivePacket(
@@ -60,7 +67,7 @@ export function LivePacketFeed({
         onClick={() => setPanelOpen(true)}
         aria-label={t('map.showLivePackets')}
         title={t('map.showLivePackets')}
-        className="absolute top-3 right-14 z-10 flex items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
+        className="relative flex shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden>
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" />
@@ -74,7 +81,7 @@ export function LivePacketFeed({
   return (
     <section
       aria-label={t('map.livePackets')}
-      className="absolute top-3 right-14 z-10 w-[360px] max-w-[calc(100%_-_4.25rem)] overflow-hidden rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
+      className="relative min-w-0 w-[360px] max-w-full overflow-hidden rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
     >
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-1.5">
         <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">

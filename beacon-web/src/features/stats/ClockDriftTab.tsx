@@ -1,7 +1,7 @@
 import { useClockDrift } from './useStats';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { DataTable, type Column } from '../../components/DataTable';
+import { DataTable, type Column, type MobileSortOption } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
 import { IataChip } from '../../components/IataChip';
 import { Timestamp } from '../../components/Timestamp';
@@ -62,6 +62,33 @@ function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
   ];
 }
 
+// Drift sorts by absolute magnitude (the signed ahead/behind text is display only), so the
+// semantic labels spell that out rather than exposing a bare Drift arrow.
+function clockMobileSortOptions(t: TFunction): MobileSortOption[] {
+  return [
+    {
+      id: 'largest-drift',
+      label: t('sort.largestDrift'),
+      sort: { columnId: 'Drift', direction: 'desc' },
+    },
+    {
+      id: 'smallest-drift',
+      label: t('sort.smallestDrift'),
+      sort: { columnId: 'Drift', direction: 'asc' },
+    },
+    {
+      id: 'recently-checked',
+      label: t('sort.recentlyChecked'),
+      sort: { columnId: 'Checked', direction: 'desc' },
+    },
+    {
+      id: 'oldest-checked',
+      label: t('sort.oldestChecked'),
+      sort: { columnId: 'Checked', direction: 'asc' },
+    },
+  ];
+}
+
 // Repeaters/room servers whose advert-derived clock has drifted past the server threshold, worst
 // first. Not time-windowed (each row is the node's latest reading), so there's no range selector.
 export function ClockDriftTab() {
@@ -82,6 +109,7 @@ export function ClockDriftTab() {
         isLoading={clockDrift.isLoading}
         emptyLabel={clockDrift.isError ? t('common.failedToLoad') : t('stats.noRepeatersOutOfSync')}
         defaultSort={{ header: 'Drift', direction: 'desc' }}
+        mobileSortOptions={clockMobileSortOptions(t)}
       />
     </div>
   );

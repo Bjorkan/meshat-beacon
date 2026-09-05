@@ -8,7 +8,12 @@ import { useScopes } from '../../hooks/useScopes';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
 import { formatHex, formatRadio } from '../../lib/formatters';
 import { Badge } from '../../components/Badge';
-import { DataTable, type Column, type SortState } from '../../components/DataTable';
+import {
+  DataTable,
+  type Column,
+  type MobileSortOption,
+  type SortState,
+} from '../../components/DataTable';
 import { LoadingPill } from '../../components/LoadingPill';
 import { ObserverFilterBar } from './ObserverFilterBar';
 import { deriveObserverStatus } from './observer-status';
@@ -200,6 +205,25 @@ export function ObserverTable({
 
   const scopeOptions = useScopes();
   const columns = useMemo(() => observerColumns(t), [t]);
+  // Status maps deliberately: the server's status ordering sorts 'offline' before 'online'
+  // lexically, so Online first needs desc and Offline first needs asc.
+  const mobileSortOptions = useMemo<MobileSortOption[]>(
+    () => [
+      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Name', direction: 'asc' } },
+      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'Name', direction: 'desc' } },
+      {
+        id: 'online-first',
+        label: t('sort.onlineFirst'),
+        sort: { columnId: 'Status', direction: 'desc' },
+      },
+      {
+        id: 'offline-first',
+        label: t('sort.offlineFirst'),
+        sort: { columnId: 'Status', direction: 'asc' },
+      },
+    ],
+    [t],
+  );
 
   return (
     <div className="flex flex-1 min-h-0">
@@ -234,6 +258,7 @@ export function ObserverTable({
           sort={sort}
           onSortChange={(value) => onViewStateChange({ sort: value })}
           sortMode="server"
+          mobileSortOptions={mobileSortOptions}
           virtualize
           onEndReached={loadMore}
           renderCard={(observer) => renderObserverCard(observer, t)}

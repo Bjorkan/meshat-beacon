@@ -305,31 +305,41 @@ export function MapView({
           to this element, which overrides Tailwind's `absolute` and would collapse inset-0 to 0
           height. data-dark drives the maplibre control theming in index.css. */}
       <div ref={containerRef} data-dark={isDark} className="flex-1" />
-      <MapSettingsPanel
-        typeFilter={typeFilter}
-        onTypeChange={handleTypeChange}
-        clustered={clustered}
-        onClusteredChange={handleClusteredChange}
-        liveMode={packetFlow}
-        neighborLines={neighborLines}
-        onNeighborLinesChange={handleNeighborLinesChange}
-        borders={borders}
-        onBordersChange={handleBordersChange}
-        buildShareParams={buildShareParams}
-      />
+      {/* Shared responsive top-overlay row: settings + live feed share one flex owner so they can
+          never claim the same physical space. On narrow screens they stack vertically. */}
+      <div className="pointer-events-none absolute inset-x-3 top-3 z-10 flex max-h-[calc(100%-4rem)] flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="pointer-events-auto flex min-w-0 max-w-full shrink-0 sm:max-w-[240px]">
+          <MapSettingsPanel
+            typeFilter={typeFilter}
+            onTypeChange={handleTypeChange}
+            clustered={clustered}
+            onClusteredChange={handleClusteredChange}
+            liveMode={packetFlow}
+            neighborLines={neighborLines}
+            onNeighborLinesChange={handleNeighborLinesChange}
+            borders={borders}
+            onBordersChange={handleBordersChange}
+            buildShareParams={buildShareParams}
+          />
+        </div>
+        {packetFlow && (
+          <div className="pointer-events-auto flex min-w-0 max-w-full justify-end overflow-y-auto sm:max-w-[360px]">
+            <LivePacketFeed
+              active={packetFlow}
+              resetKey={`${regionKey}:${packetFlowSession}`}
+              selectedIatas={selectedIatas}
+              wsManager={wsManager}
+              onOpenPacket={onOpenPacket}
+            />
+          </div>
+        )}
+      </div>
       <PacketFlowButton
         active={packetFlow}
         onToggle={() => {
           if (!packetFlow) setPacketFlowSession((session) => session + 1);
           setPacketFlow((value) => !value);
         }}
-      />
-      <LivePacketFeed
-        active={packetFlow}
-        resetKey={`${regionKey}:${packetFlowSession}`}
-        selectedIatas={selectedIatas}
-        wsManager={wsManager}
-        onOpenPacket={onOpenPacket}
       />
       {/* streams in 50 at a time; the count climbs as pages land, then the pill disappears */}
       <LoadingPill

@@ -165,6 +165,61 @@ describe('DataTable card mode', () => {
     expect(onEndReached).toHaveBeenCalledTimes(1);
   });
 
+  it('renders explicit mobile sort options and shares sort state with desktop', () => {
+    setMobile(true);
+    const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
+    const { container } = render(
+      <DataTable
+        columns={[{ header: 'ID', cell: (r: Row) => r.id, sortValue: (r: Row) => r.id }]}
+        rows={unsorted}
+        rowKey={(r) => r.id}
+        selectedKey={null}
+        onSelect={() => {}}
+        emptyLabel="none"
+        mobileSortOptions={[
+          { id: 'az', label: 'Name A–Z', sort: { columnId: 'ID', direction: 'asc' } },
+          { id: 'za', label: 'Name Z–A', sort: { columnId: 'ID', direction: 'desc' } },
+        ]}
+      />,
+    );
+
+    // explicit labels, no generic arrow chips
+    expect(screen.getByRole('button', { name: 'Name A–Z' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Name Z–A' })).toBeInTheDocument();
+    expect(screen.queryByText('▲')).toBeNull();
+    expect(screen.queryByText('▼')).toBeNull();
+
+    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
+      'b',
+      'a',
+    ]);
+    fireEvent.click(screen.getByRole('button', { name: 'Name A–Z' }));
+    expect(screen.getByRole('button', { name: 'Name A–Z' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
+      'a',
+      'b',
+    ]);
+  });
+
+  it('shows no mobile sort bar when no explicit options are given', () => {
+    setMobile(true);
+    render(
+      <DataTable
+        columns={[{ header: 'ID', cell: (r: Row) => r.id, sortValue: (r: Row) => r.id }]}
+        rows={[{ id: 'b' }, { id: 'a' }]}
+        rowKey={(r) => r.id}
+        selectedKey={null}
+        onSelect={() => {}}
+        emptyLabel="none"
+      />,
+    );
+    // a new sortable desktop column must not create a mobile action by itself
+    expect(screen.queryByLabelText(/Sort/)).toBeNull();
+  });
+
   it('keeps TanStack sorting available above the mobile cards', () => {
     setMobile(true);
     const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
@@ -176,6 +231,9 @@ describe('DataTable card mode', () => {
         selectedKey={null}
         onSelect={() => {}}
         emptyLabel="none"
+        mobileSortOptions={[
+          { id: 'az', label: 'Name A–Z', sort: { columnId: 'ID', direction: 'asc' } },
+        ]}
       />,
     );
 
@@ -183,7 +241,7 @@ describe('DataTable card mode', () => {
       'b',
       'a',
     ]);
-    fireEvent.click(within(screen.getByLabelText(/Sort/)).getByRole('button', { name: /ID/ }));
+    fireEvent.click(within(screen.getByLabelText(/Sort/)).getByRole('button', { name: /A–Z/ }));
     expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
       'a',
       'b',

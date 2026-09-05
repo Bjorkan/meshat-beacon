@@ -60,3 +60,21 @@ export function deserializeSelection(raw: string | null): RegionSelection {
   }
   return ALL_REGIONS;
 }
+
+// Normalize a selection against the configured root region: a stored selection containing only
+// the root slug means the same as the empty no-filter state (the root borrows the all-data
+// identity without converting it to a fixed IATA list), so collapse it for consistent display.
+export function normalizeSelection(
+  selection: RegionSelection,
+  rootSlug: string | null,
+): RegionSelection {
+  if (!rootSlug) return selection;
+  if (
+    selection.iatas.length === 0 &&
+    selection.regions.length === 1 &&
+    selection.regions[0] === rootSlug
+  ) {
+    return ALL_REGIONS;
+  }
+  return selection;
+}

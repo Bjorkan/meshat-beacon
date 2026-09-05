@@ -291,3 +291,59 @@ describe('region picker filter', () => {
     expect(screen.getByText('Eastern Canada')).toBeInTheDocument();
   });
 });
+
+describe('region picker root region', () => {
+  const ROOT_REGIONS = [
+    { id: 1, slug: 'sweden', name: 'Sverige', shortCode: 'SWE', isRoot: true, iatas: ['ARN'] },
+    { id: 2, slug: 'gotland', name: 'Gotland', iatas: ['VBY'] },
+  ];
+
+  beforeEach(() => {
+    vi.mocked(getIatas).mockResolvedValue([{ iata: 'ARN', displayName: 'Stockholm' }]);
+    vi.mocked(getRegions).mockResolvedValue(
+      ROOT_REGIONS.map(({ id, slug, name, shortCode, isRoot }) => ({
+        id,
+        slug,
+        name,
+        shortCode,
+        isRoot,
+      })),
+    );
+    vi.mocked(getRegion).mockImplementation(async (id: number) =>
+      ROOT_REGIONS.find((r) => r.id === id)!,
+    );
+  });
+
+  it('renders SWE Sverige as the root choice and omits the duplicate region row', async () => {
+    renderShell();
+    const trigger = screen.getByRole('button', { name: /REGION/ });
+    await waitFor(() => expect(trigger).toHaveTextContent('SWE'));
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await waitFor(() => expect(screen.getByText('Sverige')).toBeInTheDocument());
+    expect(screen.getAllByText('SWE').length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByText('All Regions')).not.toBeInTheDocument();
+    // root region is not repeated under the Regions group; non-root regions still render.
+    // Buttons with a checkbox are region rows; the top SWE Sverige row has a spacer instead.
+    const buttons = screen.getAllByRole('button');
+    const regionRows = buttons.filter((b) => b.querySelector('span.w-3.rounded-sm'));
+    expect(regionRows.map((b) => b.textContent).join('|')).not.toContain('Sverige');
+    expect(regionRows.map((b) => b.textContent).join('|')).toContain('Gotland');
+  });
+
+  it('matches the root choice on both SWE and Sverige', async () => {
+    renderShell();
+    const trigger = screen.getByRole('button', { name: /REGION/ });
+    trigger.focus();
+    fireEvent.click(trigger);
+    await waitFor(() => expect(screen.getByText('Sverige')).toBeInTheDocument());
+    const input = screen.getByPlaceholderText(/Filter/);
+
+    fireEvent.change(input, { target: { value: 'swe' } });
+    expect(screen.getByText('Sverige')).toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: 'sverige' } });
+    expect(screen.getByText('Sverige')).toBeInTheDocument();
+  });
+});

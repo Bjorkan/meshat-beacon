@@ -12,6 +12,11 @@ type RadioPreset struct {
 	IATA       string `json:"iata"`
 	SourceType string `json:"sourceType"` // "observer" or "node"
 	Count      int64  `json:"count"`      // number of observers or nodes on this preset in this IATA
+	// SuggestedTitle is the MeshCore suggested-settings title, set only for a confident
+	// catalogue match. Absent when the match is ambiguous or unknown — callers keep the
+	// raw preset label. CodingRate is known for observer-sourced rows; node rows omit it.
+	SuggestedTitle *string `json:"suggestedTitle,omitempty"`
+	CodingRate     *int16  `json:"codingRate,omitempty"`
 }
 
 // StatsOverview is the top-level network summary for the overview endpoint.

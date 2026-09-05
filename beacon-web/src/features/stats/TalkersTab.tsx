@@ -4,7 +4,7 @@ import { useChartColors } from './chartTheme';
 import { useTopAdvertisers, useTopTalkers } from './useStats';
 import { leaderboardOption } from './chartOptions';
 import { Card, ChartCard } from './cards';
-import { DataTable, type Column } from '../../components/DataTable';
+import { DataTable, type Column, type MobileSortOption } from '../../components/DataTable';
 import { Badge } from '../../components/Badge';
 import { IataChip } from '../../components/IataChip';
 import { formatCount, formatRatePerDay } from '../../lib/formatters';
@@ -30,6 +30,30 @@ export function TalkersTab({ range }: TalkersTabProps) {
 
   const advertisers = topAdvertisers.data ?? [];
 
+  // Leaderboard semantics: the API's natural order is total adverts desc, which has no visible
+  // desktop column — so the mobile model carries its own advertCount accessor via a hidden column.
+  const advertiserMobileSortOptions = useMemo<MobileSortOption[]>(
+    () => [
+      {
+        id: 'most-adverts',
+        label: t('sort.mostAdverts'),
+        sort: { columnId: '__advertCount', direction: 'desc' },
+      },
+      {
+        id: 'most-flood',
+        label: t('sort.mostFlood'),
+        sort: { columnId: 'Flood', direction: 'desc' },
+      },
+      {
+        id: 'most-direct',
+        label: t('sort.mostDirect'),
+        sort: { columnId: 'Direct', direction: 'desc' },
+      },
+      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Node', direction: 'asc' } },
+    ],
+    [t],
+  );
+
   const advertiserColumns = useMemo<Column<TopAdvertiser>[]>(() => {
     const windowMs = RANGE_MS[range];
     // count over the compacted total, then the per-day rate for the same window in muted text
@@ -40,6 +64,14 @@ export function TalkersTab({ range }: TalkersTabProps) {
       </span>
     );
     return [
+      {
+        // Hidden sort-only column: the API's natural total-advert ranking has no visible desktop
+        // column, but mobile needs it as the explicit default option. Desktop never renders it.
+        header: '__advertCount',
+        hidden: true,
+        cell: () => null,
+        sortValue: (a) => a.advertCount,
+      },
       {
         header: 'Node',
         label: t('stats.node'),
@@ -99,6 +131,8 @@ export function TalkersTab({ range }: TalkersTabProps) {
             emptyLabel={
               topAdvertisers.isError ? t('common.failedToLoad') : t('stats.noAdvertisers')
             }
+            defaultSort={{ header: '__advertCount', direction: 'desc' }}
+            mobileSortOptions={advertiserMobileSortOptions}
           />
         </div>
       </Card>
