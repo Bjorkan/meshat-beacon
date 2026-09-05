@@ -110,7 +110,7 @@ export function MapSettingsPanel({
   };
 
   return (
-    <div className="absolute top-3 left-3 z-10 w-60 max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg overflow-hidden font-mono">
+    <div className="relative min-w-0 w-60 max-w-full bg-bg-raised border border-border rounded-md shadow-lg overflow-hidden font-mono">
       <button
         type="button"
         onClick={toggle}
