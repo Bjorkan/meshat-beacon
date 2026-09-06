@@ -10,9 +10,9 @@ import { formatSnr, snrLevel, SIGNAL_LEVEL_CLASSES } from '../../lib/formatters'
 import type { RawHop, ResolvedHop, TracePacket } from '../../types/api';
 
 // A trace packet's path, rendered exactly like the TRACE payload view: the raw path-hash byte as the
-// label, tinted by resolution confidence with candidate nodes in the popover, and the per-hop SNR on a
-// sub-line below it (a "-" placeholder keeps the row aligned). rawPath and resolvedRoute are
-// index-aligned (one entry per hash).
+// label, tinted by resolution confidence with candidate nodes in the popover, and the per-hop SNR
+// below it only where measured (no placeholder — missing SNR renders nothing so the chain
+// stays compact). rawPath and resolvedRoute are index-aligned (one entry per hash).
 function TraceHopChain({
   rawPath,
   resolvedRoute,
@@ -45,12 +45,8 @@ function TraceHopChain({
                 onViewNode={onViewNode}
                 showSnr={false}
               />
-              {snr != null ? (
+              {snr != null && (
                 <span className={`text-[11px] ${sigClass}`}>{formatSnr(snr)} dB</span>
-              ) : (
-                <span className="text-[11px] text-text-dim" aria-hidden>
-                  -
-                </span>
               )}
             </span>
           </span>

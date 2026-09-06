@@ -27,6 +27,8 @@ interface TraceListProps {
 // The list now carries the most complete observation's path, so we can show the hops (and the SNR we
 // heard on each) right on the card instead of making people open the detail panel for a quick look.
 // Uniquely resolved hops show the node name; the raw prefix stays as secondary text for diagnostics.
+// SNR renders inline in the chip title when present — no placeholder sub-line, so cards without SNR
+// stay compact instead of growing a stray "-" row.
 function TracePathPreview({
   hashes,
   snrs,
@@ -44,6 +46,8 @@ function TracePathPreview({
         const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
         const hop = resolved?.[i];
         const named = hop?.confidence === 'high' && hop.nodeName;
+        const title =
+          snr != null ? `${hash.toUpperCase()} · ${formatSnr(snr)} dB` : hash.toUpperCase();
         return (
           <span key={i} className="contents">
             {i > 0 && (
@@ -53,7 +57,7 @@ function TracePathPreview({
             )}
             <span
               className="inline-flex flex-col items-center gap-0.5"
-              title={named ? hash.toUpperCase() : undefined}
+              title={named ? title : undefined}
             >
               <span className="px-1.5 py-px rounded-sm bg-primary/6 text-primary font-mono text-[11px] font-semibold">
                 {named ? hop.nodeName : hash.toUpperCase()}
@@ -61,12 +65,9 @@ function TracePathPreview({
               {named && (
                 <span className="font-mono text-[10px] text-text-dim">{hash.toUpperCase()}</span>
               )}
-              {/* keep a sub-line on every hop (SNR or a placeholder) so the badges across the row line up */}
-              {snr != null ? (
-                <span className={`font-mono text-[10px] ${sigClass}`}>{formatSnr(snr)} dB</span>
-              ) : (
-                <span className="font-mono text-[10px] text-text-dim" aria-hidden>
-                  -
+              {snr != null && (
+                <span className={`font-mono text-[10px] ${sigClass}`}>
+                  {formatSnr(snr)} dB
                 </span>
               )}
             </span>
