@@ -24,8 +24,13 @@ export function InlinePacketPath({ packet }: { packet: PacketSummary }) {
   const summary = buildPathSummary(packet);
   if (summary.isNa) return <span className="text-text-dim">n/a</span>;
   if (summary.chips.length === 0) {
+    // A direct (0-hop) packet has no path; render a bare "direct" badge rather than
+    // the duplicated "0h · direct" (the Hops·Hash column owns the 0h part — or is
+    // empty when there is nothing to count). Clamp width so it never wraps.
     return (
-      <span className="font-mono text-text-muted">{summary.hopLabel.replace(' hops', 'h')}</span>
+      <span className="max-w-28 truncate font-mono text-text-muted" title="direct">
+        direct
+      </span>
     );
   }
 

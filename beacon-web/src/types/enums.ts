@@ -45,6 +45,14 @@ export const RouteType = {
 
 export type RouteTypeValue = (typeof RouteType)[keyof typeof RouteType];
 
+// Short display names for the narrow packet-table Route column (the server sends
+// full names like TRANSPORT_FLOOD in routeTypeName, which ellipsizes at 5.75rem).
+export function shortRouteTypeName(name: string | undefined): string {
+  if (name === 'TRANSPORT_FLOOD') return 'T_FLOOD';
+  if (name === 'TRANSPORT_DIRECT') return 'T_DIRECT';
+  return name ?? '';
+}
+
 export const ROUTE_TYPE_NAMES: Record<RouteTypeValue, string> = {
   [RouteType.TRANSPORT_FLOOD]: 'TRANSPORT_FLOOD',
   [RouteType.FLOOD]: 'FLOOD',
