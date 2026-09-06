@@ -247,3 +247,57 @@ func TestGetScopeStats(t *testing.T) {
 		t.Errorf("expected PacketCount 100, got %d", items[0].PacketCount)
 	}
 }
+
+// A sub-hour window must not be rounded down to an empty SQL interval.
+func TestStatsPreserveSubHourWindows(t *testing.T) {
+	for _, endpoint := range []string{"observations", "payload", "observers", "advertisers", "talkers"} {
+		t.Run(endpoint, func(t *testing.T) {
+			mock := mockdb.NewMockQuerier(gomock.NewController(t))
+			check := func(interval pgtype.Interval) {
+				t.Helper()
+				if !interval.Valid || interval.Microseconds < (30*time.Minute).Microseconds() || interval.Microseconds > (31*time.Minute).Microseconds() {
+					t.Fatalf("expected a 30-minute window, got %+v", interval)
+				}
+			}
+			store := &Store{q: mock}
+			since := time.Now().Add(-30 * time.Minute)
+			ctx := context.Background()
+			var err error
+			switch endpoint {
+			case "observations":
+				mock.EXPECT().GetHourlyStats(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetHourlyStatsParams) ([]sqlc.MvHourlyIataStat, error) {
+					check(p.Column2)
+					return nil, nil
+				})
+				_, err = store.GetStatsObservations(ctx, nil, since)
+			case "payload":
+				mock.EXPECT().GetStatsPayloadBreakdown(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsPayloadBreakdownParams) ([]sqlc.GetStatsPayloadBreakdownRow, error) {
+					check(p.Column2)
+					return nil, nil
+				})
+				_, err = store.GetStatsPayloadBreakdown(ctx, nil, since)
+			case "observers":
+				mock.EXPECT().GetStatsTopObservers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopObserversParams) ([]sqlc.GetStatsTopObserversRow, error) {
+					check(p.Column1)
+					return nil, nil
+				})
+				_, err = store.GetStatsTopObservers(ctx, nil, since, 10)
+			case "advertisers":
+				mock.EXPECT().GetStatsTopAdvertisers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopAdvertisersParams) ([]sqlc.GetStatsTopAdvertisersRow, error) {
+					check(p.Column1)
+					return nil, nil
+				})
+				_, err = store.GetStatsTopAdvertisers(ctx, nil, since, 10)
+			case "talkers":
+				mock.EXPECT().GetStatsTopTalkers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopTalkersParams) ([]sqlc.GetStatsTopTalkersRow, error) {
+					check(p.Column1)
+					return nil, nil
+				})
+				_, err = store.GetStatsTopTalkers(ctx, nil, since, 10)
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}

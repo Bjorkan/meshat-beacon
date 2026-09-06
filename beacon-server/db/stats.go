@@ -37,7 +37,7 @@ func (s *Store) GetStatsObservations(ctx context.Context, iatas []string, since 
 	interval := time.Since(since)
 	rows, err := s.q.GetHourlyStats(ctx, sqlc.GetHourlyStatsParams{
 		Column1: iatas,
-		Column2: pgtype.Interval{Microseconds: int64(interval.Hours()) * 3600 * 1e6, Valid: true},
+		Column2: pgtype.Interval{Microseconds: interval.Microseconds(), Valid: true},
 	})
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (s *Store) GetStatsPayloadBreakdown(ctx context.Context, iatas []string, si
 	interval := time.Since(since)
 	rows, err := s.q.GetStatsPayloadBreakdown(ctx, sqlc.GetStatsPayloadBreakdownParams{
 		Column1: iatas,
-		Column2: pgtype.Interval{Microseconds: int64(interval.Hours()) * 3600 * 1e6, Valid: true},
+		Column2: pgtype.Interval{Microseconds: interval.Microseconds(), Valid: true},
 	})
 	if err != nil {
 		return nil, err
@@ -114,7 +114,7 @@ func (s *Store) GetStatsTopObservers(ctx context.Context, iatas []string, since 
 	}
 	interval := time.Since(since)
 	rows, err := s.q.GetStatsTopObservers(ctx, sqlc.GetStatsTopObserversParams{
-		Column1: pgtype.Interval{Microseconds: int64(interval.Hours()) * 3600 * 1e6, Valid: true},
+		Column1: pgtype.Interval{Microseconds: interval.Microseconds(), Valid: true},
 		Column2: iatas,
 		Limit:   limit,
 	})
@@ -140,7 +140,7 @@ func (s *Store) GetStatsTopAdvertisers(ctx context.Context, iatas []string, sinc
 	}
 	interval := time.Since(since)
 	rows, err := s.q.GetStatsTopAdvertisers(ctx, sqlc.GetStatsTopAdvertisersParams{
-		Column1: pgtype.Interval{Microseconds: int64(interval.Hours()) * 3600 * 1e6, Valid: true},
+		Column1: pgtype.Interval{Microseconds: interval.Microseconds(), Valid: true},
 		Column2: iatas,
 		Limit:   limit,
 	})
@@ -204,7 +204,7 @@ func (s *Store) GetStatsTopTalkers(ctx context.Context, iatas []string, since ti
 	}
 	interval := time.Since(since)
 	rows, err := s.q.GetStatsTopTalkers(ctx, sqlc.GetStatsTopTalkersParams{
-		Column1: pgtype.Interval{Microseconds: int64(interval.Hours()) * 3600 * 1e6, Valid: true},
+		Column1: pgtype.Interval{Microseconds: interval.Microseconds(), Valid: true},
 		Column2: iatas,
 		Limit:   limit,
 	})
