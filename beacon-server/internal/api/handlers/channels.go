@@ -163,6 +163,14 @@ func listChannelMessages(reader api.Reader) http.HandlerFunc {
 			since = time.UnixMilli(ms)
 		}
 		iatas := parseIATAs(r)
+		if regionID := r.URL.Query().Get("regionId"); regionID != "" || r.URL.Query().Get("region") != "" {
+			regionIATAs, err := resolveRegionIATAs(r.Context(), regionID, r.URL.Query().Get("region"), reader)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			iatas = append(iatas, regionIATAs...)
+		}
 		var cursor int64
 		if cursorParam := r.URL.Query().Get("cursor"); cursorParam != "" {
 			c, err := strconv.ParseInt(cursorParam, 10, 64)
