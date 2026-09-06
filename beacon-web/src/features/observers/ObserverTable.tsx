@@ -62,11 +62,18 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${deriveObserverStatus(obs) === 'online' ? 'bg-green' : 'bg-text-dim/30'}`}
           />
-          <span
-            className={`truncate ${obs.displayName ? 'text-text-normal' : 'text-text-dim italic'}`}
-          >
-            {obs.displayName ?? formatHex(obs.id)}
-          </span>
+          <div className="min-w-0">
+            <div
+              className={`truncate ${obs.displayName ? 'text-text-normal' : 'text-text-dim italic'}`}
+            >
+              {obs.displayName ?? formatHex(obs.id)}
+            </div>
+            {obs.displayName && (
+              <div className="text-[10px] text-text-dim" title={obs.id}>
+                {obs.id.slice(0, 8)}
+              </div>
+            )}
+          </div>
         </div>
       ),
     },
@@ -114,11 +121,18 @@ function renderObserverCard(obs: ObserverSummary, t: TFunction) {
           <span
             className={`w-1.5 h-1.5 rounded-full shrink-0 ${status === 'online' ? 'bg-green' : 'bg-text-dim/30'}`}
           />
-          <span
-            className={`flex-1 min-w-0 truncate ${obs.displayName ? 'text-text-normal' : 'text-text-dim italic'}`}
-          >
-            {obs.displayName ?? formatHex(obs.id)}
-          </span>
+          <div className="flex-1 min-w-0">
+            <div
+              className={`truncate ${obs.displayName ? 'text-text-normal' : 'text-text-dim italic'}`}
+            >
+              {obs.displayName ?? formatHex(obs.id)}
+            </div>
+            {obs.displayName && (
+              <div className="text-[10px] text-text-dim" title={obs.id}>
+                {obs.id.slice(0, 8)}
+              </div>
+            )}
+          </div>
         </div>
         <span className="shrink-0">
           <Badge variant={status === 'online' ? 'live' : 'offline'}>{t(`options.${status}`)}</Badge>

@@ -77,11 +77,18 @@ export function TalkersTab({ range }: TalkersTabProps) {
         label: t('stats.node'),
         cell: (a) => (
           <div className="flex min-w-0 items-center gap-2">
-            <span
-              className={`truncate ${a.nodeName ? 'text-text-normal' : 'italic text-text-dim'}`}
-            >
-              {a.nodeName ?? a.nodeId.slice(0, 8)}
-            </span>
+            <div className="min-w-0">
+              <div
+                className={`truncate ${a.nodeName ? 'text-text-normal' : 'italic text-text-dim'}`}
+              >
+                {a.nodeName ?? a.nodeId.slice(0, 8)}
+              </div>
+              {a.nodeName && (
+                <div className="text-[10px] text-text-dim" title={a.nodeId}>
+                  {a.nodeId.slice(0, 8)}
+                </div>
+              )}
+            </div>
             <Badge variant="default">{a.nodeTypeName}</Badge>
             <IataChip>{a.iata}</IataChip>
           </div>
