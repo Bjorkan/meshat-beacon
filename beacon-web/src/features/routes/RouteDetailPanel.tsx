@@ -32,12 +32,16 @@ export function RouteDetailPanel({ route, onClose }: RouteDetailPanelProps) {
         <div className="flex flex-col gap-1.5">
           {route.hops.map((hop, i) => {
             const resolved: ResolvedHop = { confidence: 'high', nodes: hop.node ? [hop.node] : [] };
+            // ResolvedHopBlock already renders the node name for high-confidence hops —
+            // show the raw hash as secondary diagnostics only when a node resolved.
             return (
               <div key={i} className="flex items-center gap-2 font-mono text-[13px]">
                 <span className="text-text-dim w-6 shrink-0">#{i + 1}</span>
                 <ResolvedHopBlock hop={resolved} label={hop.hashBytes.toUpperCase()} />
                 {hop.node?.name && (
-                  <span className="text-text-muted truncate">{hop.node.name}</span>
+                  <span className="text-text-dim truncate text-[11px]">
+                    {hop.hashBytes.toUpperCase()}
+                  </span>
                 )}
               </div>
             );

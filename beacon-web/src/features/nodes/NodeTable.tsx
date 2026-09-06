@@ -106,7 +106,12 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       label: t('entities.neighbors'),
       className: 'text-text-muted',
       sortValue: (node) => node.knownNeighborCount,
-      cell: (node) => node.knownNeighborCount.toLocaleString(),
+      cell: (node) =>
+        node.knownNeighborCount > 0 ? (
+          node.knownNeighborCount.toLocaleString()
+        ) : (
+          <span className="text-text-dim">—</span>
+        ),
     },
     {
       header: 'Location',

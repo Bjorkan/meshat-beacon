@@ -126,11 +126,16 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
   const obs = useMemo(() => aggregateByHour(observations.data ?? []), [observations.data]);
   const obsOption = useMemo(
     () =>
-      observationsAreaOption(obs, colors, {
-        observations: t('stats.observations'),
-        uniquePackets: t('stats.uniquePackets'),
-      }),
-    [obs, colors, t],
+      observationsAreaOption(
+        obs,
+        colors,
+        {
+          observations: t('stats.observations'),
+          uniquePackets: t('stats.uniquePackets'),
+        },
+        range,
+      ),
+    [obs, colors, t, range],
   );
 
   const nodeRows = useMemo(
@@ -222,6 +227,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
 
   const kpiObs = useMemo(() => aggregateByHour(overviewObs.data ?? []), [overviewObs.data]);
   const obsSpark = useMemo(() => kpiObs.slice(-24).map((p) => p.observationCount), [kpiObs]);
+  const packetSpark = useMemo(() => kpiObs.slice(-24).map((p) => p.uniquePackets), [kpiObs]);
   const observerSpark = useMemo(() => kpiObs.slice(-24).map((p) => p.activeObservers), [kpiObs]);
 
   const ov = overview.data;
@@ -237,6 +243,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
           sublabel={ovWindow}
           accent="var(--color-primary)"
           value={kpiLoading ? '—' : formatCount(ov?.totalPackets)}
+          spark={packetSpark}
         />
         <StatCard
           label={t('stats.observations')}

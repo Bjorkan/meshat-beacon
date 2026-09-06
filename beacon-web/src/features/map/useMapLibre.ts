@@ -227,7 +227,9 @@ export function useMapLibre(
       new maplibregl.LngLatBounds(fitPoints[0], fitPoints[0]),
     );
     map.fitBounds(bounds, {
-      padding: 48,
+      // Asymmetric: the footer, LIVE button and attribution sit along the bottom edge,
+      // so the southernmost cluster needs extra room to stay clear of them.
+      padding: { top: 48, left: 48, right: 48, bottom: 96 },
       maxZoom: IATA_ZOOM,
       pitch: fitPoints.length === 1 ? IATA_PITCH : DEFAULT_PITCH,
       bearing: DEFAULT_BEARING,

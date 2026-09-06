@@ -17,7 +17,7 @@ export function Tooltip({
 }) {
   const hasHover = useHasHover();
   const [touchOpen, setTouchOpen] = useState(false);
-  const trigger = <span className={`inline-flex ${className}`}>{children}</span>;
+  const trigger = <span className={`inline-flex whitespace-nowrap ${className}`}>{children}</span>;
 
   // Touch has no hover state, so a Radix Popover preserves Beacon's tap-to-inspect behavior.
   if (!hasHover) {

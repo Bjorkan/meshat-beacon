@@ -88,7 +88,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       header: 'IATA',
       className: 'text-text-normal',
       sortValue: (obs) => obs.iata,
-      cell: (obs) => obs.iata,
+      cell: (obs) => (obs.iata ? obs.iata : <span className="text-text-dim">—</span>),
     },
     {
       header: 'Status',
@@ -124,9 +124,15 @@ function renderObserverCard(obs: ObserverSummary, t: TFunction) {
         </span>
       </div>
       <div className="flex items-center gap-2 text-text-muted">
-        <span className="text-text-normal">{obs.iata}</span>
-        <span>· {obs.observerType ?? '—'}</span>
-        <span>· {formatRadio(obs.radio) ?? '—'}</span>
+        {/* Join only the segments that exist so a missing IATA never leaves a stray "·". */}
+        {[obs.iata, obs.observerType ?? '—', formatRadio(obs.radio) ?? '—']
+          .filter((seg, i) => i > 0 || seg)
+          .map((seg, i, arr) => (
+            <span key={i} className={i === 0 ? 'text-text-normal' : undefined}>
+              {i > 0 && arr[0] ? '· ' : ''}
+              {seg}
+            </span>
+          ))}
       </div>
     </div>
   );

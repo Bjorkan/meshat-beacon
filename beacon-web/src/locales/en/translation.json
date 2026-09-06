@@ -35,7 +35,9 @@
     "loadingEntities": "Loading {{noun}}… ({{count}})",
     "someEntitiesFailed": "Some {{noun}} failed to load ({{count}} shown)",
     "entitiesFailed": "Failed to load {{noun}}",
-    "ageAgo": "{{age}} ago"
+    "ageAgo": "{{age}} ago",
+    "sortedAscending": "sorted ascending",
+    "sortedDescending": "sorted descending"
   },
   "sort": {
     "newest": "Newest",
@@ -174,7 +176,11 @@
     "noObservers": "No observers",
     "neighborCount_one": "{{count}} neighbor",
     "neighborCount_other": "{{count}} neighbors",
-    "lastHeardAgo": "last heard {{age}} ago"
+    "lastHeardAgo": "last heard {{age}} ago",
+    "iata": "IATA",
+    "snr": "SNR",
+    "rssi": "RSSI",
+    "propagation": "Prop"
   },
   "channels": {
     "select": "Select a channel",
@@ -326,7 +332,7 @@
     "nodes": "Nodes",
     "topAdvertisers": "Top advertisers · {{range}}",
     "topTalkers": "Top talkers · {{range}}",
-    "byName": "by name",
+    "byCount": "most messages",
     "noAdvertisers": "No advertisers",
     "repeatersOutOfSync": "Repeaters & room servers out of sync · worst first",
     "noRepeatersOutOfSync": "No repeaters out of sync",
@@ -354,7 +360,13 @@
     "showingNodes": "Showing {{shown}} of {{total}} nodes — narrow to an IATA for the rest",
     "observationAbbrev": "{{count}} obs",
     "seenToday": "seen today",
-    "seenDaysAgo": "seen {{count}}d ago"
+    "seenDaysAgo": "seen {{count}}d ago",
+    "pickRegionAction": "Use the region picker in the header — it drives every tab.",
+    "notFoundTitle": "Page not found",
+    "notFoundSubtitle": "Check the address or go back to the start.",
+    "notFoundAction": "Back to Packets",
+    "traceCount": "Showing up to {{count}} traces",
+    "selectChannelHint": "Pick a channel in the list to read messages."
   },
   "packets": {
     "noun": "packets",

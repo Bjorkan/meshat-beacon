@@ -58,9 +58,9 @@ export function PacketExpansion({
       data-testid="packet-expansion"
       className="bg-bg-surface border-l-2 border-primary pl-6 pr-3 py-2"
     >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[10px] text-text-muted pb-2">
-        <span>
-          {t('entities.observer').toLowerCase()}{' '}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-2 text-[11px] whitespace-nowrap">
+        <span className="text-text-muted">
+          {t('entities.observer')}{' '}
           {observer ? (
             <span className="text-text-normal">
               {observer.displayName ?? observer.id.slice(0, 8)}
@@ -69,13 +69,13 @@ export function PacketExpansion({
             <span className="text-text-dim">n/a</span>
           )}
         </span>
-        <span>
+        <span className="text-text-muted">
           {t('common.first')} <Timestamp value={packet.firstHeardAt} />
         </span>
-        <span>
+        <span className="text-text-muted">
           {t('common.last')} <Timestamp value={packet.lastHeardAt} />
         </span>
-        <span>
+        <span className="text-text-muted tabular-nums">
           {t('packets.spread')} {formatPropagation(spread)}
         </span>
         <button

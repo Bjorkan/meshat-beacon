@@ -151,7 +151,7 @@ function HopPopover({
             {showSnr && hop?.snr != null && (
               <span className="text-text-dim">
                 SNR{' '}
-                <span className={SIGNAL_LEVEL_CLASSES[snrLevel(hop.snr) ?? 'bad']}>
+                <span className={SIGNAL_LEVEL_CLASSES[snrLevel(hop.snr) ?? 'mid']}>
                   {formatSnr(hop.snr)}
                 </span>
               </span>

@@ -4,7 +4,7 @@ import { Timestamp } from '../../components/Timestamp';
 import { Badge } from '../../components/Badge';
 import { ScopeTag } from '../../components/ScopeTag';
 import { payloadTypeVariant } from '../../components/badge-utils';
-import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
+import { PAYLOAD_TYPE_NAMES, shortRouteTypeName, type PayloadTypeValue } from '../../types/enums';
 import type { PacketSummary } from '../../types/api';
 import { GRID_TEMPLATE } from './packet-grid';
 import { InlinePacketPath } from './InlinePacketPath';
@@ -25,7 +25,10 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
   const observerTitle = observerName
     ? `${observerName}${area ? ` · ${area}` : ''}${observer?.id ? ` · ${observer.id}` : ''}`
     : undefined;
-  const pathMeta = pathLength ? `${pathLength.hopCount}h · ${pathLength.hashSize}B` : null;
+  const pathMeta =
+    pathLength && pathLength.hopCount > 0
+      ? `${pathLength.hopCount}h · ${pathLength.hashSize}B`
+      : null;
   const na = <span className="text-text-dim">n/a</span>;
 
   return (
@@ -60,7 +63,9 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
           </Badge>
         </span>
         <span className="flex min-w-0 items-center gap-1 overflow-hidden">
-          <span className="truncate">{packet.routeTypeName || t('packets.unknown')}</span>
+          <span className="truncate" title={packet.routeTypeName || undefined}>
+            {shortRouteTypeName(packet.routeTypeName) || t('packets.unknown')}
+          </span>
           {packet.scope && <ScopeTag className="shrink-0">{packet.scope}</ScopeTag>}
         </span>
         <span className="min-w-0 truncate" title={observerTitle}>

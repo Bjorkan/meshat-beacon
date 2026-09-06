@@ -35,7 +35,9 @@
     "loadingEntities": "Laddar {{noun}}… ({{count}})",
     "someEntitiesFailed": "Vissa {{noun}} kunde inte läsas in ({{count}} visas)",
     "entitiesFailed": "Kunde inte läsa in {{noun}}",
-    "ageAgo": "för {{age}} sedan"
+    "ageAgo": "för {{age}} sedan",
+    "sortedAscending": "sorterad stigande",
+    "sortedDescending": "sorterad fallande"
   },
   "sort": {
     "newest": "Nyast",
@@ -46,7 +48,7 @@
     "nameAZ": "Namn A–Ö",
     "nameZA": "Namn Ö–A",
     "mostNeighbors": "Flest grannar",
-    "fewestNeighbors": "Färst grannar",
+    "fewestNeighbors": "Minst grannar",
     "onlineFirst": "Online först",
     "offlineFirst": "Offline först",
     "mostAdverts": "Flest annonser",
@@ -174,7 +176,11 @@
     "noObservers": "Inga observatörer",
     "neighborCount_one": "{{count}} granne",
     "neighborCount_other": "{{count}} grannar",
-    "lastHeardAgo": "senast hörd för {{age}} sedan"
+    "lastHeardAgo": "senast hörd för {{age}} sedan",
+    "iata": "IATA",
+    "snr": "SNR",
+    "rssi": "RSSI",
+    "propagation": "Prop"
   },
   "channels": {
     "select": "Välj en kanal",
@@ -326,7 +332,7 @@
     "nodes": "Noder",
     "topAdvertisers": "Främsta advert-sändare · {{range}}",
     "topTalkers": "Främsta sändare · {{range}}",
-    "byName": "efter namn",
+    "byCount": "flest meddelanden",
     "noAdvertisers": "Inga advert-sändare",
     "repeatersOutOfSync": "Repeaters och room servers ur synk · värst först",
     "noRepeatersOutOfSync": "Inga repeaters ur synk",
@@ -354,7 +360,13 @@
     "showingNodes": "Visar {{shown}} av {{total}} noder — begränsa till en IATA för resten",
     "observationAbbrev": "{{count}} obs",
     "seenToday": "sedd idag",
-    "seenDaysAgo": "sedd för {{count}} d sedan"
+    "seenDaysAgo": "sedd för {{count}} d sedan",
+    "pickRegionAction": "Använd regionsväljaren i sidhuvudet — den styr alla flikar.",
+    "notFoundTitle": "Sidan finns inte",
+    "notFoundSubtitle": "Kontrollera adressen eller gå tillbaka till start.",
+    "notFoundAction": "Tillbaka till Paket",
+    "traceCount": "Visar upp till {{count}} spår",
+    "selectChannelHint": "Välj en kanal i listan för att läsa meddelanden."
   },
   "packets": {
     "noun": "paket",

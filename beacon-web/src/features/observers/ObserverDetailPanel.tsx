@@ -81,11 +81,15 @@ interface Stats {
   internal_heap?: number;
 }
 
-// broker freshness badge: <5m = live, <30m = stale
-function brokerStatusVariant(lastPacketAt: number | null): BadgeVariant {
-  if (!lastPacketAt) return 'offline';
-  const ageMs = Date.now() - lastPacketAt;
-  return ageMs < 5 * 60_000 ? 'live' : ageMs < 30 * 60_000 ? 'stale' : 'offline';
+// broker freshness: the badge tracks packet freshness, but a broker seen recently
+// without packets (idle, not broken) must not read as an error — red is reserved
+// for brokers silent on both channels.
+function brokerStatusVariant(lastPacketAt: number | null, lastSeenAt: number): BadgeVariant {
+  const packetAgeMs = lastPacketAt ? Date.now() - lastPacketAt : Infinity;
+  if (packetAgeMs < 5 * 60_000) return 'live';
+  if (packetAgeMs < 30 * 60_000) return 'stale';
+  const seenAgeMs = Date.now() - lastSeenAt;
+  return seenAgeMs < 30 * 60_000 ? 'stale' : 'offline';
 }
 
 // stats shape depends on the observer's firmware, so we just grab what we recognize
@@ -314,7 +318,7 @@ export function ObserverDetailPanel({
                 {[...observer.brokers]
                   .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
                   .map((b) => {
-                    const variant = brokerStatusVariant(b.lastPacketAt);
+                    const variant = brokerStatusVariant(b.lastPacketAt, b.lastSeenAt);
                     return (
                       <div key={b.name} className="flex items-center gap-3">
                         <Badge variant={variant}>{b.name}</Badge>

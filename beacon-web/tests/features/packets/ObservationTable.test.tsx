@@ -105,7 +105,7 @@ describe('ObservationTable', () => {
   it('colors a mid SNR', () => {
     render(
       <ObservationTable
-        observations={[obs(1, { snr: 7 })]}
+        observations={[obs(1, { snr: 0 })]}
         selectedId={null}
         onSelect={() => {}}
       />,
@@ -118,7 +118,7 @@ describe('ObservationTable', () => {
   it('colors a bad SNR', () => {
     render(
       <ObservationTable
-        observations={[obs(1, { snr: 2 })]}
+        observations={[obs(1, { snr: -10 })]}
         selectedId={null}
         onSelect={() => {}}
       />,

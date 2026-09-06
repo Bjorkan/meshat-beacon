@@ -23,6 +23,7 @@ function observationColumns(t: TFunction): Column<Observation>[] {
     },
     {
       header: 'IATA',
+      label: t('entities.iata'),
       size: 8,
       className: 'font-mono font-bold text-primary tracking-wider',
       cell: (observation) => observation.iata,
@@ -36,6 +37,7 @@ function observationColumns(t: TFunction): Column<Observation>[] {
     },
     {
       header: 'SNR',
+      label: t('entities.snr'),
       size: 8,
       className: (observation) => {
         const level = snrLevel(observation.snr);
@@ -45,12 +47,14 @@ function observationColumns(t: TFunction): Column<Observation>[] {
     },
     {
       header: 'RSSI',
+      label: t('entities.rssi'),
       size: 8,
       className: 'font-mono text-text-muted',
       cell: (observation) => observation.rssi ?? '—',
     },
     {
       header: 'Prop',
+      label: t('entities.propagation'),
       size: 10,
       className: 'font-mono text-text-muted',
       cell: (observation) => formatPropagation(observation.propagationTimeMs),
