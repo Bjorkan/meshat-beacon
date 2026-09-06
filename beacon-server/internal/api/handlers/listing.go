@@ -6,6 +6,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
@@ -39,4 +40,20 @@ func parseSortablePage(r *http.Request, collection, defaultSort string, defaultD
 		return "", "", nil, fmt.Errorf("pageToken does not match sort and direction")
 	}
 	return sort, direction, token, nil
+}
+
+// Bound both response size and the limit+1 / scan-depth arithmetic used by pagers.
+func parseResultLimit(r *http.Request, fallback int32) (int32, error) {
+	raw := r.URL.Query().Get("limit")
+	if raw == "" {
+		return fallback, nil
+	}
+	limit, err := strconv.ParseInt(raw, 10, 32)
+	if err != nil {
+		return 0, fmt.Errorf("limit must be an integer")
+	}
+	if limit < 1 || limit > 1000 {
+		return 0, fmt.Errorf("limit must be between 1 and 1000")
+	}
+	return int32(limit), nil
 }

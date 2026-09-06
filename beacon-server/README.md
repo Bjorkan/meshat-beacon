@@ -357,6 +357,10 @@ configurable via `websocket.max_connections_per_ip` in `config.yaml`.
 
 ## REST API
 
+List, backfill and statistics endpoints accept `limit` values from 1 to 1000.
+Omitting it keeps the endpoint-specific default. Invalid or out-of-range values
+return HTTP 400; paginate larger result sets with the returned cursor.
+
 Base path: `/api/v1`
 
 All list endpoints support cursor-based pagination via `cursor` and `limit`

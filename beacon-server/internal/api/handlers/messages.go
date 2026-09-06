@@ -37,7 +37,7 @@ func MessagesRouter(reader api.Reader) http.Handler {
 //	@Param		region		query		string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		scope		query		string	false	"Filter by transport scope name e.g. %23bc (URL-encoded #bc)"
 //	@Param		cursor	query		int		false	"Message ID of last item for pagination (results ordered newest first)"
-//	@Param		limit		query		int		false	"Max results (default 50)"
+//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200			{object}	api.Page[api.ChannelMessage]
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
@@ -60,14 +60,10 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 			}
 			id = i
 		}
-		var limit int64 = 50
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = l
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		var since time.Time
 		if sinceParam := r.URL.Query().Get("since"); sinceParam != "" {
@@ -134,7 +130,7 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 //	@Param		region		query		string	false	"Filter by region slug"
 //	@Param		regionId	query		int		false	"Filter by region ID"
 //	@Param		scope		query		string	false	"Filter by transport scope name"
-//	@Param		limit		query		int		false	"Max results (default 100)"
+//	@Param		limit		query		int		false	"Max results (1-1000, default 100)"
 //	@Success	200			{object}	[]api.ChannelMessage
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
@@ -151,14 +147,10 @@ func listMessagesBackfill(reader api.Reader) http.HandlerFunc {
 			respondError(w, http.StatusBadRequest, "afterId must be an integer")
 			return
 		}
-		var limit int32 = 100
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 100)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		iatas := parseIATAs(r)
 		if regionIDStr := r.URL.Query().Get("regionId"); regionIDStr != "" || r.URL.Query().Get("region") != "" {

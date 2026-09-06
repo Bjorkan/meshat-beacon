@@ -38,21 +38,17 @@ func ChannelsRouter(reader api.Reader) http.Handler {
 //	@Param		iata	query		string	false	"Filter by IATA code"
 //	@Param		iatas	query		string	false	"Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ"
 //	@Param		cursor	query		int		false	"last_seen epoch ms of last item for pagination"
-//	@Param		limit	query		int		false	"Max results (default 50)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200		{object}	api.Page[api.ChannelSummary]
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/channels [get]
 func listChannels(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		var limit int64 = 50
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = l
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		iatas := parseIATAs(r)
 		var cursor int64
@@ -128,7 +124,7 @@ func getChannel(reader api.Reader) http.HandlerFunc {
 //	@Param		region		query		string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		scope		query		string	false	"Filter by transport scope name e.g. %23bc (URL-encoded #bc)"
 //	@Param		cursor	query		int		false	"Message ID of last item for pagination (results ordered newest first)"
-//	@Param		limit		query		int		false	"Max results (default 50)"
+//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200			{object}	api.Page[api.ChannelMessage]
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
@@ -144,14 +140,10 @@ func listChannelMessages(reader api.Reader) http.HandlerFunc {
 			}
 			id = i
 		}
-		var limit int64 = 50
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = l
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		var since time.Time
 		if sinceParam := r.URL.Query().Get("since"); sinceParam != "" {

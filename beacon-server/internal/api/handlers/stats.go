@@ -166,7 +166,7 @@ func getStatsPayloadBreakdown(reader api.Reader) http.HandlerFunc {
 //	@Param		iatas		query	string	false	"Comma-separated IATA codes"
 //	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
 //	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs"
-//	@Param		limit	query		int		false	"Max results (default 10)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 10)"
 //	@Success	200		{array}		api.TopNode
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/stats/top-nodes [get]
@@ -181,18 +181,10 @@ func getStatsTopNodes(reader api.Reader) http.HandlerFunc {
 			}
 			iatas = append(iatas, regionIATAs...)
 		}
-		var limit int32 = 10
-		if p := r.URL.Query().Get("limit"); p != "" {
-			l, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			if l <= 0 {
-				respondError(w, http.StatusBadRequest, "limit must be positive")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 10)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		nodes, err := reader.GetStatsTopNodes(r.Context(), iatas, limit)
 		if err != nil {
@@ -213,7 +205,7 @@ func getStatsTopNodes(reader api.Reader) http.HandlerFunc {
 //	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
 //	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		since	query		int		false	"Start of window epoch ms (default last 24h)"
-//	@Param		limit	query		int		false	"Max results (default 10)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 10)"
 //	@Success	200		{array}		api.TopObserver
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/stats/top-observers [get]
@@ -237,18 +229,10 @@ func getStatsTopObservers(reader api.Reader) http.HandlerFunc {
 			}
 			since = time.UnixMilli(ms)
 		}
-		var limit int32 = 10
-		if p := r.URL.Query().Get("limit"); p != "" {
-			l, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			if l <= 0 {
-				respondError(w, http.StatusBadRequest, "limit must be positive")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 10)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		observers, err := reader.GetStatsTopObservers(r.Context(), iatas, since, limit)
 		if err != nil {
@@ -269,7 +253,7 @@ func getStatsTopObservers(reader api.Reader) http.HandlerFunc {
 //	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
 //	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		since	query		int		false	"Start of window epoch ms (default last 24h)"
-//	@Param		limit	query		int		false	"Max results (default 10)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 10)"
 //	@Success	200		{array}		api.TopAdvertiser
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/stats/top-advertisers [get]
@@ -293,18 +277,10 @@ func getStatsTopAdvertisers(reader api.Reader) http.HandlerFunc {
 			}
 			since = time.UnixMilli(ms)
 		}
-		var limit int32 = 10
-		if p := r.URL.Query().Get("limit"); p != "" {
-			l, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			if l <= 0 {
-				respondError(w, http.StatusBadRequest, "limit must be positive")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 10)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		advertisers, err := reader.GetStatsTopAdvertisers(r.Context(), iatas, since, limit)
 		if err != nil {
@@ -324,7 +300,7 @@ func getStatsTopAdvertisers(reader api.Reader) http.HandlerFunc {
 //	@Param		iatas		query	string	false	"Comma-separated IATA codes"
 //	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
 //	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs"
-//	@Param		limit	query		int		false	"Max results (default 10)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 10)"
 //	@Success	200		{array}		api.ClockDriftEntry
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/stats/clock-drift [get]
@@ -339,18 +315,10 @@ func getStatsClockDrift(reader api.Reader) http.HandlerFunc {
 			}
 			iatas = append(iatas, regionIATAs...)
 		}
-		var limit int32 = 10
-		if p := r.URL.Query().Get("limit"); p != "" {
-			l, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			if l <= 0 {
-				respondError(w, http.StatusBadRequest, "limit must be positive")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 10)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		entries, err := reader.GetStatsClockDrift(r.Context(), iatas, limit)
 		if err != nil {
@@ -371,7 +339,7 @@ func getStatsClockDrift(reader api.Reader) http.HandlerFunc {
 //	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
 //	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		since	query		int		false	"Start of window epoch ms (default last 24h)"
-//	@Param		limit	query		int		false	"Max results (default 10)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 10)"
 //	@Success	200		{array}		api.TopTalker
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/stats/top-talkers [get]
@@ -395,18 +363,10 @@ func getStatsTopTalkers(reader api.Reader) http.HandlerFunc {
 			}
 			since = time.UnixMilli(ms)
 		}
-		var limit int32 = 10
-		if p := r.URL.Query().Get("limit"); p != "" {
-			l, err := strconv.ParseInt(p, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			if l <= 0 {
-				respondError(w, http.StatusBadRequest, "limit must be positive")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 10)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		talkers, err := reader.GetStatsTopTalkers(r.Context(), iatas, since, limit)
 		if err != nil {

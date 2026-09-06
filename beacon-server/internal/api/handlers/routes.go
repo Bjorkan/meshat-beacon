@@ -37,7 +37,7 @@ func RoutesRouter(reader api.Reader) http.Handler {
 //	@Param		pageToken	query		string	false	"Opaque keyset cursor returned as nextPageToken"
 //	@Param		sort		query		string	false	"Sort by iata, hops, observations, first_seen or last_seen"
 //	@Param		direction	query		string	false	"Sort direction: asc or desc"
-//	@Param		limit		query		int		false	"Max results (default 50)"
+//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200			{object}	api.Page[api.KnownRoute]
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/routes [get]
@@ -61,11 +61,10 @@ func listKnownRoutes(reader api.Reader) http.HandlerFunc {
 				cursor = time.UnixMilli(ms)
 			}
 		}
-		var limit int32 = 50
-		if v := r.URL.Query().Get("limit"); v != "" {
-			if l, err := strconv.ParseInt(v, 10, 32); err == nil {
-				limit = int32(l)
-			}
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		routes, err := reader.ListKnownRoutes(r.Context(), api.RouteListParams{
 			IATAs: iatas, HopCount: hopCount, LegacyCursor: cursor, PageToken: pageToken,

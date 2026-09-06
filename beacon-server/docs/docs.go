@@ -80,7 +80,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -202,7 +202,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -388,7 +388,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -458,7 +458,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 100)",
+                        "description": "Max results (1-1000, default 100)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -602,7 +602,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -737,7 +737,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -854,7 +854,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -946,7 +946,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -1151,7 +1151,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -1245,7 +1245,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 100)",
+                        "description": "Max results (1-1000, default 100)",
                         "name": "limit",
                         "in": "query"
                     },
@@ -1449,7 +1449,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -1706,7 +1706,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 10)",
+                        "description": "Max results (1-1000, default 10)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -2049,7 +2049,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 10)",
+                        "description": "Max results (1-1000, default 10)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -2103,7 +2103,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 10)",
+                        "description": "Max results (1-1000, default 10)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -2163,7 +2163,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 10)",
+                        "description": "Max results (1-1000, default 10)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -2223,7 +2223,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 10)",
+                        "description": "Max results (1-1000, default 10)",
                         "name": "limit",
                         "in": "query"
                     }
@@ -2307,7 +2307,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "description": "Max results (default 50)",
+                        "description": "Max results (1-1000, default 50)",
                         "name": "limit",
                         "in": "query"
                     }

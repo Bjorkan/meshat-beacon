@@ -52,7 +52,7 @@ func NodesRouter(reader api.Reader) http.Handler {
 //	@Param		direction				query		string	false	"Sort direction: asc or desc (default desc)"
 //	@Param		pageToken				query		string	false	"Opaque keyset cursor returned as nextPageToken"
 //	@Param		cursor					query		int		false	"Legacy last_seen epoch ms cursor (only for last_seen desc)"
-//	@Param		limit					query		int		false	"Max results (default 50)"
+//	@Param		limit					query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200						{object}	api.Page[api.NodeSummary]
 //	@Failure	400						{object}	handlers.APIError
 //	@Failure	500						{object}	handlers.APIError
@@ -70,14 +70,10 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 		} else if typeName := r.URL.Query().Get("typeName"); typeName != "" {
 			nodeType = api.NodeTypeFromString(typeName)
 		}
-		var limit int32 = 50
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		var cursor int64
 		if cursorParam := r.URL.Query().Get("cursor"); cursorParam != "" {
@@ -216,7 +212,7 @@ func getNode(reader api.Reader) http.HandlerFunc {
 //	@Produce	json
 //	@Param		nodeId	path		string	true	"Node UUID"
 //	@Param		cursor	query		int		false	"Observation ID of last item for pagination"
-//	@Param		limit	query		int		false	"Max results (default 50)"
+//	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200		{object}	api.Page[api.PacketObservationSummary]
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	500		{object}	handlers.APIError
@@ -237,14 +233,10 @@ func listNodeObservations(reader api.Reader) http.HandlerFunc {
 			}
 			cursor = c
 		}
-		var limit int32 = 50
-		if limitParam := r.URL.Query().Get("limit"); limitParam != "" {
-			l, err := strconv.ParseInt(limitParam, 10, 32)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, "limit must be an integer")
-				return
-			}
-			limit = int32(l)
+		limit, limitErr := parseResultLimit(r, 50)
+		if limitErr != nil {
+			respondError(w, http.StatusBadRequest, limitErr.Error())
+			return
 		}
 		observations, err := reader.ListNodeObservations(r.Context(), nodeID, cursor, limit)
 		if err != nil {
