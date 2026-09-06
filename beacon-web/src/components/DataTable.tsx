@@ -347,6 +347,13 @@ export function DataTable<T>({
                       key={header.id}
                       className="whitespace-nowrap px-4 py-2 text-left font-medium"
                       style={sourceColumn?.size ? { width: `${sourceColumn.size}%` } : undefined}
+                      aria-sort={
+                        direction === 'asc'
+                          ? 'ascending'
+                          : direction === 'desc'
+                            ? 'descending'
+                            : undefined
+                      }
                     >
                       {header.isPlaceholder ? null : header.column.getCanSort() ? (
                         <button
@@ -358,14 +365,24 @@ export function DataTable<T>({
                               ? true
                               : undefined
                           }
+                          aria-label={`${flexRender(header.column.columnDef.header, header.getContext())}${
+                            direction === 'asc'
+                              ? ` (${t('common.sortedAscending')})`
+                              : direction === 'desc'
+                                ? ` (${t('common.sortedDescending')})`
+                                : ''
+                          }`}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
-                          <span
-                            className={direction ? 'text-primary' : 'text-text-dim/40'}
-                            aria-hidden
-                          >
-                            {direction === 'desc' ? '▼' : '▲'}
-                          </span>
+                          {/* Only the active sort column shows an arrow; inactive sortable
+                              columns show nothing so the sort state reads unambiguously. */}
+                          {direction ? (
+                            <span className="text-primary" aria-hidden>
+                              {direction === 'desc' ? '▼' : '▲'}
+                            </span>
+                          ) : (
+                            <span className="w-[9px] shrink-0" aria-hidden />
+                          )}
                         </button>
                       ) : (
                         flexRender(header.column.columnDef.header, header.getContext())

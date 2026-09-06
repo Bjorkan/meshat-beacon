@@ -35,7 +35,9 @@
     "loadingEntities": "Laddar {{noun}}… ({{count}})",
     "someEntitiesFailed": "Vissa {{noun}} kunde inte läsas in ({{count}} visas)",
     "entitiesFailed": "Kunde inte läsa in {{noun}}",
-    "ageAgo": "för {{age}} sedan"
+    "ageAgo": "för {{age}} sedan",
+    "sortedAscending": "sorterad stigande",
+    "sortedDescending": "sorterad fallande"
   },
   "sort": {
     "newest": "Nyast",
@@ -46,7 +48,7 @@
     "nameAZ": "Namn A–Ö",
     "nameZA": "Namn Ö–A",
     "mostNeighbors": "Flest grannar",
-    "fewestNeighbors": "Färst grannar",
+    "fewestNeighbors": "Minst grannar",
     "onlineFirst": "Online först",
     "offlineFirst": "Offline först",
     "mostAdverts": "Flest annonser",

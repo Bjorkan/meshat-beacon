@@ -35,7 +35,9 @@
     "loadingEntities": "Loading {{noun}}… ({{count}})",
     "someEntitiesFailed": "Some {{noun}} failed to load ({{count}} shown)",
     "entitiesFailed": "Failed to load {{noun}}",
-    "ageAgo": "{{age}} ago"
+    "ageAgo": "{{age}} ago",
+    "sortedAscending": "sorted ascending",
+    "sortedDescending": "sorted descending"
   },
   "sort": {
     "newest": "Newest",
