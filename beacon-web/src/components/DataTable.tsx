@@ -106,6 +106,11 @@ export function DataTable<T>({
   }));
   const sort = controlledSort ?? internalSort;
   const sorting = useMemo(() => sortStateToTanStack(sort), [sort]);
+  const columnVisibility = useMemo(
+    () => Object.fromEntries(columns.map((column) => [column.header, !column.hidden])),
+    [columns],
+  );
+  const visibleColumnCount = columns.filter((column) => !column.hidden).length;
 
   const tableColumns = useMemo<ColumnDef<T>[]>(
     () =>
@@ -147,7 +152,7 @@ export function DataTable<T>({
   const table = useReactTable({
     data: rows ?? [],
     columns: [...tableColumns, ...hiddenSortColumns],
-    state: { sorting },
+    state: { sorting, columnVisibility },
     getRowId: (row) => rowKey(row),
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -397,7 +402,7 @@ export function DataTable<T>({
             {virtualize && topPadding > 0 && (
               <tr aria-hidden>
                 <td
-                  colSpan={columns.length}
+                  colSpan={visibleColumnCount}
                   style={{ height: topPadding, padding: 0, border: 0 }}
                 />
               </tr>
@@ -443,7 +448,7 @@ export function DataTable<T>({
             {virtualize && bottomPadding > 0 && (
               <tr aria-hidden>
                 <td
-                  colSpan={columns.length}
+                  colSpan={visibleColumnCount}
                   style={{ height: bottomPadding, padding: 0, border: 0 }}
                 />
               </tr>

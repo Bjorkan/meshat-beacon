@@ -323,3 +323,26 @@ describe('DataTable controlled sorting', () => {
     expect(onSortChange).toHaveBeenCalledWith({ header: 'ID', direction: 'asc' });
   });
 });
+
+describe('DataTable hidden sort columns', () => {
+  it.each([false, true])('keeps sort-only values out of the layout (mobile=%s)', (mobile) => {
+    setMobile(mobile);
+    const { container } = render(
+      <DataTable
+        columns={[
+          { header: 'ID', cell: (r: Row) => r.id },
+          { header: '__rank', hidden: true, cell: () => null, sortValue: (r: Row) => r.id },
+        ]}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selectedKey={null}
+        onSelect={() => {}}
+        emptyLabel="none"
+        defaultSort={{ header: '__rank', direction: 'desc' }}
+      />,
+    );
+    expect(screen.queryByText(/__rank/)).not.toBeInTheDocument();
+    const cells = container.querySelectorAll(mobile ? 'dd' : 'tbody td');
+    expect([...cells].map((cell) => cell.textContent)).toEqual(['b', 'a']);
+  });
+});
