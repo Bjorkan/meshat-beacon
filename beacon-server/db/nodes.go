@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"time"
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
@@ -25,8 +26,14 @@ func (s *Store) UpsertNode(ctx context.Context, n ingest.UpsertNodeParams, radio
 	// years of drift, so only compute/store a delta when it's non-zero.
 	var driftSeconds *int32
 	if n.AdvertTimestamp != 0 {
-		d := int32(int64(n.AdvertTimestamp) - time.Now().Unix())
-		driftSeconds = &d
+		delta := int64(n.AdvertTimestamp) - time.Now().Unix()
+		// Corrupt uint32 timestamps can exceed the signed database field and
+		// reverse the drift's sign on conversion. Exclude MinInt32 too: SQL
+		// uses abs(drift) for ranking, which cannot represent abs(MinInt32).
+		if delta > math.MinInt32 && delta <= math.MaxInt32 {
+			d := int32(delta)
+			driftSeconds = &d
+		}
 	}
 	params := sqlc.UpsertNodeParams{
 		PublicKey:               n.PublicKey,

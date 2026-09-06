@@ -763,3 +763,20 @@ func TestDeleteStaleNodeIATAs(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestUpsertNode_DoesNotWrapClockDrift(t *testing.T) {
+	mock := mockdb.NewMockQuerier(gomock.NewController(t))
+	mock.EXPECT().UpsertNode(gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.UpsertNodeRow, error) {
+			if p.DeviceClockDriftSeconds != nil {
+				t.Errorf("unrepresentable positive drift wrapped to %d", *p.DeviceClockDriftSeconds)
+			}
+			return sqlc.UpsertNodeRow{}, nil
+		},
+	)
+	store := &Store{q: mock}
+	_, _, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{AdvertTimestamp: ^uint32(0)}, ingest.RadioSettings{})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
