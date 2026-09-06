@@ -176,7 +176,11 @@
     "noObservers": "Inga observatörer",
     "neighborCount_one": "{{count}} granne",
     "neighborCount_other": "{{count}} grannar",
-    "lastHeardAgo": "senast hörd för {{age}} sedan"
+    "lastHeardAgo": "senast hörd för {{age}} sedan",
+    "iata": "IATA",
+    "snr": "SNR",
+    "rssi": "RSSI",
+    "propagation": "Prop"
   },
   "channels": {
     "select": "Välj en kanal",

@@ -176,7 +176,11 @@
     "noObservers": "No observers",
     "neighborCount_one": "{{count}} neighbor",
     "neighborCount_other": "{{count}} neighbors",
-    "lastHeardAgo": "last heard {{age}} ago"
+    "lastHeardAgo": "last heard {{age}} ago",
+    "iata": "IATA",
+    "snr": "SNR",
+    "rssi": "RSSI",
+    "propagation": "Prop"
   },
   "channels": {
     "select": "Select a channel",
