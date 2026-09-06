@@ -308,3 +308,17 @@ func TestGetStatsNodeTypes_OK(t *testing.T) {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
 }
+
+func TestStatsRejectNonPositiveLimits(t *testing.T) {
+	for _, endpoint := range []string{"top-nodes", "top-observers", "top-advertisers", "top-talkers", "clock-drift"} {
+		for _, limit := range []string{"0", "-1"} {
+			t.Run(endpoint+"/"+limit, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				StatsRouter(stubReader{}).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/"+endpoint+"?limit="+limit, nil))
+				if w.Code != http.StatusBadRequest {
+					t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+				}
+			})
+		}
+	}
+}

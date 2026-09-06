@@ -188,6 +188,10 @@ func getStatsTopNodes(reader api.Reader) http.HandlerFunc {
 				respondError(w, http.StatusBadRequest, "limit must be an integer")
 				return
 			}
+			if l <= 0 {
+				respondError(w, http.StatusBadRequest, "limit must be positive")
+				return
+			}
 			limit = int32(l)
 		}
 		nodes, err := reader.GetStatsTopNodes(r.Context(), iatas, limit)
@@ -238,6 +242,10 @@ func getStatsTopObservers(reader api.Reader) http.HandlerFunc {
 			l, err := strconv.ParseInt(p, 10, 32)
 			if err != nil {
 				respondError(w, http.StatusBadRequest, "limit must be an integer")
+				return
+			}
+			if l <= 0 {
+				respondError(w, http.StatusBadRequest, "limit must be positive")
 				return
 			}
 			limit = int32(l)
@@ -292,6 +300,10 @@ func getStatsTopAdvertisers(reader api.Reader) http.HandlerFunc {
 				respondError(w, http.StatusBadRequest, "limit must be an integer")
 				return
 			}
+			if l <= 0 {
+				respondError(w, http.StatusBadRequest, "limit must be positive")
+				return
+			}
 			limit = int32(l)
 		}
 		advertisers, err := reader.GetStatsTopAdvertisers(r.Context(), iatas, since, limit)
@@ -332,6 +344,10 @@ func getStatsClockDrift(reader api.Reader) http.HandlerFunc {
 			l, err := strconv.ParseInt(p, 10, 32)
 			if err != nil {
 				respondError(w, http.StatusBadRequest, "limit must be an integer")
+				return
+			}
+			if l <= 0 {
+				respondError(w, http.StatusBadRequest, "limit must be positive")
 				return
 			}
 			limit = int32(l)
@@ -384,6 +400,10 @@ func getStatsTopTalkers(reader api.Reader) http.HandlerFunc {
 			l, err := strconv.ParseInt(p, 10, 32)
 			if err != nil {
 				respondError(w, http.StatusBadRequest, "limit must be an integer")
+				return
+			}
+			if l <= 0 {
+				respondError(w, http.StatusBadRequest, "limit must be positive")
 				return
 			}
 			limit = int32(l)
