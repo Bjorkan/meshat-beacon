@@ -144,10 +144,7 @@ export function MessagePanel({
   if (!channel) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-4">
-        <EmptyState
-          title={t('channels.select')}
-          subtitle={t('stats.selectChannelHint')}
-        />
+        <EmptyState title={t('channels.select')} subtitle={t('stats.selectChannelHint')} />
       </div>
     );
   }

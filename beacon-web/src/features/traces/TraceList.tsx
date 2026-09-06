@@ -66,9 +66,7 @@ function TracePathPreview({
                 <span className="font-mono text-[10px] text-text-dim">{hash.toUpperCase()}</span>
               )}
               {snr != null && (
-                <span className={`font-mono text-[10px] ${sigClass}`}>
-                  {formatSnr(snr)} dB
-                </span>
+                <span className={`font-mono text-[10px] ${sigClass}`}>{formatSnr(snr)} dB</span>
               )}
             </span>
           </span>

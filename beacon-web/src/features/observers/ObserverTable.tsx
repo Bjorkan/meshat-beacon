@@ -88,8 +88,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       header: 'IATA',
       className: 'text-text-normal',
       sortValue: (obs) => obs.iata,
-      cell: (obs) =>
-        obs.iata ? obs.iata : <span className="text-text-dim">—</span>,
+      cell: (obs) => (obs.iata ? obs.iata : <span className="text-text-dim">—</span>),
     },
     {
       header: 'Status',
