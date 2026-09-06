@@ -68,7 +68,17 @@ export function MessagePanel({
   onBack,
 }: MessagePanelProps) {
   const { t } = useTranslation();
-  const { data, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    isFetchNextPageError,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     ...channelQueries.messages({ channelId: channel?.id, regionKey, iatas }),
     enabled: channel !== null,
     staleTime: 30_000,
@@ -129,17 +139,25 @@ export function MessagePanel({
     anchor.count = sorted.length;
   }, [sorted.length, channel?.id, isLoading, userScrolled]);
 
+  const loadOlder = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el || isFetching) return;
+    prepend.current = { pending: true, prevHeight: el.scrollHeight, prevTop: el.scrollTop };
+    void fetchNextPage().then((result) => {
+      if (result.isError) prepend.current.pending = false;
+    });
+  }, [isFetching, fetchNextPage]);
+
   const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current;
     if (!el) return;
     const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
     setUserScrolled(!atBottom);
     // near the top: pull the next older page, capturing metrics so the prepend can hold position
-    if (el.scrollTop < 40 && hasNextPage && !isFetchingNextPage) {
-      prepend.current = { pending: true, prevHeight: el.scrollHeight, prevTop: el.scrollTop };
-      fetchNextPage();
+    if (el.scrollTop < 40 && hasNextPage && !isFetchNextPageError) {
+      loadOlder();
     }
-  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
+  }, [hasNextPage, isFetchNextPageError, loadOlder]);
 
   if (!channel) {
     return (
@@ -194,6 +212,23 @@ export function MessagePanel({
         </div>
       )}
 
+      {isError && (
+        <div
+          role="alert"
+          className="flex shrink-0 items-center justify-between gap-2 border-b border-danger/20 bg-danger/5 px-3 py-2 font-mono text-xs text-danger"
+        >
+          <span>{t('common.failedToLoad')}</span>
+          <button
+            type="button"
+            disabled={isFetching}
+            onClick={() => (isFetchNextPageError ? loadOlder() : void refetch())}
+            className="shrink-0 rounded border border-border px-2 py-1 text-text-normal hover:bg-bg-surface disabled:opacity-50"
+          >
+            {t('common.tryAgain')}
+          </button>
+        </div>
+      )}
+
       <div
         className="flex-1 overflow-y-auto [overflow-anchor:none]"
         ref={scrollContainerRef}
@@ -215,11 +250,11 @@ export function MessagePanel({
             ))}
             <div ref={bottomRef} />
           </div>
-        ) : (
+        ) : !isError ? (
           <div className="flex items-center justify-center h-32 text-text-muted text-xs font-mono">
             {t('channels.noMessages')}
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* floats over the panel (not the scroll area) so older-page fetches don't shift it */}
