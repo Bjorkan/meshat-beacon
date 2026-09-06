@@ -106,6 +106,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
 
 function renderObserverCard(obs: ObserverSummary, t: TFunction) {
   const status = deriveObserverStatus(obs);
+  const radio = formatRadio(obs.radio);
   return (
     <div className="flex flex-col gap-1.5 font-mono text-xs">
       <div className="flex items-center justify-between gap-2">
@@ -123,17 +124,11 @@ function renderObserverCard(obs: ObserverSummary, t: TFunction) {
           <Badge variant={status === 'online' ? 'live' : 'offline'}>{t(`options.${status}`)}</Badge>
         </span>
       </div>
-      <div className="flex items-center gap-2 text-text-muted">
-        {/* Join only the segments that exist so a missing IATA never leaves a stray "·". */}
-        {[obs.iata, obs.observerType ?? '—', formatRadio(obs.radio) ?? '—']
-          .filter((seg, i) => i > 0 || seg)
-          .map((seg, i, arr) => (
-            <span key={i} className={i === 0 ? 'text-text-normal' : undefined}>
-              {i > 0 && arr[0] ? '· ' : ''}
-              {seg}
-            </span>
-          ))}
+      <div className="flex min-w-0 items-start gap-2 text-text-muted">
+        {obs.iata && <span className="shrink-0 text-text-normal">{obs.iata}</span>}
+        <span className="min-w-0 break-all">{obs.observerType ?? '—'}</span>
       </div>
+      {radio && <div className="text-text-muted">{radio}</div>}
     </div>
   );
 }
