@@ -328,7 +328,7 @@
     "nodes": "Nodes",
     "topAdvertisers": "Top advertisers · {{range}}",
     "topTalkers": "Top talkers · {{range}}",
-    "byName": "by name",
+    "byCount": "most messages",
     "noAdvertisers": "No advertisers",
     "repeatersOutOfSync": "Repeaters & room servers out of sync · worst first",
     "noRepeatersOutOfSync": "No repeaters out of sync",

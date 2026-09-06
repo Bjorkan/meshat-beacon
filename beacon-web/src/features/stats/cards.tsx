@@ -52,7 +52,8 @@ function Sparkline({ values, color }: { values: number[]; color: string }) {
   );
 }
 
-// KPI tile: label, big mono value, optional sparkline + sub-label.
+// KPI tile: label, big mono value, optional sparkline + sub-label. Cards without a
+// sparkline render no placeholder so they stay compact instead of faking a graph.
 export function StatCard({
   label,
   value,
@@ -77,7 +78,7 @@ export function StatCard({
       <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-text-bright">
         {value}
       </div>
-      {spark ? <Sparkline values={spark} color={accent} /> : <div className="mt-1.5 h-[20px]" />}
+      {spark && <Sparkline values={spark} color={accent} />}
     </div>
   );
 }

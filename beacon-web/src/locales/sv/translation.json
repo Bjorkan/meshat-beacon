@@ -328,7 +328,7 @@
     "nodes": "Noder",
     "topAdvertisers": "Främsta advert-sändare · {{range}}",
     "topTalkers": "Främsta sändare · {{range}}",
-    "byName": "efter namn",
+    "byCount": "flest meddelanden",
     "noAdvertisers": "Inga advert-sändare",
     "repeatersOutOfSync": "Repeaters och room servers ur synk · värst först",
     "noRepeatersOutOfSync": "Inga repeaters ur synk",

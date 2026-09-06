@@ -138,7 +138,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
       </Card>
       <ChartCard
         title={t('stats.topTalkers', { range })}
-        right={<span className="font-mono text-[10px] text-text-muted">{t('stats.byName')}</span>}
+        right={<span className="font-mono text-[10px] text-text-muted">{t('stats.byCount')}</span>}
         height={leaderboardHeight(talkerRows.length)}
         option={talkersOption}
         isLoading={topTalkers.isLoading}

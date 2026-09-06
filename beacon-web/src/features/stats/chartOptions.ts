@@ -312,6 +312,9 @@ export function typeBarOption(
   c: ChartColors,
 ): EChartsOption {
   const crowded = items.length > 5;
+  // Top labels collide on short bars once every category shows a value; keep them only on
+  // bars tall enough to stand clear (full value stays in the tooltip either way).
+  const tallest = items.reduce((m, it) => Math.max(m, it.value), 0);
   return {
     animation: false,
     backgroundColor: 'transparent',
@@ -351,7 +354,8 @@ export function typeBarOption(
           color: c.textBright,
           fontFamily: MONO,
           fontSize: 9,
-          formatter: (p: { value: number }) => formatCount(p.value),
+          formatter: (p: { value: number }) =>
+            tallest > 0 && p.value / tallest >= 0.12 ? formatCount(p.value) : '',
         },
       },
     ],
