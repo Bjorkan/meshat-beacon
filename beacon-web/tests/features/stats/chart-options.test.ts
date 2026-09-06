@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- poking into loose ECharts option shapes */
 import { describe, it, expect } from 'vitest';
 import {
+  observationsAreaOption,
   typeBarOption,
   leaderboardOption,
   donutOption,
@@ -219,5 +220,18 @@ describe('receiveErrorsOption', () => {
       [2000, 8],
       [3000, 8],
     ]);
+  });
+});
+
+describe('time axis labels', () => {
+  it('distinguishes hours in the 24-hour view and dates in multi-day views', () => {
+    const morning = new Date(2026, 8, 6, 8, 0).getTime();
+    const afternoon = new Date(2026, 8, 6, 14, 0).getTime();
+    const daily = observationsAreaOption([], colors, undefined, '24h') as Record<string, any>;
+    expect(daily.xAxis.axisLabel.formatter(morning)).toBe('6/9 08:00');
+    expect(daily.xAxis.axisLabel.formatter(afternoon)).toBe('6/9 14:00');
+    const weekly = observationsAreaOption([], colors, undefined, '7d') as Record<string, any>;
+    expect(weekly.xAxis.axisLabel.formatter(morning)).toBe('6/9');
+    expect(weekly.xAxis.axisLabel.formatter(new Date(2026, 8, 7).getTime())).toBe('7/9');
   });
 });

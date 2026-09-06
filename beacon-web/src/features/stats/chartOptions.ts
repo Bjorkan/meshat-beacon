@@ -9,6 +9,7 @@ function timeAxis(c: ChartColors, range?: '24h' | '7d' | '30d') {
   return {
     type: 'time' as const,
     boundaryGap: false,
+    minInterval: range === '24h' ? 3600 * 1000 : 86400 * 1000,
     axisLine: { lineStyle: { color: c.border } },
     axisLabel: {
       color: c.textMuted,
@@ -16,17 +17,16 @@ function timeAxis(c: ChartColors, range?: '24h' | '7d' | '30d') {
       fontSize: 10,
       hideOverlap: true,
       // ECharts' default time formatter mixes bare day numbers with English month
-      // names ("31, Sep, 2") at month boundaries — a fixed numeric D/M reads the
-      // same in both locales and never swaps language mid-axis.
+      // names at month boundaries. Keep numeric dates and include the time in
+      // the daily view so ticks on the same date remain distinguishable.
       formatter: (value: number) => {
         const d = new Date(value);
-        return `${d.getDate()}/${d.getMonth() + 1}`;
+        const date = `${d.getDate()}/${d.getMonth() + 1}`;
+        if (range !== '24h') return date;
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${date} ${hours}:${minutes}`;
       },
-      ...(range === '24h'
-        ? { interval: 6 * 3600 * 1000, minInterval: 3600 * 1000 }
-        : range === '30d'
-          ? { interval: 7 * 86400 * 1000, minInterval: 86400 * 1000 }
-          : { interval: 86400 * 1000, minInterval: 86400 * 1000 }),
     },
     splitLine: { show: false },
   };
