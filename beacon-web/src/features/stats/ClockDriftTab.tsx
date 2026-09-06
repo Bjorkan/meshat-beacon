@@ -5,11 +5,13 @@ import { DataTable, type Column, type MobileSortOption } from '../../components/
 import { Badge } from '../../components/Badge';
 import { IataChip } from '../../components/IataChip';
 import { Timestamp } from '../../components/Timestamp';
-import { formatClockDrift } from '../../lib/formatters';
+import { formatClockDrift, isPlausibleClockDrift } from '../../lib/formatters';
 import type { ClockDriftEntry } from './types';
 
-// every row is already past the drift threshold; flag the worst (>= 1h off) more urgently
+// every row is already past the drift threshold; flag the worst (>= 1h off) more urgently.
+// Implausible readings (bad advert timestamps, not real drift) stay neutral.
 function driftClass(seconds: number) {
+  if (!isPlausibleClockDrift(seconds)) return 'text-text-dim';
   return Math.abs(seconds) >= 3600 ? 'text-danger' : 'text-warn';
 }
 

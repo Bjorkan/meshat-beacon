@@ -51,16 +51,19 @@ describe('timeAgoMs', () => {
 });
 
 describe('snrLevel', () => {
-  it('returns good for SNR >= 10', () => {
+  it('returns good for SNR >= 5 (LoRa link-budget semantics)', () => {
     expect(snrLevel(10.5)).toBe('good');
+    expect(snrLevel(5)).toBe('good');
   });
 
-  it('returns mid for SNR between 5 and 10', () => {
-    expect(snrLevel(7.2)).toBe('mid');
+  it('returns mid for marginal SNR between -5 and 5', () => {
+    expect(snrLevel(1.2)).toBe('mid');
+    expect(snrLevel(-5)).toBe('mid');
   });
 
-  it('returns bad for SNR < 5', () => {
-    expect(snrLevel(3.1)).toBe('bad');
+  it('returns bad for SNR below -5', () => {
+    expect(snrLevel(-5.1)).toBe('bad');
+    expect(snrLevel(-15)).toBe('bad');
   });
 
   it('returns null for null input', () => {
@@ -121,6 +124,17 @@ describe('formatClockDrift', () => {
   it('breaks out minutes and hours, dropping seconds once hours appear', () => {
     expect(formatClockDrift(432)).toBe('+7m 12s ahead'); // 7*60 + 12
     expect(formatClockDrift(-3670)).toBe('-1h 1m behind'); // 3670 -> 1h 1m
+  });
+
+  it('compacts days instead of printing raw hours', () => {
+    expect(formatClockDrift(90000)).toBe('+1d 1h ahead'); // 25h
+    expect(formatClockDrift(-172800)).toBe('-2d 0h behind');
+  });
+
+  it('renders implausible readings (bad advert timestamps) as invalid, not centuries', () => {
+    expect(formatClockDrift(527515 * 3600)).toBe('—');
+    expect(formatClockDrift(-496759 * 3600)).toBe('—');
+    expect(formatClockDrift(527515 * 3600, { inSync: 'x', ahead: 'y', behind: 'z' })).toBe('—');
   });
 
   it('renders exact minute/hour boundaries with a zero remainder', () => {

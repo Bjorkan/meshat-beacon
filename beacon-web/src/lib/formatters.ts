@@ -26,10 +26,13 @@ export const SIGNAL_LEVEL_CLASSES: Record<SignalLevel, string> = {
   bad: 'text-danger',
 };
 
+// LoRa link-budget semantics (shared with the map's SNR_STOPS): usable signal lives
+// roughly between -20 and +10 dB, so the old >=5/>=10 cutoffs painted healthy
+// positive links red. Aligned: green >= 5, yellow >= -5, red below.
 export function snrLevel(snr: number | null | undefined): SignalLevel | null {
   if (snr == null) return null;
-  if (snr >= 10) return 'good';
-  if (snr >= 5) return 'mid';
+  if (snr >= 5) return 'good';
+  if (snr >= -5) return 'mid';
   return 'bad';
 }
 
@@ -55,22 +58,32 @@ export function formatUptime(seconds: number): string {
 // Signed device-clock drift for the node detail, e.g. "+42s ahead", "-1h 1m behind", "in sync".
 // formatUptime floors to whole minutes and is unsigned, so it can't render sub-minute drift.
 // +ve = device clock ahead of the server (matches clockDriftSeconds).
+// Beyond 90 days the reading is almost certainly a bad advert timestamp, not a real drift:
+// callers should treat it as invalid (see MAX_PLAUSIBLE_CLOCK_DRIFT_S).
+export const MAX_PLAUSIBLE_CLOCK_DRIFT_S = 90 * 86400;
+
+export function isPlausibleClockDrift(seconds: number): boolean {
+  return Number.isFinite(seconds) && Math.abs(seconds) <= MAX_PLAUSIBLE_CLOCK_DRIFT_S;
+}
+
 export function formatClockDrift(
   seconds: number,
-  labels: { inSync: string; ahead: string; behind: string } = {
+  labels: { inSync: string; ahead: string; behind: string; invalid?: string } = {
     inSync: 'in sync',
     ahead: 'ahead',
     behind: 'behind',
   },
 ): string {
+  if (!isPlausibleClockDrift(seconds)) return labels.invalid ?? '—';
   if (seconds === 0) return labels.inSync;
   const dir = seconds > 0 ? labels.ahead : labels.behind;
   const sign = seconds > 0 ? '+' : '-';
   const s = Math.abs(seconds);
-  const h = Math.floor(s / 3600);
+  const d = Math.floor(s / 86400);
+  const h = Math.floor((s % 86400) / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  const mag = h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  const mag = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
   return `${sign}${mag} ${dir}`;
 }
 
