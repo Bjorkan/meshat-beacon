@@ -4,6 +4,7 @@ import {
   formatAbsolute,
   timeAgoMs,
   formatSnr,
+  formatRadio,
   snrLevel,
   formatPropagation,
   formatCount,
@@ -167,5 +168,21 @@ describe('formatRatePerDay', () => {
   it('shows a dash for a missing count, matching formatCount', () => {
     expect(formatRatePerDay(null, 7 * DAY_MS)).toBe('—');
     expect(formatRatePerDay(undefined, 7 * DAY_MS)).toBe('—');
+  });
+});
+
+describe('formatRadio', () => {
+  it('formats a compact radio config', () => {
+    expect(formatRadio('869.618,62.5,8')).toBe('869.618 MHz · SF8 · 62.5 kHz');
+  });
+
+  it('treats all-zero configs (no radio hardware) as unknown', () => {
+    expect(formatRadio('0,0,0')).toBeNull();
+  });
+
+  it('treats missing input as unknown', () => {
+    expect(formatRadio(null)).toBeNull();
+    expect(formatRadio(undefined)).toBeNull();
+    expect(formatRadio('')).toBeNull();
   });
 });
