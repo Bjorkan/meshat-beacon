@@ -274,7 +274,9 @@ export function useMapNodes(
           'text-field': ['get', 'point_count_abbreviated'],
           'text-font': ['Noto Sans Bold'],
           'text-size': clusterTextSizeExpression() as ExpressionSpecification,
-          'text-offset': [0, -0.35],
+          // The composition breakdown sits below the total, so the count owns
+          // the vertical center instead of floating above it.
+          'text-offset': [0, -0.55],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -294,14 +296,15 @@ export function useMapNodes(
         layout: {
           'text-field': clusterBreakdownTextExpression() as ExpressionSpecification,
           'text-font': ['Noto Sans Bold'],
-          'text-size': 9,
-          'text-offset': [0, 0.85],
+          'text-size': 10.5,
+          'text-offset': [0, 0.75],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
         paint: {
+          // Dark text halo keeps the small role counts legible on light basemaps too.
           'text-halo-color': 'rgba(12,16,24,0.96)',
-          'text-halo-width': 0.9,
+          'text-halo-width': 1.6,
         },
       } as SymbolLayerSpecification);
     }
