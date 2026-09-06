@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { BeaconLogo } from './BeaconLogo';
 
 // shared empty/placeholder state: faint on-brand beacon mark + message
@@ -5,9 +6,10 @@ import { BeaconLogo } from './BeaconLogo';
 interface EmptyStateProps {
   title: string;
   subtitle?: string;
+  action?: ReactNode;
 }
 
-export function EmptyState({ title, subtitle }: EmptyStateProps) {
+export function EmptyState({ title, subtitle, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center gap-3 flex-1 h-full min-h-[12rem] py-12 text-center select-none">
       <BeaconLogo size={36} className="text-border" />
@@ -15,6 +17,7 @@ export function EmptyState({ title, subtitle }: EmptyStateProps) {
         <span className="text-text-muted text-sm font-mono tracking-wide">{title}</span>
         {subtitle && <span className="text-text-dim text-xs font-mono">{subtitle}</span>}
       </div>
+      {action}
     </div>
   );
 }

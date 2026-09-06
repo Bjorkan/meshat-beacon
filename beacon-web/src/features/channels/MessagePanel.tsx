@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { channelQueries } from '../../api/queries';
 import { Badge } from '../../components/Badge';
+import { EmptyState } from '../../components/EmptyState';
 import { Timestamp } from '../../components/Timestamp';
 import { LoadingPill } from '../../components/LoadingPill';
 import { channelDisplayName } from './types';
@@ -142,8 +143,11 @@ export function MessagePanel({
 
   if (!channel) {
     return (
-      <div className="flex-1 flex items-center justify-center text-text-muted text-sm font-mono">
-        {t('channels.select')}
+      <div className="flex flex-1 flex-col items-center justify-center px-4">
+        <EmptyState
+          title={t('channels.select')}
+          subtitle={t('stats.selectChannelHint')}
+        />
       </div>
     );
   }

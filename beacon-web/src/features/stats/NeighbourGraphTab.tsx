@@ -68,7 +68,19 @@ export function NeighbourGraphTab() {
   );
 
   if (isAll)
-    return <EmptyState title={t('stats.pickRegion')} subtitle={t('stats.pickRegionHint')} />;
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center px-4">
+        <EmptyState
+          title={t('stats.pickRegion')}
+          subtitle={t('stats.pickRegionHint')}
+          action={
+            <span className="font-mono text-[11px] text-text-dim">
+              {t('stats.pickRegionAction')}
+            </span>
+          }
+        />
+      </div>
+    );
   if (isError)
     return <EmptyState title={t('stats.neighbourGraph')} subtitle={t('stats.failedNodes')} />;
   // build only once the pager settles, or the force layout would restart on every streamed page

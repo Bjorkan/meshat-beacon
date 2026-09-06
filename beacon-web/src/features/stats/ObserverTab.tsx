@@ -225,21 +225,24 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
   // use the response's interval, not the range prop — keepPreviousData can briefly show the old range's points
   const bucketed = telemetry.data != null && telemetry.data.interval !== '1h';
   const airtime = useMemo(
-    () => airtimeOption(points, colors, bucketed),
-    [points, colors, bucketed],
+    () => airtimeOption(points, colors, bucketed, range),
+    [points, colors, bucketed, range],
   );
   const battery = useMemo(
-    () => batteryOption(points, colors, `${t('details.battery')} V`),
-    [points, colors, t],
+    () => batteryOption(points, colors, `${t('details.battery')} V`, range),
+    [points, colors, t, range],
   );
   const noise = useMemo(
-    () => noiseFloorOption(points, colors, `${t('details.noiseFloor')} dBm`),
-    [points, colors, t],
+    () => noiseFloorOption(points, colors, `${t('details.noiseFloor')} dBm`, range),
+    [points, colors, t, range],
   );
-  const queue = useMemo(() => queueOption(points, colors, t('details.queue')), [points, colors, t]);
+  const queue = useMemo(
+    () => queueOption(points, colors, t('details.queue'), range),
+    [points, colors, t, range],
+  );
   const recvErrors = useMemo(
-    () => receiveErrorsOption(points, colors, bucketed, t('details.receiveErrors')),
-    [points, colors, bucketed, t],
+    () => receiveErrorsOption(points, colors, bucketed, t('details.receiveErrors'), range),
+    [points, colors, bucketed, t, range],
   );
 
   // Bots / MQTT bridges report status but no device telemetry — show one clear empty state rather

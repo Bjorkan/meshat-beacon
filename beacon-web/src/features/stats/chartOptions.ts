@@ -5,12 +5,29 @@ import type { TelemetryPoint } from './types';
 
 const MONO = 'JetBrains Mono, monospace';
 
-function timeAxis(c: ChartColors) {
+function timeAxis(c: ChartColors, range?: '24h' | '7d' | '30d') {
   return {
     type: 'time' as const,
     boundaryGap: false,
     axisLine: { lineStyle: { color: c.border } },
-    axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, hideOverlap: true },
+    axisLabel: {
+      color: c.textMuted,
+      fontFamily: MONO,
+      fontSize: 10,
+      hideOverlap: true,
+      // ECharts' default time formatter mixes bare day numbers with English month
+      // names ("31, Sep, 2") at month boundaries — a fixed numeric D/M reads the
+      // same in both locales and never swaps language mid-axis.
+      formatter: (value: number) => {
+        const d = new Date(value);
+        return `${d.getDate()}/${d.getMonth() + 1}`;
+      },
+      ...(range === '24h'
+        ? { interval: 6 * 3600 * 1000, minInterval: 3600 * 1000 }
+        : range === '30d'
+          ? { interval: 7 * 86400 * 1000, minInterval: 86400 * 1000 }
+          : { interval: 86400 * 1000, minInterval: 86400 * 1000 }),
+    },
     splitLine: { show: false },
   };
 }
@@ -32,6 +49,7 @@ export function observationsAreaOption(
   points: { hour: number; observationCount: number; uniquePackets: number }[],
   c: ChartColors,
   labels = { observations: 'Observations', uniquePackets: 'Unique packets' },
+  range?: '24h' | '7d' | '30d',
 ): EChartsOption {
   const obs = points.map((p) => [p.hour, p.observationCount]);
   const uniq = points.map((p) => [p.hour, p.uniquePackets]);
@@ -53,7 +71,7 @@ export function observationsAreaOption(
       textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
       inactiveColor: c.textDim,
     },
-    xAxis: timeAxis(c),
+    xAxis: timeAxis(c, range),
     yAxis: valueAxis(c),
     series: [
       {
@@ -382,6 +400,7 @@ export function airtimeOption(
   points: TelemetryPoint[],
   c: ChartColors,
   bucketed: boolean,
+  range?: '24h' | '7d' | '30d',
 ): EChartsOption {
   const series = (key: 'airtimeRxPct' | 'airtimeTxPct') =>
     bucketed ? points.map((p) => [p.t, p[key]]) : deltaSeries(points, key);
@@ -398,7 +417,7 @@ export function airtimeOption(
       textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
     },
     tooltip: { trigger: 'axis', ...tooltipStyle(c) },
-    xAxis: timeAxis(c),
+    xAxis: timeAxis(c, range),
     yAxis: valueAxis(c),
     series: [
       {
@@ -455,6 +474,7 @@ function metricLineOption(
     accessor: (p: TelemetryPoint) => number | null;
     delta?: boolean;
     area?: boolean;
+    range?: '24h' | '7d' | '30d';
   },
 ): EChartsOption {
   return {
@@ -462,7 +482,7 @@ function metricLineOption(
     backgroundColor: 'transparent',
     grid: { left: 50, right: 14, top: 14, bottom: 22 },
     tooltip: { trigger: 'axis', ...tooltipStyle(c) },
-    xAxis: timeAxis(c),
+    xAxis: timeAxis(c, o.range),
     yAxis: valueAxis(c, { scale: true }),
     series: [
       {
@@ -480,18 +500,39 @@ function metricLineOption(
   };
 }
 
-export const batteryOption = (p: TelemetryPoint[], c: ChartColors, name = 'Battery V') =>
+export const batteryOption = (
+  p: TelemetryPoint[],
+  c: ChartColors,
+  name = 'Battery V',
+  range?: '24h' | '7d' | '30d',
+) =>
   metricLineOption(p, c, {
     name,
     color: c.primary,
     accessor: (x) => (x.batteryMv == null ? null : +(x.batteryMv / 1000).toFixed(3)),
+    range,
   });
 
-export const noiseFloorOption = (p: TelemetryPoint[], c: ChartColors, name = 'Noise dBm') =>
-  metricLineOption(p, c, { name, color: c.warn, accessor: (x) => x.noiseFloorDb });
+export const noiseFloorOption = (
+  p: TelemetryPoint[],
+  c: ChartColors,
+  name = 'Noise dBm',
+  range?: '24h' | '7d' | '30d',
+) => metricLineOption(p, c, { name, color: c.warn, accessor: (x) => x.noiseFloorDb, range });
 
-export const queueOption = (p: TelemetryPoint[], c: ChartColors, name = 'Queue') =>
-  metricLineOption(p, c, { name, color: c.secondary, accessor: (x) => x.queueLength, area: true });
+export const queueOption = (
+  p: TelemetryPoint[],
+  c: ChartColors,
+  name = 'Queue',
+  range?: '24h' | '7d' | '30d',
+) =>
+  metricLineOption(p, c, {
+    name,
+    color: c.secondary,
+    accessor: (x) => x.queueLength,
+    area: true,
+    range,
+  });
 
 // receiveErrors is a cumulative counter in raw points, a per-bucket delta in bucketed ones
 export const receiveErrorsOption = (
@@ -499,6 +540,7 @@ export const receiveErrorsOption = (
   c: ChartColors,
   bucketed: boolean,
   name = 'Recv errors',
+  range?: '24h' | '7d' | '30d',
 ) =>
   metricLineOption(p, c, {
     name,
@@ -506,4 +548,5 @@ export const receiveErrorsOption = (
     accessor: (x) => x.receiveErrors,
     delta: !bucketed,
     area: true,
+    range,
   });

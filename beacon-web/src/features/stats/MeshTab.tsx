@@ -126,11 +126,16 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
   const obs = useMemo(() => aggregateByHour(observations.data ?? []), [observations.data]);
   const obsOption = useMemo(
     () =>
-      observationsAreaOption(obs, colors, {
-        observations: t('stats.observations'),
-        uniquePackets: t('stats.uniquePackets'),
-      }),
-    [obs, colors, t],
+      observationsAreaOption(
+        obs,
+        colors,
+        {
+          observations: t('stats.observations'),
+          uniquePackets: t('stats.uniquePackets'),
+        },
+        range,
+      ),
+    [obs, colors, t, range],
   );
 
   const nodeRows = useMemo(

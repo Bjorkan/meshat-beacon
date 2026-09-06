@@ -163,7 +163,7 @@ export function TraceList({
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
           <span className="font-mono text-[11px] text-text-dim">
-            {tags ? t('traces.tag', { count: tags.length }) : ''}
+            {tags ? t('stats.traceCount', { count: tags.length }) : ''}
           </span>
           <Segmented
             options={typeOptions}

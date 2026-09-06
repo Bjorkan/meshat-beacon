@@ -356,7 +356,13 @@
     "showingNodes": "Showing {{shown}} of {{total}} nodes — narrow to an IATA for the rest",
     "observationAbbrev": "{{count}} obs",
     "seenToday": "seen today",
-    "seenDaysAgo": "seen {{count}}d ago"
+    "seenDaysAgo": "seen {{count}}d ago",
+    "pickRegionAction": "Use the region picker in the header — it drives every tab.",
+    "notFoundTitle": "Page not found",
+    "notFoundSubtitle": "Check the address or go back to the start.",
+    "notFoundAction": "Back to Packets",
+    "traceCount": "Showing up to {{count}} traces",
+    "selectChannelHint": "Pick a channel in the list to read messages."
   },
   "packets": {
     "noun": "packets",

@@ -36,6 +36,7 @@ import {
 import { useIsMobile } from './hooks/useMediaQuery';
 import { AppShell } from './components/AppShell';
 import { EmptyState } from './components/EmptyState';
+import { NotFoundView } from './routes/not-found';
 import { PacketAnalyzerDrawer } from './features/packets/PacketAnalyzerDrawer';
 import { PacketAnalyzerOverlay } from './features/packets/PacketAnalyzerOverlay';
 import { PathLinkRestore } from './features/packets/PathLinkRestore';
@@ -624,7 +625,7 @@ function legacyRedirect(search: Record<string, unknown>) {
 const rootRoute = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   component: RootLayout,
   validateSearch: validateRootSearch,
-  notFoundComponent: () => <EmptyState title="404" />,
+  notFoundComponent: NotFoundView,
 });
 
 const indexRoute = createRoute({

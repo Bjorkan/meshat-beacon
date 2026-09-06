@@ -356,7 +356,13 @@
     "showingNodes": "Visar {{shown}} av {{total}} noder — begränsa till en IATA för resten",
     "observationAbbrev": "{{count}} obs",
     "seenToday": "sedd idag",
-    "seenDaysAgo": "sedd för {{count}} d sedan"
+    "seenDaysAgo": "sedd för {{count}} d sedan",
+    "pickRegionAction": "Använd regionsväljaren i sidhuvudet — den styr alla flikar.",
+    "notFoundTitle": "Sidan finns inte",
+    "notFoundSubtitle": "Kontrollera adressen eller gå tillbaka till start.",
+    "notFoundAction": "Tillbaka till Paket",
+    "traceCount": "Visar upp till {{count}} spår",
+    "selectChannelHint": "Välj en kanal i listan för att läsa meddelanden."
   },
   "packets": {
     "noun": "paket",
