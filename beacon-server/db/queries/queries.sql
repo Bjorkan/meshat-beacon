@@ -1416,6 +1416,17 @@ JOIN nodes n ON n.id = ns.node_id
 WHERE n.node_type IN (2, 3)
   AND ns.prefix_4 = ANY($1::bytea[]);
 
+-- name: ListAmbiguousPrefix2 :many
+-- Every 2-byte prefix claimed by more than one infra node, globally. The path map
+-- uses this to decide whether a 2-byte route is safe to draw: a 2-byte route is only
+-- drawn when none of its prefixes appear here AND every hop resolved high-confidence.
+SELECT ns.prefix_2 AS prefix
+FROM node_short_ids ns
+JOIN nodes n ON n.id = ns.node_id
+WHERE n.node_type IN (2, 3)
+GROUP BY ns.prefix_2
+HAVING COUNT(DISTINCT ns.node_id) > 1;
+
 -- name: RefreshHourlyStats :exec
 REFRESH MATERIALIZED VIEW CONCURRENTLY mv_hourly_iata_stats;
 

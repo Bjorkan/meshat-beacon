@@ -281,7 +281,8 @@
     "closePath": "Stäng sökvägskartan",
     "allPaths": "Alla sökvägar",
     "traceRoute": "Trace-rutt",
-    "pathBlockedShortHash": "Ingen säkerställd rutt: paketet skickades med {{size}}B-hashar, men en rutt kräver {{required}}B-hashar för att vara entydig.",
+    "pathBlockedShortHash": "Ingen säkerställd rutt: paketet skickades med {{size}}B-hashar, men en rutt kräver minst {{required}}B-hashar för att vara entydig.",
+    "pathBlockedAmbiguousHop": "Ingen säkerställd rutt: ett 2-byte-hopp på rutten matchar mer än en nod i databasen.",
     "pathBlockedOutOfRange": "Ingen säkerställd rutt: de matchade hoppen ligger för långt isär för att vara direkta radiohopp.",
     "pathBlockedUnresolved": "Ingen säkerställd rutt: för få hopp kunde matchas mot kända noder."
   },

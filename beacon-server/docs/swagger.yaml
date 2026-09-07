@@ -1795,6 +1795,28 @@ paths:
       summary: List packets reliably routed through a node (TRACE excluded)
       tags:
       - Nodes
+  /nodes/ambiguous-prefix2:
+    get:
+      description: |-
+        Every 2-byte node prefix claimed by more than one infra node, globally.
+        The path map draws a 2-byte route only when this list is empty
+        for its prefixes and every hop resolved high-confidence.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              type: string
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: List ambiguous 2-byte prefixes
+      tags:
+      - Nodes
   /observers:
     get:
       parameters:

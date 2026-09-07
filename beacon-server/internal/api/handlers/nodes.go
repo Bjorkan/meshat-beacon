@@ -17,11 +17,13 @@ import (
 // NodesRouter mounts all /nodes routes onto a subrouter.
 //
 // GET  /nodes                       → listNodes
+// GET  /nodes/ambiguous-prefix2     → listAmbiguousPrefix2
 // GET  /nodes/{nodeId}              → getNode
 // GET  /nodes/{nodeId}/observations → listNodeObservations
 func NodesRouter(reader api.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", listNodes(reader))
+	r.Get("/ambiguous-prefix2", listAmbiguousPrefix2(reader))
 	r.Route("/{nodeId}", func(r chi.Router) {
 		r.Get("/", getNode(reader))
 		r.Get("/observations", listNodeObservations(reader))
@@ -177,6 +179,31 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 			return
 		}
 		respond(w, http.StatusOK, nodes)
+	}
+}
+
+// listAmbiguousPrefix2 godoc
+//
+//	@Summary	List ambiguous 2-byte prefixes
+//	@Description	Every 2-byte node prefix claimed by more than one infra node, globally.
+//	@Description	The path map draws a 2-byte route only when this list is empty
+//	@Description	for its prefixes and every hop resolved high-confidence.
+//	@Tags		Nodes
+//	@Produce	json
+//	@Success	200		{array}		string
+//	@Failure	500		{object}	handlers.APIError
+//	@Router		/nodes/ambiguous-prefix2 [get]
+func listAmbiguousPrefix2(reader api.Reader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		prefixes, err := reader.ListAmbiguousPrefix2(r.Context())
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if prefixes == nil {
+			prefixes = []string{}
+		}
+		respond(w, http.StatusOK, prefixes)
 	}
 }
 

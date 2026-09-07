@@ -205,6 +205,10 @@ func (s stubReader) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]a
 	return nil, nil
 }
 
+func (s stubReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
 func (s stubReader) ListNodeObservations(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (api.Page[api.PacketObservationSummary], error) {
 	if s.listNodeObservations != nil {
 		return s.listNodeObservations(ctx, nodeID, cursor, limit)

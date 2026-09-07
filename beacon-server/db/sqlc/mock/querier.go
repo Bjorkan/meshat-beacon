@@ -814,6 +814,21 @@ func (mr *MockQuerierMockRecorder) ListAllChannelMessages(ctx, arg any) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAllChannelMessages", reflect.TypeOf((*MockQuerier)(nil).ListAllChannelMessages), ctx, arg)
 }
 
+// ListAmbiguousPrefix2 mocks base method.
+func (m *MockQuerier) ListAmbiguousPrefix2(ctx context.Context) ([][]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAmbiguousPrefix2", ctx)
+	ret0, _ := ret[0].([][]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAmbiguousPrefix2 indicates an expected call of ListAmbiguousPrefix2.
+func (mr *MockQuerierMockRecorder) ListAmbiguousPrefix2(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAmbiguousPrefix2", reflect.TypeOf((*MockQuerier)(nil).ListAmbiguousPrefix2), ctx)
+}
+
 // ListChannelMessages mocks base method.
 func (m *MockQuerier) ListChannelMessages(ctx context.Context, arg db.ListChannelMessagesParams) ([]db.ListChannelMessagesRow, error) {
 	m.ctrl.T.Helper()

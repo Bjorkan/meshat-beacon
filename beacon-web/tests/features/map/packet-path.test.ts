@@ -248,6 +248,79 @@ describe('buildPacketPaths', () => {
     expect(buildPacketPathResult(threeByte).blocked).toBeNull();
   });
 
+  it('draws a 2-byte route when the DB has no 2-byte collisions and hops are high-confidence', () => {
+    const twoByte = (over: Partial<Observation> = {}) =>
+      obs(1, [hop('a', ...A), hop('b', ...C)], {
+        observerId: 'obs-1',
+        propagationTimeMs: 100,
+        pathLength: { raw: '', hashSize: 2, hopCount: 2 },
+        pathBytes: 'a1b2c3d4',
+        ...over,
+      });
+    // fail-closed without the collision set: cannot prove safety yet.
+    // The open buttons stay fail-open (pure detail data) so they remain
+    // clickable onto the modal's explanation; the modal itself withholds here.
+    expect(buildPacketPaths(detail([twoByte()]))).toEqual([]);
+    expect(buildPacketPathResult(detail([twoByte()])).blocked).toMatchObject({
+      reason: 'ambiguous-hop',
+    });
+    // empty collision set + all hops high + air bytes present: draw
+    const ok = buildPacketPathResult(detail([twoByte()]), { ambiguousPrefix2: [] });
+    expect(ok.paths).toHaveLength(1);
+    expect(ok.blocked).toBeNull();
+  });
+
+  it('withholds a 2-byte route when any hop is ambiguous', () => {
+    const ambiguous: ResolvedHop = {
+      confidence: 'ambiguous',
+      nodes: [
+        { id: 'x', publicKey: 'pa', longitude: A[0], latitude: A[1] },
+        { id: 'y', publicKey: 'pb', longitude: B[0], latitude: B[1] },
+      ],
+    };
+    const d = detail([
+      obs(1, [ambiguous, hop('b', ...C)], {
+        observerId: 'obs-1',
+        propagationTimeMs: 100,
+        pathLength: { raw: '', hashSize: 2, hopCount: 2 },
+        pathBytes: 'a1b2c3d4',
+      }),
+    ]);
+    expect(buildPacketPaths(d, { ambiguousPrefix2: [] })).toEqual([]);
+    expect(buildPacketPathResult(d, { ambiguousPrefix2: [] }).blocked).toMatchObject({
+      reason: 'ambiguous-hop',
+    });
+  });
+
+  it('withholds a 2-byte route when an air prefix collides in the DB', () => {
+    const d = detail([
+      obs(1, [hop('a', ...A), hop('b', ...C)], {
+        observerId: 'obs-1',
+        propagationTimeMs: 100,
+        pathLength: { raw: '', hashSize: 2, hopCount: 2 },
+        pathBytes: 'a1b2c3d4',
+      }),
+    ]);
+    // only the second hop's prefix collides — the whole route is still withheld
+    const result = buildPacketPathResult(d, { ambiguousPrefix2: ['c3d4'] });
+    expect(result.paths).toEqual([]);
+    expect(result.blocked).toMatchObject({ reason: 'ambiguous-hop' });
+  });
+
+  it('withholds a 2-byte route when air bytes are missing', () => {
+    const d = detail([
+      obs(1, [hop('a', ...A), hop('b', ...C)], {
+        observerId: 'obs-1',
+        propagationTimeMs: 100,
+        pathLength: { raw: '', hashSize: 2, hopCount: 2 },
+        // no pathBytes: prefixes can't be checked, so withhold rather than guess
+      }),
+    ]);
+    expect(buildPacketPathResult(d, { ambiguousPrefix2: [] }).blocked).toMatchObject({
+      reason: 'ambiguous-hop',
+    });
+  });
+
   it('withholds a 3-byte path with an MQTT-stitched leg beyond LoRa range', () => {
     const d = detail([
       obs(1, [hop('a', ...A), hop('far', ...FAR)], {

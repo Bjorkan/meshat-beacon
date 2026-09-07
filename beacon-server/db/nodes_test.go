@@ -780,3 +780,39 @@ func TestUpsertNode_DoesNotWrapClockDrift(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestListAmbiguousPrefix2_HexEncodes(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	mock.EXPECT().
+		ListAmbiguousPrefix2(gomock.Any()).
+		Return([][]byte{{0xa3, 0xf1}, {0x00, 0x01}}, nil)
+
+	store := &Store{q: mock}
+	got, err := store.ListAmbiguousPrefix2(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 || got[0] != "a3f1" || got[1] != "0001" {
+		t.Errorf("expected [a3f1 0001], got %v", got)
+	}
+}
+
+func TestListAmbiguousPrefix2_Empty(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	mock.EXPECT().
+		ListAmbiguousPrefix2(gomock.Any()).
+		Return(nil, nil)
+
+	store := &Store{q: mock}
+	got, err := store.ListAmbiguousPrefix2(context.Background())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected empty, got %v", got)
+	}
+}

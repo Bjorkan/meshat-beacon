@@ -10,6 +10,19 @@ vi.mock('../../../src/features/map/PacketPathMap', () => ({
   ),
 }));
 
+// the modal fetches the global 2-byte collision set for its 2-byte gate;
+// default to "no collisions" so 2-byte fixtures draw unless a test overrides it
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQuery: (options: { queryKey: readonly unknown[] }) =>
+      options?.queryKey[1] === 'ambiguous-prefix2'
+        ? { data: [] as string[] }
+        : actual.useQuery(options as never),
+  };
+});
+
 import { PacketPathMapModal } from '../../../src/features/map/PacketPathMapModal';
 
 // this Node/jsdom combo leaves window.localStorage unavailable; stub it so nothing during the
@@ -113,7 +126,64 @@ describe('PacketPathMapModal', () => {
     render(<PacketPathMapModal detail={shortHash} onClose={() => {}} />);
     // no observer rows: every candidate was withheld
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*3B hashes/);
+    expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*2B hashes/);
+  });
+
+  it('draws a 2-byte route when the DB reports no collisions', () => {
+    const twoByte = {
+      ...detail,
+      observations: detail.observations.map((o) => ({
+        ...o,
+        pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
+        pathBytes: 'a1b2c3d4',
+      })),
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={twoByte} onClose={() => {}} />);
+    // collision set is mocked empty: both observer rows draw
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Bravo')).toBeInTheDocument();
+    expect(screen.queryByRole('note')).not.toBeInTheDocument();
+  });
+
+  it('explains a 2-byte route with an ambiguous hop', () => {
+    const ambiguous = {
+      ...detail,
+      observations: [
+        {
+          ...detail.observations[0],
+          pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
+          pathBytes: 'a1b2c3d4',
+          resolvedPath: [
+            {
+              confidence: 'ambiguous',
+              nodes: [
+                { id: 'x', publicKey: 'pa', longitude: 16.5, latitude: 59.6 },
+                { id: 'y', publicKey: 'pb', longitude: 16.52, latitude: 59.61 },
+              ],
+            },
+            hop('b', 16.54, 59.62),
+          ],
+        },
+        {
+          ...detail.observations[1],
+          pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
+          pathBytes: 'e5f60708',
+          resolvedPath: [
+            {
+              confidence: 'ambiguous',
+              nodes: [
+                { id: 'p', publicKey: 'pc', longitude: 16.56, latitude: 59.63 },
+                { id: 'q', publicKey: 'pd', longitude: 16.58, latitude: 59.64 },
+              ],
+            },
+            hop('d', 16.6, 59.65),
+          ],
+        },
+      ],
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={ambiguous} onClose={() => {}} />);
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/more than one node/);
   });
 
   it('explains an MQTT-stitched route with an impossible leg', () => {

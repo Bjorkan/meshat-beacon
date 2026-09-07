@@ -1916,6 +1916,38 @@ func (q *Queries) ListAllChannelMessages(ctx context.Context, arg ListAllChannel
 	return items, nil
 }
 
+const listAmbiguousPrefix2 = `-- name: ListAmbiguousPrefix2 :many
+SELECT ns.prefix_2 AS prefix
+FROM node_short_ids ns
+JOIN nodes n ON n.id = ns.node_id
+WHERE n.node_type IN (2, 3)
+GROUP BY ns.prefix_2
+HAVING COUNT(DISTINCT ns.node_id) > 1
+`
+
+// Every 2-byte prefix claimed by more than one infra node, globally. The path map
+// uses this to decide whether a 2-byte route is safe to draw: a 2-byte route is only
+// drawn when none of its prefixes appear here AND every hop resolved high-confidence.
+func (q *Queries) ListAmbiguousPrefix2(ctx context.Context) ([][]byte, error) {
+	rows, err := q.db.Query(ctx, listAmbiguousPrefix2)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := [][]byte{}
+	for rows.Next() {
+		var prefix []byte
+		if err := rows.Scan(&prefix); err != nil {
+			return nil, err
+		}
+		items = append(items, prefix)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listChannelMessages = `-- name: ListChannelMessages :many
 SELECT DISTINCT ON (cm.id) cm.id, cm.channel_id, cm.packet_hash, cm.sender_name, cm.sender_pubkey, cm.content, cm.sent_at, encode(cm.packet_hash, 'hex') as packet_hash_hex, c.channel_hash,
 (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = cm.packet_hash) AS observation_count

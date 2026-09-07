@@ -11,18 +11,28 @@ export interface PathPoint {
 }
 
 // A resolved hop is only trustworthy when its prefix is wide enough to be
-// unambiguous. This matches the backend's neighbor rule (packet.go): path
-// edges are only derived from >=3-byte hashes, and 1–2 byte prefixes stay
-// excluded. The path map applies the same gate so it can never draw a
-// physically impossible route from colliding 1-byte prefixes.
+// unambiguous. 3+ byte routes always draw (same bar as the backend's neighbor
+// rule in packet.go). 2-byte routes draw only when the database has zero
+// 2-byte collisions globally AND every hop on the route resolved
+// high-confidence — see buildPacketPathResult's ambiguousPrefix2 param.
+// 1-byte prefixes collide too widely to ever verify, so they never draw.
 export const MIN_PATH_HASH_BYTES = 3;
+export const MIN_VERIFIABLE_HASH_BYTES = 2;
 
-export type PacketPathBlockReason = 'short-hash' | 'out-of-range' | 'unresolved';
+export type PacketPathBlockReason = 'short-hash' | 'ambiguous-hop' | 'out-of-range' | 'unresolved';
 
 export interface PacketPathBlockInfo {
   reason: PacketPathBlockReason;
   observedHashSize: number; // the best (widest) hashSize seen on this packet, e.g. 1
   count: number; // how many drawable candidates were held back
+}
+
+// Options that refine the width gate. ambiguousPrefix2 is the server's global
+// 2-byte collision set (lowercase hex, e.g. "a3f1") from
+// GET /nodes/ambiguous-prefix2 — omit it and 2-byte routes stay withheld,
+// so a slow/failed fetch can never draw an unverified route.
+export interface PacketPathOptions {
+  ambiguousPrefix2?: string[] | null;
 }
 
 export interface PacketPath {
@@ -65,45 +75,88 @@ function observerLabel(obs: Observation): string {
   return obs.observerName ?? obs.observerId.slice(0, 8);
 }
 
+// The exact 2-byte prefixes that were on the air for one observation, lowercased
+// hex, or null when the bytes are missing/malformed. This is what a collision
+// would actually confuse — resolved hops don't carry per-hop prefixes here.
+function pathBytePrefixes(pathBytes: string | undefined, hashSize: number): string[] | null {
+  if (pathBytes == null || pathBytes.length % (hashSize * 2) !== 0) return null;
+  if (!/^[0-9a-fA-F]*$/.test(pathBytes)) return null;
+  const out: string[] = [];
+  for (let i = 0; i < pathBytes.length; i += hashSize * 2) {
+    out.push(pathBytes.slice(i, i + hashSize * 2).toLowerCase());
+  }
+  return out;
+}
+
 // One verifierbar path per observation (and the trace route for TRACE packets): the route
-// must be sent with >=3-byte hashes, resolve to >=2 located hops, and have every leg within
-// direct LoRa range. Anything else is withheld so the map can never draw a physically
-// impossible route from colliding 1-byte prefixes or an MQTT-stitched hop. Colors are
+// must be sent with >=2-byte hashes, resolve to >=2 located hops, and have every leg within
+// direct LoRa range. 3+ byte widths always draw; 2-byte widths draw only when the database
+// has zero 2-byte collisions globally AND every hop on the route resolved high-confidence
+// (no ambiguous hop anywhere on it). Anything else is withheld so the map can never draw a
+// physically impossible route from colliding prefixes or an MQTT-stitched hop. Colors are
 // assigned after sorting so the selector swatch matches the drawn line.
-export function buildPacketPaths(detail: PacketDetail): PacketPath[] {
-  return buildPacketPathResult(detail).paths;
+export function buildPacketPaths(detail: PacketDetail, options?: PacketPathOptions): PacketPath[] {
+  return buildPacketPathResult(detail, options).paths;
 }
 
 // Same as buildPacketPaths, but also reports why candidates were withheld so the
 // modal can explain instead of just showing an empty map. observedHashSize is the
 // widest hashSize seen anywhere on this packet (used for the short-hash message).
-export function buildPacketPathResult(detail: PacketDetail): {
+export function buildPacketPathResult(
+  detail: PacketDetail,
+  options?: PacketPathOptions,
+): {
   paths: PacketPath[];
   blocked: PacketPathBlockInfo | null;
 } {
   const raw: Omit<PacketPath, 'color'>[] = [];
   let shortHashCount = 0;
+  let ambiguousHopCount = 0;
   let outOfRangeCount = 0;
   let unresolvedCount = 0;
   let observedHashSize = 0;
+  // Fail-closed: without the server's collision set we cannot prove a 2-byte route
+  // safe, so 2-byte candidates stay withheld until the fetch resolves.
+  const ambiguousPrefix2 =
+    options?.ambiguousPrefix2 == null ? null : new Set(options.ambiguousPrefix2);
   const add = (
     key: string,
     label: string,
     propagationMs: number | undefined,
-    points: PathPoint[],
+    chain: ResolvedHop[],
     hashSize: number | null,
+    pathBytes?: string,
   ) => {
     if (hashSize != null) observedHashSize = Math.max(observedHashSize, hashSize);
+    const points = pathPoints(chain);
     // Not enough located hops to draw a line at all.
     if (points.length < 2) {
       unresolvedCount += 1;
       return;
     }
-    // 1–2 byte prefixes collide across nodes: an "exact" match is a guess, not a route.
+    // 1-byte prefixes collide too widely to ever verify.
     // Unknown width (null) skips this gate — we don't claim a width we can't verify.
-    if (hashSize != null && hashSize < MIN_PATH_HASH_BYTES) {
+    if (hashSize != null && hashSize < MIN_VERIFIABLE_HASH_BYTES) {
       shortHashCount += 1;
       return;
+    }
+    // 2-byte routes need both halves of the proof: zero collisions for every prefix
+    // on this route in the whole database, and no ambiguous hop anywhere on it.
+    // The prefix check keys off the observation's own pathBytes (the exact bytes
+    // that were on the air), not the resolved hop's hashBytes — resolved hops
+    // don't carry per-hop prefixes on this path, and the air bytes are what a
+    // collision would actually confuse.
+    if (hashSize === MIN_VERIFIABLE_HASH_BYTES) {
+      const airPrefixes = pathBytePrefixes(pathBytes, hashSize);
+      const hitsCollisionSet =
+        ambiguousPrefix2 == null ||
+        airPrefixes == null ||
+        airPrefixes.some((p) => ambiguousPrefix2.has(p));
+      const hasAmbiguousHop = chain.some((h) => h.confidence !== 'high');
+      if (hitsCollisionSet || hasAmbiguousHop) {
+        ambiguousHopCount += 1;
+        return;
+      }
     }
     // A leg longer than a direct LoRa hop can reach is an MQTT interconnect stitching
     // regions together, not a radio hop — drawing it claims an impossible route.
@@ -125,8 +178,9 @@ export function buildPacketPathResult(detail: PacketDetail): {
         obs.observerId,
         observerLabel(obs),
         obs.propagationTimeMs,
-        pathPoints(chain),
+        chain,
         obs.pathLength.hashSize,
+        obs.pathBytes,
       );
     }
   }
@@ -134,8 +188,9 @@ export function buildPacketPathResult(detail: PacketDetail): {
     // A trace route's width is the trace payload's own hash width. Prefer the
     // per-hop hashBytes when present (it is on RouteHop-derived trace hops),
     // gated on the narrowest hop; unknown width (null) skips the width gate
-    // rather than guessing — range/point checks still apply. 1–2 byte trace
-    // widths stay excluded like 1–2 byte OTA paths.
+    // rather than guessing — confidence/range/point checks still apply.
+    // 2-byte trace widths need the same collision-free proof as OTA paths; the
+    // air bytes come from the first observation carrying them.
     const perHopWidths = detail.resolvedRoute
       .map((h) => (h.hashBytes != null ? h.hashBytes.length / 2 : null))
       .filter((w): w is number => w != null);
@@ -145,7 +200,8 @@ export function buildPacketPathResult(detail: PacketDetail): {
         : detail.observations.length > 0
           ? Math.max(...detail.observations.map((o) => o.pathLength?.hashSize ?? 0))
           : null;
-    add('trace', 'Trace route', undefined, pathPoints(detail.resolvedRoute), traceWidth);
+    const tracePathBytes = detail.observations.find((o) => o.pathBytes != null)?.pathBytes;
+    add('trace', 'Trace route', undefined, detail.resolvedRoute, traceWidth, tracePathBytes);
   }
 
   // fastest first; missing propagation (incl. the trace route) sorts last
@@ -157,15 +213,17 @@ export function buildPacketPathResult(detail: PacketDetail): {
   // Ordering inside `add` matters: unresolved <2-point candidates never reach the
   // width/range checks, so a bare 1-byte sighting with no located hops reports
   // 'unresolved' rather than 'short-hash'.
-  const blockedCount = shortHashCount + outOfRangeCount + unresolvedCount;
+  const blockedCount = shortHashCount + ambiguousHopCount + outOfRangeCount + unresolvedCount;
   const blocked: PacketPathBlockInfo | null =
     paths.length > 0 || blockedCount === 0
       ? null
       : shortHashCount > 0
         ? { reason: 'short-hash', observedHashSize, count: blockedCount }
-        : outOfRangeCount > 0
-          ? { reason: 'out-of-range', observedHashSize, count: blockedCount }
-          : { reason: 'unresolved', observedHashSize, count: blockedCount };
+        : ambiguousHopCount > 0
+          ? { reason: 'ambiguous-hop', observedHashSize, count: blockedCount }
+          : outOfRangeCount > 0
+            ? { reason: 'out-of-range', observedHashSize, count: blockedCount }
+            : { reason: 'unresolved', observedHashSize, count: blockedCount };
   return { paths, blocked };
 }
 

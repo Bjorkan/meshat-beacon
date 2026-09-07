@@ -65,6 +65,8 @@ export function PacketAnalyzerDrawer({
 }: PacketAnalyzerDrawerProps) {
   const { t } = useTranslation();
 
+  // hasPathInfo is computed fail-open on the width gate (pure detail data); the
+  // modal re-checks fail-closed with the live collision set — see PacketExpansion.
   const pathResult = useMemo(() => (detail ? buildPacketPathResult(detail) : null), [detail]);
   const hasPath = (pathResult?.paths.length ?? 0) > 0;
   const hasPathInfo = hasPath || pathResult?.blocked != null;

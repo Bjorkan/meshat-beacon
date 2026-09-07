@@ -354,3 +354,17 @@ func TestListNodes_RejectsInvalidSortablePagination(t *testing.T) {
 		})
 	}
 }
+
+func TestListAmbiguousPrefix2_OK(t *testing.T) {
+	r := chi.NewRouter()
+	r.Mount("/nodes", NodesRouter(stubReader{}))
+	req := httptest.NewRequest(http.MethodGet, "/nodes/ambiguous-prefix2", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if strings.TrimSpace(w.Body.String()) != "[]" {
+		t.Errorf("expected empty JSON array, got %s", w.Body.String())
+	}
+}

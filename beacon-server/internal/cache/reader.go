@@ -39,6 +39,7 @@ const (
 	keyNodePrefix              = "beacon:node:"
 	keyNodeNeighborsPrefix     = "beacon:node:neighbors:"
 	keyNodesByIDsPrefix        = "beacon:nodes:ids:"
+	keyAmbiguousPrefix2        = "beacon:nodes:ambiguous-prefix2"
 	keyObserverPrefix          = "beacon:observer:"
 	keyObserverScopesPrefix    = "beacon:observer:scopes:"
 )
@@ -332,6 +333,16 @@ func (cr *CachedReader) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map
 	key := keyNodesByIDsPrefix + strings.Join(strs, ",")
 	return getOrSet(ctx, cr.c, key, cr.ttl.Nodes, func() (map[uuid.UUID]*api.ResolvedNode, error) {
 		return cr.inner.GetNodesByIDs(ctx, ids)
+	})
+}
+
+// ListAmbiguousPrefix2 implements [api.Reader]. The set changes only when nodes
+// advertise (new short IDs) or are deleted, same cadence as node detail —
+// but a stale "no collisions" answer would draw a route that is actually
+// ambiguous, so this uses the stats TTL (short) rather than the nodes TTL.
+func (cr *CachedReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
+	return getOrSet(ctx, cr.c, keyAmbiguousPrefix2, cr.ttl.Stats, func() ([]string, error) {
+		return cr.inner.ListAmbiguousPrefix2(ctx)
 	})
 }
 

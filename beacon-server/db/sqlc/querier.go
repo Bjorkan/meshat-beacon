@@ -120,6 +120,10 @@ type Querier interface {
 	// Pass empty string for iata or scope to skip those filters.
 	// Pass cursor=0 to start from the beginning.
 	ListAllChannelMessages(ctx context.Context, arg ListAllChannelMessagesParams) ([]ListAllChannelMessagesRow, error)
+	// Every 2-byte prefix claimed by more than one infra node, globally. The path map
+	// uses this to decide whether a 2-byte route is safe to draw: a 2-byte route is only
+	// drawn when none of its prefixes appear here AND every hop resolved high-confidence.
+	ListAmbiguousPrefix2(ctx context.Context) ([][]byte, error)
 	// Returns messages for a channel identified by integer ID.
 	// Pass a zero/null timestamp for since to return all messages up to limit.
 	// Pass empty string for iata to skip IATA filtering.

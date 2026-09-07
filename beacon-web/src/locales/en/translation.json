@@ -281,7 +281,8 @@
     "closePath": "Close path map",
     "allPaths": "All paths",
     "traceRoute": "Trace route",
-    "pathBlockedShortHash": "No verifiable route: this packet was sent with {{size}}B hashes, but a route needs {{required}}B hashes to be unambiguous.",
+    "pathBlockedShortHash": "No verifiable route: this packet was sent with {{size}}B hashes, but a route needs at least {{required}}B hashes to be unambiguous.",
+    "pathBlockedAmbiguousHop": "No verifiable route: a 2-byte hop on this route matches more than one node in the database.",
     "pathBlockedOutOfRange": "No verifiable route: the resolved hops are too far apart to be direct radio hops.",
     "pathBlockedUnresolved": "No verifiable route: too few hops resolved to known nodes."
   },

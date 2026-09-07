@@ -66,6 +66,10 @@ export async function rawGetNodes(params: { type?: number; typeName?: string; ia
   return request<Models.PageNodeSummary>("/nodes", { "type": params.type, "typeName": params.typeName, "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "name": params.name, "scope": params.scope, "pubkey": params.pubkey, "pubkeyPrefix": params.pubkeyPrefix, "supportsMultibytePaths": params.supportsMultibytePaths, "supportsMultibyteTraces": params.supportsMultibyteTraces, "neighbors": params.neighbors, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
 }
 
+export async function rawGetNodesAmbiguousPrefix2(): Promise<Array<string>> {
+  return request<Array<string>>("/nodes/ambiguous-prefix2", undefined);
+}
+
 export async function rawGetNodesNodeId(params: { nodeId: string; }): Promise<Models.Node> {
   return request<Models.Node>(`/nodes/${encodeURIComponent(String(params.nodeId))}`, undefined);
 }

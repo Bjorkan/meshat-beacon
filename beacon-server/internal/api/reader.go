@@ -219,6 +219,12 @@ type Reader interface {
 	// GetNodeNeighbors returns the neighbors of a node ordered by most recently seen.
 	GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]NodeNeighbor, error)
 
+	// ListAmbiguousPrefix2 returns every 2-byte prefix claimed by more than one infra
+	// node, globally, as lowercase hex (e.g. "a3f1"). The path map uses it to decide
+	// whether a 2-byte route is safe to draw: with zero collisions in the whole
+	// database, a high-confidence 2-byte hit is as trustworthy as a 3-byte one.
+	ListAmbiguousPrefix2(ctx context.Context) ([]string, error)
+
 	// GetKnownRoutesByNode returns all known routes in a given IATA that contain
 	// the specified node UUID anywhere in their hop sequence.
 	GetKnownRoutesByNode(ctx context.Context, iata string, nodeID uuid.UUID) ([]KnownRoute, error)

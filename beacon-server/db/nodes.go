@@ -320,6 +320,22 @@ func (s *Store) GetNodeByPubkey(ctx context.Context, pubkey []byte) (uuid.UUID, 
 	return s.q.GetNodeByPubkey(ctx, pubkey)
 }
 
+// ListAmbiguousPrefix2 returns every 2-byte prefix claimed by more than one infra
+// node, globally. The path map uses it to decide whether a 2-byte route is safe to
+// draw: with zero collisions in the whole database, a high-confidence 2-byte hit is
+// as trustworthy as a 3-byte one. Results are hex-encoded and sorted for stable output.
+func (s *Store) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
+	rows, err := s.q.ListAmbiguousPrefix2(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, hex.EncodeToString(r))
+	}
+	return out, nil
+}
+
 func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.NodeNeighbor, error) {
 	rows, err := s.q.GetNodeNeighbors(ctx, nodeID)
 	if err != nil {

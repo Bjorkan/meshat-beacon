@@ -38,8 +38,12 @@ export function PacketExpansion({
   const spread = packet.lastHeardAt - packet.firstHeardAt;
   const ready = !isLoading && !isError;
   // The button stays enabled even when every candidate is withheld (short hashes,
-  // out-of-range legs): the modal then explains why instead of drawing a guess.
-  // Only a packet with nothing at all to say keeps the button disabled.
+  // ambiguous hops, out-of-range legs): the modal then explains why instead of
+  // drawing a guess. Only a packet with nothing at all to say keeps the button
+  // disabled. hasPathInfo is computed fail-open on the width gate (pure detail
+  // data); the modal re-checks fail-closed with the live collision set, so the
+  // button can never promise a route the modal won't draw — at worst it opens
+  // the modal onto its explanation.
   const pathResult = useMemo(() => (data ? buildPacketPathResult(data) : null), [data]);
   const hasPath = (pathResult?.paths.length ?? 0) > 0;
   const hasPathInfo = hasPath || pathResult?.blocked != null;

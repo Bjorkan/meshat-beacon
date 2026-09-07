@@ -39,6 +39,7 @@ import {
   rawGetChannelsChannelIDMessages,
   rawGetIatas,
   rawGetNodes,
+  rawGetNodesAmbiguousPrefix2,
   rawGetNodesNodeId,
   rawGetNodesNodeIdNeighbors,
   rawGetNodesNodeIdObservations,
@@ -376,6 +377,13 @@ export function getObserversPage(
 
 export function getNode(nodeId: string): Promise<Node> {
   return rawGetNodesNodeId({ nodeId }) as Promise<Node>;
+}
+
+// Every 2-byte node prefix claimed by more than one infra node, globally, as
+// lowercase hex. The path map draws a 2-byte route only when none of its hops'
+// prefixes appear here and every hop resolved high-confidence.
+export function getAmbiguousPrefix2(): Promise<string[]> {
+  return rawGetNodesAmbiguousPrefix2() as Promise<string[]>;
 }
 
 export function getNodeObservations(

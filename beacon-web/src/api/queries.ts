@@ -12,6 +12,7 @@
 import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/react-query';
 import type { InfiniteData, QueryKey, UseInfiniteQueryOptions } from '@tanstack/react-query';
 import {
+  getAmbiguousPrefix2,
   getBrokers,
   getChannels,
   getChannelMessagesPage,
@@ -256,6 +257,16 @@ export const nodeQueries = {
       queryKey: ['node-neighbors', id] as const,
       queryFn: () => getNodeNeighbors(id),
       staleTime: 30_000,
+      refetchOnWindowFocus: false,
+    }),
+  // Global 2-byte collision set for the path map's 2-byte gate. Cached briefly:
+  // a stale "no collisions" answer would draw an actually-ambiguous route, so
+  // this stays fresh rather than sharing the longer node-detail TTL.
+  ambiguousPrefix2: () =>
+    queryOptions({
+      queryKey: ['nodes', 'ambiguous-prefix2'] as const,
+      queryFn: () => getAmbiguousPrefix2(),
+      staleTime: 60_000,
       refetchOnWindowFocus: false,
     }),
 };

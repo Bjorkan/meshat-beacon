@@ -101,6 +101,10 @@ func (s *stubReader) GetNodeNeighbors(_ context.Context, _ uuid.UUID) ([]api.Nod
 	return nil, nil
 }
 
+func (s *stubReader) ListAmbiguousPrefix2(_ context.Context) ([]string, error) {
+	return nil, nil
+}
+
 func (s *stubReader) GetNodesByIDs(_ context.Context, _ []uuid.UUID) (map[uuid.UUID]*api.ResolvedNode, error) {
 	return nil, nil
 }

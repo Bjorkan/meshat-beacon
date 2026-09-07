@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import type { PacketDetail } from '../../types/api';
+import { nodeQueries } from '../../api/queries';
 import { ModalOverlay } from '../../components/ModalOverlay';
 import { CloseButton } from '../../components/CloseButton';
 import { CopyLinkButton } from '../../components/CopyLinkButton';
@@ -56,21 +58,30 @@ export function PacketPathMapModal({
   initialSelectedKey?: string | null;
 }) {
   const { t } = useTranslation();
-  const { paths, blocked } = useMemo(() => buildPacketPathResult(detail), [detail]);
+  // Global 2-byte collision set: a 2-byte route draws only when none of its air
+  // prefixes collide anywhere in the database. Fail-closed while loading — an
+  // unresolved fetch withholds 2-byte routes rather than drawing them blind.
+  const { data: ambiguousPrefix2 } = useQuery(nodeQueries.ambiguousPrefix2());
+  const { paths, blocked } = useMemo(
+    () => buildPacketPathResult(detail, { ambiguousPrefix2 }),
+    [detail, ambiguousPrefix2],
+  );
   const blockedKey =
     blocked == null
       ? null
       : blocked.reason === 'short-hash'
         ? 'map.pathBlockedShortHash'
-        : blocked.reason === 'out-of-range'
-          ? 'map.pathBlockedOutOfRange'
-          : 'map.pathBlockedUnresolved';
+        : blocked.reason === 'ambiguous-hop'
+          ? 'map.pathBlockedAmbiguousHop'
+          : blocked.reason === 'out-of-range'
+            ? 'map.pathBlockedOutOfRange'
+            : 'map.pathBlockedUnresolved';
   const blockedMessage =
     blocked == null || blockedKey == null
       ? null
       : t(blockedKey, {
           size: blocked.observedHashSize,
-          required: 3,
+          required: 2,
           count: blocked.count,
         });
   const [selectedKey, setSelectedKey] = useState<string | null>(

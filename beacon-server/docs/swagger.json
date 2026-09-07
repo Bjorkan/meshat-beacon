@@ -627,6 +627,35 @@
                 }
             }
         },
+        "/nodes/ambiguous-prefix2": {
+            "get": {
+                "description": "Every 2-byte node prefix claimed by more than one infra node, globally.\nThe path map draws a 2-byte route only when this list is empty\nfor its prefixes and every hop resolved high-confidence.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Nodes"
+                ],
+                "summary": "List ambiguous 2-byte prefixes",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/nodes/{nodeId}": {
             "get": {
                 "produces": [
