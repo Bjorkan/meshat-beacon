@@ -21,7 +21,6 @@ import type { NodeFeatureProps } from './node-geojson';
 import {
   NODES_SOURCE_ID,
   NODES_CLUSTER_LAYER_ID,
-  NODES_CLUSTER_BREAKDOWN_LAYER_ID,
   NODES_CLUSTER_FALLBACK_LAYER_ID,
   NODES_CLUSTER_HALO_LAYER_ID,
   NODES_DOT_LAYER_ID,
@@ -60,7 +59,7 @@ import {
   NODE_INTERACTION_RADIUS_PX,
   shouldClusterNodes,
 } from './marker-scale';
-import { clusterBreakdownTextExpression, clusterRoleProperties } from './cluster-style';
+import { clusterRoleProperties } from './cluster-style';
 import { applyNodeClusterMode } from './node-clustering';
 import { syncMapOverlayLayerOrder } from './map-layer-order';
 
@@ -274,9 +273,8 @@ export function useMapNodes(
           'text-field': ['get', 'point_count_abbreviated'],
           'text-font': ['Noto Sans Bold'],
           'text-size': clusterTextSizeExpression() as ExpressionSpecification,
-          // The composition breakdown sits below the total, so the count owns
-          // the vertical center instead of floating above it.
-          'text-offset': [0, -0.55],
+          // Overview clusters show only a legible total; tapping reveals their nodes.
+          'text-offset': [0, 0],
           'text-allow-overlap': true,
           'text-ignore-placement': true,
         },
@@ -287,28 +285,6 @@ export function useMapNodes(
         },
       } as SymbolLayerSpecification);
     }
-    if (!map.getLayer(NODES_CLUSTER_BREAKDOWN_LAYER_ID)) {
-      map.addLayer({
-        id: NODES_CLUSTER_BREAKDOWN_LAYER_ID,
-        type: 'symbol',
-        source: NODES_SOURCE_ID,
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': clusterBreakdownTextExpression() as ExpressionSpecification,
-          'text-font': ['Noto Sans Bold'],
-          'text-size': 10.5,
-          'text-offset': [0, 0.75],
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-        },
-        paint: {
-          // Dark text halo keeps the small role counts legible on light basemaps too.
-          'text-halo-color': 'rgba(12,16,24,0.96)',
-          'text-halo-width': 1.6,
-        },
-      } as SymbolLayerSpecification);
-    }
-
     // Cluster layers are meaningful only while the source is clustered. Hiding them immediately on
     // Live/Off transitions prevents stale worker tiles from flashing an old cluster during the
     // asynchronous setClusterOptions update; enabling them makes the normal-map contract explicit.
@@ -317,7 +293,6 @@ export function useMapNodes(
       NODES_CLUSTER_HALO_LAYER_ID,
       NODES_CLUSTER_FALLBACK_LAYER_ID,
       NODES_CLUSTER_LAYER_ID,
-      NODES_CLUSTER_BREAKDOWN_LAYER_ID,
     ]) {
       if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', clusterVisibility);
     }
@@ -657,11 +632,7 @@ export function useMapNodes(
       }
 
       const cluster = map.queryRenderedFeatures(e.point, {
-        layers: [
-          NODES_CLUSTER_LAYER_ID,
-          NODES_CLUSTER_BREAKDOWN_LAYER_ID,
-          NODES_CLUSTER_FALLBACK_LAYER_ID,
-        ],
+        layers: [NODES_CLUSTER_LAYER_ID, NODES_CLUSTER_FALLBACK_LAYER_ID],
       })[0];
       const clusterFeature = cluster;
       if (clusterFeature?.geometry.type === 'Point') {
@@ -739,7 +710,6 @@ export function useMapNodes(
       NODES_POINT_LAYER_ID,
       NODES_DOT_LAYER_ID,
       NODES_CLUSTER_LAYER_ID,
-      NODES_CLUSTER_BREAKDOWN_LAYER_ID,
       NODES_CLUSTER_FALLBACK_LAYER_ID,
     ]) {
       map.on('mouseenter', layer, setPointer);
@@ -762,7 +732,6 @@ export function useMapNodes(
         NODES_POINT_LAYER_ID,
         NODES_DOT_LAYER_ID,
         NODES_CLUSTER_LAYER_ID,
-        NODES_CLUSTER_BREAKDOWN_LAYER_ID,
         NODES_CLUSTER_FALLBACK_LAYER_ID,
       ]) {
         map.off('mouseenter', layer, setPointer);
