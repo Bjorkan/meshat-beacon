@@ -101,10 +101,9 @@ export function MapView({
   const [packetFlow, setPacketFlow] = useState(() => urlView.flow ?? false);
   const [packetFlowSession, setPacketFlowSession] = useState(0);
 
-  // IATA region borders overlay, on by default (outline only); seeded URL -> localStorage so an
-  // explicit "off" sticks, like the other toggles
+  // IATA borders are opt-in; explicit URL and saved preferences still take precedence.
   const [borders, setBorders] = useState(
-    () => urlView.borders ?? readPreference(MAP_BORDERS_STORAGE_KEY) !== 'off',
+    () => urlView.borders ?? readPreference(MAP_BORDERS_STORAGE_KEY) === 'on',
   );
   const handleBordersChange = useCallback((on: boolean) => {
     setBorders(on);

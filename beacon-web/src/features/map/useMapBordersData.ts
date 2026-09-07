@@ -40,13 +40,15 @@ export function useMapBordersData(iataCodes: string[], enabled: boolean): Border
   const sig = iataCodes.map((iata, i) => `${iata}:${results[i]?.data ? 1 : 0}`).join('|');
   return useMemo(
     () =>
-      mergeBorders(
-        iataCodes.map((iata, i) => ({
-          iata,
-          border: results[i]?.data ?? null,
-        })),
-      ),
+      enabled
+        ? mergeBorders(
+            iataCodes.map((iata, i) => ({
+              iata,
+              border: results[i]?.data ?? null,
+            })),
+          )
+        : { type: 'FeatureCollection' as const, features: [] },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- sig captures iataCodes + which borders loaded
-    [sig],
+    [sig, enabled],
   );
 }
