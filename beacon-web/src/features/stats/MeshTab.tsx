@@ -262,6 +262,7 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
         />
         <StatCard
           label={t('stats.activeIatas')}
+          variant="snapshot"
           sublabel={ovWindow}
           accent="var(--color-warn)"
           value={kpiLoading ? '—' : (ov?.activeIatas ?? '—')}

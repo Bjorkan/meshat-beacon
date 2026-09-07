@@ -60,15 +60,20 @@ export function StatCard({
   accent,
   spark,
   sublabel,
+  variant = spark ? 'trend' : 'snapshot',
 }: {
   label: string;
   value: ReactNode;
   accent: string; // CSS color for the sparkline, e.g. "var(--color-primary)"
   spark?: number[];
   sublabel?: ReactNode;
+  variant?: 'trend' | 'snapshot';
 }) {
   return (
-    <div className="rounded-lg border border-border bg-bg-surface px-3.5 py-3">
+    <div
+      data-variant={variant}
+      className={`rounded-lg border border-border bg-bg-surface px-3.5 py-3 ${variant === 'snapshot' ? 'self-start' : ''}`}
+    >
       <div className="flex items-center justify-between">
         <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-muted">
           {label}
@@ -78,7 +83,7 @@ export function StatCard({
       <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-text-bright">
         {value}
       </div>
-      {spark && <Sparkline values={spark} color={accent} />}
+      {variant === 'trend' && spark && <Sparkline values={spark} color={accent} />}
     </div>
   );
 }
