@@ -10,8 +10,10 @@ export function NodeDetailOverlay({
   onViewObserver,
   onViewNode,
   onViewOnMap,
+  onAnalyzePacket,
 }: {
   nodeId: string;
+  onAnalyzePacket: (hash: string) => void;
   onClose: () => void;
   onViewObserver: (observerId: string) => void;
   onViewNode?: (nodeId: string) => void;
@@ -26,6 +28,7 @@ export function NodeDetailOverlay({
         onViewObserver={onViewObserver}
         onViewNode={onViewNode}
         onViewOnMap={onViewOnMap}
+        onAnalyzePacket={onAnalyzePacket}
       />
     </ModalOverlay>
   );

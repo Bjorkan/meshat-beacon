@@ -3,7 +3,7 @@ import type { PacketDetail } from '../types/api';
 
 export interface Overlays {
   overlayPacketHash: string | null;
-  setOverlayPacketHash: (hash: string | null) => void;
+  openPacket: (hash: string | null) => void;
   overlayNodeId: string | null;
   setOverlayNodeId: (id: string | null) => void;
   pathMapDetail: PacketDetail | null;

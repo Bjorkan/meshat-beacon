@@ -22,7 +22,7 @@ vi.mock('@tanstack/react-router', async (importOriginal) => {
 vi.mock('../../src/routes/overlays', () => ({
   useOverlays: () => ({
     analyze: vi.fn(),
-    setOverlayPacketHash: vi.fn(),
+    openPacket: vi.fn(),
     setOverlayNodeId: vi.fn(),
   }),
 }));

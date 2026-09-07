@@ -26,7 +26,7 @@ export function MapRoute() {
         urlView={urlView}
         selectedNodeId={search.node ?? null}
         onSelectNode={selectMapNode}
-        onOpenPacket={overlays.setOverlayPacketHash}
+        onOpenPacket={overlays.openPacket}
       />
       {search.node && (
         <NodeDetailPanel
@@ -34,7 +34,7 @@ export function MapRoute() {
           onClose={() => selectMapNode(null)}
           onViewObserver={overlays.selectObserver}
           onViewNode={selectMapNode}
-          onAnalyzePacket={overlays.setOverlayPacketHash}
+          onAnalyzePacket={overlays.openPacket}
         />
       )}{' '}
     </>

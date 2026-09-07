@@ -100,3 +100,23 @@ describe('ResolvedHopBlock (mobile)', () => {
     expect(onViewNode).not.toHaveBeenCalled();
   });
 });
+
+describe('ResolvedHopBlock inside a modal', () => {
+  it('keeps the interactive popover inside the dialog pointer and focus boundary', () => {
+    setMobile(true);
+    const onViewNode = vi.fn();
+    render(
+      <div role="dialog" aria-label="Analyzer">
+        <div className="overflow-hidden">
+          <ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />
+        </div>
+      </div>,
+    );
+    fireEvent.click(screen.getByText('Repeater A'));
+    const dialog = screen.getByRole('dialog', { name: 'Analyzer' });
+    const popover = within(dialog).getByRole('tooltip');
+    expect(popover.parentElement).toBe(dialog);
+    fireEvent.click(within(popover).getByRole('button', { name: 'Repeater A' }));
+    expect(onViewNode).toHaveBeenCalledWith('node-1');
+  });
+});

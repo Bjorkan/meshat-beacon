@@ -205,3 +205,40 @@ describe('NodeDetailPanel clock drift', () => {
     expect(screen.queryByText(/Clock drift/i)).not.toBeInTheDocument();
   });
 });
+
+describe('NodeDetailPanel observation actions', () => {
+  it('renders a full-width native button and opens that observation packet', async () => {
+    mockGetNodeObservations.mockResolvedValue({
+      items: [
+        {
+          id: 12,
+          packetHash: 'abcdef12',
+          payloadType: 4,
+          payloadTypeName: 'ADVERT',
+          iata: 'YVR',
+          heardAt: 2,
+          hopCount: 1,
+        },
+      ],
+      hasMore: false,
+      nextCursor: null,
+    });
+    const analyze = vi.fn();
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={client}>
+        <NodeDetailPanel
+          nodeId="node-self"
+          onClose={vi.fn()}
+          onViewObserver={vi.fn()}
+          onAnalyzePacket={analyze}
+        />
+      </QueryClientProvider>,
+    );
+    const row = await screen.findByRole('button', { name: /ADVERT.*YVR/ });
+    expect(row).toHaveAttribute('type', 'button');
+    expect(row).toHaveClass('w-full');
+    fireEvent.click(row);
+    expect(analyze).toHaveBeenCalledWith('abcdef12');
+  });
+});

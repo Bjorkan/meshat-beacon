@@ -24,7 +24,8 @@ function nodeLabel(node: ResolvedNode): string {
   return node.name ?? node.publicKey.slice(0, 8);
 }
 
-// Portals to <body> so the drawer's overflow doesn't clip it; a close delay bridges the mouse gap.
+// Portal outside the scrolling drawer, but inside its dialog when modal. This keeps
+// touch targets inside Radix's focus/pointer boundary. A close delay bridges the mouse gap.
 function HopPopover({
   hop,
   rawLabel,
@@ -43,6 +44,7 @@ function HopPopover({
   const ref = useRef<HTMLSpanElement>(null);
   const tipRef = useRef<HTMLSpanElement>(null);
   const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const [portalContainer, setPortalContainer] = useState<Element | null>(null);
   const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
   const closeTimer = useRef<number | null>(null);
 
@@ -54,6 +56,7 @@ function HopPopover({
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
+    setPortalContainer(ref.current?.closest('[role="dialog"]') ?? document.body);
     const rect = ref.current?.getBoundingClientRect();
     if (rect) setAnchor(rect);
   }
@@ -63,6 +66,7 @@ function HopPopover({
   // touch: tap toggles; stopPropagation so a hop tap doesn't also select the Route row/card it's in
   function toggle(e: ReactMouseEvent) {
     e.stopPropagation();
+    setPortalContainer(ref.current?.closest('[role="dialog"]') ?? document.body);
     setAnchor((a) => (a ? null : (ref.current?.getBoundingClientRect() ?? null)));
   }
 
@@ -157,7 +161,7 @@ function HopPopover({
               </span>
             )}
           </span>,
-          document.body,
+          portalContainer ?? document.body,
         )}
     </span>
   );

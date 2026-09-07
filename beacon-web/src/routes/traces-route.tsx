@@ -17,7 +17,7 @@ export function TracesRoute() {
   );
   return (
     <TraceList
-      onAnalyze={overlays.setOverlayPacketHash}
+      onAnalyze={overlays.openPacket}
       onViewNode={overlays.setOverlayNodeId}
       typeFilter={typeFilter}
       onTypeFilterChange={onTypeFilterChange}

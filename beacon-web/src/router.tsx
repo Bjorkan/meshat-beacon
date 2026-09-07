@@ -362,6 +362,22 @@ function RootLayout() {
     [navigate],
   );
 
+  const openPacket = useCallback(
+    (hash: string | null) => {
+      // Replace the controlled analyzer and dismiss its node peek in one transition.
+      // A node opened from the URL-backed drawer keeps that same drawer.
+      setOverlayNodeId(null);
+      setSelectedObservationId(null);
+      if (analyzerHash) {
+        setOverlayPacketHash(null);
+        analyze(hash);
+      } else {
+        setOverlayPacketHash(hash);
+      }
+    },
+    [analyzerHash, analyze],
+  );
+
   const selectNode = useCallback(
     (id: string | null) => {
       navigate({
@@ -419,7 +435,7 @@ function RootLayout() {
   const overlays = useMemo<Overlays>(
     () => ({
       overlayPacketHash,
-      setOverlayPacketHash,
+      openPacket,
       overlayNodeId,
       setOverlayNodeId,
       pathMapDetail,
@@ -437,6 +453,7 @@ function RootLayout() {
     }),
     [
       overlayPacketHash,
+      openPacket,
       overlayNodeId,
       pathMapDetail,
       selectedObservationId,
@@ -487,25 +504,27 @@ function RootLayout() {
                 }}
               />
             )}
+            {overlayPacketHash && (
+              <PacketAnalyzerOverlay
+                key={overlayPacketHash}
+                detail={overlayPacketDetail}
+                loading={overlayPacketLoading}
+                onClose={() => setOverlayPacketHash(null)}
+                onViewNode={setOverlayNodeId}
+                onViewPath={() => {
+                  if (overlayPacketDetail) overlays.openPath(overlayPacketDetail, null);
+                }}
+                inactive={!!overlayNodeId || !!pathMapDetail}
+              />
+            )}
             {overlayNodeId && (
               <NodeDetailOverlay
                 nodeId={overlayNodeId}
+                onAnalyzePacket={openPacket}
                 onClose={() => setOverlayNodeId(null)}
                 onViewObserver={selectObserver}
                 onViewNode={setOverlayNodeId}
                 onViewOnMap={viewNodeOnMap}
-              />
-            )}
-            {overlayPacketHash && (
-              <PacketAnalyzerOverlay
-                detail={overlayPacketDetail}
-                loading={overlayPacketLoading}
-                onClose={() => setOverlayPacketHash(null)}
-                onViewObserver={selectObserver}
-                onViewPath={() => {
-                  if (overlayPacketDetail) overlays.openPath(overlayPacketDetail, null);
-                }}
-                inactive={!!pathMapDetail}
               />
             )}
             {pathMapDetail && (

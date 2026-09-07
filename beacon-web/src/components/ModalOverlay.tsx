@@ -39,7 +39,7 @@ export function ModalOverlay({
           onPointerDownOutside={(event) => {
             if (inactive) event.preventDefault();
           }}
-          className="fixed inset-y-0 right-0 z-40 flex max-w-full shadow-2xl focus:outline-none"
+          className="fixed inset-y-0 right-0 z-40 flex w-full lg:w-auto max-w-full shadow-2xl focus:outline-none"
         >
           {children}
         </Dialog.Content>

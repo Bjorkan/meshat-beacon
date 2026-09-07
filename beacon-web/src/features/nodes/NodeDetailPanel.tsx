@@ -57,8 +57,10 @@ function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: 
   const { t } = useTranslation();
   const level = snrLevel(obs.snr);
   return (
-    <div
-      className={`bg-bg-base border border-border rounded px-3 py-2 border-l-2 border-l-primary ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
+    <button
+      type="button"
+      disabled={!onClick}
+      className={`w-full text-left focus-visible:outline-2 focus-visible:outline-primary bg-bg-base border border-border rounded px-3 py-2 border-l-2 border-l-primary ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
       onClick={onClick}
     >
       <div className="flex items-center gap-2 text-[11px] mb-1.5">
@@ -94,7 +96,7 @@ function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: 
           <span className="font-medium text-text-normal">{obs.hopCount ?? '—'}</span>
         </div>
       </div>
-    </div>
+    </button>
   );
 }
 

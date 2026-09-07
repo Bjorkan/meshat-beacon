@@ -146,7 +146,7 @@ export function NodeDetailRoute() {
       onClose={close}
       onViewObserver={overlays.selectObserver}
       onViewNode={selectNode}
-      onAnalyzePacket={overlays.setOverlayPacketHash}
+      onAnalyzePacket={overlays.openPacket}
       onViewOnMap={viewOnMap}
     />
   );

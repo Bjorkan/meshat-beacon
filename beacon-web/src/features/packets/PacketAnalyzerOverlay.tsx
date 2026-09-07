@@ -2,54 +2,38 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PacketDetail } from '../../types/api';
 import { PacketAnalyzerDrawer } from './PacketAnalyzerDrawer';
-import { NodeDetailOverlay } from '../nodes/NodeDetailOverlay';
 import { ModalOverlay } from '../../components/ModalOverlay';
 
-// Packet analyzer floated over a node detail panel (mirror of NodeDetailOverlay). The node detail it
-// can stack on top gets no onAnalyzePacket, so the overlay chain stops there instead of recursing.
+// The route controller owns node overlays and packet replacement, keeping the stack bounded.
 export function PacketAnalyzerOverlay({
   detail,
   loading,
   onClose,
-  onViewObserver,
+  onViewNode,
   onViewPath,
   inactive = false,
 }: {
   detail: PacketDetail | undefined;
   loading?: boolean;
   onClose: () => void;
-  onViewObserver: (observerId: string) => void;
+  onViewNode: (nodeId: string) => void;
   onViewPath?: () => void;
   inactive?: boolean;
 }) {
   const { t } = useTranslation();
   const [selectedObservationId, setSelectedObservationId] = useState<number | null>(null);
-  const [viewNodeId, setViewNodeId] = useState<string | null>(null);
 
   return (
-    <>
-      <ModalOverlay
-        label={t('packets.analyzerLabel')}
+    <ModalOverlay label={t('packets.analyzerLabel')} onClose={onClose} inactive={inactive}>
+      <PacketAnalyzerDrawer
+        detail={detail}
+        loading={loading}
+        selectedObservationId={selectedObservationId}
+        onSelectObservation={setSelectedObservationId}
         onClose={onClose}
-        inactive={!!viewNodeId || inactive}
-      >
-        <PacketAnalyzerDrawer
-          detail={detail}
-          loading={loading}
-          selectedObservationId={selectedObservationId}
-          onSelectObservation={setSelectedObservationId}
-          onClose={onClose}
-          onViewNode={setViewNodeId}
-          onViewPath={onViewPath}
-        />
-      </ModalOverlay>
-      {viewNodeId && (
-        <NodeDetailOverlay
-          nodeId={viewNodeId}
-          onClose={() => setViewNodeId(null)}
-          onViewObserver={onViewObserver}
-        />
-      )}
-    </>
+        onViewNode={onViewNode}
+        onViewPath={onViewPath}
+      />
+    </ModalOverlay>
   );
 }

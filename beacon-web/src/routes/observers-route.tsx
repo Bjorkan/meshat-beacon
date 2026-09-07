@@ -121,7 +121,7 @@ export function ObserverDetailRoute() {
     <ObserverDetailPanel
       observerId={observerId}
       onClose={close}
-      onAnalyzePacket={overlays.setOverlayPacketHash}
+      onAnalyzePacket={overlays.openPacket}
       onViewStats={overlays.viewObserverStats}
     />
   );
