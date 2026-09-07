@@ -1,13 +1,18 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { traceQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
-import { SkeletonRows } from '../../components/SkeletonRows';
-import { EmptyState } from '../../components/EmptyState';
 import { Timestamp } from '../../components/Timestamp';
 import { Badge } from '../../components/Badge';
 import { Segmented } from '../stats/Segmented';
+import {
+  DataTable,
+  type Column,
+  type MobileSortOption,
+  type SortState,
+} from '../../components/DataTable';
 import { snrLevel, SIGNAL_LEVEL_CLASSES, formatSnr } from '../../lib/formatters';
 import { TraceDetailPanel } from './TraceDetailPanel';
 import type { TraceTagSummary, TraceType } from '../../types/api';
@@ -24,22 +29,25 @@ interface TraceListProps {
   onTypeFilterChange: (value: '' | TraceType) => void;
 }
 
-// The list now carries the most complete observation's path, so we can show the hops (and the SNR we
-// heard on each) right on the card instead of making people open the detail panel for a quick look.
-// Uniquely resolved hops show the node name; the raw prefix stays as secondary text for diagnostics.
-// SNR renders inline in the chip title when present — no placeholder sub-line, so cards without SNR
-// stay compact instead of growing a stray "-" row.
+// The desktop row carries the most complete observation's path, so scanners can read the hops
+// (and the SNR heard on each) without opening the detail panel. Uniquely resolved hops show
+// the node name; the raw prefix stays as secondary text for diagnostics. SNR renders inline
+// in the chip title when present — no placeholder sub-line, so paths without SNR stay compact.
 function TracePathPreview({
   hashes,
   snrs,
   resolved,
+  overflow = 0,
+  compact = false,
 }: {
   hashes: string[];
   snrs: number[];
   resolved?: { confidence: string; nodeName?: string }[];
+  overflow?: number;
+  compact?: boolean;
 }) {
   return (
-    <div className="mt-1.5 flex flex-wrap items-center gap-x-1 gap-y-1.5">
+    <div className={`${compact ? '' : 'mt-1.5 '}flex flex-wrap items-center gap-x-1 gap-y-1.5`}>
       {hashes.map((hash, i) => {
         const snr = snrs?.[i];
         const level = snr != null ? snrLevel(snr) : null;
@@ -72,50 +80,108 @@ function TracePathPreview({
           </span>
         );
       })}
+      {overflow > 0 && <span className="font-mono text-[11px] text-text-dim">+{overflow}</span>}
     </div>
   );
 }
 
-// A trace tag as a selectable card, echoing PacketRow's look so the tab reads like the Packets tab.
-function TraceTagCard({
-  tag,
-  selected,
-  onSelect,
-}: {
-  tag: TraceTagSummary;
-  selected: boolean;
-  onSelect: (tag: string) => void;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div
-      className={`bg-bg-surface border rounded-md px-3.5 py-2.5 cursor-pointer ${
-        selected
-          ? 'border-primary bg-primary/10'
-          : 'border-border hover:border-text-dim/30 hover:bg-bg-raised/50'
-      }`}
-      onClick={() => onSelect(tag.traceTag)}
-      aria-pressed={selected}
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onSelect(tag.traceTag);
-        }
-      }}
-    >
-      <div className="flex items-center gap-2.5">
+const TRACE_PATH_PREVIEW_HOPS = 6;
+
+function traceColumns(t: TFunction): Column<TraceTagSummary>[] {
+  return [
+    {
+      header: 'Tag',
+      sortValue: (tag) => tag.traceTag,
+      cell: (tag) => (
         <span className="font-mono text-xs font-semibold text-primary tracking-wider">
           {tag.traceTag.toUpperCase()}
         </span>
-        {/* pings get the primary tint, traces the amber one, so the two read apart at a glance */}
+      ),
+    },
+    {
+      header: 'Type',
+      label: t('traces.type'),
+      className: 'text-text-muted',
+      sortValue: (tag) => tag.traceType,
+      cell: (tag) =>
+        tag.traceType ? (
+          <Badge variant={tag.traceType === 'PING' ? 'text' : 'trace'}>{tag.traceType}</Badge>
+        ) : (
+          <span className="text-text-dim">—</span>
+        ),
+    },
+    {
+      header: 'Packets',
+      label: t('traces.packets'),
+      className: 'text-text-muted',
+      sortValue: (tag) => tag.packetCount,
+      cell: (tag) => tag.packetCount.toLocaleString(),
+    },
+    {
+      header: 'IATA',
+      className: 'text-text-muted',
+      sortValue: (tag) => tag.iataCount,
+      cell: (tag) => tag.iataCount.toLocaleString(),
+    },
+    {
+      header: 'Path',
+      label: t('traces.path'),
+      cell: (tag) =>
+        tag.pathHashes?.length ? (
+          <TracePathPreview
+            hashes={tag.pathHashes.slice(0, TRACE_PATH_PREVIEW_HOPS)}
+            snrs={(tag.snrValues ?? []).slice(0, TRACE_PATH_PREVIEW_HOPS)}
+            resolved={tag.resolvedPath?.slice(0, TRACE_PATH_PREVIEW_HOPS)}
+            overflow={tag.pathHashes.length - TRACE_PATH_PREVIEW_HOPS}
+          />
+        ) : (
+          <span className="text-text-dim">{t('traces.noPath')}</span>
+        ),
+    },
+    {
+      header: 'First seen',
+      label: t('traces.firstSeen'),
+      className: 'text-text-muted',
+      sortValue: (tag) => tag.firstHeardAt,
+      cell: (tag) => <Timestamp value={tag.firstHeardAt} />,
+    },
+    {
+      header: 'Last seen',
+      label: t('traces.lastSeen'),
+      className: 'text-text-muted',
+      sortValue: (tag) => tag.lastHeardAt,
+      cell: (tag) => <Timestamp value={tag.lastHeardAt} />,
+    },
+  ];
+}
+
+// Semantic mobile sort actions for Traces: explicit user-facing orderings. Adding a sortable
+// desktop column above never creates a mobile option by itself.
+function traceMobileSortOptions(t: TFunction): MobileSortOption[] {
+  return [
+    { id: 'newest', label: t('sort.newest'), sort: { columnId: 'Last seen', direction: 'desc' } },
+    { id: 'oldest', label: t('sort.oldest'), sort: { columnId: 'First seen', direction: 'asc' } },
+    {
+      id: 'most-packets',
+      label: t('sort.mostPackets'),
+      sort: { columnId: 'Packets', direction: 'desc' },
+    },
+  ];
+}
+
+// Mobile card: tag + type up top (the desktop row's identity), path preview, then the counts
+// and recency a scanner needs. Mirrors renderRouteCard's shape so the tab reads like Routes.
+function renderTraceCard(tag: TraceTagSummary, t: TFunction) {
+  return (
+    <div className="flex flex-col gap-1.5 font-mono text-xs">
+      <div className="flex items-center gap-2">
+        <span className="font-mono text-xs font-semibold text-primary tracking-wider">
+          {tag.traceTag.toUpperCase()}
+        </span>
         {tag.traceType && (
           <Badge variant={tag.traceType === 'PING' ? 'text' : 'trace'}>{tag.traceType}</Badge>
         )}
         <Timestamp value={tag.lastHeardAt} className="ml-auto text-[11px] text-text-dim" />
-      </div>
-      <div className="mt-1 text-[11px] text-text-dim font-mono">
-        {t('traces.summary', { packets: tag.packetCount, iatas: tag.iataCount })}
       </div>
       {tag.pathHashes?.length ? (
         <TracePathPreview
@@ -124,6 +190,9 @@ function TraceTagCard({
           resolved={tag.resolvedPath}
         />
       ) : null}
+      <div className="text-[11px] text-text-dim">
+        {t('traces.summary', { packets: tag.packetCount, iatas: tag.iataCount })}
+      </div>
     </div>
   );
 }
@@ -137,6 +206,7 @@ export function TraceList({
   const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [sort, setSort] = useState<SortState>({ header: 'Last seen', direction: 'desc' });
   const typeOptions = [
     { value: '', label: t('common.all') },
     { value: 'TRACE', label: 'Trace' },
@@ -156,6 +226,9 @@ export function TraceList({
     traceQueries.list({ regionKey, iatas, type: typeFilter, limit: TRACE_LIST_LIMIT }),
   );
 
+  const columns = useMemo(() => traceColumns(t), [t]);
+  const mobileSortOptions = useMemo(() => traceMobileSortOptions(t), [t]);
+
   return (
     <div className="flex flex-1 min-h-0">
       <div className="flex-1 min-w-0 flex flex-col">
@@ -170,22 +243,19 @@ export function TraceList({
             ariaLabel={t('traces.type')}
           />
         </div>
-        <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
-          {isLoading ? (
-            <SkeletonRows rows={8} />
-          ) : (tags?.length ?? 0) === 0 ? (
-            <EmptyState title={t('traces.noTraces')} />
-          ) : (
-            tags!.map((t) => (
-              <TraceTagCard
-                key={t.traceTag}
-                tag={t}
-                selected={t.traceTag === selectedTag}
-                onSelect={setSelectedTag}
-              />
-            ))
-          )}
-        </div>
+        <DataTable
+          columns={columns}
+          rows={tags}
+          rowKey={(tag) => tag.traceTag}
+          selectedKey={selectedTag}
+          onSelect={setSelectedTag}
+          isLoading={isLoading}
+          emptyLabel={t('traces.noTraces')}
+          sort={sort}
+          onSortChange={setSort}
+          mobileSortOptions={mobileSortOptions}
+          renderCard={(tag) => renderTraceCard(tag, t)}
+        />
       </div>
       {selectedTag && (
         <TraceDetailPanel

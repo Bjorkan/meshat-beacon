@@ -280,7 +280,10 @@
     "copyPathLink": "Copy path link",
     "closePath": "Close path map",
     "allPaths": "All paths",
-    "traceRoute": "Trace route"
+    "traceRoute": "Trace route",
+    "pathBlockedShortHash": "No verifiable route: this packet was sent with {{size}}B hashes, but a route needs {{required}}B hashes to be unambiguous.",
+    "pathBlockedOutOfRange": "No verifiable route: the resolved hops are too far apart to be direct radio hops.",
+    "pathBlockedUnresolved": "No verifiable route: too few hops resolved to known nodes."
   },
   "routes": {
     "route": "Route",
@@ -301,6 +304,9 @@
   },
   "traces": {
     "type": "Trace type",
+    "path": "Path",
+    "firstSeen": "First seen",
+    "lastSeen": "Last seen",
     "tag_one": "{{count}} tag",
     "tag_other": "{{count}} tags",
     "noTraces": "No traces",
@@ -385,6 +391,7 @@
     "heardBy_other": "Heard by {{count}} observers",
     "propagation": "Propagation",
     "noResolvedPath": "No resolved path to map",
+    "noVerifiablePath": "No verifiable route — why?",
     "viewPath": "View path on map",
     "observation": "Observation",
     "observationsCount": "Observations ({{count}})",

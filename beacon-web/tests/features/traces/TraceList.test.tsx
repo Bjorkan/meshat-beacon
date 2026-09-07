@@ -93,8 +93,8 @@ describe('TraceList', () => {
 
     expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
     expect(screen.getByText('9B40DE22')).toBeInTheDocument();
-    // no detail panel yet -> no "Packets" section heading
-    expect(screen.queryByText('Packets')).not.toBeInTheDocument();
+    // no detail panel yet -> no packet-analysis rows (tag headers stay in the table)
+    expect(screen.queryByText('hash-aaa')).not.toBeInTheDocument();
   });
 
   it("opens the detail panel with a Packets section listing the trace's packets when a card is clicked", async () => {
@@ -242,6 +242,18 @@ describe('TraceList', () => {
     await waitFor(() =>
       expect(mockGetTraces.mock.calls.at(-1)?.[1]).toMatchObject({ type: 'PING' }),
     );
+  });
+
+  it('truncates the desktop path preview with a +N remainder', async () => {
+    const hashes = Array.from({ length: 9 }, (_, i) => `h${i}`);
+    mockGetTraces.mockResolvedValue([
+      tag('3f2a11c0', 4, { traceType: 'TRACE', pathHashes: hashes, snrValues: [] }),
+    ]);
+
+    renderTraces();
+
+    expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
+    expect(screen.getByText('+3')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no traces', async () => {

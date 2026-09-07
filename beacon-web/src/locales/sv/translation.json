@@ -280,7 +280,10 @@
     "copyPathLink": "Kopiera sökvägslänk",
     "closePath": "Stäng sökvägskartan",
     "allPaths": "Alla sökvägar",
-    "traceRoute": "Trace-rutt"
+    "traceRoute": "Trace-rutt",
+    "pathBlockedShortHash": "Ingen säkerställd rutt: paketet skickades med {{size}}B-hashar, men en rutt kräver {{required}}B-hashar för att vara entydig.",
+    "pathBlockedOutOfRange": "Ingen säkerställd rutt: de matchade hoppen ligger för långt isär för att vara direkta radiohopp.",
+    "pathBlockedUnresolved": "Ingen säkerställd rutt: för få hopp kunde matchas mot kända noder."
   },
   "routes": {
     "route": "Rutt",
@@ -301,6 +304,9 @@
   },
   "traces": {
     "type": "Trace-typ",
+    "path": "Sökväg",
+    "firstSeen": "Först sedd",
+    "lastSeen": "Senast sedd",
     "tag_one": "{{count}} tagg",
     "tag_other": "{{count}} taggar",
     "noTraces": "Inga traces",
@@ -385,6 +391,7 @@
     "heardBy_other": "Hört av {{count}} observatörer",
     "propagation": "Utbredning",
     "noResolvedPath": "Ingen matchad sökväg att visa på kartan",
+    "noVerifiablePath": "Ingen säkerställd rutt — varför?",
     "viewPath": "Visa sökväg på kartan",
     "observation": "Observation",
     "observationsCount": "Observationer ({{count}})",
