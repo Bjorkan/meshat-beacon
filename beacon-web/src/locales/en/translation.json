@@ -162,6 +162,8 @@
     "unknown": "Unknown"
   },
   "entities": {
+    "optionalColumns": "Optional columns:",
+    "columnCoverage": "{{populated}} of {{total}} loaded nodes have data in this column.",
     "name": "Name",
     "type": "Type",
     "radio": "Radio",

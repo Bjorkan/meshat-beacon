@@ -1,5 +1,5 @@
 import { nodeTypeLabel } from '../../lib/node-types';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { nodeQueries } from '../../api/queries';
@@ -53,6 +53,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
   return [
     {
       header: 'Name',
+      size: 40,
       label: t('entities.name'),
       sortValue: (node) => node.name ?? formatHex(node.id),
       cell: (node) => (
@@ -78,6 +79,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
     },
     {
       header: 'Radio',
+      size: 12,
       label: t('entities.radio'),
       className: 'text-text-muted',
       sortValue: (node) => formatRadioWithTitle(node.radio, node.radioTitle)?.label ?? null,
@@ -111,6 +113,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
     },
     {
       header: 'Neighbors',
+      size: 8,
       label: t('entities.neighbors'),
       className: 'text-text-muted',
       sortValue: (node) => node.knownNeighborCount,
@@ -186,6 +189,7 @@ export function NodeTable({
   onRowIntent,
 }: NodeTableProps) {
   const { t } = useTranslation();
+  const [optionalColumns, setOptionalColumns] = useState({ Radio: false, Neighbors: false });
   const { iatas, regionKey } = useRegion();
   const { typeFilter, pathsFilter, tracesFilter, scopeFilter, sort, search, searchField } =
     viewState;
@@ -253,7 +257,23 @@ export function NodeTable({
   });
 
   const scopeOptions = useScopes();
-  const columns = useMemo(() => nodeColumns(t), [t]);
+  // Keep sparse diagnostics available on demand. An active deep-linked sort always reveals
+  // its column, so the ordering has a visible explanation even on first load.
+  const columns = useMemo(
+    () =>
+      nodeColumns(t).map((column) => ({
+        ...column,
+        hidden:
+          column.header in optionalColumns &&
+          !optionalColumns[column.header as keyof typeof optionalColumns] &&
+          sort.header !== column.header,
+      })),
+    [t, optionalColumns, sort.header],
+  );
+  const coverage = {
+    Radio: nodes.filter((node) => formatRadioWithTitle(node.radio, node.radioTitle) != null).length,
+    Neighbors: nodes.filter((node) => node.knownNeighborCount > 0).length,
+  };
   // Only sortings with clear user-facing meaning become mobile actions; Type/Radio stay
   // desktop-only rather than exposing lexical implementation orderings as detached actions.
   const mobileSortOptions = useMemo<MobileSortOption[]>(
@@ -292,6 +312,35 @@ export function NodeTable({
           onScopeChange={(value) => onViewStateChange({ scopeFilter: value })}
           scopeOptions={scopeOptions}
         />
+
+        <div className="hidden shrink-0 flex-wrap items-center gap-4 border-b border-border px-4 py-2 font-mono text-xs text-text-muted lg:flex">
+          <span>{t('entities.optionalColumns')}</span>
+          {(['Radio', 'Neighbors'] as const).map((header) => (
+            <label
+              key={header}
+              className="flex cursor-pointer items-center gap-2"
+              title={t('entities.columnCoverage', {
+                populated: coverage[header],
+                total: loadedCount,
+              })}
+            >
+              <input
+                type="checkbox"
+                checked={optionalColumns[header] || sort.header === header}
+                onChange={(event) => {
+                  const checked = event.target.checked;
+                  setOptionalColumns((prev) => ({ ...prev, [header]: checked }));
+                  if (!checked && sort.header === header)
+                    onViewStateChange({ sort: { header: 'Name', direction: 'asc' } });
+                }}
+              />
+              {t(header === 'Radio' ? 'entities.radio' : 'entities.neighbors')}
+              <span className="tabular-nums">
+                ({coverage[header]}/{loadedCount})
+              </span>
+            </label>
+          ))}
+        </div>
 
         <DataTable
           columns={columns}
