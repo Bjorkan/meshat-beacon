@@ -3765,7 +3765,7 @@
                     "type": "string"
                 },
                 "suggestedTitle": {
-                    "description": "SuggestedTitle is the MeshCore suggested-settings title, set only for a confident\ncatalogue match. Absent when the match is ambiguous or unknown — callers keep the\nraw preset label. CodingRate is known for observer-sourced rows; node rows omit it.",
+                    "description": "SuggestedTitle is the MeshCore suggested-settings title for the preset's\nnormalized (frequency, bandwidth, SF) triple. Coding rate never affects\nnaming. Distinct upstream aliases for one triple join deterministically\n(\"A / B\"). Absent for unknown configurations — callers keep the raw label.",
                     "type": "string"
                 }
             }

@@ -252,8 +252,8 @@ func (s *Store) GetRadioPresets(ctx context.Context, preset string, iatas []stri
 }
 
 // resolvePresetTitle maps a "freqMhz,bwKhz,sf" preset to a MeshCore suggested-settings title,
-// or "" when the match is ambiguous or unknown. The preset key carries no coding rate, so a
-// title is only claimed when every catalogue candidate for the triple shares one title.
+// or "" when unknown. Coding rate never participates in naming, so no match is ambiguous:
+// every (frequency, bandwidth, SF) triple resolves to at most one deterministic title.
 func (s *Store) resolvePresetTitle(preset string) string {
 	if s.presetCatalogue == nil {
 		return ""
@@ -268,11 +268,7 @@ func (s *Store) resolvePresetTitle(preset string) string {
 	if err1 != nil || err2 != nil || err3 != nil {
 		return ""
 	}
-	got := s.presetCatalogue.Match(freq, bw, sf, nil)
-	if got.Ambiguous {
-		return ""
-	}
-	return got.Title
+	return s.presetCatalogue.Match(freq, bw, sf)
 }
 
 func (s *Store) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {

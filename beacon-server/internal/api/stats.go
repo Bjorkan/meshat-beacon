@@ -12,9 +12,10 @@ type RadioPreset struct {
 	IATA       string `json:"iata"`
 	SourceType string `json:"sourceType"` // "observer" or "node"
 	Count      int64  `json:"count"`      // number of observers or nodes on this preset in this IATA
-	// SuggestedTitle is the MeshCore suggested-settings title, set only for a confident
-	// catalogue match. Absent when the match is ambiguous or unknown — callers keep the
-	// raw preset label. CodingRate is known for observer-sourced rows; node rows omit it.
+	// SuggestedTitle is the MeshCore suggested-settings title for the preset's
+	// normalized (frequency, bandwidth, SF) triple. Coding rate never affects
+	// naming. Distinct upstream aliases for one triple join deterministically
+	// ("A / B"). Absent for unknown configurations — callers keep the raw label.
 	SuggestedTitle *string `json:"suggestedTitle,omitempty"`
 	CodingRate     *int16  `json:"codingRate,omitempty"`
 }

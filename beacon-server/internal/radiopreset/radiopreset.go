@@ -5,13 +5,21 @@
 // catalogue. The catalogue is fetched once at startup (never per request, never from browsers)
 // and retained in memory for the process lifetime. Startup failure leaves Beacon fully
 // operational with raw preset labels.
+//
+// Display naming is keyed by normalized (frequency, bandwidth, spreading factor) only.
+// Coding rate is deliberately excluded from the naming key: two radios with the same
+// frequency/bandwidth/SF share the same suggested title even when their coding rates differ.
+// Multiple distinct titles sharing one triple are joined deterministically as "A / B"
+// (sorted, deduplicated) rather than letting upstream array order decide.
 package radiopreset
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -25,35 +33,61 @@ const MeshCoreConfigURL = "https://api.meshcore.nz/api/v1/config"
 // fetchTimeout bounds the one startup fetch so a hung upstream cannot stall boot.
 const fetchTimeout = 10 * time.Second
 
-type upstreamEntry struct {
-	Title           string `json:"title"`
-	Frequency       string `json:"frequency"`
-	SpreadingFactor string `json:"spreading_factor"`
-	Bandwidth       string `json:"bandwidth"`
-	CodingRate      string `json:"coding_rate"`
+// maxConfigBytes caps the startup response so a pathological upstream cannot OOM the server.
+const maxConfigBytes = 1 << 20
+
+// numericText accepts upstream numbers sent either as JSON strings ("62.5") or JSON
+// numbers (62.5); both carry the same meaning for matching.
+type numericText string
+
+func (n *numericText) UnmarshalJSON(raw []byte) error {
+	if len(raw) > 0 && raw[0] == '"' {
+		var value string
+		if err := json.Unmarshal(raw, &value); err != nil {
+			return err
+		}
+		*n = numericText(value)
+		return nil
+	}
+	var value json.Number
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return err
+	}
+	if _, err := value.Float64(); err != nil {
+		return err
+	}
+	*n = numericText(value.String())
+	return nil
 }
 
-// Entry is one normalized catalogue entry.
-type Entry struct {
-	Title           string
-	FrequencyMHz    float64
-	SpreadingFactor int
-	BandwidthKHz    float64
-	CodingRate      int
+type upstreamEntry struct {
+	Title           string      `json:"title"`
+	Frequency       numericText `json:"frequency"`
+	SpreadingFactor numericText `json:"spreading_factor"`
+	Bandwidth       numericText `json:"bandwidth"`
+	// coding_rate is intentionally absent: it never participates in display naming.
+}
+
+// radioKey is the naming identity. Frequency/bandwidth use float32 so the catalogue
+// normalizes to the same precision Beacon stores in PostgreSQL REAL: the decimal
+// "869.618" and its float32 round-trip resolve to one key.
+type radioKey struct {
+	frequency, bandwidth float32
+	sf                   int
 }
 
 // Catalogue is the startup-loaded snapshot of suggested radio settings.
 type Catalogue struct {
-	entries []Entry
+	titles map[radioKey][]string
+	count  int
 }
 
 // Fetcher abstracts the HTTP GET so tests inject a fake source; production passes nil to use the
-// default client against MeshCoreConfigURL.
+// default client against MeshCoreConfigURL. The fetcher receives the same bounded context and
+// must return the full config response body; tests never contact the real endpoint.
 type Fetcher func(ctx context.Context, url string) ([]byte, error)
 
 func defaultFetch(ctx context.Context, url string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
-	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
@@ -66,19 +100,12 @@ func defaultFetch(ctx context.Context, url string) ([]byte, error) {
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("meshcore config: unexpected status %d", resp.StatusCode)
 	}
-	var body struct {
-		Config struct {
-			Suggested struct {
-				Entries []upstreamEntry `json:"entries"`
-			} `json:"suggested_radio_settings"`
-		} `json:"config"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
-		return nil, err
-	}
-	raw, err := json.Marshal(body.Config.Suggested.Entries)
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxConfigBytes+1))
 	if err != nil {
 		return nil, err
+	}
+	if len(raw) > maxConfigBytes {
+		return nil, fmt.Errorf("meshcore config: response exceeds %d bytes", maxConfigBytes)
 	}
 	return raw, nil
 }
@@ -86,128 +113,87 @@ func defaultFetch(ctx context.Context, url string) ([]byte, error) {
 // Load fetches the catalogue once. On any failure it logs a bounded warning and returns an empty
 // catalogue so Beacon keeps serving raw labels — startup must never fail because of this.
 func Load(ctx context.Context, fetch Fetcher) *Catalogue {
+	ctx, cancel := context.WithTimeout(ctx, fetchTimeout)
+	defer cancel()
 	if fetch == nil {
 		fetch = defaultFetch
 	}
 	raw, err := fetch(ctx, MeshCoreConfigURL)
+	if err == nil && len(raw) > maxConfigBytes {
+		err = fmt.Errorf("meshcore config: response exceeds %d bytes", maxConfigBytes)
+	}
+	var body struct {
+		Config struct {
+			Suggested struct {
+				Entries *[]upstreamEntry `json:"entries"`
+			} `json:"suggested_radio_settings"`
+		} `json:"config"`
+	}
+	if err == nil {
+		err = json.Unmarshal(raw, &body)
+	}
+	if err == nil && body.Config.Suggested.Entries == nil {
+		err = fmt.Errorf("meshcore config: missing suggested_radio_settings.entries")
+	}
 	if err != nil {
-		log.Printf("radiopreset: startup catalogue unavailable, using raw labels: %v", err)
+		log.Printf("radiopreset: startup catalogue unavailable, using raw labels: %.160q", err.Error())
 		return &Catalogue{}
 	}
-	var entries []upstreamEntry
-	if err := json.Unmarshal(raw, &entries); err != nil {
-		log.Printf("radiopreset: startup catalogue parse failed, using raw labels: %v", err)
-		return &Catalogue{}
-	}
-	cat := &Catalogue{}
-	for _, e := range entries {
-		entry, err := normalize(e)
-		if err != nil {
+	cat := &Catalogue{titles: make(map[radioKey][]string)}
+	for _, e := range *body.Config.Suggested.Entries {
+		f, err1 := strconv.ParseFloat(strings.TrimSpace(string(e.Frequency)), 64)
+		b, err2 := strconv.ParseFloat(strings.TrimSpace(string(e.Bandwidth)), 64)
+		sf, err3 := strconv.ParseFloat(strings.TrimSpace(string(e.SpreadingFactor)), 64)
+		title := strings.TrimSpace(e.Title)
+		if err1 != nil || err2 != nil || err3 != nil || sf != math.Trunc(sf) || title == "" {
 			continue
 		}
-		cat.entries = append(cat.entries, entry)
-	}
-	return cat
-}
-
-// LoadFromEntries builds a catalogue from already-parsed entries (tests and offline tooling).
-func LoadFromEntries(raw []upstreamEntry) *Catalogue {
-	cat := &Catalogue{}
-	for _, e := range raw {
-		entry, err := normalizeUpstream(e.Title, e.Frequency, e.SpreadingFactor, e.Bandwidth, e.CodingRate)
-		if err != nil {
+		key, valid := keyFor(f, b, int(sf))
+		if !valid {
 			continue
 		}
-		cat.entries = append(cat.entries, entry)
+		cat.titles[key] = append(cat.titles[key], title)
+		cat.count++
 	}
-	return cat
-}
-
-func normalize(e upstreamEntry) (Entry, error) {
-	return normalizeUpstream(e.Title, e.Frequency, e.SpreadingFactor, e.Bandwidth, e.CodingRate)
-}
-
-func normalizeUpstream(title, freq, sf, bw, cr string) (Entry, error) {
-	f, err := strconv.ParseFloat(strings.TrimSpace(freq), 64)
-	if err != nil {
-		return Entry{}, err
-	}
-	sfi, err := strconv.Atoi(strings.TrimSpace(sf))
-	if err != nil {
-		return Entry{}, err
-	}
-	b, err := strconv.ParseFloat(strings.TrimSpace(bw), 64)
-	if err != nil {
-		return Entry{}, err
-	}
-	c, err := strconv.Atoi(strings.TrimSpace(cr))
-	if err != nil {
-		return Entry{}, err
-	}
-	return Entry{Title: strings.TrimSpace(title), FrequencyMHz: f, SpreadingFactor: sfi, BandwidthKHz: b, CodingRate: c}, nil
-}
-
-// MatchResult describes how a Beacon preset maps to the catalogue.
-type MatchResult struct {
-	// Title is set only for a confident exact match. Multiple titles sharing identical complete
-	// parameters are joined deterministically as "A / B" rather than picking array order.
-	Title string
-	// Ambiguous is true when the known fields match several catalogue entries that differ only
-	// on fields Beacon did not record (e.g. missing coding rate). Callers keep the raw label.
-	Ambiguous bool
-}
-
-// Match resolves a preset. freqMHz/bwKHz/sf always participate; codingRate participates only when
-// known (non-nil): a nil CR that leaves several CR-distinct candidates must not claim a title.
-func (c *Catalogue) Match(freqMHz float64, bwKHz float64, sf int, codingRate *int) MatchResult {
-	var exact []Entry
-	var partial []Entry
-	for _, e := range c.entries {
-		if e.FrequencyMHz != freqMHz || e.BandwidthKHz != bwKHz || e.SpreadingFactor != sf {
-			continue
-		}
-		if codingRate != nil {
-			if e.CodingRate == *codingRate {
-				exact = append(exact, e)
+	for key, titles := range cat.titles {
+		sort.Strings(titles)
+		unique := titles[:0]
+		for _, title := range titles {
+			if len(unique) == 0 || unique[len(unique)-1] != title {
+				unique = append(unique, title)
 			}
-		} else {
-			partial = append(partial, e)
 		}
+		cat.titles[key] = unique
 	}
-	if codingRate != nil {
-		if len(exact) == 0 {
-			return MatchResult{}
-		}
-		titles := uniqueTitles(exact)
-		return MatchResult{Title: strings.Join(titles, " / ")}
-	}
-	if len(partial) == 0 {
-		return MatchResult{}
-	}
-	// Without CR we can only claim a title when every candidate agrees on all remaining fields
-	// AND shares one title; differing CRs or differing titles mean ambiguous.
-	crs := map[int]bool{}
-	for _, e := range partial {
-		crs[e.CodingRate] = true
-	}
-	titles := uniqueTitles(partial)
-	if len(crs) == 1 && len(titles) == 1 {
-		return MatchResult{Title: titles[0]}
-	}
-	return MatchResult{Ambiguous: true}
+	return cat
 }
 
-func uniqueTitles(entries []Entry) []string {
-	seen := map[string]bool{}
-	var out []string
-	for _, e := range entries {
-		if !seen[e.Title] {
-			seen[e.Title] = true
-			out = append(out, e.Title)
-		}
+func keyFor(f, b float64, sf int) (radioKey, bool) {
+	key := radioKey{frequency: float32(f), bandwidth: float32(b), sf: sf}
+	if math.IsNaN(f) || math.IsNaN(b) || math.IsInf(f, 0) || math.IsInf(b, 0) {
+		return radioKey{}, false
 	}
-	sort.Strings(out)
-	return out
+	if math.IsInf(float64(key.frequency), 0) || math.IsInf(float64(key.bandwidth), 0) {
+		return radioKey{}, false
+	}
+	if f <= 0 || b <= 0 || sf < 5 || sf > 12 {
+		return radioKey{}, false
+	}
+	return key, true
+}
+
+// Match resolves a preset by normalized frequency/bandwidth/SF. Coding rate never
+// participates: entries differing only by coding rate share one title. Genuinely
+// distinct titles for one triple join deterministically ("A / B"); "" means unknown.
+func (c *Catalogue) Match(freqMHz, bwKHz float64, sf int) string {
+	if c == nil {
+		return ""
+	}
+	key, valid := keyFor(freqMHz, bwKHz, sf)
+	if !valid {
+		return ""
+	}
+	return strings.Join(c.titles[key], " / ")
 }
 
 // Len reports the catalogue size (tests and startup logging).
@@ -215,5 +201,5 @@ func (c *Catalogue) Len() int {
 	if c == nil {
 		return 0
 	}
-	return len(c.entries)
+	return c.count
 }
