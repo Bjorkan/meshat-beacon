@@ -114,6 +114,7 @@ websocket:
 #  stale_threshold: 24h          # default: 24h
 #  delete_after: 720h            # default: 30 days, same default as packets.retention
 #  clock_drift_threshold: 5m     # default: 5m
+#  iata_membership_ttl: 168h    # default: 7 days; IATA badges older than this stop counting
 
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.

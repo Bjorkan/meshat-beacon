@@ -197,6 +197,7 @@ nodes:
   stale_threshold: 24h # mark a node "stale" in the API after this long unseen (default: 24h)
   delete_after: 720h # delete a node entirely after this long unseen (default: 30 days, same default as packets.retention)
   clock_drift_threshold: 5m # |device clock - server clock| above which clockOutOfSync=true for a repeater/room server (default: 5m)
+  iata_membership_ttl: 168h # drop an IATA badge from a node not heard on that IATA for this long (default: 7 days)
 
 # Redis caching layer (optional).
 # Caches read-heavy, slow-changing responses to reduce PostgreSQL load.

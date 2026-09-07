@@ -230,8 +230,9 @@ type NodesConfig struct {
 	DeleteAfter duration `yaml:"delete_after"`
 	// IATAMembershipTTL is how long a node_iatas row counts as current regional membership
 	// after its last_heard. Stale rows remain stored for history but stop producing badges
-	// and stop matching IATA-scoped queries. Defaults to 30 days if not set, matching the
-	// default packet/node retention so membership cannot outlive the observations behind it.
+	// and stop matching IATA-scoped queries. Defaults to 7 days if not set, matching the
+	// neighbor retention window — a node not heard on an IATA for a week no longer counts
+	// as a member of that IATA.
 	IATAMembershipTTL duration `yaml:"iata_membership_ttl"`
 }
 
@@ -440,7 +441,7 @@ func Resolve(cfg *Config) ResolvedConfig {
 		r.NodeDeleteAfter = 30 * 24 * time.Hour
 	}
 	if r.NodeIATAMembershipTTL == 0 {
-		r.NodeIATAMembershipTTL = 30 * 24 * time.Hour
+		r.NodeIATAMembershipTTL = 7 * 24 * time.Hour
 	}
 	return r
 }

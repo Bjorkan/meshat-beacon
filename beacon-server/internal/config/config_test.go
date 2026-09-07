@@ -104,6 +104,9 @@ func TestResolve_Defaults(t *testing.T) {
 	if r.NodeDeleteAfter != 30*24*time.Hour {
 		t.Errorf("expected NodeDeleteAfter 720h (same default as PacketRetention), got %v", r.NodeDeleteAfter)
 	}
+	if r.NodeIATAMembershipTTL != 7*24*time.Hour {
+		t.Errorf("expected NodeIATAMembershipTTL 168h (7 days), got %v", r.NodeIATAMembershipTTL)
+	}
 }
 
 func TestResolve_ExplicitValues(t *testing.T) {
