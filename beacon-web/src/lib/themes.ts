@@ -28,7 +28,8 @@ const FALLBACK: Theme = {
     '--palette-text-bright': '#FFFFFF',
     '--palette-text-normal': '#E5E7EB',
     '--palette-text-muted': '#9CA3AF',
-    '--palette-text-dim': '#6B7280',
+    '--palette-text-dim': '#9CA3AF',
+    '--palette-decoration': '#6B7280',
   },
 };
 

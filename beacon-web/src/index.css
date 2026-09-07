@@ -20,8 +20,10 @@
 
   --color-text-bright: var(--palette-text-bright, #fafafa);
   --color-text-normal: var(--palette-text-normal, #a1a1aa);
-  --color-text-muted: var(--palette-text-muted, #73737b);
-  --color-text-dim: var(--palette-text-dim, #5f5f65);
+  --color-text-muted: var(--palette-text-muted, #9ca3af);
+  /* Dim remains readable secondary copy; decoration is only for non-text accents. */
+  --color-decoration: var(--palette-decoration, #6b7280);
+  --color-text-dim: var(--palette-text-dim, #9ca3af);
 }
 
 /* base resets */

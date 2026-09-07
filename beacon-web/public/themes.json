@@ -17,7 +17,8 @@
       "--palette-text-bright": "#FFFFFF",
       "--palette-text-normal": "#E5E7EB",
       "--palette-text-muted": "#9CA3AF",
-      "--palette-text-dim": "#6B7280"
+      "--palette-text-dim": "#9CA3AF",
+      "--palette-decoration": "#6B7280"
     }
   },
   {
@@ -38,7 +39,8 @@
       "--palette-text-bright": "#111827",
       "--palette-text-normal": "#1F2937",
       "--palette-text-muted": "#4B5563",
-      "--palette-text-dim": "#6B7280"
+      "--palette-text-dim": "#626976",
+      "--palette-decoration": "#6B7280"
     }
   }
 ]
