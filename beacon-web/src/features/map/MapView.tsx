@@ -343,14 +343,13 @@ export function MapView({
           setPacketFlow((value) => !value);
         }}
       />
-      {/* streams in 50 at a time; docks top-center so it never covers
-          clusters, the LIVE button or the bottom attribution */}
+      {/* Keep loading status above LIVE on mobile, clear of the settings header. */}
       <LoadingPill
         loading={isPaging}
         error={nodesError}
         count={loadedCount}
         noun={t('entities.nodes')}
-        position="top-3 left-1/2 -translate-x-1/2"
+        position="bottom-14 left-1/2 -translate-x-1/2 sm:bottom-auto sm:top-3"
       />
       {error && (
         // z-20 so the failure overlay covers the settings card (z-10) instead of it floating on top

@@ -22,9 +22,9 @@ export function LoadingPill({
   return (
     <div
       role="status"
-      className={`absolute ${position} z-10 flex items-center gap-2 px-2.5 py-1 bg-bg-surface border border-border-subtle rounded-md font-mono text-[11px] ${tone} shadow-lg`}
+      className={`pointer-events-none absolute ${position} max-w-[calc(100%-1.5rem)] z-10 flex items-center gap-2 px-2.5 py-1 bg-bg-surface border border-border-subtle rounded-md font-mono text-[11px] ${tone} shadow-lg`}
     >
-      <span className={`size-1.5 rounded-full ${dot}`} aria-hidden />
+      <span className={`size-1.5 shrink-0 rounded-full ${dot}`} aria-hidden />
       {loading
         ? t('common.loadingEntities', { noun, count })
         : count > 0
