@@ -112,7 +112,9 @@ describe('RouteTable search', () => {
     renderTable();
     await screen.findByText('Find path');
     expect(
-      screen.getByText('Choose an IATA or region in the global selector to search routes.'),
+      screen.getByText(
+        'The selected scope is too broad for route search. Choose an IATA or a narrower region in the global selector.',
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText('Search')).toBeDisabled();
   });
