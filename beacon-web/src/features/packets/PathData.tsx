@@ -120,7 +120,7 @@ function HopPopover({
       onMouseEnter={hasHover ? open : undefined}
       onMouseLeave={hasHover ? scheduleClose : undefined}
       onClick={hasHover ? undefined : toggle}
-      className="inline-flex"
+      className="inline-flex min-w-0 max-w-full"
     >
       {children}
       {anchor &&
@@ -184,7 +184,7 @@ export function ResolvedHopBlock({
   const highNode = confidence === 'high' && hop?.nodes.length === 1 ? hop.nodes[0] : undefined;
   // High-confidence identity is primary; ambiguous/none deliberately keep the raw hash visible.
   const primaryLabel = highNode ? nodeLabel(highNode) : label;
-  const blockClass = `px-1.5 py-px rounded-sm font-semibold ${HOP_BLOCK_CLASSES[confidence]}`;
+  const blockClass = `min-w-0 max-w-full [overflow-wrap:anywhere] px-1.5 py-px rounded-sm font-semibold ${HOP_BLOCK_CLASSES[confidence]}`;
   // mouse-only shortcut: a single high-confidence match jumps straight to the node (touch opens popover)
   const single = hasHover && highNode && onViewNode ? highNode : undefined;
   return (
@@ -229,7 +229,7 @@ export function PathData({
   return (
     <div className={`flex flex-wrap items-center gap-1 font-mono ${textClass}`}>
       {hops.map((hop, i) => (
-        <span key={i} className="contents">
+        <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
           {i > 0 && (
             <span className="text-text-dim" aria-hidden>
               →
