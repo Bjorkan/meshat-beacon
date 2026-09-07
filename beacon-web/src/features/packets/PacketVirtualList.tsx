@@ -46,6 +46,8 @@ export function PacketVirtualList({
   onSelectObservation,
 }: PacketVirtualListProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const expansionRef = useRef<HTMLDivElement>(null);
+  const revealedHashRef = useRef<string | null>(null);
   const freshHashes = useFreshHashes(packets);
   const isMobile = useIsMobile();
   const atTopRef = useRef(true);
@@ -95,6 +97,33 @@ export function PacketVirtualList({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on packet-list change; virtualizer is stable
   }, [packets]);
 
+  // Reveal the first useful portion once, after the expanded virtual row has been measured.
+  // Scroll only this list (the shell already excludes bottom navigation), and never follow
+  // subsequent telemetry updates or force an already-visible expansion to the top.
+  useLayoutEffect(() => {
+    if (!expandedHash) {
+      revealedHashRef.current = null;
+      return;
+    }
+    if (!isMobile || revealedHashRef.current === expandedHash) return;
+    const parent = parentRef.current;
+    const expansion = expansionRef.current;
+    if (!parent || !expansion) return;
+    const viewport = parent.getBoundingClientRect();
+    const detail = expansion.getBoundingClientRect();
+    if (viewport.height === 0 || detail.height === 0) return;
+    revealedHashRef.current = expandedHash;
+    const preview = Math.min(detail.height, 192, viewport.height);
+    const delta =
+      detail.top < viewport.top
+        ? detail.top - viewport.top
+        : Math.max(0, detail.top + preview - viewport.bottom);
+    if (delta !== 0) {
+      parent.scrollTop += delta;
+      handleScroll();
+    }
+  });
+
   return (
     <div ref={parentRef} className="flex-1 overflow-y-auto px-4 pb-10" onScroll={handleScroll}>
       <PacketTableHeader />
@@ -135,13 +164,15 @@ export function PacketVirtualList({
                   />
                 )}
                 {expanded && (
-                  <PacketExpansion
-                    packet={packet}
-                    onOpenAnalyzer={onOpenAnalyzer}
-                    onViewPath={onViewPath}
-                    selectedObservationId={selectedObservationId}
-                    onSelectObservation={onSelectObservation}
-                  />
+                  <div ref={expansionRef}>
+                    <PacketExpansion
+                      packet={packet}
+                      onOpenAnalyzer={onOpenAnalyzer}
+                      onViewPath={onViewPath}
+                      selectedObservationId={selectedObservationId}
+                      onSelectObservation={onSelectObservation}
+                    />
+                  </div>
                 )}
               </div>
             </div>
