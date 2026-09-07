@@ -39,6 +39,7 @@ func RoutesRouter(reader api.Reader) http.Handler {
 //	@Param		direction	query		string	false	"Sort direction: asc or desc"
 //	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200			{object}	api.Page[api.KnownRoute]
+//	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/routes [get]
 func listKnownRoutes(reader api.Reader) http.HandlerFunc {
@@ -51,15 +52,21 @@ func listKnownRoutes(reader api.Reader) http.HandlerFunc {
 		iatas := parseIATAs(r)
 		var hopCount int32
 		if v := r.URL.Query().Get("hopCount"); v != "" {
-			if h, err := strconv.ParseInt(v, 10, 32); err == nil {
-				hopCount = int32(h)
+			h, err := strconv.ParseInt(v, 10, 32)
+			if err != nil || h < 0 {
+				respondError(w, http.StatusBadRequest, "invalid hopCount, expected a non-negative integer")
+				return
 			}
+			hopCount = int32(h)
 		}
 		var cursor time.Time
 		if v := r.URL.Query().Get("cursor"); v != "" {
-			if ms, err := strconv.ParseInt(v, 10, 64); err == nil {
-				cursor = time.UnixMilli(ms)
+			ms, err := strconv.ParseInt(v, 10, 64)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "invalid cursor, expected epoch milliseconds")
+				return
 			}
+			cursor = time.UnixMilli(ms)
 		}
 		limit, limitErr := parseResultLimit(r, 50)
 		if limitErr != nil {
