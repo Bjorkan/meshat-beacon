@@ -1325,8 +1325,8 @@ INSERT INTO node_neighbors (
   node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope
 )
 VALUES (
-  $1, $2, $3, 1, $4, CASE WHEN $4 IS NULL THEN 0 ELSE 1 END,
-  CASE WHEN $4 IS NULL THEN NULL ELSE NOW() END, $5
+  $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
+  CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
