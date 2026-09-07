@@ -110,7 +110,6 @@ export const NODES_SOURCE_ID = 'nodes';
 export const NODES_CLUSTER_HALO_LAYER_ID = 'nodes-clusters-halo'; // soft shadow behind the neutral bubble
 export const NODES_CLUSTER_FALLBACK_LAYER_ID = 'nodes-clusters-fallback'; // neutral circular cluster bubble + hit target
 export const NODES_CLUSTER_LAYER_ID = 'nodes-clusters'; // centered total count; also the Spiderfy parent layer
-export const NODES_CLUSTER_BREAKDOWN_LAYER_ID = 'nodes-clusters-breakdown'; // compact R/C/M/S composition below total
 export const NODES_DOT_LAYER_ID = 'nodes-dots'; // compact low-zoom network overview
 export const NODES_POINT_LAYER_ID = 'nodes-unclustered';
 export const NODES_SELECTED_LAYER_ID = 'nodes-selected'; // circle ring under the selected node's icon
