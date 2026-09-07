@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
 import { formatBattery, formatCount, formatUptime } from '../../lib/formatters';
 import { statsQueries } from '../../api/queries';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useRegion } from '../../hooks/useRegion';
 import { useChartColors } from './chartTheme';
 import { useTopObservers } from './useStats';
@@ -209,6 +210,8 @@ interface ObserverTabProps {
 
 export function ObserverTab({ range, selectedObserverId, onSelectObserver }: ObserverTabProps) {
   const { t } = useTranslation();
+  const isMobile = useIsMobile();
+  const pickerRef = useRef<HTMLDetailsElement>(null);
   const colors = useChartColors();
   const topObservers = useTopObservers(range, 15);
   const observer = useObserver(selectedObserverId);
@@ -256,7 +259,28 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5 px-4 py-4 lg:flex-row">
       <div className="w-full shrink-0 lg:w-[260px]">
-        <ObserverList range={range} selectedId={selectedObserverId} onSelect={onSelectObserver} />
+        {isMobile ? (
+          <details ref={pickerRef} className="rounded-lg border border-border bg-bg-surface">
+            <summary className="cursor-pointer px-3.5 py-3 font-mono text-xs text-text-normal">
+              {t('stats.selectObserver')}
+              {observer.data && `: ${observer.data.displayName ?? observer.data.id.slice(0, 8)}`}
+            </summary>
+            <ObserverList
+              range={range}
+              selectedId={selectedObserverId}
+              onSelect={(id) => {
+                onSelectObserver(id);
+                if (pickerRef.current) {
+                  pickerRef.current.open = false;
+                  pickerRef.current.querySelector('summary')?.focus();
+                  pickerRef.current.scrollIntoView({ block: 'nearest' });
+                }
+              }}
+            />
+          </details>
+        ) : (
+          <ObserverList range={range} selectedId={selectedObserverId} onSelect={onSelectObserver} />
+        )}
       </div>
 
       <div className="flex min-w-0 flex-1 flex-col gap-3.5">
