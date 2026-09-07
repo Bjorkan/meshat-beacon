@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Badge } from '../../components/Badge';
@@ -700,7 +701,7 @@ function DiscoverRespPayload({ payload }: PayloadProps) {
       {nodeTypeName && (
         <div>
           <span className="text-text-dim">{t('packets.nodeType')} </span>
-          <Badge variant="default">{nodeTypeName}</Badge>
+          <Badge variant="default">{nodeTypeLabel(nodeTypeName, t('options.unknown'))}</Badge>
         </div>
       )}
       {requestSnr != null && (

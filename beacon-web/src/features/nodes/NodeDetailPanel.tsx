@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import { ApiError } from '../../api/generated/client';
 import { NodePathPackets } from './NodePathPackets';
 import { useQuery } from '@tanstack/react-query';
@@ -34,7 +35,9 @@ function NodeNeighborRow({ neighbor, onClick }: { neighbor: NodeNeighbor; onClic
         >
           {neighbor.name ?? formatHex(neighbor.id)}
         </span>
-        <Badge variant="default">{neighbor.nodeTypeName}</Badge>
+        <Badge variant="default">
+          {nodeTypeLabel(neighbor.nodeTypeName, t('options.unknown'))}
+        </Badge>
         <IataChip>{neighbor.iata}</IataChip>
         <Timestamp
           value={neighbor.lastSeen}
@@ -167,7 +170,9 @@ export function NodeDetailPanel({
                       >
                         {node.name ?? formatHex(node.id)}
                       </span>
-                      <Badge variant="default">{node.nodeTypeName}</Badge>
+                      <Badge variant="default">
+                        {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}
+                      </Badge>
                     </div>
                     <div className="flex items-center gap-2">
                       <div

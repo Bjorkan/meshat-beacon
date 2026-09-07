@@ -169,7 +169,7 @@ describe('PayloadBreakdown — DISCOVER_RESP', () => {
 
   it('renders the responder node type and its request SNR', () => {
     render(<PayloadBreakdown payload={respPayload} />);
-    expect(screen.getByText('repeater')).toBeInTheDocument();
+    expect(screen.getByText('Repeater')).toBeInTheDocument();
     expect(screen.getByText(/-4\.50/)).toBeInTheDocument();
   });
 

@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -190,12 +191,12 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
     () =>
       [...(nodeTypes.data ?? [])]
         .sort((a, b) => b.count - a.count)
-        .map((t) => ({
-          name: t.nodeTypeName,
-          value: t.count,
-          color: nodeTypeColor(t.nodeTypeName),
+        .map((entry) => ({
+          name: nodeTypeLabel(entry.nodeTypeName, t('options.unknown')),
+          value: entry.count,
+          color: nodeTypeColor(entry.nodeTypeName),
         })),
-    [nodeTypes.data],
+    [nodeTypes.data, t],
   );
   const typeTotal = useMemo(() => typeRows.reduce((a, t) => a + t.value, 0), [typeRows]);
   const typesOption = useMemo(

@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import { useClockDrift } from './useStats';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -25,7 +26,7 @@ function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
           <span className={`truncate ${e.nodeName ? 'text-text-normal' : 'italic text-text-dim'}`}>
             {e.nodeName ?? e.nodeId.slice(0, 8)}
           </span>
-          <Badge variant="default">{e.nodeTypeName}</Badge>
+          <Badge variant="default">{nodeTypeLabel(e.nodeTypeName, t('options.unknown'))}</Badge>
         </div>
       ),
       sortValue: (e) => e.nodeName ?? e.nodeId,

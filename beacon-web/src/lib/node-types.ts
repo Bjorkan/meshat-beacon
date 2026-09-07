@@ -17,3 +17,8 @@ export const NODE_TYPE_OPTIONS: { value: string; label: string }[] = NODE_TYPES.
   value: t.name,
   label: t.label,
 }));
+
+// API versions use both upper- and lowercase enums. Unknown values never leak schema copy.
+export function nodeTypeLabel(name: string | null | undefined, unknown = 'Unknown'): string {
+  return NODE_TYPES.find((type) => type.name === name?.toLowerCase())?.label ?? unknown;
+}

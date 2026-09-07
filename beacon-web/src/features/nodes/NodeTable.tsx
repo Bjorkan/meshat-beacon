@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import { useCallback, useMemo } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -71,7 +72,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
               <ObserverIcon />
             </Tooltip>
           )}
-          {node.nodeTypeName}
+          {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}
         </Badge>
       ),
     },
@@ -150,7 +151,7 @@ function renderNodeCard(node: NodeSummary, t: TFunction) {
                 <ObserverIcon />
               </Tooltip>
             )}
-            {node.nodeTypeName}
+            {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}
           </Badge>
         </span>
       </div>

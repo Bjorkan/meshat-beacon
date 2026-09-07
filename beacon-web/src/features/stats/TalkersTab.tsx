@@ -1,3 +1,4 @@
+import { nodeTypeLabel } from '../../lib/node-types';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useChartColors } from './chartTheme';
@@ -89,7 +90,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
                 </div>
               )}
             </div>
-            <Badge variant="default">{a.nodeTypeName}</Badge>
+            <Badge variant="default">{nodeTypeLabel(a.nodeTypeName, t('options.unknown'))}</Badge>
             <IataChip>{a.iata}</IataChip>
           </div>
         ),

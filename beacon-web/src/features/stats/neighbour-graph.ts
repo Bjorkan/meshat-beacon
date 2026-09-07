@@ -1,5 +1,5 @@
 import type { NodeSummary, NodeNeighbor } from '../nodes/types';
-import { NODE_TYPE_NAMES, NODE_TYPES } from '../../lib/node-types';
+import { NODE_TYPE_NAMES, NODE_TYPES, nodeTypeLabel } from '../../lib/node-types';
 import { blend, nodeTypeColor, tooltipStyle, withAlpha, type ChartColors } from './chartTheme';
 import { OBS_STOPS, AGE } from '../map/neighbor-thresholds';
 import type { EChartsOption } from './echarts-setup';
@@ -269,7 +269,7 @@ export function neighbourGraphOption(
           return `${observationLabel} · ${seenLabel}`;
         }
         const d = param.data as unknown as GraphNode;
-        const type = d.nodeTypeName || (opts.t?.('options.unknown') ?? 'unknown');
+        const type = nodeTypeLabel(d.nodeTypeName, opts.t?.('options.unknown') ?? 'Unknown');
         const neighbours =
           opts.t?.('entities.neighborCount', { count: d.degree }) ??
           `${d.degree} neighbour${d.degree === 1 ? '' : 's'}`;
