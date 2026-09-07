@@ -44,16 +44,16 @@ const ROUTE_SORT_KEYS: Record<string, string> = {
 const nodeLabel = (n: ResolvedNode) => n.name ?? formatHex(n.publicKey);
 
 // A run of route hops as a hash chain (reusing the packet path renderer); hops are high-confidence.
-function HopChain({ hops }: { hops: RouteHop[] }) {
+function HopChain({ hops, initialConnector }: { hops: RouteHop[]; initialConnector?: string }) {
   return (
     <>
       {hops.map((hop, i) => {
         const resolved: ResolvedHop = { confidence: 'high', nodes: hop.node ? [hop.node] : [] };
         return (
-          <span key={i} className="contents">
-            {i > 0 && (
-              <span className="text-text-dim" aria-hidden>
-                →
+          <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
+            {(i > 0 || initialConnector) && (
+              <span className="shrink-0 text-text-dim" aria-hidden>
+                {i === 0 ? initialConnector : '→'}
               </span>
             )}
             <ResolvedHopBlock hop={resolved} label={hop.hashBytes.toUpperCase()} />
@@ -93,22 +93,25 @@ function CrossRouteCard({ route }: { route: CrossIATARoute }) {
       </div>
       <div className="flex flex-wrap items-center gap-1 font-mono text-[13px]">
         <HopChain hops={route.sourceSegment} />
-        {route.sourceSegment.length > 0 && (
-          <span className="text-warn" aria-hidden>
-            ⇒
+        <span className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
+          {route.sourceSegment.length > 0 && (
+            <span className="shrink-0 text-warn" aria-hidden>
+              ⇒
+            </span>
+          )}
+          <span className="min-w-0 [overflow-wrap:anywhere] text-primary font-semibold">
+            {nodeLabel(crossHop.fromNode)}
           </span>
-        )}
-        <span className="text-primary font-semibold">{nodeLabel(crossHop.fromNode)}</span>
-        <span className="text-warn" aria-hidden>
-          ⇒
         </span>
-        <span className="text-primary font-semibold">{nodeLabel(crossHop.toNode)}</span>
-        {route.targetSegment.length > 0 && (
-          <span className="text-warn" aria-hidden>
+        <span className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
+          <span className="shrink-0 text-warn" aria-hidden>
             ⇒
           </span>
-        )}
-        <HopChain hops={route.targetSegment} />
+          <span className="min-w-0 [overflow-wrap:anywhere] text-primary font-semibold">
+            {nodeLabel(crossHop.toNode)}
+          </span>
+        </span>
+        <HopChain hops={route.targetSegment} initialConnector="⇒" />
       </div>
     </div>
   );

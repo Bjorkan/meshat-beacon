@@ -32,13 +32,13 @@ function TraceHopChain({
         const level = snr != null ? snrLevel(snr) : null;
         const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
         return (
-          <span key={i} className="contents">
+          <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
             {i > 0 && (
               <span className="text-text-dim" aria-hidden>
                 →
               </span>
             )}
-            <span className="inline-flex flex-col items-center gap-0.5">
+            <span className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5">
               <ResolvedHopBlock
                 hop={resolvedRoute[i]}
                 label={raw.hash.toUpperCase()}

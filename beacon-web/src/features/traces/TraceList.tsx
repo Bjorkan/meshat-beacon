@@ -57,17 +57,17 @@ function TracePathPreview({
         const title =
           snr != null ? `${hash.toUpperCase()} · ${formatSnr(snr)} dB` : hash.toUpperCase();
         return (
-          <span key={i} className="contents">
+          <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
             {i > 0 && (
               <span className="text-text-dim" aria-hidden>
                 →
               </span>
             )}
             <span
-              className="inline-flex flex-col items-center gap-0.5"
+              className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5"
               title={named ? title : undefined}
             >
-              <span className="px-1.5 py-px rounded-sm bg-primary/6 text-primary font-mono text-[11px] font-semibold">
+              <span className="max-w-full [overflow-wrap:anywhere] px-1.5 py-px rounded-sm bg-primary/6 text-primary font-mono text-[11px] font-semibold">
                 {named ? hop.nodeName : hash.toUpperCase()}
               </span>
               {named && (
