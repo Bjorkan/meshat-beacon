@@ -184,6 +184,7 @@
     "propagation": "Prop"
   },
   "channels": {
+    "open": "Öppna {{name}}",
     "select": "Välj en kanal",
     "back": "Tillbaka till kanaler",
     "key": "nyckel",
@@ -379,7 +380,7 @@
     "notFoundSubtitle": "Kontrollera adressen eller gå tillbaka till start.",
     "notFoundAction": "Tillbaka till Paket",
     "traceCount": "Visar upp till {{count}} spår",
-    "selectChannelHint": "Välj en kanal i listan för att läsa meddelanden."
+    "selectChannelHint": "Öppna en kanal för att läsa meddelanden, se när de hördes och undersöka deras paket."
   },
   "packets": {
     "noun": "paket",

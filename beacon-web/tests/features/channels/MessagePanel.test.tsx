@@ -144,3 +144,22 @@ it('keeps loaded messages and retries only the failed older page', async () => {
   expect(screen.getByText('from rest')).toBeInTheDocument();
   expect(getPage).toHaveBeenLastCalledWith(1, { iatas: undefined, cursor: 1 });
 });
+
+it('offers an explicit action for a populated unselected workspace', () => {
+  const select = vi.fn();
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <MessagePanel
+        channel={null}
+        suggestedChannel={channel}
+        onSelectChannel={select}
+        heardCounts={{}}
+        regionKey="*"
+      />
+    </QueryClientProvider>,
+  );
+  expect(select).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Open Public' }));
+  expect(select).toHaveBeenCalledWith(channel.id);
+});

@@ -184,6 +184,7 @@
     "propagation": "Prop"
   },
   "channels": {
+    "open": "Open {{name}}",
     "select": "Select a channel",
     "back": "Back to channels",
     "key": "key",
@@ -379,7 +380,7 @@
     "notFoundSubtitle": "Check the address or go back to the start.",
     "notFoundAction": "Back to Packets",
     "traceCount": "Showing up to {{count}} traces",
-    "selectChannelHint": "Pick a channel in the list to read messages."
+    "selectChannelHint": "Open a channel to read messages, see when they were heard and inspect their packets."
   },
   "packets": {
     "noun": "packets",

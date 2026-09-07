@@ -51,6 +51,8 @@ function MessageRow({
 
 interface MessagePanelProps {
   channel: ChannelSummary | null;
+  suggestedChannel?: ChannelSummary;
+  onSelectChannel?: (id: number) => void;
   heardCounts: Record<string, number>;
   iatas?: string[];
   regionKey: string;
@@ -61,6 +63,8 @@ interface MessagePanelProps {
 
 export function MessagePanel({
   channel,
+  suggestedChannel,
+  onSelectChannel,
   heardCounts,
   iatas,
   regionKey,
@@ -162,7 +166,21 @@ export function MessagePanel({
   if (!channel) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center px-4">
-        <EmptyState title={t('channels.select')} subtitle={t('stats.selectChannelHint')} />
+        <EmptyState
+          title={t('channels.select')}
+          subtitle={t('stats.selectChannelHint')}
+          action={
+            suggestedChannel && onSelectChannel ? (
+              <button
+                type="button"
+                onClick={() => onSelectChannel(suggestedChannel.id)}
+                className="max-w-full rounded border border-primary-dim bg-primary/10 px-4 py-2 text-sm text-text-normal hover:bg-primary/20 [overflow-wrap:anywhere]"
+              >
+                {t('channels.open', { name: channelDisplayName(suggestedChannel) })}
+              </button>
+            ) : undefined
+          }
+        />
       </div>
     );
   }

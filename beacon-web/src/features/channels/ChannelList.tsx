@@ -133,6 +133,8 @@ export function ChannelList({
         {(!isMobile || selectedChannel !== null) && (
           <MessagePanel
             channel={selectedChannel}
+            suggestedChannel={filteredChannels[0]}
+            onSelectChannel={handleSelect}
             heardCounts={heardCounts}
             iatas={iatas}
             regionKey={regionKey}
