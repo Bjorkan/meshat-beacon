@@ -2880,6 +2880,10 @@ const docTemplate = `{
                     "description": "shorthand: \"freqMhz,bwKhz,sf\" e.g. \"910.525,62.5,7\"",
                     "type": "string"
                 },
+                "radioTitle": {
+                    "description": "MeshCore suggested-settings title for the radio triple, e.g. \"EU/UK (Narrow)\"; absent when unknown",
+                    "type": "string"
+                },
                 "stale": {
                     "description": "Stale is true when the node hasn't been seen (last_seen) within the configured\nstaleness window (default 24h; internal/config.ResolvedConfig.NodeStaleThreshold).\nApplies to every node type, unlike ClockDriftSeconds/ClockOutOfSync on Node, which\nare repeater/room-server only.",
                     "type": "boolean"
@@ -3041,6 +3045,10 @@ const docTemplate = `{
                     "description": "shorthand: \"freqMhz,bwKhz,sf\" e.g. \"910.525,62.5,7\"",
                     "type": "string"
                 },
+                "radioTitle": {
+                    "description": "MeshCore suggested-settings title for the radio triple, e.g. \"EU/UK (Narrow)\"; absent when unknown",
+                    "type": "string"
+                },
                 "stale": {
                     "description": "Stale is true when the node hasn't been seen (last_seen) within the configured\nstaleness window (default 24h; internal/config.ResolvedConfig.NodeStaleThreshold).\nApplies to every node type, unlike ClockDriftSeconds/ClockOutOfSync on Node, which\nare repeater/room-server only.",
                     "type": "boolean"
@@ -3159,6 +3167,10 @@ const docTemplate = `{
                     "description": "LoRa spreading factor",
                     "type": "integer"
                 },
+                "radioTitle": {
+                    "description": "MeshCore suggested-settings title for the radio triple, e.g. \"EU/UK (Narrow)\"; absent when unknown",
+                    "type": "string"
+                },
                 "scopes": {
                     "description": "list of observer forwarded scopes matched to config",
                     "type": "array",
@@ -3193,7 +3205,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
-                    "description": "broker name e.g. \"mqtt1\"",
+                    "description": "broker name e.g. \"meshat.se\"",
                     "type": "string"
                 }
             }
@@ -3218,6 +3230,10 @@ const docTemplate = `{
                 },
                 "radio": {
                     "description": "friendly radio param string: freqMhz,BwKhz,SF e.g. \"910.525,62.5,7\"",
+                    "type": "string"
+                },
+                "radioTitle": {
+                    "description": "MeshCore suggested-settings title for the radio triple, e.g. \"EU/UK (Narrow)\"; absent when unknown",
                     "type": "string"
                 },
                 "scopes": {

@@ -121,10 +121,13 @@ function RadioSection({
     observer.radioBwKhz && `${observer.radioBwKhz} kHz`,
     observer.radioCr && `CR 4/${observer.radioCr}`,
   ].filter(Boolean) as string[];
+  const title = observer.radioTitle ?? parts.join(' · ') ?? undefined;
 
   return (
     <Section title={t('entities.radio')}>
-      <div className="font-mono text-[13px] text-text-muted">{parts.join(' · ')}</div>
+      <div className="font-mono text-[13px] text-text-muted" title={parts.join(' · ') || undefined}>
+        {title}
+      </div>
       {noiseFloor != null && (
         <div className="font-mono text-[13px] mt-1">
           <Field label={t('details.noiseFloor')} value={`${noiseFloor} dBm`} />

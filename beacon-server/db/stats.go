@@ -268,6 +268,17 @@ func (s *Store) resolvePresetTitle(preset string) string {
 	if err1 != nil || err2 != nil || err3 != nil {
 		return ""
 	}
+	return s.resolvePresetTitleTriple(freq, bw, sf)
+}
+
+// resolvePresetTitleTriple maps a numeric (freqMhz, bwKhz, sf) triple to a MeshCore
+// suggested-settings title, or "" when the catalogue is missing or has no match.
+// Callers with raw REAL columns use this directly instead of round-tripping through
+// the comma-joined preset string.
+func (s *Store) resolvePresetTitleTriple(freq, bw float64, sf int) string {
+	if s.presetCatalogue == nil {
+		return ""
+	}
 	return s.presetCatalogue.Match(freq, bw, sf)
 }
 

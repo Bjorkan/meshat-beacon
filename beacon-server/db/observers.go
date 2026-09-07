@@ -77,8 +77,12 @@ func (s *Store) ListObservers(ctx context.Context, params api.ObserverListParams
 			Scopes: v.Scopes,
 		}
 		if v.RadioFreqMhz != nil && v.RadioSf != nil && v.RadioBwKhz != nil {
-			s := fmt.Sprintf("%g,%g,%d", *v.RadioFreqMhz, *v.RadioBwKhz, *v.RadioSf)
-			observer.Radio = &s
+			radioStr := fmt.Sprintf("%g,%g,%d", *v.RadioFreqMhz, *v.RadioBwKhz, *v.RadioSf)
+			observer.Radio = &radioStr
+			if title := s.resolvePresetTitleTriple(float64(*v.RadioFreqMhz), float64(*v.RadioBwKhz), int(*v.RadioSf)); title != "" {
+				t := title
+				observer.RadioTitle = &t
+			}
 		}
 		if v.DisplayName != nil {
 			observer.DisplayName = v.DisplayName
@@ -169,6 +173,14 @@ func (s *Store) GetObserver(ctx context.Context, observerID uuid.UUID) (*api.Obs
 	}
 	observer.LastStatusAt = lastStatusAt
 	observer.IATA, _ = s.GetObserverLastIATA(ctx, observerID)
+	if obs.RadioFreqMhz != nil && obs.RadioSf != nil && obs.RadioBwKhz != nil {
+		radioStr := fmt.Sprintf("%g,%g,%d", *obs.RadioFreqMhz, *obs.RadioBwKhz, *obs.RadioSf)
+		observer.Radio = &radioStr
+		if title := s.resolvePresetTitleTriple(float64(*obs.RadioFreqMhz), float64(*obs.RadioBwKhz), int(*obs.RadioSf)); title != "" {
+			t := title
+			observer.RadioTitle = &t
+		}
+	}
 	return &observer, nil
 }
 

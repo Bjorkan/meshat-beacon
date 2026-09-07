@@ -140,3 +140,16 @@ export function formatRadio(radio: string | null | undefined): string | null {
   if (f === 0 && b === 0 && s === 0) return null;
   return `${f} MHz · SF${sf} · ${b} kHz`;
 }
+
+// Radio cell label: the MeshCore suggested-settings title when the backend resolved one
+// (e.g. "EU/UK (Narrow)"), else the raw formatted triple. Keeps the raw params as the
+// tooltip title so diagnostics stay one hover away.
+export function formatRadioWithTitle(
+  radio: string | null | undefined,
+  radioTitle?: string | null,
+): { label: string; title?: string } | null {
+  const raw = formatRadio(radio);
+  if (raw == null) return null;
+  if (radioTitle) return { label: radioTitle, title: raw };
+  return { label: raw };
+}

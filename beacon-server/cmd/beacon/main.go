@@ -223,28 +223,12 @@ func main() {
 		log.Printf("config: ingest filter inactive — accepting all IATAs")
 	}
 
-	broker1 := ingest.New(
+	broker := ingest.New(
 		ingest.Config{
-			BrokerName:          "mqtt1",
-			URL:                 getEnv("MQTT_BROKER_1_URL"),
-			Username:            getEnv("MQTT_BROKER_1_USERNAME"),
-			Password:            getEnv("MQTT_BROKER_1_PASSWORD"),
-			TelemetryResolution: resolved.TelemetryResolution,
-			NeighborMaxKm:       resolved.NeighborMaxKm,
-			AllowedIATAs:        allowedIATAs,
-		},
-		coalescer,
-		h,
-		keys,
-		scopes,
-	)
-
-	broker2 := ingest.New(
-		ingest.Config{
-			BrokerName:          "mqtt2",
-			URL:                 getEnv("MQTT_BROKER_2_URL"),
-			Username:            getEnv("MQTT_BROKER_2_USERNAME"),
-			Password:            getEnv("MQTT_BROKER_2_PASSWORD"),
+			BrokerName:          "meshat.se",
+			URL:                 brokerCredential("MQTT_BROKER_URL", "MQTT_BROKER_1_URL"),
+			Username:            brokerCredential("MQTT_BROKER_USERNAME", "MQTT_BROKER_1_USERNAME"),
+			Password:            brokerCredential("MQTT_BROKER_PASSWORD", "MQTT_BROKER_1_PASSWORD"),
 			TelemetryResolution: resolved.TelemetryResolution,
 			NeighborMaxKm:       resolved.NeighborMaxKm,
 			AllowedIATAs:        allowedIATAs,
@@ -256,12 +240,10 @@ func main() {
 	)
 
 	if cr, ok := reader.(*cache.CachedReader); ok {
-		broker1.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
-		broker2.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
+		broker.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
 	}
 
-	go broker1.Start(ctx)
-	go broker2.Start(ctx)
+	go broker.Start(ctx)
 
 	scheduler := background.New([]background.Task{
 		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),
@@ -271,7 +253,7 @@ func main() {
 	go scheduler.Start(ctx)
 
 	// ── HTTP server ──────────────────────────────────────────────────────────
-	r := router.New(h, reader, []*ingest.Worker{broker1, broker2}, resolved.MaxConnsPerIP, cfg.CORS)
+	r := router.New(h, reader, []*ingest.Worker{broker}, resolved.MaxConnsPerIP, cfg.CORS)
 
 	srv := &http.Server{
 		Addr:    addr,
@@ -309,4 +291,14 @@ func getEnv(key string) string {
 		log.Printf("warning: %s is not set", key)
 	}
 	return v
+}
+
+// brokerCredential resolves one MQTT credential. MQTT_BROKER_* is the current name;
+// the legacy MQTT_BROKER_1_* is honored as a fallback so existing deployments
+// keep working until their env files are renamed.
+func brokerCredential(current, legacy string) string {
+	if v := os.Getenv(current); v != "" {
+		return v
+	}
+	return getEnv(legacy)
 }

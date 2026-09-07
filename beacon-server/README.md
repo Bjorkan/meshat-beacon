@@ -1,17 +1,17 @@
 # MeshCore Beacon
 
-MeshCore Beacon is a MeshCore network observation backend. It connects to one or
-more MeshCore MQTT brokers, ingests LoRa packet traffic in real time, stores it
+MeshCore Beacon is a MeshCore network observation backend. It connects to the
+MeshCore MQTT broker, ingests LoRa packet traffic in real time, stores it
 in PostgreSQL, and streams live events to WebSocket clients.
 
 ## What it does
 
-- Subscribes to MeshCore MQTT brokers and decodes incoming LoRa packets using
+- Subscribes to the MeshCore MQTT broker and decodes incoming LoRa packets using
   [meshcore-go](https://github.com/meshcore-go/meshcore-go)
 - Stores packets, observations, nodes, observers, traces, routes and channel
   messages in PostgreSQL (more backends to come)
-- Deduplicates observations across multiple brokers (same packet heard by two
-  brokers is one observation per observer)
+- Deduplicates observations across observers (the same packet heard by two
+  observers is one observation per observer)
 - Decrypts group text messages for known channel keys
 - Detects firmware capability flags from path hash sizes
 - Streams live events to WebSocket clients with subscription filtering by IATA,
@@ -85,7 +85,7 @@ Beacon will:
 
 - Load `.env` and `config.yaml`
 - Connect to PostgreSQL and seed config data
-- Connect to the configured MQTT brokers
+- Connect to the configured MQTT broker
 - Start the HTTP server on `LISTEN_ADDR` (default `:8080`)
 
 ### Cold start and path resolution
@@ -110,20 +110,20 @@ matching a now-known channel and decrypts them. Watch the startup log for
 
 ### Environment variables (`.env`)
 
-| Variable                 | Default       | Description                                                  |
-| ------------------------ | ------------- | ------------------------------------------------------------ |
-| `LISTEN_ADDR`            | `:8080`       | HTTP listen address                                          |
-| `POSTGRES_DSN`           | —             | PostgreSQL connection string                                 |
-| `REDIS_ADDR`             | —             | Redis address (`host:port`). Leave unset to disable caching. |
-| `REDIS_PASSWORD`         | —             | Redis password (optional)                                    |
-| `REDIS_DB`               | `0`           | Redis database index                                         |
-| `CONFIG_PATH`            | `config.yaml` | Path to YAML config file                                     |
-| `MQTT_BROKER_1_URL`      | —             | Broker 1 WebSocket URL (e.g. `wss://mqtt1.example.com:443`)  |
-| `MQTT_BROKER_1_USERNAME` | —             | Broker 1 username                                            |
-| `MQTT_BROKER_1_PASSWORD` | —             | Broker 1 password                                            |
-| `MQTT_BROKER_2_URL`      | —             | Broker 2 WebSocket URL                                       |
-| `MQTT_BROKER_2_USERNAME` | —             | Broker 2 username                                            |
-| `MQTT_BROKER_2_PASSWORD` | —             | Broker 2 password                                            |
+| Variable               | Default       | Description                                                  |
+| ---------------------- | ------------- | ------------------------------------------------------------ |
+| `LISTEN_ADDR`          | `:8080`       | HTTP listen address                                          |
+| `POSTGRES_DSN`         | —             | PostgreSQL connection string                                 |
+| `REDIS_ADDR`           | —             | Redis address (`host:port`). Leave unset to disable caching. |
+| `REDIS_PASSWORD`       | —             | Redis password (optional)                                    |
+| `REDIS_DB`             | `0`           | Redis database index                                         |
+| `CONFIG_PATH`          | `config.yaml` | Path to YAML config file                                     |
+| `MQTT_BROKER_URL`      | —             | Broker WebSocket URL (e.g. `wss://meshcore-mqtt.meshat.se`)  |
+| `MQTT_BROKER_USERNAME` | —             | Broker username                                              |
+| `MQTT_BROKER_PASSWORD` | —             | Broker password                                              |
+
+The legacy `MQTT_BROKER_1_URL/USERNAME/PASSWORD` names are still honored as a
+fallback, so existing `.env` files keep working until they are renamed.
 
 ### Config file (`config.yaml`)
 

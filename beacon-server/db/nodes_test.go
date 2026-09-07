@@ -13,6 +13,7 @@ import (
 	mockdb "github.com/MeshCore-Beacon/beacon-server/db/sqlc/mock"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
+	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/mock/gomock"
@@ -814,5 +815,84 @@ func TestListAmbiguousPrefix2_Empty(t *testing.T) {
 	}
 	if len(got) != 0 {
 		t.Errorf("expected empty, got %v", got)
+	}
+}
+
+// testPresetCatalogue builds a minimal catalogue resolving the EU 869.618/62.5/SF8
+// triple without a network fetch.
+func testPresetCatalogue() *radiopreset.Catalogue {
+	return radiopreset.Load(context.Background(), func(ctx context.Context, url string) ([]byte, error) {
+		return []byte(`{"config":{"suggested_radio_settings":{"entries":[{"title":"EU/UK (Narrow)","frequency":"869.618","bandwidth":"62.5","spreading_factor":"8"}]}}}`), nil
+	})
+}
+
+func TestListNodes_RadioTitle(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	freq := float32(869.618)
+	bw := float32(62.5)
+	sf := int16(8)
+	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
+	mock.EXPECT().
+		ListNodes(gomock.Any(), gomock.Any()).
+		Return([]sqlc.ListNodesRow{
+			{
+				ID:           nodeID,
+				PublicKey:    []byte{0x01},
+				RadioFreqMhz: &freq,
+				RadioBwKhz:   &bw,
+				RadioSf:      &sf,
+			},
+		}, nil)
+
+	store := &Store{q: mock}
+	store.SetPresetCatalogue(testPresetCatalogue())
+
+	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(page.Items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(page.Items))
+	}
+	n := page.Items[0]
+	if n.Radio == nil || *n.Radio != "869.618,62.5,8" {
+		t.Errorf("expected raw radio triple, got %v", n.Radio)
+	}
+	if n.RadioTitle == nil || *n.RadioTitle != "EU/UK (Narrow)" {
+		t.Errorf("expected suggested title, got %v", n.RadioTitle)
+	}
+}
+
+func TestListNodes_RadioTitleAbsentWithoutCatalogue(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+
+	freq := float32(869.618)
+	bw := float32(62.5)
+	sf := int16(8)
+	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
+
+	mock.EXPECT().
+		ListNodes(gomock.Any(), gomock.Any()).
+		Return([]sqlc.ListNodesRow{
+			{
+				ID:           nodeID,
+				PublicKey:    []byte{0x01},
+				RadioFreqMhz: &freq,
+				RadioBwKhz:   &bw,
+				RadioSf:      &sf,
+			},
+		}, nil)
+
+	store := &Store{q: mock} // no catalogue installed
+	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if page.Items[0].RadioTitle != nil {
+		t.Errorf("expected no title without catalogue, got %v", *page.Items[0].RadioTitle)
 	}
 }

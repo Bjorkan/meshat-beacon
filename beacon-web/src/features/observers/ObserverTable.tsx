@@ -6,7 +6,7 @@ import { brokerQueries, observerQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useScopes } from '../../hooks/useScopes';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
-import { formatHex, formatRadio } from '../../lib/formatters';
+import { formatHex, formatRadioWithTitle } from '../../lib/formatters';
 import { Badge } from '../../components/Badge';
 import {
   DataTable,
@@ -88,8 +88,15 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       header: 'Radio',
       label: t('entities.radio'),
       className: 'text-text-muted',
-      sortValue: (obs) => formatRadio(obs.radio) ?? null,
-      cell: (obs) => formatRadio(obs.radio) ?? '—',
+      sortValue: (obs) => formatRadioWithTitle(obs.radio, obs.radioTitle)?.label ?? null,
+      cell: (obs) => {
+        const formatted = formatRadioWithTitle(obs.radio, obs.radioTitle);
+        return formatted ? (
+          <span title={formatted.title}>{formatted.label}</span>
+        ) : (
+          <span className="text-text-dim">—</span>
+        );
+      },
     },
     {
       header: 'IATA',
@@ -113,7 +120,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
 
 function renderObserverCard(obs: ObserverSummary, t: TFunction) {
   const status = deriveObserverStatus(obs);
-  const radio = formatRadio(obs.radio);
+  const radio = formatRadioWithTitle(obs.radio, obs.radioTitle)?.label;
   return (
     <div className="flex flex-col gap-1.5 font-mono text-xs">
       <div className="flex items-center justify-between gap-2">

@@ -5,6 +5,7 @@ export interface ObserverSummary {
   iata: string;
   status: 'online' | 'offline';
   radio?: string; // compact "freq,bw,sf" string, e.g. "915,250,11"; absent when unknown
+  radioTitle?: string; // MeshCore suggested-settings title, e.g. "EU/UK (Narrow)"; absent when unknown
   scopes?: string[]; // transport scopes this observer forwards, e.g. ["#bc", "#west"]
   // epoch ms; not in REST list responses — patched in from WS status events for recency derivation
   lastStatusAt?: number;
@@ -20,6 +21,7 @@ export interface Observer extends ObserverSummary {
   radioSf?: number;
   radioBwKhz?: number;
   radioCr?: number;
+  radioTitle?: string; // MeshCore suggested-settings title, e.g. "EU/UK (Narrow)"; absent when unknown
   batteryLevel?: number;
   uptimeSeconds?: number;
   statusMetadata?: Record<string, unknown>;

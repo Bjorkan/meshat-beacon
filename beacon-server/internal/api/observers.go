@@ -13,6 +13,7 @@ type ObserverSummary struct {
 	IATA         string    `json:"iata"`                   // most recently heard IATA
 	Status       string    `json:"status"`                 // "online" or "offline" derived from last_status_at
 	Radio        *string   `json:"radio,omitempty"`        // friendly radio param string: freqMhz,BwKhz,SF e.g. "910.525,62.5,7"
+	RadioTitle   *string   `json:"radioTitle,omitempty"`   // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
 	Scopes       []string  `json:"scopes,omitempty"`       // list of observer forwarded scopes matched to config
 }
 
@@ -20,7 +21,7 @@ type ObserverSummary struct {
 // including timestamps for diagnosing partial outages — e.g. distinguishing
 // "observer is down" from "one broker stopped delivering for this observer".
 type ObserverBroker struct {
-	Name         string `json:"name"`         // broker name e.g. "mqtt1"
+	Name         string `json:"name"`         // broker name e.g. "meshat.se"
 	LastSeenAt   int64  `json:"lastSeenAt"`   // epoch ms, last time observer was seen on this broker
 	LastPacketAt int64  `json:"lastPacketAt"` // epoch ms, last packet received via this broker; 0 if none
 }

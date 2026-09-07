@@ -19,7 +19,7 @@ export type IATA = { displayName?: string; iata?: string; lat?: number; lon?: nu
 
 export type KnownRoute = { firstSeen?: number; hopCount?: number; hops?: Array<RouteHop>; iata?: string; id?: number; lastSeen?: number; observationCount?: number; };
 
-export type Node = { clockCheckedAt?: number; clockDriftSeconds?: number; clockOutOfSync?: boolean; defaultScope?: string; firstSeen?: number; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lastAdvertAt?: number; lastSeen?: number; lat?: number; lng?: number; locationSource?: string; metadata?: unknown; minFirmwareVersion?: string; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; neighbors?: Array<NodeNeighbor>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; };
+export type Node = { clockCheckedAt?: number; clockDriftSeconds?: number; clockOutOfSync?: boolean; defaultScope?: string; firstSeen?: number; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lastAdvertAt?: number; lastSeen?: number; lat?: number; lng?: number; locationSource?: string; metadata?: unknown; minFirmwareVersion?: string; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; neighbors?: Array<NodeNeighbor>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; radioTitle?: string; stale?: boolean; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; };
 
 export type NodeIATA = { iata?: string; lastHeard?: number; };
 
@@ -27,17 +27,17 @@ export type NodeLinkMetric = { nodeId?: string; snr?: number; snrLastSeen?: numb
 
 export type NodeNeighbor = { firstSeen?: number; iata?: string; id?: string; lastSeen?: number; lat?: number; lng?: number; name?: string; nodeType?: number; nodeTypeName?: string; observationCount?: number; publicKey?: string; snr?: number; snrLastSeen?: number; snrSampleCount?: number; };
 
-export type NodeSummary = { defaultScope?: string; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lat?: number; lng?: number; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; stale?: boolean; };
+export type NodeSummary = { defaultScope?: string; iatas?: Array<NodeIATA>; id?: string; isObserver?: boolean; knownNeighborCount?: number; lat?: number; lng?: number; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; nodeType?: number; nodeTypeName?: string; observerId?: string; publicKey?: string; radio?: string; radioTitle?: string; stale?: boolean; };
 
 export type NodeTypeCount = { count?: number; nodeType?: number; nodeTypeName?: string; };
 
 export type ObservationPoint = { activeObservers?: number; hour?: number; iata?: string; observationCount?: number; uniquePackets?: number; };
 
-export type Observer = { batteryLevel?: number; brokers?: Array<ObserverBroker>; displayName?: string; firmwareBuild?: string; firmwareVersion?: string; firstSeen?: number; hardwareModel?: string; iata?: string; id?: string; lastSeen?: number; lastStatusAt?: number; observationCount?: number; observerType?: string; publicKey?: string; radio?: string; radioBwKhz?: number; radioCr?: number; radioFreqMhz?: number; radioSf?: number; scopes?: Array<string>; softwareVersion?: string; status?: string; statusMetadata?: unknown; uptimeSeconds?: number; };
+export type Observer = { batteryLevel?: number; brokers?: Array<ObserverBroker>; displayName?: string; firmwareBuild?: string; firmwareVersion?: string; firstSeen?: number; hardwareModel?: string; iata?: string; id?: string; lastSeen?: number; lastStatusAt?: number; observationCount?: number; observerType?: string; publicKey?: string; radio?: string; radioBwKhz?: number; radioCr?: number; radioFreqMhz?: number; radioSf?: number; radioTitle?: string; scopes?: Array<string>; softwareVersion?: string; status?: string; statusMetadata?: unknown; uptimeSeconds?: number; };
 
 export type ObserverBroker = { lastPacketAt?: number; lastSeenAt?: number; name?: string; };
 
-export type ObserverSummary = { displayName?: string; iata?: string; id?: string; observerType?: string; radio?: string; scopes?: Array<string>; status?: string; };
+export type ObserverSummary = { displayName?: string; iata?: string; id?: string; observerType?: string; radio?: string; radioTitle?: string; scopes?: Array<string>; status?: string; };
 
 export type ObserverTelemetry = { interval?: string; points?: Array<ObserverTelemetryPoint>; range?: string; };
 

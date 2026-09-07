@@ -5,6 +5,7 @@ import {
   timeAgoMs,
   formatSnr,
   formatRadio,
+  formatRadioWithTitle,
   snrLevel,
   formatPropagation,
   formatCount,
@@ -184,5 +185,26 @@ describe('formatRadio', () => {
     expect(formatRadio(null)).toBeNull();
     expect(formatRadio(undefined)).toBeNull();
     expect(formatRadio('')).toBeNull();
+  });
+});
+
+describe('formatRadioWithTitle', () => {
+  it('prefers the suggested title and keeps raw params as tooltip', () => {
+    expect(formatRadioWithTitle('869.618,62.5,8', 'EU/UK (Narrow)')).toEqual({
+      label: 'EU/UK (Narrow)',
+      title: '869.618 MHz · SF8 · 62.5 kHz',
+    });
+  });
+
+  it('falls back to raw params without a title', () => {
+    expect(formatRadioWithTitle('869.618,62.5,8', undefined)?.label).toBe(
+      '869.618 MHz · SF8 · 62.5 kHz',
+    );
+    expect(formatRadioWithTitle('869.618,62.5,8', null)?.title).toBeUndefined();
+  });
+
+  it('returns null for unknown configs even with a title', () => {
+    expect(formatRadioWithTitle('0,0,0', 'EU/UK (Narrow)')).toBeNull();
+    expect(formatRadioWithTitle(null, 'EU/UK (Narrow)')).toBeNull();
   });
 });

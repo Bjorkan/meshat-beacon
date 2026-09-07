@@ -54,6 +54,7 @@ type NodeSummary struct {
 	Latitude           *float64         `json:"lat,omitempty"`          // decimal degrees, from advert AppData
 	Longitude          *float64         `json:"lng,omitempty"`          // decimal degrees, from advert AppData
 	Radio              *string          `json:"radio,omitempty"`        // shorthand: "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
+	RadioTitle         *string          `json:"radioTitle,omitempty"`   // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
 	IATAs              []NodeIATA       `json:"iatas"`                  // IATAs where this node has been heard, with last heard timestamps
 	DefaultScope       *string          `json:"defaultScope,omitempty"` // most recently matched transport scope name e.g. "#bc"
 	KnownNeighborCount int64            `json:"knownNeighborCount"`

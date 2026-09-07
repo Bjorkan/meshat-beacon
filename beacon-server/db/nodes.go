@@ -197,8 +197,12 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 			}
 		}
 		if v.RadioFreqMhz != nil && v.RadioSf != nil && v.RadioBwKhz != nil {
-			s := fmt.Sprintf("%g,%g,%d", *v.RadioFreqMhz, *v.RadioBwKhz, *v.RadioSf)
-			node.Radio = &s
+			radioStr := fmt.Sprintf("%g,%g,%d", *v.RadioFreqMhz, *v.RadioBwKhz, *v.RadioSf)
+			node.Radio = &radioStr
+			if title := s.resolvePresetTitleTriple(float64(*v.RadioFreqMhz), float64(*v.RadioBwKhz), int(*v.RadioSf)); title != "" {
+				t := title
+				node.RadioTitle = &t
+			}
 		}
 		items = append(items, node)
 	}
@@ -266,8 +270,12 @@ func (s *Store) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error
 		}
 	}
 	if row.RadioFreqMhz != nil && row.RadioSf != nil && row.RadioBwKhz != nil {
-		s := fmt.Sprintf("%g,%g,%d", *row.RadioFreqMhz, *row.RadioBwKhz, *row.RadioSf)
-		node.Radio = &s
+		radioStr := fmt.Sprintf("%g,%g,%d", *row.RadioFreqMhz, *row.RadioBwKhz, *row.RadioSf)
+		node.Radio = &radioStr
+		if title := s.resolvePresetTitleTriple(float64(*row.RadioFreqMhz), float64(*row.RadioBwKhz), int(*row.RadioSf)); title != "" {
+			t := title
+			node.RadioTitle = &t
+		}
 	}
 	if row.LastAdvertAt.Valid {
 		ms := row.LastAdvertAt.Time.UnixMilli()

@@ -6,7 +6,7 @@ import { useRegion } from '../../hooks/useRegion';
 import { useScopes } from '../../hooks/useScopes';
 import { useTick } from '../../hooks/useTick';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
-import { formatHex, timeAgoMs, formatRadio } from '../../lib/formatters';
+import { formatHex, timeAgoMs, formatRadioWithTitle } from '../../lib/formatters';
 import { Badge } from '../../components/Badge';
 import { Tooltip } from '../../components/Tooltip';
 import { ObserverIcon } from '../../components/ObserverIcon';
@@ -79,8 +79,15 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       header: 'Radio',
       label: t('entities.radio'),
       className: 'text-text-muted',
-      sortValue: (node) => formatRadio(node.radio) ?? null,
-      cell: (node) => formatRadio(node.radio) ?? '—',
+      sortValue: (node) => formatRadioWithTitle(node.radio, node.radioTitle)?.label ?? null,
+      cell: (node) => {
+        const formatted = formatRadioWithTitle(node.radio, node.radioTitle);
+        return formatted ? (
+          <span title={formatted.title}>{formatted.label}</span>
+        ) : (
+          <span className="text-text-dim">—</span>
+        );
+      },
     },
     {
       header: 'IATAs',
@@ -148,7 +155,7 @@ function renderNodeCard(node: NodeSummary, t: TFunction) {
         </span>
       </div>
       <div className="flex items-center gap-2 text-text-muted">
-        <span>{formatRadio(node.radio) ?? '—'}</span>
+        <span>{formatRadioWithTitle(node.radio, node.radioTitle)?.label ?? '—'}</span>
         {location && <span>· {location}</span>}
         {node.knownNeighborCount > 0 && (
           <span>· {t('entities.neighborCount', { count: node.knownNeighborCount })}</span>

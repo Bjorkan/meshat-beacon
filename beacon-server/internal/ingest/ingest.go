@@ -1,11 +1,11 @@
 // Copyright 2026 Beacon Contributors
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// Package ingest subscribes to a single MeshCore MQTT broker and drives the
+// Package ingest subscribes to the MeshCore MQTT broker and drives the
 // observation pipeline described in the design doc.
 //
-// Call Start() once per broker in a dedicated goroutine. Both broker instances
-// share the same *hub.Hub and *DB handle so dedup and fan-out are centralised.
+// Call Start() once in a dedicated goroutine. The single broker worker shares
+// the *hub.Hub and *DB handle with the rest of the server.
 //
 // Pipeline per incoming /packets message:
 //  1. Parse topic → extract IATA + publisher pubkey
@@ -13,7 +13,7 @@
 //  3. Compute content-based packet hash (PacketHash)
 //  4. Upsert observers + observer_brokers + iata_codes
 //  5. Upsert packets row (ON CONFLICT bump last_heard_at)
-//  6. Insert packet_observations (ON CONFLICT DO NOTHING for cross-broker dedup)
+//  6. Insert packet_observations (ON CONFLICT DO NOTHING for cross-observer dedup)
 //  7. Match transport codes against known scopes (TRANSPORT_FLOOD/DIRECT only)
 //  8. If INSERT succeeded: capability detection, payload-type side effects, fan-out
 //
@@ -56,11 +56,11 @@ import (
 
 // Config holds the connection parameters for one broker.
 type Config struct {
-	// BrokerName is a short human-readable label ("mqtt1", "mqtt2") used in
+	// BrokerName is a short human-readable label (e.g. "meshat.se") used in
 	// log messages and stored in packet_observations.source_broker.
 	BrokerName string
 
-	// URL is the full broker WebSocket URL, e.g. "wss://mqtt1.meshcore.ca/mqtt"
+	// URL is the full broker WebSocket URL, e.g. "wss://meshcore-mqtt.meshat.se"
 	URL string
 
 	Username string

@@ -14,7 +14,7 @@ import {
   formatHex,
   formatSnr,
   snrLevel,
-  formatRadio,
+  formatRadioWithTitle,
   formatClockDrift,
   SIGNAL_LEVEL_CLASSES,
 } from '../../lib/formatters';
@@ -249,9 +249,17 @@ export function NodeDetailPanel({
                 label={t('filters.multibyteTraces')}
                 value={t(node.supportsMultibyteTraces ? 'common.yes' : 'common.no')}
               />
-              {node.radio && (
-                <Field label={t('entities.radio')} value={formatRadio(node.radio) ?? '—'} />
-              )}
+              {node.radio &&
+                (() => {
+                  const formatted = formatRadioWithTitle(node.radio, node.radioTitle);
+                  return formatted ? (
+                    <span title={formatted.title}>
+                      <Field label={t('entities.radio')} value={formatted.label} />
+                    </span>
+                  ) : (
+                    <Field label={t('entities.radio')} value="—" />
+                  );
+                })()}
               {node.defaultScope && <Field label={t('filters.scope')} value={node.defaultScope} />}
             </div>
           </Section>
