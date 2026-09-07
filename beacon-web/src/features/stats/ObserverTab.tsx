@@ -263,7 +263,9 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
           <details ref={pickerRef} className="rounded-lg border border-border bg-bg-surface">
             <summary className="cursor-pointer px-3.5 py-3 font-mono text-xs text-text-normal">
               {t('stats.selectObserver')}
-              {observer.data && `: ${observer.data.displayName ?? observer.data.id.slice(0, 8)}`}
+              {selectedObserverId &&
+                observer.data &&
+                `: ${observer.data.displayName ?? selectedObserverId.slice(0, 8)}`}
             </summary>
             <ObserverList
               range={range}

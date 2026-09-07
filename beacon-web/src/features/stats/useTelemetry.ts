@@ -3,7 +3,7 @@ import { observerQueries, telemetryQueries } from '../../api/queries';
 import type { StatsRange } from './types';
 
 export function useObserver(observerId: string | null) {
-  return useQuery(observerQueries.detail(observerId ?? ''));
+  return useQuery({ ...observerQueries.detail(observerId ?? ''), enabled: !!observerId });
 }
 
 export function useObserverTelemetry(observerId: string | null, range: StatsRange) {
