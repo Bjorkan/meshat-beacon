@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import maplibregl from 'maplibre-gl';
+import { mapOverlayInsets } from './map-insets';
 import type { Map as MapLibreMap, RasterDEMSourceSpecification } from 'maplibre-gl';
 import {
   DEM_TILES,
@@ -70,6 +71,7 @@ export function useMapLibre(
   // a deep-link camera ([lng, lat] + zoom); when set it opens the map here and wins over the initial
   // region fitBounds. Later region changes still auto-fit.
   initialCamera?: { center: [number, number]; zoom: number },
+  live = false,
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -195,6 +197,21 @@ export function useMapLibre(
     map.setStyle(resolveMapStyle(styleId).url);
   }, [styleId]);
 
+  // Persistent padding also governs cluster zoom and node focus. Recalculate on container
+  // resize (including panel changes), not just a window breakpoint crossing.
+  useEffect(() => {
+    const map = mapRef.current;
+    const container = containerRef.current;
+    if (!map || !container) return;
+    const update = () => {
+      map.setPadding(mapOverlayInsets(container.clientWidth, container.clientHeight, live));
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, [live]);
+
   // Frame the selection: fitBounds over its IATA points, or the default overview when there's none.
   // A single point gets the IATA_ZOOM terrain tilt; multiple get a flat overview. Waits for the
   // style, and the key check skips redundant re-fits (incl. isReady toggling on basemap swaps).
@@ -208,6 +225,7 @@ export function useMapLibre(
     if (!fitPoints || fitPoints.length === 0) {
       map.flyTo({
         center: DEFAULT_CENTER,
+        padding: map.getPadding(),
         zoom: DEFAULT_ZOOM,
         pitch: DEFAULT_PITCH,
         bearing: DEFAULT_BEARING,
@@ -227,9 +245,8 @@ export function useMapLibre(
       new maplibregl.LngLatBounds(fitPoints[0], fitPoints[0]),
     );
     map.fitBounds(bounds, {
-      // Asymmetric: the footer, LIVE button and attribution sit along the bottom edge,
-      // so the southernmost cluster needs extra room to stay clear of them.
-      padding: { top: 48, left: 48, right: 48, bottom: 96 },
+      // Use the same safe rectangle as node focus and cluster navigation.
+      padding: map.getPadding(),
       maxZoom: IATA_ZOOM,
       pitch: fitPoints.length === 1 ? IATA_PITCH : DEFAULT_PITCH,
       bearing: DEFAULT_BEARING,

@@ -214,6 +214,7 @@ export function MapView({
     fitPoints,
     undefined,
     initialCamera,
+    packetFlow,
   );
   const isDark = resolveMapStyle(styleId).dark; // drives marker theming + maplibre control chrome
   const mapThemeKey = `${themeKey}:${styleRevision}`;
@@ -229,6 +230,7 @@ export function MapView({
     lastFocusedNodeRef.current = selectedNodeId;
     map.flyTo({
       center: [selectedNodeForFocus.lng, selectedNodeForFocus.lat],
+      padding: map.getPadding(),
       zoom: Math.max(map.getZoom(), 12),
       duration: 650,
       essential: true,

@@ -655,7 +655,12 @@ export function useMapNodes(
               const decision = clusterClickDecision(map.getZoom(), expansionZoom, maxExpansionZoom);
               if (decision.type === 'zoom') {
                 clearSpider();
-                map.easeTo({ center, zoom: decision.zoom, duration: CLUSTER_ZOOM_DURATION_MS });
+                map.easeTo({
+                  center,
+                  padding: map.getPadding(),
+                  zoom: decision.zoom,
+                  duration: CLUSTER_ZOOM_DURATION_MS,
+                });
               } else {
                 spider.spiderfy(NODES_CLUSTER_LAYER_ID, clusterId);
                 requestAnimationFrame(() => {
@@ -671,7 +676,12 @@ export function useMapNodes(
               const fallbackZoom = fallbackClusterZoom(map.getZoom(), maxExpansionZoom);
               if (fallbackZoom != null) {
                 clearSpider();
-                map.easeTo({ center, zoom: fallbackZoom, duration: CLUSTER_ZOOM_DURATION_MS });
+                map.easeTo({
+                  center,
+                  padding: map.getPadding(),
+                  zoom: fallbackZoom,
+                  duration: CLUSTER_ZOOM_DURATION_MS,
+                });
               } else {
                 spider.spiderfy(NODES_CLUSTER_LAYER_ID, clusterId);
               }
