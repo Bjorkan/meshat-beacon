@@ -1,3 +1,4 @@
+import { readPreference, writePreference } from '../../lib/storage';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from './SegmentedControl';
@@ -95,18 +96,14 @@ export function MapSettingsPanel({
   ];
   // collapsed by default on mobile (the card would cover the map); a saved preference still wins
   const [open, setOpen] = useState(() => {
-    const stored = localStorage.getItem(OPEN_STORAGE_KEY);
+    const stored = readPreference(OPEN_STORAGE_KEY);
     return stored === null ? !isMobile : stored === 'true';
   });
 
   const toggle = () => {
     const next = !open;
     setOpen(next);
-    try {
-      localStorage.setItem(OPEN_STORAGE_KEY, String(next));
-    } catch {
-      // private mode / quota — the toggle still works, just not persisted
-    }
+    writePreference(OPEN_STORAGE_KEY, String(next));
   };
 
   return (

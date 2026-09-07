@@ -1,3 +1,4 @@
+import { readPreference, writePreference } from './lib/storage';
 import i18n, { type Resource } from 'i18next';
 import { initReactI18next } from 'react-i18next';
 
@@ -62,17 +63,8 @@ function supportedLanguage(language: string | null | undefined): string | undefi
   )?.code;
 }
 
-function storage(): Storage | undefined {
-  try {
-    return typeof globalThis.localStorage === 'undefined' ? undefined : globalThis.localStorage;
-  } catch {
-    // Storage can be disabled by browser privacy settings or unavailable in SSR/test environments.
-    return undefined;
-  }
-}
-
 export function detectLanguage(): string {
-  return supportedLanguage(storage()?.getItem(LANGUAGE_STORAGE_KEY)) ?? DEFAULT_LANGUAGE;
+  return supportedLanguage(readPreference(LANGUAGE_STORAGE_KEY)) ?? DEFAULT_LANGUAGE;
 }
 
 function updateDocumentLanguage(language: string) {
@@ -98,7 +90,7 @@ updateDocumentLanguage(i18n.resolvedLanguage ?? DEFAULT_LANGUAGE);
 
 i18n.on('languageChanged', (language) => {
   const supported = supportedLanguage(language) ?? DEFAULT_LANGUAGE;
-  storage()?.setItem(LANGUAGE_STORAGE_KEY, supported);
+  writePreference(LANGUAGE_STORAGE_KEY, supported);
   updateDocumentLanguage(supported);
 });
 

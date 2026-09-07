@@ -1,3 +1,4 @@
+import { readPreference, writePreference } from '../../lib/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -71,29 +72,29 @@ export function MapView({
   // localStorage, so a shared link can't clobber the visitor's saved prefs.
 
   const [typeFilter, setTypeFilter] = useState(
-    () => urlView.nodeType ?? localStorage.getItem(MAP_NODE_TYPE_STORAGE_KEY) ?? '',
+    () => urlView.nodeType ?? readPreference(MAP_NODE_TYPE_STORAGE_KEY) ?? '',
   ); // "" = All
   const handleTypeChange = useCallback((t: string) => {
     setTypeFilter(t);
-    localStorage.setItem(MAP_NODE_TYPE_STORAGE_KEY, t);
+    writePreference(MAP_NODE_TYPE_STORAGE_KEY, t);
   }, []);
 
   const [clustered, setClustered] = useState(
-    () => urlView.clustered ?? localStorage.getItem(MAP_CLUSTER_STORAGE_KEY) !== 'off',
+    () => urlView.clustered ?? readPreference(MAP_CLUSTER_STORAGE_KEY) !== 'off',
   );
   const handleClusteredChange = useCallback((c: boolean) => {
     setClustered(c);
-    localStorage.setItem(MAP_CLUSTER_STORAGE_KEY, c ? 'on' : 'off');
+    writePreference(MAP_CLUSTER_STORAGE_KEY, c ? 'on' : 'off');
   }, []);
 
   const [neighborLines, setNeighborLines] = useState<NeighborLinesMode>(() => {
     if (urlView.neighborLines) return urlView.neighborLines;
-    const stored = localStorage.getItem(MAP_NEIGHBOR_LINES_STORAGE_KEY);
+    const stored = readPreference(MAP_NEIGHBOR_LINES_STORAGE_KEY);
     return stored === 'on' || stored === 'selected' || stored === 'off' ? stored : 'selected';
   });
   const handleNeighborLinesChange = useCallback((mode: NeighborLinesMode) => {
     setNeighborLines(mode);
-    localStorage.setItem(MAP_NEIGHBOR_LINES_STORAGE_KEY, mode);
+    writePreference(MAP_NEIGHBOR_LINES_STORAGE_KEY, mode);
   }, []);
 
   // live packet-flow animation: opt-in per session (off by default, not persisted; a deep link can seed it)
@@ -103,11 +104,11 @@ export function MapView({
   // IATA region borders overlay, on by default (outline only); seeded URL -> localStorage so an
   // explicit "off" sticks, like the other toggles
   const [borders, setBorders] = useState(
-    () => urlView.borders ?? localStorage.getItem(MAP_BORDERS_STORAGE_KEY) !== 'off',
+    () => urlView.borders ?? readPreference(MAP_BORDERS_STORAGE_KEY) !== 'off',
   );
   const handleBordersChange = useCallback((on: boolean) => {
     setBorders(on);
-    localStorage.setItem(MAP_BORDERS_STORAGE_KEY, on ? 'on' : 'off');
+    writePreference(MAP_BORDERS_STORAGE_KEY, on ? 'on' : 'off');
   }, []);
 
   // A deep-link camera opens the map here and suppresses the initial region fit (see useMapLibre).

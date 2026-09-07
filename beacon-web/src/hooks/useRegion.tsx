@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
+import { writePreference } from '../lib/storage';
 import { createContext, useContext, useState, useMemo, useCallback, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { regionQueries } from '../api/queries';
@@ -34,11 +35,7 @@ export function RegionProvider({
 
   const setSelection = useCallback((next: RegionSelection) => {
     setSelectionState(next);
-    try {
-      localStorage.setItem(STORAGE_KEY, serializeSelection(next));
-    } catch {
-      // private-mode / quota — selection still lives in state, just not persisted
-    }
+    writePreference(STORAGE_KEY, serializeSelection(next));
   }, []);
 
   const value = useMemo(() => ({ selection, setSelection }), [selection, setSelection]);

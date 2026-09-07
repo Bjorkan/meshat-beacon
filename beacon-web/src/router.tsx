@@ -1,4 +1,5 @@
 /* eslint-disable react-refresh/only-export-components -- the router instance and its routes share this module by design */
+import { readPreference } from './lib/storage';
 // Application route tree (TanStack Router, code-based — the heavy tabs keep their React.lazy
 // chunks, which gives the same bundler-level code splitting a file-based plugin would generate).
 //
@@ -196,9 +197,9 @@ function activeTabFromPathname(pathname: string): string {
 // persisted selection, then the pre-multi-select single-IATA key (migrated), else all regions.
 function computeInitialSelection(fromUrl: RegionSelection): RegionSelection {
   if (!isAllRegions(fromUrl)) return fromUrl;
-  const stored = deserializeSelection(localStorage.getItem('beacon-region-selection'));
+  const stored = deserializeSelection(readPreference('beacon-region-selection'));
   if (!isAllRegions(stored)) return stored;
-  const legacy = localStorage.getItem('beacon-region');
+  const legacy = readPreference('beacon-region');
   if (legacy && legacy !== '*') return { regions: [], iatas: [legacy.toUpperCase()] };
   return ALL_REGIONS;
 }
