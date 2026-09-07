@@ -16,6 +16,7 @@ import (
 // Unset fields return zero values. Use it for both validation tests
 // (leave all fields nil) and happy path tests (set only what you need).
 type stubReader struct {
+	listNodePathPackets          func(context.Context, uuid.UUID, []string, *api.PageToken, int32) (api.Page[api.PacketSummary], error)
 	listIATAs                    func(ctx context.Context) ([]api.IATA, error)
 	getIATA                      func(ctx context.Context, iata string) (*api.IATA, error)
 	getIATABorder                func(ctx context.Context, iata string) (json.RawMessage, error)
@@ -384,4 +385,11 @@ func (s stubReader) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map[uui
 		return s.getNodesByIDs(ctx, ids)
 	}
 	return nil, nil
+}
+
+func (s stubReader) ListNodePathPackets(ctx context.Context, id uuid.UUID, iatas []string, cursor *api.PageToken, limit int32) (api.Page[api.PacketSummary], error) {
+	if s.listNodePathPackets != nil {
+		return s.listNodePathPackets(ctx, id, iatas, cursor, limit)
+	}
+	return api.Page[api.PacketSummary]{}, nil
 }

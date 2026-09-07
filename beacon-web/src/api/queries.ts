@@ -21,6 +21,7 @@ import {
   getNode,
   getNodeNeighbors,
   getNodeObservations,
+  getNodePathPackets,
   getNodesPage,
   getObserver,
   getObserverAdverts,
@@ -173,6 +174,16 @@ function nodeListKey(f: NodeListFilters) {
 }
 
 export const nodeQueries = {
+  pathPackets: (nodeId: string, regionKey: string, iatas?: string[]) =>
+    infiniteQueryOptions({
+      queryKey: ['node-path-packets', nodeId, regionKey] as const,
+      queryFn: ({ pageParam }) =>
+        getNodePathPackets(nodeId, { iatas, pageToken: pageParam, limit: 25 }),
+      initialPageParam: undefined as string | undefined,
+      getNextPageParam: (last: CursorPage<PacketSummary>) => last.nextPageToken ?? undefined,
+      staleTime: 30_000,
+    }),
+
   all: () => ['nodes'] as const,
   // Map variant: always requests neighborIds so the neighbor-lines toggle is a pure client-side
   // render switch. Deliberately a different key from the filtered Nodes-table list.

@@ -404,3 +404,7 @@ func TestCachedReader_InvalidateObserver(t *testing.T) {
 		t.Error("expected observer scopes key to be deleted")
 	}
 }
+
+func (s *stubReader) ListNodePathPackets(context.Context, uuid.UUID, []string, *api.PageToken, int32) (api.Page[api.PacketSummary], error) {
+	return api.Page[api.PacketSummary]{}, nil
+}

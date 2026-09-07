@@ -78,6 +78,10 @@ export async function rawGetNodesNodeIdObservations(params: { nodeId: string; cu
   return request<Models.PagePacketObservationSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/observations`, { "cursor": params.cursor, "limit": params.limit });
 }
 
+export async function rawGetNodesNodeIdPathPackets(params: { nodeId: string; iatas?: string; regionId?: number; region?: string; pageToken?: string; limit?: number; }): Promise<Models.PagePacketSummary> {
+  return request<Models.PagePacketSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/path-packets`, { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "pageToken": params.pageToken, "limit": params.limit });
+}
+
 export async function rawGetObservers(params: { iata?: string; iatas?: string; regionId?: number; region?: string; type?: string; broker?: string; status?: string; name?: string; scope?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }): Promise<Models.PageObserverSummary> {
   return request<Models.PageObserverSummary>("/observers", { "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "type": params.type, "broker": params.broker, "status": params.status, "name": params.name, "scope": params.scope, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
 }

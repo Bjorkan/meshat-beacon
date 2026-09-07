@@ -223,6 +223,11 @@
     "noiseFloor": "Brusgolv"
   },
   "nodes": {
+    "pathsThrough": "Sökvägar genom noden",
+    "pathsThroughHint": "Paket med ett entydigt hopp genom noden i vald region. TRACE-paket ingår inte.",
+    "noPathPackets": "Inga matchande paket",
+    "morePathPackets": "Läs in fler paket",
+
     "detail": "Noddetaljer",
     "detailLabel": "Noddetaljer",
     "copyLink": "Kopiera nodlänk",

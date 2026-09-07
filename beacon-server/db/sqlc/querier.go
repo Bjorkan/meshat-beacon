@@ -54,6 +54,9 @@ type Querier interface {
 	GetNodeByPubkey(ctx context.Context, publicKey []byte) (uuid.UUID, error)
 	// Returns the neighbors of a node with details, ordered by most recently seen.
 	GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]GetNodeNeighborsRow, error)
+	// Copyright 2026 Beacon Contributors
+	// SPDX-License-Identifier: AGPL-3.0-or-later
+	GetNodePathPublicKey(ctx context.Context, id uuid.UUID) ([]byte, error)
 	GetNodesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]GetNodesByIDsRow, error)
 	GetObserverBrokers(ctx context.Context, observerID uuid.UUID) ([]GetObserverBrokersRow, error)
 	GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error)
@@ -137,6 +140,10 @@ type Querier interface {
 	// Used for WS reconnect backfill.
 	ListMessagesAfterID(ctx context.Context, arg ListMessagesAfterIDParams) ([]ListMessagesAfterIDRow, error)
 	ListNodeObservations(ctx context.Context, arg ListNodeObservationsParams) ([]ListNodeObservationsRow, error)
+	// Prefixes are resolved globally with ResolvePathHashes before this query.
+	// First matching observation ID is an immutable ordering key. A snapshot excludes
+	// newly arriving packets/observations from all later pages, avoiding duplicates.
+	ListNodePathPackets(ctx context.Context, arg ListNodePathPacketsParams) ([]ListNodePathPacketsRow, error)
 	// Keyset-paginated node list. $7 preserves the legacy last_seen cursor; new clients round-trip
 	// nextPageToken, which supplies $14-$17 and remains correct for every supported sort field.
 	ListNodes(ctx context.Context, arg ListNodesParams) ([]ListNodesRow, error)

@@ -42,6 +42,7 @@ import {
   rawGetNodesNodeId,
   rawGetNodesNodeIdNeighbors,
   rawGetNodesNodeIdObservations,
+  rawGetNodesNodeIdPathPackets,
   rawGetObservers,
   rawGetObserversObserverId,
   rawGetObserversObserverIdAdverts,
@@ -386,6 +387,17 @@ export function getNodeObservations(
     cursor: params?.cursor,
     limit: params?.limit ?? DEFAULT_PAGE_SIZE,
   }) as Promise<CursorPage<NodeObservation>>;
+}
+
+export function getNodePathPackets(
+  nodeId: string,
+  params: { iatas?: string[]; pageToken?: string; limit?: number },
+): Promise<CursorPage<PacketSummary>> {
+  return rawGetNodesNodeIdPathPackets({
+    ...params,
+    nodeId,
+    iatas: iatasParam(params.iatas),
+  }) as Promise<CursorPage<PacketSummary>>;
 }
 
 export function getNodeNeighbors(nodeId: string): Promise<NodeNeighbor[]> {

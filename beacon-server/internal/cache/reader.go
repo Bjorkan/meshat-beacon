@@ -453,3 +453,9 @@ func (cr *CachedReader) SearchCrossIATARoutes(ctx context.Context, fromHash, fro
 func (cr *CachedReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
 	return cr.inner.ListTraceTags(ctx, iatas, scope, traceType, since, until, cursor, limit)
 }
+
+// Traversal history resolves confidence on every request so a new hash collision
+// cannot leave stale node attribution in a cached page.
+func (cr *CachedReader) ListNodePathPackets(ctx context.Context, id uuid.UUID, iatas []string, cursor *api.PageToken, limit int32) (api.Page[api.PacketSummary], error) {
+	return cr.inner.ListNodePathPackets(ctx, id, iatas, cursor, limit)
+}

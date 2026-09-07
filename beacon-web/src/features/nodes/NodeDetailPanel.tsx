@@ -1,3 +1,4 @@
+import { NodePathPackets } from './NodePathPackets';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { nodeQueries } from '../../api/queries';
@@ -290,6 +291,10 @@ export function NodeDetailPanel({
               </div>
             )}
           </Section>
+
+          {(node.nodeType === 2 || node.nodeType === 3) && (
+            <NodePathPackets nodeId={nodeId} onAnalyzePacket={onAnalyzePacket} />
+          )}
 
           <Section title={t('details.observations')}>
             {observations && observations.items.length > 0 ? (

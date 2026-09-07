@@ -223,6 +223,11 @@
     "noiseFloor": "Noise floor"
   },
   "nodes": {
+    "pathsThrough": "Paths through this node",
+    "pathsThroughHint": "Packets with an unambiguous hop through this node in the selected region. TRACE packets are excluded.",
+    "noPathPackets": "No matching packets",
+    "morePathPackets": "Load more packets",
+
     "detail": "Node Detail",
     "detailLabel": "Node detail",
     "copyLink": "Copy node link",

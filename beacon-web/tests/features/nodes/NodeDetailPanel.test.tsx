@@ -6,7 +6,12 @@ import { NodeDetailPanel } from '../../../src/features/nodes/NodeDetailPanel';
 import { getNode, getNodeObservations, getNodeNeighbors } from '../../../src/api/client';
 import type { Node, NodeNeighbor } from '../../../src/features/nodes/types';
 
+vi.mock('../../../src/hooks/useRegion', () => ({
+  useRegion: () => ({ regionKey: '*', iatas: undefined }),
+}));
+
 vi.mock('../../../src/api/client', () => ({
+  getNodePathPackets: vi.fn().mockResolvedValue({ items: [], hasMore: false }),
   getNode: vi.fn(),
   getNodeObservations: vi.fn(),
   getNodeNeighbors: vi.fn(),

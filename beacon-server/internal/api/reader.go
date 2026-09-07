@@ -24,6 +24,10 @@ type Page[T any] struct {
 }
 
 type Reader interface {
+	// ListNodePathPackets returns unique packets with a globally unambiguous hop through nodeID.
+	// The matching observations are region-filtered; TRACE is deliberately excluded.
+	ListNodePathPackets(ctx context.Context, nodeID uuid.UUID, iatas []string, cursor *PageToken, limit int32) (Page[PacketSummary], error)
+
 	// ListIATAs returns all known IATA codes with display name and coordinates.
 	// IATAs are auto-created on first packet arrival from that location.
 	ListIATAs(ctx context.Context) ([]IATA, error)

@@ -25,6 +25,7 @@ func NodesRouter(reader api.Reader) http.Handler {
 	r.Route("/{nodeId}", func(r chi.Router) {
 		r.Get("/", getNode(reader))
 		r.Get("/observations", listNodeObservations(reader))
+		r.Get("/path-packets", listNodePathPackets(reader))
 		r.Get("/neighbors", listNodeNeighbors(reader))
 	})
 	return r

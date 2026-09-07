@@ -1019,3 +1019,41 @@ The protocol doesn't need to know about backgrounding; the client just treats re
 - **packetObservation payload size.** Currently fat: includes the full resolved path with node coordinates. Could be 1-2 KB per event in heavy traffic. Slim alternative would be `{packetHash, observationId, iata, heardAt}` only, with clients fetching details via REST when needed. Tradeoff is bandwidth vs round-trip count.
 
 (See [Questions and Answers](high_level_design.md#questions-and-answers) in the high level design for resolved items: SSE fallback, rate limiting strategy, mobile push notifications, broker bundling, pprof protection, observationId backfill.)
+
+### Packets routed through a node
+
+`GET /api/v1/nodes/{nodeId}/path-packets` lists unique packets whose observed path
+contains a globally high-confidence match for that node. This is separate from
+`/observations`, which selects packets originating from the node. The node detail
+panel exposes this list for repeaters and room servers, using the global region
+selection. Query parameters: `iatas`, `regionId`/`region`, `limit` (1–1000, default
+50), and the returned opaque `pageToken`.
+
+Hop matching uses the packet-detail resolver and respects boundaries for 1–4 byte
+hashes. A prefix with multiple infrastructure-node candidates anywhere in the
+network is excluded, even if only one candidate is in the selected region.
+**TRACE is deliberately excluded**: observation path bytes contain SNR values,
+whereas its canonical route hashes are in the payload.
+
+The response is a `Page<PacketSummary>`. `observationCount` counts matching
+observations within the region and snapshot; `latestObserver` and `lastHeardAt`
+describe the matching observation with the greatest ingestion ID. Each packet
+appears once, ordered by its first matching observation ID descending. The first
+page fixes an upper observation ID; later pages exclude new arrivals, including
+new observations of already returned packets. Tokens are scoped to the node and
+region. Refresh to include new traffic. Confidence is reevaluated on each request,
+so newly discovered hash collisions can remove previously eligible matches.
+
+Migration 028 builds a GIN expression index over boundary-aligned hop arrays,
+including retained historical observations. Index creation runs in the normal
+migration transaction and can take time/block writes on a large existing table;
+account for this during deployment. No separate backfill is needed. The database
+integration test verifies matches, deduplication, snapshot paging, and index use:
+
+```sh
+BEACON_TEST_DATABASE_URL=postgres://user:password@localhost/beacon_test \
+  go -C beacon-server test ./db -run TestNodePathPacketsIntegration -v
+```
+
+Use a disposable test database; the test creates and removes its own schema and
+runs all migrations there.
