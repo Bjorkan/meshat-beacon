@@ -62,6 +62,9 @@ interface DetailPanelProps {
   // map underneath (and its neighbor lines) stays visible. No effect at lg+ (the panel is a sidebar).
   collapsible?: boolean;
   isLoading?: boolean;
+  loadError?: boolean;
+  onRetry?: () => void;
+  retrying?: boolean;
   notFound?: boolean;
   notFoundIcon?: ReactNode;
   notFoundLabel?: string;
@@ -75,6 +78,9 @@ export function DetailPanel({
   onClose,
   collapsible,
   isLoading,
+  loadError,
+  onRetry,
+  retrying,
   notFound,
   notFoundIcon,
   notFoundLabel,
@@ -106,6 +112,24 @@ export function DetailPanel({
       </div>
 
       <div className={`flex-1 overflow-y-auto min-h-0 ${minimized ? 'hidden lg:block' : ''}`}>
+        {loadError && (
+          <div
+            role="alert"
+            className="m-3 flex items-center justify-between gap-3 rounded border border-danger/30 p-3 text-xs text-danger"
+          >
+            {t('common.failedToLoad')}
+            {onRetry && (
+              <button
+                type="button"
+                disabled={retrying}
+                onClick={onRetry}
+                className="shrink-0 text-text-normal underline disabled:opacity-50"
+              >
+                {t('common.tryAgain')}
+              </button>
+            )}
+          </div>
+        )}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-2.5 text-text-dim">
             <span className="text-[13px] font-mono">{t('common.loading')}</span>

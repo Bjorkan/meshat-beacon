@@ -1,3 +1,4 @@
+import { ApiError } from '../../../src/api/generated/client';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -240,5 +241,23 @@ describe('NodeDetailPanel observation actions', () => {
     expect(row).toHaveClass('w-full');
     fireEvent.click(row);
     expect(analyze).toHaveBeenCalledWith('abcdef12');
+  });
+});
+
+describe('NodeDetailPanel fetch failures', () => {
+  it('shows a retryable network error without claiming the entity does not exist', async () => {
+    mockGetNode.mockRejectedValueOnce(new Error('offline'));
+    renderPanel();
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Node not found')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await screen.findByText('Timestamps');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('keeps the not-found state for an actual 404', async () => {
+    mockGetNode.mockRejectedValueOnce(new ApiError(404, 'not_found', 'missing'));
+    renderPanel();
+    await screen.findByText('Node not found');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });

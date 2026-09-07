@@ -1,3 +1,4 @@
+import { ApiError } from '../../api/generated/client';
 import { NodePathPackets } from './NodePathPackets';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -120,7 +121,14 @@ export function NodeDetailPanel({
   onViewOnMap,
 }: NodeDetailPanelProps) {
   const { t } = useTranslation();
-  const { data: node, isLoading } = useQuery(nodeQueries.detail(nodeId));
+  const {
+    data: node,
+    isLoading,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery(nodeQueries.detail(nodeId));
+  const loadError = error != null && !(error instanceof ApiError && error.status === 404);
 
   const { data: observations } = useQuery(nodeQueries.observations(nodeId));
 
@@ -134,7 +142,10 @@ export function NodeDetailPanel({
       onClose={onClose}
       collapsible
       isLoading={isLoading}
-      notFound={!node}
+      notFound={!node && !loadError}
+      loadError={loadError}
+      onRetry={() => void refetch()}
+      retrying={isFetching}
       notFoundLabel={t('nodes.notFound')}
       notFoundIcon={
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-border">

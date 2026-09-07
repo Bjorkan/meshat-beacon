@@ -1,3 +1,4 @@
+import { ApiError } from '../../api/generated/client';
 import type { Observer, AdvertObservation } from './types';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
@@ -147,7 +148,14 @@ export function ObserverDetailPanel({
   onViewStats,
 }: ObserverDetailPanelProps) {
   const { t } = useTranslation();
-  const { data: observer, isLoading } = useQuery(observerQueries.detail(observerId));
+  const {
+    data: observer,
+    isLoading,
+    error,
+    isFetching,
+    refetch,
+  } = useQuery(observerQueries.detail(observerId));
+  const loadError = error != null && !(error instanceof ApiError && error.status === 404);
 
   const { data: adverts } = useQuery(observerQueries.adverts(observerId));
 
@@ -167,7 +175,10 @@ export function ObserverDetailPanel({
         />
       }
       isLoading={isLoading}
-      notFound={!observer}
+      notFound={!observer && !loadError}
+      loadError={loadError}
+      onRetry={() => void refetch()}
+      retrying={isFetching}
       notFoundLabel={t('observers.notFound')}
       notFoundIcon={
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="text-border">

@@ -1,3 +1,4 @@
+import { ApiError } from '../../../src/api/generated/client';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -114,5 +115,23 @@ describe('ObserverDetailPanel adverts', () => {
 
     fireEvent.click(await screen.findByText('Node Alpha'));
     expect(onAnalyzePacket).toHaveBeenCalledWith('hash-1');
+  });
+});
+
+describe('ObserverDetailPanel fetch failures', () => {
+  it('shows a retryable network error without claiming the entity does not exist', async () => {
+    mockGetObserver.mockRejectedValueOnce(new Error('offline'));
+    renderPanel();
+    await screen.findByRole('alert');
+    expect(screen.queryByText('Observer not found')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+    await screen.findByText('Timestamps');
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+  it('keeps the not-found state for an actual 404', async () => {
+    mockGetObserver.mockRejectedValueOnce(new ApiError(404, 'not_found', 'missing'));
+    renderPanel();
+    await screen.findByText('Observer not found');
+    expect(screen.queryByRole('alert')).toBeNull();
   });
 });
