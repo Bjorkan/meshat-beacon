@@ -179,6 +179,9 @@ func (s *Store) GetStatsClockDrift(ctx context.Context, iatas []string, limit in
 	}
 	items := make([]api.ClockDriftEntry, 0, len(rows))
 	for _, v := range rows {
+		if v.DeviceClockDriftSeconds == nil || !plausibleClockDrift(*v.DeviceClockDriftSeconds) || !v.LastAdvertAt.Valid {
+			continue
+		}
 		entry := api.ClockDriftEntry{
 			NodeID:            v.ID,
 			NodeName:          v.Name,

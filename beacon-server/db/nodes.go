@@ -284,7 +284,7 @@ func (s *Store) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error
 	// Only repeaters (2) and room servers (3) sign adverts with a device clock worth
 	// checking; omit entirely (not just zero) for other node types or an unmeasured node
 	// per the API contract, so the frontend can distinguish "unknown" from "in sync".
-	if (row.NodeType == 2 || row.NodeType == 3) && row.DeviceClockDriftSeconds != nil && row.LastAdvertAt.Valid {
+	if (row.NodeType == 2 || row.NodeType == 3) && row.DeviceClockDriftSeconds != nil && row.LastAdvertAt.Valid && plausibleClockDrift(*row.DeviceClockDriftSeconds) {
 		drift := int(*row.DeviceClockDriftSeconds)
 		node.ClockDriftSeconds = &drift
 		checkedAt := row.LastAdvertAt.Time.UnixMilli()
@@ -418,4 +418,9 @@ func (s *Store) ReconfirmNeighbors(ctx context.Context) error {
 // query for the observer_owners exclusion and known_routes caveat.
 func (s *Store) DeleteOldNodes(ctx context.Context, cutoff time.Time) error {
 	return s.q.DeleteOldNodes(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
+}
+
+// Match the UI and ranking query: readings beyond 90 days are invalid timestamps.
+func plausibleClockDrift(seconds int32) bool {
+	return seconds >= -7776000 && seconds <= 7776000
 }

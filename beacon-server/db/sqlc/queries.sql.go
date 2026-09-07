@@ -1246,10 +1246,11 @@ FROM nodes n
 LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $4::timestamptz
 WHERE n.node_type IN (2, 3)
   AND n.device_clock_drift_seconds IS NOT NULL
-  AND ABS(n.device_clock_drift_seconds) > $1::int
+  AND n.device_clock_drift_seconds BETWEEN -7776000 AND 7776000
+  AND ABS(n.device_clock_drift_seconds::bigint) > $1::int
   AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= $4::timestamptz))
 GROUP BY n.id, n.name, n.node_type, n.device_clock_drift_seconds, n.last_advert_at
-ORDER BY ABS(n.device_clock_drift_seconds) DESC
+ORDER BY ABS(n.device_clock_drift_seconds::bigint) DESC
 LIMIT $3
 `
 

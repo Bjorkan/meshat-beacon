@@ -104,7 +104,7 @@ export function ClockDriftTab() {
       </div>
       <DataTable
         columns={columns}
-        rows={clockDrift.data}
+        rows={clockDrift.data?.filter((entry) => isPlausibleClockDrift(entry.clockDriftSeconds))}
         rowKey={(e) => e.nodeId}
         selectedKey={null}
         onSelect={() => {}}

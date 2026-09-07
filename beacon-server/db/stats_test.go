@@ -301,3 +301,27 @@ func TestStatsPreserveSubHourWindows(t *testing.T) {
 		})
 	}
 }
+
+func TestGetStatsClockDrift_ExcludesInvalidReadings(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+	rows := []sqlc.GetStatsClockDriftRow{}
+	for _, drift := range []int32{-2147483648, -7776001, -7776000, -600, 600, 7776000, 7776001, 2147483647} {
+		rows = append(rows, sqlc.GetStatsClockDriftRow{DeviceClockDriftSeconds: &drift, LastAdvertAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}})
+	}
+	rows = append(rows, sqlc.GetStatsClockDriftRow{})
+	mock.EXPECT().GetStatsClockDrift(gomock.Any(), gomock.Any()).Return(rows, nil)
+	store := &Store{q: mock, clockDriftThreshold: 5 * time.Minute}
+	items, err := store.GetStatsClockDrift(context.Background(), nil, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 4 {
+		t.Fatalf("expected four plausible readings, got %v", items)
+	}
+	for i, want := range []int{-7776000, -600, 600, 7776000} {
+		if items[i].ClockDriftSeconds != want {
+			t.Errorf("reading %d: got %d, want %d", i, items[i].ClockDriftSeconds, want)
+		}
+	}
+}
