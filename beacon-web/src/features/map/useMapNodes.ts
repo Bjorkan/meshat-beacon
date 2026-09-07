@@ -559,8 +559,6 @@ export function useMapNodes(
     }
     if (map.getLayer(NODES_CLUSTER_LAYER_ID))
       map.setPaintProperty(NODES_CLUSTER_LAYER_ID, 'text-opacity', 1);
-    if (map.getLayer(NODES_CLUSTER_BREAKDOWN_LAYER_ID))
-      map.setPaintProperty(NODES_CLUSTER_BREAKDOWN_LAYER_ID, 'text-opacity', 1);
   }, [mapRef, isReady, effectiveClustered, liveMode, themeKey]);
 
   // Push new node data into the source as it arrives; the source re-clusters automatically. A data
