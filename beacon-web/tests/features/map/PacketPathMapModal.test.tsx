@@ -38,8 +38,9 @@ const detail = {
       iata: 'YYZ',
       heardAt: 0,
       sourceBroker: 'b',
-      pathLength: { raw: '', hashSize: 1, hopCount: 2 },
-      resolvedPath: [hop('a', -79, 43), hop('b', -75, 45)],
+      // 3-byte hashes + nearby Västmanland hops: verifiable and drawable.
+      pathLength: { raw: 'c2', hashSize: 3, hopCount: 2 },
+      resolvedPath: [hop('a', 16.5, 59.6), hop('b', 16.52, 59.61)],
       propagationTimeMs: 100,
     },
     {
@@ -49,8 +50,8 @@ const detail = {
       iata: 'YOW',
       heardAt: 0,
       sourceBroker: 'b',
-      pathLength: { raw: '', hashSize: 1, hopCount: 2 },
-      resolvedPath: [hop('c', -80, 44), hop('d', -76, 46)],
+      pathLength: { raw: 'c2', hashSize: 3, hopCount: 2 },
+      resolvedPath: [hop('c', 16.54, 59.62), hop('d', 16.56, 59.63)],
       propagationTimeMs: 480,
     },
   ],
@@ -99,6 +100,38 @@ describe('PacketPathMapModal', () => {
   it('renders a copy-link button', () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
     expect(screen.getByRole('button', { name: 'Copy path link' })).toBeInTheDocument();
+  });
+
+  it('explains a withheld 1-byte route instead of drawing it', () => {
+    const shortHash = {
+      ...detail,
+      observations: detail.observations.map((o) => ({
+        ...o,
+        pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
+      })),
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={shortHash} onClose={() => {}} />);
+    // no observer rows: every candidate was withheld
+    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*3B hashes/);
+  });
+
+  it('explains an MQTT-stitched route with an impossible leg', () => {
+    const stitched = {
+      ...detail,
+      observations: [
+        {
+          ...detail.observations[0],
+          resolvedPath: [hop('a', 16.5, 59.6), hop('far', 12.57, 55.68)],
+        },
+        {
+          ...detail.observations[1],
+          resolvedPath: [hop('c', 16.54, 59.62), hop('far2', 12.57, 55.68)],
+        },
+      ],
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={stitched} onClose={() => {}} />);
+    expect(screen.getByRole('note')).toHaveTextContent(/too far apart/);
   });
 
   describe('copy path link', () => {

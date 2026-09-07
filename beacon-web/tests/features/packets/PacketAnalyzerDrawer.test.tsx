@@ -46,7 +46,8 @@ function makeDetail(resolvedPath: unknown[]): PacketDetail {
         iata: 'YYZ',
         heardAt: 0,
         sourceBroker: 'b',
-        pathLength: { raw: '02', hashSize: 1, hopCount: resolvedPath.length },
+        // 3-byte hashes with nearby Västmanland coords: verifiable and drawable.
+        pathLength: { raw: 'c2', hashSize: 3, hopCount: resolvedPath.length },
         resolvedPath,
       },
     ],
@@ -90,7 +91,7 @@ describe('PacketAnalyzerDrawer view-path button', () => {
     const onViewPath = vi.fn();
     render(
       <PacketAnalyzerDrawer
-        detail={makeDetail([hop('a', -79, 43), hop('b', -75, 45)])}
+        detail={makeDetail([hop('a', 16.5, 59.6), hop('b', 16.52, 59.61)])}
         selectedObservationId={null}
         onClose={() => {}}
         onViewPath={onViewPath}
@@ -102,16 +103,37 @@ describe('PacketAnalyzerDrawer view-path button', () => {
     expect(onViewPath).toHaveBeenCalledOnce();
   });
 
-  it('disables the button when no path is drawable', () => {
+  it('disables the button only when there is no path and nothing to explain', () => {
     render(
       <PacketAnalyzerDrawer
-        detail={makeDetail([hop('a', -79, 43)])}
+        detail={{ ...makeDetail([]), observations: [] }}
         selectedObservationId={null}
         onClose={() => {}}
         onViewPath={() => {}}
       />,
     );
-    expect(screen.getByRole('button', { name: /view path on map/i })).toBeDisabled();
+    const btn = screen.getByRole('button', { name: /view path on map/i });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute('title', 'No resolved path to map');
+  });
+
+  it('keeps the button enabled for withheld 1-byte paths so the modal can explain', () => {
+    const onViewPath = vi.fn();
+    const detail = makeDetail([hop('a', 16.5, 59.6), hop('b', 16.52, 59.61)]);
+    detail.observations[0]!.pathLength = { raw: '42', hashSize: 1, hopCount: 2 };
+    render(
+      <PacketAnalyzerDrawer
+        detail={detail}
+        selectedObservationId={null}
+        onClose={() => {}}
+        onViewPath={onViewPath}
+      />,
+    );
+    const btn = screen.getByRole('button', { name: /view path on map/i });
+    expect(btn).toBeEnabled();
+    expect(btn).toHaveAttribute('title', 'No verifiable route — why?');
+    fireEvent.click(btn);
+    expect(onViewPath).toHaveBeenCalledOnce();
   });
 });
 

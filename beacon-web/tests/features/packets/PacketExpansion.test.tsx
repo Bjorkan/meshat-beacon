@@ -49,13 +49,18 @@ const resolvedHop = (id: string, lng: number, lat: number) => ({
   nodes: [{ id, publicKey: 'pk', longitude: lng, latitude: lat }],
 });
 
-// a detail with a real drawable path (>=2 located hops), for the "hasPath" enabled cases
+// Nearby Västmanland coords (~1.6 km apart) so legs stay inside the 150 km LoRa
+// cap; the default obs() fixture is 1-byte, which the path map gates out.
+// a detail with a real drawable path (>=3-byte hashes, >=2 located hops), for the "hasPath" enabled cases
 const detailWithPath = (): PacketDetail =>
   ({
     packetHash: 'AA11',
     header: header(),
     observations: [
-      obs(1, { resolvedPath: [resolvedHop('a', -79, 43), resolvedHop('b', -75, 45)] }),
+      obs(1, {
+        resolvedPath: [resolvedHop('a', 16.5, 59.6), resolvedHop('b', 16.52, 59.61)],
+        pathLength: { raw: 'c2', hashSize: 3, hopCount: 2 },
+      }),
     ],
   }) as unknown as PacketDetail;
 
@@ -208,12 +213,33 @@ describe('PacketExpansion', () => {
 
   it('disables View path on map when the loaded detail has no resolvable path', () => {
     usePacketDetail.mockReturnValue({
-      data: { packetHash: 'AA11', header: header(), observations: [obs(1)] },
+      data: { packetHash: 'AA11', header: header(), observations: [] },
     });
     render(<PacketExpansion {...props} />);
     const viewPathBtn = screen.getByRole('button', { name: 'View path on map' });
     expect(viewPathBtn).toBeDisabled();
     expect(viewPathBtn).toHaveAttribute('title', 'No resolved path to map');
+  });
+
+  it('keeps View path on map enabled for withheld 1-byte paths so the modal can explain', () => {
+    // A located 1-byte pair draws nothing, but the modal's short-hash note is
+    // still worth opening — the button points at the explanation, not the map.
+    usePacketDetail.mockReturnValue({
+      data: {
+        packetHash: 'AA11',
+        header: header(),
+        observations: [
+          obs(1, {
+            resolvedPath: [resolvedHop('a', 16.5, 59.6), resolvedHop('b', 16.52, 59.61)],
+            pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
+          }),
+        ],
+      },
+    });
+    render(<PacketExpansion {...props} />);
+    const viewPathBtn = screen.getByRole('button', { name: 'View path on map' });
+    expect(viewPathBtn).not.toBeDisabled();
+    expect(viewPathBtn).toHaveAttribute('title', 'No verifiable route — why?');
   });
 
   it('calls onViewPath when its button is clicked', () => {

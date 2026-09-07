@@ -6,7 +6,7 @@ import { CloseButton } from '../../components/CloseButton';
 import { CopyLinkButton } from '../../components/CopyLinkButton';
 import { formatPropagation } from '../../lib/formatters';
 import { useTheme } from '../../hooks/useTheme';
-import { buildPacketPaths } from './packet-path';
+import { buildPacketPathResult } from './packet-path';
 import { PacketPathMap } from './PacketPathMap';
 import { mapStyleForTheme } from './types';
 
@@ -56,7 +56,23 @@ export function PacketPathMapModal({
   initialSelectedKey?: string | null;
 }) {
   const { t } = useTranslation();
-  const paths = useMemo(() => buildPacketPaths(detail), [detail]);
+  const { paths, blocked } = useMemo(() => buildPacketPathResult(detail), [detail]);
+  const blockedKey =
+    blocked == null
+      ? null
+      : blocked.reason === 'short-hash'
+        ? 'map.pathBlockedShortHash'
+        : blocked.reason === 'out-of-range'
+          ? 'map.pathBlockedOutOfRange'
+          : 'map.pathBlockedUnresolved';
+  const blockedMessage =
+    blocked == null || blockedKey == null
+      ? null
+      : t(blockedKey, {
+          size: blocked.observedHashSize,
+          required: 3,
+          count: blocked.count,
+        });
   const [selectedKey, setSelectedKey] = useState<string | null>(
     // deep-link value that matches a known path isolates it; anything else (incl. "all") shows All
     () =>
@@ -87,6 +103,15 @@ export function PacketPathMapModal({
             <CloseButton onClose={onClose} label={t('map.closePath')} className="-mr-1" />
           </div>
         </div>
+
+        {blockedMessage != null && (
+          <div
+            role="note"
+            className="shrink-0 px-3 py-2 border-b border-warn/20 bg-warn/5 text-[12px] font-mono text-text-normal"
+          >
+            {blockedMessage}
+          </div>
+        )}
 
         <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
           <div className="h-[55vh] max-lg:shrink-0 lg:h-auto lg:flex-1 min-h-0 bg-bg-base">

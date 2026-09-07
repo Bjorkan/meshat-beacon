@@ -5,7 +5,7 @@ import { formatPropagation } from '../../lib/formatters';
 import { Timestamp } from '../../components/Timestamp';
 import { usePacketDetail } from './usePacketDetail';
 import { ObservationTable } from './ObservationTable';
-import { buildPacketPaths } from '../map/packet-path';
+import { buildPacketPathResult } from '../map/packet-path';
 
 // Roughly what fits the scroll cap; observations are unbounded server-side.
 const SKELETON_ROW_CAP = 12;
@@ -37,7 +37,12 @@ export function PacketExpansion({
   // already in ms for formatPropagation -- no *1000 here.
   const spread = packet.lastHeardAt - packet.firstHeardAt;
   const ready = !isLoading && !isError;
-  const hasPath = useMemo(() => (data ? buildPacketPaths(data).length > 0 : false), [data]);
+  // The button stays enabled even when every candidate is withheld (short hashes,
+  // out-of-range legs): the modal then explains why instead of drawing a guess.
+  // Only a packet with nothing at all to say keeps the button disabled.
+  const pathResult = useMemo(() => (data ? buildPacketPathResult(data) : null), [data]);
+  const hasPath = (pathResult?.paths.length ?? 0) > 0;
+  const hasPathInfo = hasPath || pathResult?.blocked != null;
   // The summary already knows the count is zero, so skip the fetch-driven states entirely rather
   // than showing a blank (0-row) skeleton while it loads.
   const noObservations = packet.observationCount === 0;
@@ -81,8 +86,14 @@ export function PacketExpansion({
         <button
           type="button"
           onClick={onViewPath}
-          disabled={!ready || !hasPath}
-          title={hasPath ? undefined : t('packets.noResolvedPath')}
+          disabled={!ready || !hasPathInfo}
+          title={
+            hasPath
+              ? undefined
+              : hasPathInfo
+                ? t('packets.noVerifiablePath')
+                : t('packets.noResolvedPath')
+          }
           className={ACTION_BUTTON_CLASS}
         >
           {t('packets.viewPath')}

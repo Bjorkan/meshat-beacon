@@ -29,7 +29,7 @@ import {
 import { PayloadBreakdown } from './payload-renderers';
 import { ObservationCard } from './ObservationCard';
 import { PathData } from './PathData';
-import { buildPacketPaths } from '../map/packet-path';
+import { buildPacketPathResult } from '../map/packet-path';
 
 function decodePayloadHex(encoded: string): string | null {
   try {
@@ -65,7 +65,9 @@ export function PacketAnalyzerDrawer({
 }: PacketAnalyzerDrawerProps) {
   const { t } = useTranslation();
 
-  const hasPath = useMemo(() => (detail ? buildPacketPaths(detail).length > 0 : false), [detail]);
+  const pathResult = useMemo(() => (detail ? buildPacketPathResult(detail) : null), [detail]);
+  const hasPath = (pathResult?.paths.length ?? 0) > 0;
+  const hasPathInfo = hasPath || pathResult?.blocked != null;
 
   const selectedObs =
     detail?.observations.find((o) => o.id === selectedObservationId) ??
@@ -172,8 +174,14 @@ export function PacketAnalyzerDrawer({
               <button
                 type="button"
                 onClick={onViewPath}
-                disabled={!hasPath || !onViewPath}
-                title={hasPath ? undefined : t('packets.noResolvedPath')}
+                disabled={!hasPathInfo || !onViewPath}
+                title={
+                  hasPath
+                    ? undefined
+                    : hasPathInfo
+                      ? t('packets.noVerifiablePath')
+                      : t('packets.noResolvedPath')
+                }
                 className="w-full flex items-center justify-center gap-1.5 rounded border border-border bg-bg-base px-3 py-1.5 text-[13px] font-mono text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
