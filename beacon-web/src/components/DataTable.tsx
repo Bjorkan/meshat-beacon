@@ -210,7 +210,7 @@ export function DataTable<T>({
       <div className="flex min-h-0 flex-1 flex-col bg-bg-base">
         {mobileSortOptions && mobileSortOptions.length > 0 ? (
           <div
-            className="flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
+            className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
             aria-label={t('common.sort')}
           >
             {mobileSortOptions.map((option) => {
@@ -223,7 +223,7 @@ export function DataTable<T>({
                   onClick={() => applyMobileSort(option)}
                   aria-pressed={selected}
                   aria-busy={sortMode === 'client' && selected && !sortReady ? true : undefined}
-                  className={`flex shrink-0 items-center gap-1 rounded-sm border px-2 py-1 transition-colors ${
+                  className={`flex min-h-9 min-w-0 max-w-full items-center gap-1 rounded-sm border px-2 py-1 text-left [overflow-wrap:anywhere] transition-colors ${
                     selected
                       ? 'border-primary-dim bg-primary/10 text-text-normal'
                       : 'border-border text-text-muted hover:border-primary-dim hover:text-text-normal'
