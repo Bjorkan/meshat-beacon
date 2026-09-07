@@ -48,11 +48,24 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
         className="grid w-full items-center gap-x-2 px-2 py-1 text-left text-[11px] cursor-pointer"
         style={{ gridTemplateColumns: GRID_TEMPLATE }}
       >
+        {/* Fixed square cell so the chevron spins in place: as a grid item a bare
+            text span stretches to the full column and rotating that oblong box
+            makes the glyph orbit. An SVG chevron (symmetric geometry) rotates
+            cleanly, unlike the › text glyph whose side bearings shift it. */}
         <span
-          className={`text-text-dim transition-transform ${expanded ? 'rotate-90' : ''}`}
+          data-testid="expand-chevron"
+          className={`inline-flex h-4 w-4 shrink-0 place-self-center items-center justify-center text-text-dim transition-transform duration-200 origin-center ${expanded ? 'rotate-90' : ''}`}
           aria-hidden
         >
-          ›
+          <svg width="8" height="12" viewBox="0 0 8 12" fill="none" aria-hidden>
+            <path
+              d="M2 1.5 6 6 2 10.5"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </span>
         <span className="font-mono text-xs font-semibold text-primary tracking-wider">
           {formatHex(packet.packetHash)}

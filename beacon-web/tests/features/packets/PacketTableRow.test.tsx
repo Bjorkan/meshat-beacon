@@ -140,7 +140,7 @@ describe('PacketTableRow', () => {
       />,
     );
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByText('›')).toHaveClass('rotate-90');
+    expect(screen.getByTestId('expand-chevron')).toHaveClass('rotate-90');
     expect(screen.getByText('#bc')).toBeInTheDocument();
     expect(screen.getByText('CUSTOM_99')).toBeInTheDocument();
     expect(screen.getByText('Unknown')).toBeInTheDocument();
