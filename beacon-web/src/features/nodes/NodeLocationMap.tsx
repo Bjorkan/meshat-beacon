@@ -27,6 +27,13 @@ export function NodeLocationMap({ node }: { node: Node }) {
     mapRef.current = map;
     map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
     map.addControl(new maplibregl.AttributionControl({ compact: true }));
+    // Tiny panel map: keep the credit as a bare (i) so it never covers the
+    // node dot. MapLibre pops the compact control open on load (adds
+    // .maplibregl-compact-show), so strip it up front; clicking still opens it.
+    // (Same trick as useMapLibre/PacketPathMap.)
+    const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+    attrib?.classList.add('maplibregl-compact');
+    attrib?.classList.remove('maplibregl-compact-show');
     const onLoad = () => {
       if (!map.getSource('node-location')) {
         map.addSource('node-location', {
