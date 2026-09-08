@@ -7,7 +7,7 @@ import { nodeQueries } from '../../api/queries';
 import { useChartColors } from './chartTheme';
 import { buildNeighbourGraph, buildEgoGraph, neighbourGraphOption } from './neighbour-graph';
 import { NeighbourGraph } from './NeighbourGraph';
-import { EmptyState } from '../../components/EmptyState';
+import { Link } from '@tanstack/react-router';
 import { SearchBar, type SearchFieldOption } from '../../components/SearchBar';
 
 // Most-connected nodes rendered; past this the canvas force layout bogs down. Reuses the map's node
@@ -67,32 +67,49 @@ export function NeighbourGraphTab() {
     [ego, graph, colors, t],
   );
 
-  if (isAll)
+  if (isAll || isError || isPaging || graph.nodes.length === 0) {
+    const title = isAll
+      ? t('stats.pickRegion')
+      : isPaging
+        ? t('stats.loadingMesh')
+        : t('stats.neighbourGraph');
+    const message = isAll
+      ? t('stats.pickRegionHint')
+      : isError
+        ? t('stats.failedNodes')
+        : isPaging
+          ? t('stats.nodeCount', { count: loadedCount })
+          : nodes.length === 0
+            ? t('stats.noNodesRegion')
+            : t('stats.noGraphEdges');
     return (
-      <div className="flex flex-1 flex-col items-center justify-center px-4">
-        <EmptyState
-          title={t('stats.pickRegion')}
-          subtitle={t('stats.pickRegionHint')}
-          action={
-            <span className="font-mono text-[11px] text-text-dim">
-              {t('stats.pickRegionAction')}
-            </span>
-          }
-        />
-      </div>
+      <section
+        className="m-4 h-fit max-w-xl space-y-3 rounded-lg border border-border bg-bg-surface p-5"
+        aria-live="polite"
+      >
+        <h2 className="font-semibold text-text-normal">{title}</h2>
+        <p className="text-sm text-text-muted">{message}</p>
+        {!isPaging && <p className="text-sm text-text-muted">{t('stats.pickRegionAction')}</p>}
+        {!isAll && !isPaging && (
+          <Link
+            search={(prev) => ({
+              region: prev.region,
+              regions: prev.regions ?? [],
+              iata: prev.iata ?? [],
+              types: [],
+              routes: [],
+              obs: [],
+              scope: prev.scope ?? [],
+            })}
+            to="/nodes"
+            className="inline-block text-sm text-primary underline"
+          >
+            {t('stats.inspectNodes')}
+          </Link>
+        )}
+      </section>
     );
-  if (isError)
-    return <EmptyState title={t('stats.neighbourGraph')} subtitle={t('stats.failedNodes')} />;
-  // build only once the pager settles, or the force layout would restart on every streamed page
-  if (isPaging)
-    return (
-      <EmptyState
-        title={t('stats.loadingMesh')}
-        subtitle={t('stats.nodeCount', { count: loadedCount })}
-      />
-    );
-  if (graph.nodes.length === 0)
-    return <EmptyState title={t('stats.neighbourGraph')} subtitle={t('stats.noNodesRegion')} />;
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">

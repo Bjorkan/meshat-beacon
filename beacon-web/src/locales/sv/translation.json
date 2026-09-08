@@ -231,7 +231,6 @@
     "pathsThroughHint": "Paket med ett entydigt hopp genom noden i vald region. TRACE-paket ingår inte.",
     "noPathPackets": "Inga matchande paket",
     "morePathPackets": "Läs in fler paket",
-
     "detail": "Noddetaljer",
     "detailLabel": "Noddetaljer",
     "copyLink": "Kopiera nodlänk",
@@ -394,7 +393,9 @@
     "notFoundSubtitle": "Kontrollera adressen eller gå tillbaka till start.",
     "notFoundAction": "Tillbaka till Paket",
     "traceCount": "Visar upp till {{count}} spår",
-    "selectChannelHint": "Öppna en kanal för att läsa meddelanden, se när de hördes och undersöka deras paket."
+    "selectChannelHint": "Öppna en kanal för att läsa meddelanden, se när de hördes och undersöka deras paket.",
+    "noGraphEdges": "Det finns noder i regionen, men inga kopplingar mellan dem har observerats ännu.",
+    "inspectNodes": "Visa noder"
   },
   "packets": {
     "noPackets": "Inga paket",

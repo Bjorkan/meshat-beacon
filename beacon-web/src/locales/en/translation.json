@@ -231,7 +231,6 @@
     "pathsThroughHint": "Packets with an unambiguous hop through this node in the selected region. TRACE packets are excluded.",
     "noPathPackets": "No matching packets",
     "morePathPackets": "Load more packets",
-
     "detail": "Node Detail",
     "detailLabel": "Node detail",
     "copyLink": "Copy node link",
@@ -394,7 +393,9 @@
     "notFoundSubtitle": "Check the address or go back to the start.",
     "notFoundAction": "Back to Packets",
     "traceCount": "Showing up to {{count}} traces",
-    "selectChannelHint": "Open a channel to read messages, see when they were heard and inspect their packets."
+    "selectChannelHint": "Open a channel to read messages, see when they were heard and inspect their packets.",
+    "noGraphEdges": "Nodes exist in this region, but no connections between them have been observed yet.",
+    "inspectNodes": "Inspect nodes"
   },
   "packets": {
     "noPackets": "No packets",
