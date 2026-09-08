@@ -7,6 +7,7 @@
     "tagline": "MeshCore Network Analyzer"
   },
   "common": {
+    "retry": "Retry",
     "loading": "Loading…",
     "failedToLoad": "Failed to load",
     "noMatches": "No matches",
@@ -253,6 +254,8 @@
     "noAdvertsHeard": "No adverts heard"
   },
   "map": {
+    "loadingLocation": "Loading location map…",
+    "failedLocation": "The basemap could not load. The location is shown as coordinates below.",
     "noDrawablePaths": "No verified route to display",
     "noDrawablePathsHint": "This packet has no route with sufficient location information.",
     "settings": "Map Settings",

@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import maplibregl from 'maplibre-gl';
 import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import { mapStyleForTheme, resolveMapStyle } from '../map/types';
@@ -8,6 +9,20 @@ import type { Node } from './types';
 // Self-contained single-node map for the node detail Location section. Dedicated MapLibre instance
 // showing only this node: no /nodes list, no neighbors, no borders, no packet flow, no clustering.
 export function NodeLocationMap({ node }: { node: Node }) {
+  const { themeId } = useTheme();
+  const [attempt, setAttempt] = useState(0);
+  return (
+    <LocationCanvas
+      key={`${themeId}:${attempt}`}
+      node={node}
+      onRetry={() => setAttempt((n) => n + 1)}
+    />
+  );
+}
+
+function LocationCanvas({ node, onRetry }: { node: Node; onRetry: () => void }) {
+  const { t } = useTranslation();
+  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const { themeId } = useTheme();
@@ -34,7 +49,13 @@ export function NodeLocationMap({ node }: { node: Node }) {
     const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
     attrib?.classList.add('maplibregl-compact');
     attrib?.classList.remove('maplibregl-compact-show');
+    let failed = false;
+    const onError = () => {
+      failed = true;
+      setStatus('error');
+    };
     const onLoad = () => {
+      if (!failed) setStatus('ready');
       if (!map.getSource('node-location')) {
         map.addSource('node-location', {
           type: 'geojson',
@@ -65,7 +86,12 @@ export function NodeLocationMap({ node }: { node: Node }) {
       }
     };
     map.on('load', onLoad);
+    map.on('error', onError);
+    const timeout = window.setTimeout(() => {
+      if (!map.loaded()) onError();
+    }, 15000);
     return () => {
+      window.clearTimeout(timeout);
       map.remove();
       mapRef.current = null;
     };
@@ -97,10 +123,30 @@ export function NodeLocationMap({ node }: { node: Node }) {
   }, [node.lat, node.lng]);
 
   return (
-    <div
-      ref={containerRef}
-      data-testid="node-location-map"
-      className="h-36 w-full overflow-hidden rounded-md border border-border"
-    />
+    <div className="space-y-1">
+      <div className="relative h-36 overflow-hidden rounded-md border border-border bg-bg-base">
+        <div ref={containerRef} data-testid="node-location-map" className="h-full w-full" />
+        {status !== 'ready' && (
+          <div
+            className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-bg-base/95 px-3 text-center font-mono text-xs text-text-muted"
+            role="status"
+          >
+            <span>{t(status === 'loading' ? 'map.loadingLocation' : 'map.failedLocation')}</span>
+            {status === 'error' && (
+              <button
+                type="button"
+                className="rounded border border-border px-3 py-1.5 text-text-normal hover:bg-bg-raised"
+                onClick={onRetry}
+              >
+                {t('common.retry')}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+      <p className="font-mono text-xs text-text-muted">
+        {node.lat?.toFixed(5)}, {node.lng?.toFixed(5)}
+      </p>
+    </div>
   );
 }

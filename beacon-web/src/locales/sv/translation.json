@@ -7,6 +7,7 @@
     "tagline": "Nätverksanalys för MeshCore"
   },
   "common": {
+    "retry": "Försök igen",
     "loading": "Laddar…",
     "failedToLoad": "Kunde inte läsa in",
     "noMatches": "Inga träffar",
@@ -253,6 +254,8 @@
     "noAdvertsHeard": "Inga adverts hörda"
   },
   "map": {
+    "loadingLocation": "Laddar positionskarta…",
+    "failedLocation": "Bakgrundskartan kunde inte laddas. Positionen visas som koordinater nedan.",
     "noDrawablePaths": "Ingen verifierad rutt att visa",
     "noDrawablePathsHint": "Paketets observationer innehåller ingen rutt med tillräckliga positionsuppgifter.",
     "settings": "Kartinställningar",
