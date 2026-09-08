@@ -6,7 +6,7 @@ import type { PaddingOptions } from 'maplibre-gl';
 export function mapOverlayInsets(width: number, height: number, live: boolean): PaddingOptions {
   const narrow = width < 640;
   return {
-    top: Math.min(84, height * 0.2),
+    top: Math.min(112, height * 0.2),
     left: Math.min(40, width * 0.1),
     right: live && !narrow ? Math.min(396, width * 0.4) : Math.min(48, width * 0.12),
     bottom: Math.min(

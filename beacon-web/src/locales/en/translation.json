@@ -254,6 +254,13 @@
     "noAdvertsHeard": "No adverts heard"
   },
   "map": {
+    "legend": "Map legend",
+    "legendClusters": "Numbered circle: nodes in the cluster.",
+    "legendSelected": "Selected node and its neighbors",
+    "legendBorders": "IATA borders",
+    "legendLive": "Animated arrow: packet direction",
+    "legendLinks": "Link color: SNR when signal data exists, otherwise observation count.",
+    "legendLinkFallback": "Blue link: no measurements. Older links appear fainter.",
     "loadingLocation": "Loading location map…",
     "failedLocation": "The basemap could not load. The location is shown as coordinates below.",
     "noDrawablePaths": "No verified route to display",

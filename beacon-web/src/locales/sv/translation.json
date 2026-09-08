@@ -254,6 +254,13 @@
     "noAdvertsHeard": "Inga adverts hörda"
   },
   "map": {
+    "legend": "Teckenförklaring",
+    "legendClusters": "Cirkel med siffra: antal noder i klustret.",
+    "legendSelected": "Markerad nod och dess grannar",
+    "legendBorders": "IATA-gränser",
+    "legendLive": "Animerad pil: paketets riktning",
+    "legendLinks": "Länkfärg: SNR när signaldata finns, annars antal observationer.",
+    "legendLinkFallback": "Blå länk: inga mätvärden. Äldre länkar visas svagare.",
     "loadingLocation": "Laddar positionskarta…",
     "failedLocation": "Bakgrundskartan kunde inte laddas. Positionen visas som koordinater nedan.",
     "noDrawablePaths": "Ingen verifierad rutt att visa",

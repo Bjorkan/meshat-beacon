@@ -23,6 +23,7 @@ import {
   neighborRenderMode,
   type NeighborEdgeProps,
 } from './node-geojson';
+import { MapLegend } from './MapLegend';
 import { MapSettingsPanel } from './MapSettingsPanel';
 import { buildMapParams, type MapViewSnapshot, type ParsedMapView } from './map-url';
 import {
@@ -311,7 +312,7 @@ export function MapView({
           screens and stacks below settings on narrow ones. Separate absolute slots (not one
           shared flex row) so each keeps its own anchor and they can never overlap. */}
       <div className="pointer-events-none absolute inset-x-3 top-3 bottom-16 z-10 sm:inset-x-3">
-        <div className="pointer-events-auto absolute left-0 top-0 flex min-w-0 max-w-[calc(100%-3.5rem)] sm:max-w-[240px]">
+        <div className="pointer-events-auto absolute left-0 top-0 flex max-h-full min-w-0 max-w-[calc(100%-3.5rem)] flex-col gap-2 overflow-y-auto sm:max-w-[240px]">
           <MapSettingsPanel
             typeFilter={typeFilter}
             onTypeChange={handleTypeChange}
@@ -323,6 +324,13 @@ export function MapView({
             borders={borders}
             onBordersChange={handleBordersChange}
             buildShareParams={buildShareParams}
+          />
+          <MapLegend
+            borders={borders}
+            neighbors={neighborEdges.features.length > 0}
+            live={packetFlow}
+            clustered={clustered && !packetFlow}
+            selected={!!selectedNodeId}
           />
         </div>
         {packetFlow && (
