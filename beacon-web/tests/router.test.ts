@@ -103,7 +103,7 @@ describe('application routes', () => {
     expect(routeSearch(nodes)).toMatchObject({
       nq: 'alice',
       nsf: 'pubkey',
-      nt: 'REPEATER',
+      nt: 'repeater',
       np: 'true',
       ntr: 'false',
       ns: '#east',
@@ -164,13 +164,13 @@ describe('application routes', () => {
     const first = await routerAt('/nodes');
     await first.navigate({
       to: '/nodes',
-      search: (prev) => ({ ...prev, nq: 'alice', nt: 'REPEATER', nsort: 'radio', ndir: 'desc' }),
+      search: (prev) => ({ ...prev, nq: 'alice', nt: 'repeater', nsort: 'radio', ndir: 'desc' }),
     });
 
     const reloaded = await routerAt(first.state.location.href);
     expect(routeSearch(reloaded)).toMatchObject({
       nq: 'alice',
-      nt: 'REPEATER',
+      nt: 'repeater',
       nsort: 'radio',
       ndir: 'desc',
     });
@@ -178,7 +178,7 @@ describe('application routes', () => {
 
   it('restores list filters and sorting through Back and Forward', async () => {
     const router = await routerAt('/nodes');
-    await router.navigate({ to: '/nodes', search: (prev) => ({ ...prev, nt: 'REPEATER' }) });
+    await router.navigate({ to: '/nodes', search: (prev) => ({ ...prev, nt: 'repeater' }) });
     await router.navigate({
       to: '/nodes',
       search: (prev) => ({ ...prev, nsort: 'radio', ndir: 'desc' }),
@@ -187,19 +187,19 @@ describe('application routes', () => {
     router.history.back();
     await router.load();
     expect(routeSearch(router)).toMatchObject({
-      nt: 'REPEATER',
+      nt: 'repeater',
       nsort: undefined,
       ndir: undefined,
     });
 
     router.history.forward();
     await router.load();
-    expect(routeSearch(router)).toMatchObject({ nt: 'REPEATER', nsort: 'radio', ndir: 'desc' });
+    expect(routeSearch(router)).toMatchObject({ nt: 'repeater', nsort: 'radio', ndir: 'desc' });
   });
 
   it('keeps repeated text-search replacements out of browser history', async () => {
     const router = await routerAt('/nodes');
-    await router.navigate({ to: '/nodes', search: (prev) => ({ ...prev, nt: 'REPEATER' }) });
+    await router.navigate({ to: '/nodes', search: (prev) => ({ ...prev, nt: 'repeater' }) });
     for (const nq of ['a', 'al', 'ali', 'alice']) {
       await router.navigate({ to: '/nodes', replace: true, search: (prev) => ({ ...prev, nq }) });
     }
@@ -210,3 +210,18 @@ describe('application routes', () => {
     expect(routeSearch(router).nq).toBeUndefined();
   });
 });
+
+it.each(['2', 'unknown_type', '%5B%22repeater%22%5D'])(
+  'drops invalid node type deep links: %s',
+  async (value) => {
+    const router = await routerAt(`/nodes?nt=${value}`);
+    expect(routeSearch(router).nt).toBeUndefined();
+  },
+);
+it.each(['companion', 'repeater', 'room_server', 'sensor'])(
+  'preserves canonical node type %s',
+  async (value) => {
+    const router = await routerAt(`/nodes?nt=${value}`);
+    expect(routeSearch(router).nt).toBe(value);
+  },
+);

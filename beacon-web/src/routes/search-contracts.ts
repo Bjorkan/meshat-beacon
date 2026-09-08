@@ -1,3 +1,4 @@
+import { NODE_TYPE_NAMES } from '../lib/node-types';
 import { parseMapViewSearch } from '../features/map/map-url';
 import type { StatsRange, StatsTab } from '../features/stats/types';
 
@@ -24,7 +25,7 @@ export function validateNodesSearch(search: Record<string, unknown>): NodesSearc
   return {
     nq: searchString(search.nq),
     nsf: oneOf(search.nsf, ['name', 'pubkey'] as const),
-    nt: searchString(search.nt),
+    nt: oneOf(typeof search.nt === 'string' ? search.nt.toLowerCase() : search.nt, NODE_TYPE_NAMES),
     np: oneOf(search.np, ['true', 'false'] as const),
     ntr: oneOf(search.ntr, ['true', 'false'] as const),
     ns: searchString(search.ns),
