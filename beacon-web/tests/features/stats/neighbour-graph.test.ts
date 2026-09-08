@@ -4,7 +4,6 @@ import {
   buildEgoGraph,
   obsColor,
   ageOpacity,
-  labelSize,
   nodeNameMatches,
 } from '../../../src/features/stats/neighbour-graph';
 import type { NodeSummary, NodeNeighbor } from '../../../src/features/nodes/types';
@@ -179,21 +178,20 @@ describe('buildNeighbourGraph', () => {
     expect(g.links).toEqual([]);
   });
 
-  it('gives busier hubs a larger label font than quieter ones', () => {
+  it('keeps dense overview graphs free of persistent labels', () => {
+    const ids = Array.from({ length: 100 }, (_, i) => String(i));
     const g = buildNeighbourGraph(
-      [
-        node({ id: 'hub', knownNeighborCount: 40, neighborIds: ['small', 'e1', 'e2'] }),
-        node({ id: 'small', knownNeighborCount: 2, neighborIds: ['hub'] }),
-        node({ id: 'e1', knownNeighborCount: 1, neighborIds: ['hub'] }),
-        node({ id: 'e2', knownNeighborCount: 1, neighborIds: ['hub'] }),
-      ],
-      10,
+      ids.map((id) =>
+        node({
+          id,
+          name: `Long overlapping station name ${id}`,
+          neighborIds: ids.filter((other) => other !== id),
+        }),
+      ),
+      100,
     );
-    const hub = g.nodes.find((n) => n.id === 'hub')!;
-    const small = g.nodes.find((n) => n.id === 'small')!;
-    expect(hub.label?.show).toBe(true);
-    expect(small.label?.show).toBe(true);
-    expect(hub.label!.fontSize!).toBeGreaterThan(small.label!.fontSize!);
+    expect(g.nodes).toHaveLength(100);
+    expect(g.nodes.every((n) => !n.label?.show)).toBe(true);
   });
 
   it('renders only nodes that participate in a displayed edge', () => {
@@ -229,19 +227,6 @@ describe('nodeNameMatches', () => {
   it('treats an empty/whitespace query as no match', () => {
     expect(nodeNameMatches('anything', '')).toBe(false);
     expect(nodeNameMatches('anything', '   ')).toBe(false);
-  });
-});
-
-describe('labelSize', () => {
-  it('grows with degree and is largest at the max', () => {
-    expect(labelSize(40, 40)).toBeGreaterThan(labelSize(5, 40));
-    expect(labelSize(20, 40)).toBeGreaterThanOrEqual(labelSize(5, 40));
-  });
-
-  it('clamps to a sane font range and survives maxDegree 0', () => {
-    expect(labelSize(0, 0)).toBeGreaterThanOrEqual(9);
-    expect(labelSize(0, 40)).toBeGreaterThanOrEqual(9);
-    expect(labelSize(1000, 1000)).toBeLessThanOrEqual(16);
   });
 });
 
@@ -290,9 +275,9 @@ describe('buildEgoGraph', () => {
     expect(g.nodes[0]!.category).toBe(0); // companion
   });
 
-  it('shows a label on every node', () => {
+  it('labels only the focused node persistently', () => {
     const g = buildEgoGraph(center, [neighbor({ id: 'a' })], NOW);
-    expect(g.nodes.every((n) => n.label?.show)).toBe(true);
+    expect(g.nodes.map((n) => n.label?.show)).toEqual([true, false]);
   });
 
   it('folds per-iata rows: obs summed, freshest lastSeen wins', () => {

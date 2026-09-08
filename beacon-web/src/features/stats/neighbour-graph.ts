@@ -37,21 +37,10 @@ export interface NeighbourGraph {
 const OTHER_CATEGORY = NODE_TYPE_NAMES.length;
 const MIN_SIZE = 6;
 const MAX_SIZE = 34;
-const HUB_LABELS = 30; // only the biggest hubs get a persistent label, else 1000 nodes are a text wall
-const MIN_LABEL = 9;
-const MAX_LABEL = 16;
-
 // Case-insensitive substring match for the graph search; an empty query matches nothing.
 export function nodeNameMatches(name: string, query: string): boolean {
   const q = query.trim().toLowerCase();
   return q.length > 0 && name.toLowerCase().includes(q);
-}
-
-// Busier hubs get a louder label; sqrt so a few giant hubs don't dwarf the rest of the labelled set.
-export function labelSize(degree: number, maxDegree: number): number {
-  if (maxDegree <= 0) return MIN_LABEL;
-  const t = Math.sqrt(degree) / Math.sqrt(maxDegree);
-  return Math.round(MIN_LABEL + (MAX_LABEL - MIN_LABEL) * t);
 }
 
 // Keep the top-`cap` most-connected nodes and their internal edges. Unlike the map's edge builder we
@@ -98,16 +87,6 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
   participants.forEach((n, i) => participantIndex.set(n.id, i));
   const maxDegree = participants.reduce((m, n) => Math.max(m, retainedDegree.get(n.id) ?? 0), 0);
 
-  const labelIds = new Set(
-    [...participants]
-      .sort(
-        (a, b) =>
-          (retainedDegree.get(b.id) ?? 0) - (retainedDegree.get(a.id) ?? 0) ||
-          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      )
-      .slice(0, HUB_LABELS)
-      .map((n) => n.id),
-  );
   const graphNodes: GraphNode[] = participants.map((n) => {
     const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(n.nodeTypeName);
     const degree = retainedDegree.get(n.id) ?? 0;
@@ -118,9 +97,7 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
       nodeTypeName: n.nodeTypeName,
       degree,
       symbolSize: symbolSize(degree, maxDegree),
-      label: labelIds.has(n.id)
-        ? { show: true, fontSize: labelSize(degree, maxDegree) }
-        : undefined,
+      label: { show: false },
     };
   });
 
@@ -171,7 +148,7 @@ function egoNode(
     nodeTypeName,
     degree,
     symbolSize: size,
-    label: { show: true },
+    label: { show: size === CENTER_SIZE },
   };
 }
 
@@ -311,7 +288,7 @@ export function neighbourGraphOption(
               friction: 0.2,
               layoutAnimation: !big,
             },
-        emphasis: { focus: 'none', scale: false },
+        emphasis: { focus: 'none', scale: false, label: { show: true, fontSize: 12 } },
         label: {
           show: false,
           position: 'right',

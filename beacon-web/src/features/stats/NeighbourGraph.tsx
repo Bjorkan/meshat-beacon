@@ -45,13 +45,14 @@ export function NeighbourGraph({ option, nodes, search, onSelect }: Props) {
     const chart = chartRef.current;
     if (!chart || chart.isDisposed()) return;
     const q = search.trim();
+    const showMatchLabels = nodes.filter((n) => nodeNameMatches(n.name, q)).length <= 5;
     const data = nodes.map((n) => {
       if (!q) return { ...n, itemStyle: { opacity: 1 }, label: n.label ?? { show: false } };
       const match = nodeNameMatches(n.name, q);
       return {
         ...n,
         itemStyle: { opacity: match ? 1 : 0.06 },
-        label: match ? { show: true, fontSize: 13 } : { show: false },
+        label: match && showMatchLabels ? { show: true, fontSize: 13 } : { show: false },
       };
     });
     chart.setOption({ series: [{ data }] }, { notMerge: false });
