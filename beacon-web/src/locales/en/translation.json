@@ -397,7 +397,10 @@
     "traceCount": "Showing up to {{count}} traces",
     "selectChannelHint": "Open a channel to read messages, see when they were heard and inspect their packets.",
     "noGraphEdges": "Nodes exist in this region, but no connections between them have been observed yet.",
-    "inspectNodes": "Inspect nodes"
+    "inspectNodes": "Inspect nodes",
+    "snapshotWindow": "Snapshot · Last {{hours}} hours",
+    "rangeAnalysis": "Traffic over time",
+    "chartTimeRange": "Traffic chart time range"
   },
   "packets": {
     "noPackets": "No packets",

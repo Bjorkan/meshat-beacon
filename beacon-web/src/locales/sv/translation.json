@@ -397,7 +397,10 @@
     "traceCount": "Visar upp till {{count}} spår",
     "selectChannelHint": "Öppna en kanal för att läsa meddelanden, se när de hördes och undersöka deras paket.",
     "noGraphEdges": "Det finns noder i regionen, men inga kopplingar mellan dem har observerats ännu.",
-    "inspectNodes": "Visa noder"
+    "inspectNodes": "Visa noder",
+    "snapshotWindow": "Ögonblicksbild · Senaste {{hours}} timmarna",
+    "rangeAnalysis": "Trafik över tid",
+    "chartTimeRange": "Tidsintervall för trafikdiagram"
   },
   "packets": {
     "noPackets": "Inga paket",

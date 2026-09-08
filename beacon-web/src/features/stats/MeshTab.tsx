@@ -1,3 +1,5 @@
+import { Segmented } from './Segmented';
+import { RANGE_OPTIONS } from './StatsSubHeader';
 import { nodeTypeLabel } from '../../lib/node-types';
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
@@ -50,6 +52,7 @@ function aggregateByHour(points: ObservationPoint[]) {
 
 interface MeshTabProps {
   range: StatsRange;
+  onRangeChange: (range: StatsRange) => void;
   onSelectObserver: (observerId: string) => void;
 }
 
@@ -109,7 +112,7 @@ function scopeMobileSortOptions(t: TFunction): MobileSortOption[] {
   ];
 }
 
-export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
+export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps) {
   const { t } = useTranslation();
   const colors = useChartColors();
   const overview = useStatsOverview();
@@ -238,6 +241,9 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5 px-4 py-4">
+      <h2 className="text-sm font-semibold text-text-normal">
+        {t('stats.snapshotWindow', { hours: ov?.windowHours ?? 24 })}
+      </h2>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard
           label={t('stats.totalPackets')}
@@ -269,6 +275,15 @@ export function MeshTab({ range, onSelectObserver }: MeshTabProps) {
         />
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+        <h2 className="text-sm font-semibold text-text-normal">{t('stats.rangeAnalysis')}</h2>
+        <Segmented
+          options={RANGE_OPTIONS}
+          value={range}
+          onChange={(value) => onRangeChange(value as StatsRange)}
+          ariaLabel={t('stats.chartTimeRange')}
+        />
+      </div>
       <ChartCard
         title={`${t('stats.observations')} · ${range}`}
         height={200}

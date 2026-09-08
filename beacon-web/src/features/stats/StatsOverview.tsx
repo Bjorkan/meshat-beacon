@@ -31,7 +31,13 @@ export function StatsOverview({ statsTab: tab, range, observerId, onPatch }: Sta
     <div className="flex min-h-0 flex-1 flex-col">
       <StatsSubHeader tab={tab} onTabChange={handleTab} range={range} onRangeChange={handleRange} />
       <div className="min-h-0 flex-1 overflow-y-auto">
-        {tab === 'mesh' && <MeshTab range={range} onSelectObserver={handleSelectObserver} />}
+        {tab === 'mesh' && (
+          <MeshTab
+            onRangeChange={handleRange}
+            range={range}
+            onSelectObserver={handleSelectObserver}
+          />
+        )}
         {tab === 'talkers' && <TalkersTab range={range} />}
         {tab === 'clockdrift' && <ClockDriftTab />}
         {tab === 'observer' && (

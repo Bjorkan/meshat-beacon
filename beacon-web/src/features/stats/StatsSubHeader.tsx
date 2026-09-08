@@ -95,7 +95,7 @@ function GraphIcon() {
   );
 }
 
-const RANGE_OPTIONS = [
+export const RANGE_OPTIONS = [
   { value: '24h', label: '24h' },
   { value: '7d', label: '7d' },
   { value: '30d', label: '30d' },
@@ -143,7 +143,7 @@ export function StatsSubHeader({ tab, onTabChange, range, onRangeChange }: Props
         </div>
       )}
       {/* graph is topology and clock-drift is each node's latest reading — neither is time-windowed */}
-      {tab !== 'graph' && tab !== 'clockdrift' && (
+      {(tab === 'observer' || tab === 'talkers') && (
         <Segmented
           className="shrink-0"
           options={RANGE_OPTIONS}
