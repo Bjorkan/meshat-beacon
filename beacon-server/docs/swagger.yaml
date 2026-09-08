@@ -938,8 +938,8 @@ definitions:
         description: |-
           SuggestedTitle is the MeshCore suggested-settings title for the preset's
           normalized (frequency, bandwidth, SF) triple. Coding rate never affects
-          naming. Distinct upstream aliases for one triple join deterministically
-          ("A / B"). Absent for unknown configurations — callers keep the raw label.
+          naming. Absent for unknown or ambiguous configurations — callers keep
+          the raw label.
         type: string
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RawHop:

@@ -3812,7 +3812,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "suggestedTitle": {
-                    "description": "SuggestedTitle is the MeshCore suggested-settings title for the preset's\nnormalized (frequency, bandwidth, SF) triple. Coding rate never affects\nnaming. Distinct upstream aliases for one triple join deterministically\n(\"A / B\"). Absent for unknown configurations — callers keep the raw label.",
+                    "description": "SuggestedTitle is the MeshCore suggested-settings title for the preset's\nnormalized (frequency, bandwidth, SF) triple. Coding rate never affects\nnaming. Absent for unknown or ambiguous configurations — callers keep\nthe raw label.",
                     "type": "string"
                 }
             }

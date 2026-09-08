@@ -9,8 +9,8 @@
 // Display naming is keyed by normalized (frequency, bandwidth, spreading factor) only.
 // Coding rate is deliberately excluded from the naming key: two radios with the same
 // frequency/bandwidth/SF share the same suggested title even when their coding rates differ.
-// Multiple distinct titles sharing one triple are joined deterministically as "A / B"
-// (sorted, deduplicated) rather than letting upstream array order decide.
+// Multiple distinct titles sharing one triple are ambiguous: callers retain the raw
+// radio configuration instead of inventing a combined catalogue title.
 package radiopreset
 
 import (
@@ -184,7 +184,7 @@ func keyFor(f, b float64, sf int) (radioKey, bool) {
 
 // Match resolves a preset by normalized frequency/bandwidth/SF. Coding rate never
 // participates: entries differing only by coding rate share one title. Genuinely
-// distinct titles for one triple join deterministically ("A / B"); "" means unknown.
+// distinct titles for one triple return "", as do unknown configurations.
 func (c *Catalogue) Match(freqMHz, bwKHz float64, sf int) string {
 	if c == nil {
 		return ""
@@ -193,7 +193,11 @@ func (c *Catalogue) Match(freqMHz, bwKHz float64, sf int) string {
 	if !valid {
 		return ""
 	}
-	return strings.Join(c.titles[key], " / ")
+	titles := c.titles[key]
+	if len(titles) != 1 {
+		return ""
+	}
+	return titles[0]
 }
 
 // Len reports the catalogue size (tests and startup logging).

@@ -46,15 +46,15 @@ func loadFixture(t *testing.T) *Catalogue {
 	return cat
 }
 
-func TestMatch_IgnoresCodingRate(t *testing.T) {
+func TestMatch_AmbiguousAliasesUseRawFallback(t *testing.T) {
 	cat := loadFixture(t)
 	// Switzerland and EU/UK (Narrow) share 869.618/62.5/SF8 with different coding
-	// rates; both must resolve to the same joined title.
-	if got := cat.Match(869.618, 62.5, 8); got != "EU/UK (Narrow) / Switzerland" {
-		t.Fatalf("CR variants must share a title, got %q", got)
+	// rates; neither may resolve to an invented combined title.
+	if got := cat.Match(869.618, 62.5, 8); got != "" {
+		t.Fatalf("ambiguous variants must use raw fallback, got %q", got)
 	}
 	// float32 round-trips from the REAL columns must match the decimal catalogue text.
-	if got := cat.Match(869.6179809570312, 62.5, 8); got != "EU/UK (Narrow) / Switzerland" {
+	if got := cat.Match(869.6179809570312, 62.5, 8); got != "" {
 		t.Fatalf("float32 precision must not break matching, got %q", got)
 	}
 	// SF distinguishes triples even when frequency/bandwidth agree.
@@ -65,7 +65,7 @@ func TestMatch_IgnoresCodingRate(t *testing.T) {
 
 func TestMatch_NumericNormalization(t *testing.T) {
 	cat := loadFixture(t)
-	if got := cat.Match(869.618, 62.500, 8); got == "" {
+	if got := cat.Match(869.6179809570312, 62.500, 7); got != "Portugal 868" {
 		t.Fatal("equivalent integer/decimal representations must match")
 	}
 	if cat.Len() != 4 {
@@ -146,5 +146,14 @@ func TestHTTPFetcherHonorsDeadline(t *testing.T) {
 	})
 	if cat.Len() != 0 {
 		t.Fatal("expected timeout fallback")
+	}
+}
+
+func TestMatch_DuplicateTitleIgnoresCodingRate(t *testing.T) {
+	cat := Load(context.Background(), func(context.Context, string) ([]byte, error) {
+		return []byte(strings.ReplaceAll(fixture, "Switzerland", "EU/UK (Narrow)")), nil
+	})
+	if got := cat.Match(869.618, 62.5, 8); got != "EU/UK (Narrow)" {
+		t.Fatalf("duplicate titles across CR variants must resolve once, got %q", got)
 	}
 }
