@@ -69,15 +69,15 @@ export function ObserverFilterBar({
         onChange={onStatusChange}
         fullWidth={fullWidth}
       />
-      {typeOptions.length > 0 && (
-        <SelectDropdown
-          label={t('filters.type')}
-          options={typeOptions.map((type) => ({ value: type, label: type }))}
-          value={typeFilter}
-          onChange={onTypeChange}
-          fullWidth={fullWidth}
-        />
-      )}
+      <SelectDropdown
+        label={t('filters.type')}
+        options={[...new Set([...typeOptions, ...(typeFilter ? [typeFilter] : [])])].map(
+          (type) => ({ value: type, label: type }),
+        )}
+        value={typeFilter}
+        onChange={onTypeChange}
+        fullWidth={fullWidth}
+      />
       {brokerOptions.length > 0 && (
         <SelectDropdown
           label={t('filters.broker')}
