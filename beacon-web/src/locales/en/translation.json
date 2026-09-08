@@ -385,6 +385,8 @@
     "selectChannelHint": "Open a channel to read messages, see when they were heard and inspect their packets."
   },
   "packets": {
+    "noPackets": "No packets",
+    "noMatchesHint": "No packets match the search and selected filters. Clear filters to show packets in the selected scope.",
     "noun": "packets",
     "analyzer": "Packet Analyzer",
     "analyzerLabel": "Packet analyzer",

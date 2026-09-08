@@ -200,10 +200,10 @@ describe('PacketList loading feedback', () => {
     expect(screen.getByRole('status').textContent).toContain('Failed to load packets');
   });
 
-  it('renders neither pill nor skeletons when idle', async () => {
+  it('renders an explicit empty state without pill or skeletons when idle', async () => {
     await renderList();
 
-    expect(screen.getByTestId('expanded')).toBeTruthy();
+    expect(screen.getByText('No packets')).toBeInTheDocument();
     expect(screen.queryByRole('status')).toBeNull();
   });
 });
@@ -382,4 +382,14 @@ describe('PacketList live observation handoff', () => {
 
     expect(invalidate).not.toHaveBeenCalled();
   });
+});
+
+it('explains zero-match searches and offers to clear filters', async () => {
+  usePackets.mockImplementation(basePackets);
+  await renderList('/?q=nomatch');
+  expect(screen.getByText('No matches')).toBeInTheDocument();
+  const clear = screen.getAllByRole('button', { name: 'Clear all' }).at(-1)!;
+  fireEvent.click(clear);
+  await waitFor(() => expect(usePackets).toHaveBeenLastCalledWith(false, null));
+  expect(screen.queryByText('No matches')).toBeNull();
 });

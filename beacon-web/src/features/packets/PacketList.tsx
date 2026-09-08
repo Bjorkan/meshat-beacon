@@ -10,6 +10,7 @@ import { useWsPacketHandler, useWsLaggedHandler } from '../../hooks/useWsHandler
 import { PacketVirtualList } from './PacketVirtualList';
 import { FilterBar } from '../../components/FilterBar';
 import { LoadingPill } from '../../components/LoadingPill';
+import { EmptyState } from '../../components/EmptyState';
 import { SkeletonRows } from '../../components/SkeletonRows';
 import { PAYLOAD_TYPE_NAMES, ROUTE_TYPE_NAMES } from '../../types/enums';
 import type { WsManager } from '../../api/ws-manager';
@@ -175,6 +176,13 @@ export function PacketList({
   }, [wsManager]);
 
   const bannerCount = isScrolledAway ? newPacketCount : 0;
+  const hasFilters = !!(
+    filters.search ||
+    filters.payloadTypes.length ||
+    filters.routeTypes.length ||
+    filters.observers.length ||
+    filters.scopes.length
+  );
 
   // Remount the list (fresh at the top, no stale scroll anchor for the virtualizer to preserve)
   // when returning to the top with packets held while away — a big prepend into the live list
@@ -253,6 +261,22 @@ export function PacketList({
 
         {isLoading && packets.length === 0 ? (
           <SkeletonRows />
+        ) : packets.length === 0 && !isError ? (
+          <EmptyState
+            title={t(hasFilters ? 'common.noMatches' : 'packets.noPackets')}
+            subtitle={hasFilters ? t('packets.noMatchesHint') : undefined}
+            action={
+              hasFilters ? (
+                <button
+                  type="button"
+                  className="rounded border border-border px-3 py-2 text-text-normal hover:bg-bg-raised"
+                  onClick={clearFilters}
+                >
+                  {t('common.clearAll')}
+                </button>
+              ) : undefined
+            }
+          />
         ) : (
           <PacketVirtualList
             key={listResetKey}

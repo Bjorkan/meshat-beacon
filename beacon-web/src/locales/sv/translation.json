@@ -385,6 +385,8 @@
     "selectChannelHint": "Öppna en kanal för att läsa meddelanden, se när de hördes och undersöka deras paket."
   },
   "packets": {
+    "noPackets": "Inga paket",
+    "noMatchesHint": "Inga paket matchar sökningen och de valda filtren. Rensa filtren för att visa paket i det valda området.",
     "noun": "paket",
     "analyzer": "Paketanalys",
     "analyzerLabel": "Paketanalys",
