@@ -65,6 +65,7 @@ export function PacketExpansion({
   return (
     <div
       data-testid="packet-expansion"
+      id={`packet-expansion-${packet.packetHash}`}
       className="bg-bg-surface border-l-2 border-primary pl-6 pr-3 py-2"
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-2 text-[11px] whitespace-nowrap">

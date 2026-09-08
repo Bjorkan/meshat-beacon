@@ -8,18 +8,32 @@ interface TimestampProps {
   mode?: 'relative' | 'absolute'; // default "relative"
   ms?: boolean; // include .mmm in the absolute form (default false)
   className?: string;
+  insideButton?: boolean;
 }
 
 // The single way to render a timestamp across the app. Defaults to a relative label ("2m ago") with
 // the full absolute time on hover (via the custom Tooltip, which shows instantly — the native title
 // attribute lagged ~1s); "absolute" mode flips the two. Self-refreshes via the shared ticker, so
 // callers don't sprinkle useTick() or build their own tooltips.
-export function Timestamp({ value, mode = 'relative', ms, className }: TimestampProps) {
+export function Timestamp({
+  value,
+  mode = 'relative',
+  ms,
+  className,
+  insideButton,
+}: TimestampProps) {
   const { t } = useTranslation();
   useTick(); // keep the relative label fresh
 
   const relative = t('common.ageAgo', { age: timeAgoMs(value) });
   const absolute = formatAbsolute(value, { ms });
+
+  if (insideButton)
+    return (
+      <span className={className} title={mode === 'absolute' ? relative : absolute}>
+        {mode === 'absolute' ? absolute : relative}
+      </span>
+    );
 
   return (
     <Tooltip label={mode === 'absolute' ? relative : absolute} className={className}>

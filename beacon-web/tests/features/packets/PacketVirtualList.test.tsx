@@ -323,9 +323,8 @@ describe('PacketVirtualList responsive row', () => {
       <PacketVirtualList packets={[pkt('AA11')]} expandedHash={null} {...handlers} />,
     );
 
-    // PacketRow has no button role; PacketTableRow's toggle is a real <button>
-    expect(screen.queryByRole('button')).toBeNull();
-    const card = container.querySelector('[aria-pressed]');
+    expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
+    const card = container.querySelector('button.w-full');
     expect(card).not.toBeNull();
 
     fireEvent.click(card!);
