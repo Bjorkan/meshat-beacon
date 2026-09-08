@@ -57,6 +57,30 @@ beforeEach(() => {
 });
 
 describe('RouteTable search', () => {
+  it('bounds a 21-hop preview while preserving every hop in the detail panel', async () => {
+    const route: KnownRoute = {
+      id: 42,
+      iata: 'AAA',
+      hopCount: 21,
+      observationCount: 7,
+      firstSeen: 1,
+      lastSeen: 2,
+      hops: Array.from({ length: 21 }, (_, i) => ({
+        nodeId: `n${i}`,
+        hashBytes: i.toString(16).padStart(4, '0'),
+      })),
+    };
+    mockGetKnownRoutesPage.mockResolvedValue({ items: [route], nextCursor: null, hasMore: false });
+    renderTable();
+    const omitted = await screen.findByLabelText(
+      '18 intermediate hops; open the route to see all hops',
+    );
+    expect(screen.queryByText('000A')).not.toBeInTheDocument();
+    fireEvent.click(omitted);
+    expect(await screen.findByText('000A')).toBeInTheDocument();
+    expect(screen.getByText('#21')).toBeInTheDocument();
+  });
+
   it('allows the route root to shrink inside the mobile flex chain', async () => {
     renderTable();
     await screen.findByText('Find path');

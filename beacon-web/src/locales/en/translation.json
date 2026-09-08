@@ -314,7 +314,10 @@
     "noMatching": "No matching routes",
     "none": "No routes",
     "noun": "routes",
-    "summary": "{{hops}} hops · {{observations}} obs"
+    "summary": "{{hops}} hops · {{observations}} obs",
+    "omittedHops": "{{count}} intermediate hops; open the route to see all hops",
+    "expandRoute": "Show full route",
+    "collapseRoute": "Show compact route"
   },
   "traces": {
     "type": "Trace type",

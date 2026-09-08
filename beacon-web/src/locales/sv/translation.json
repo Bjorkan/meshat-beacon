@@ -314,7 +314,10 @@
     "noMatching": "Inga matchande rutter",
     "none": "Inga rutter",
     "noun": "rutter",
-    "summary": "{{hops}} hopp · {{observations}} obs"
+    "summary": "{{hops}} hopp · {{observations}} obs",
+    "omittedHops": "{{count}} mellanliggande hopp; öppna rutten för att se alla hopp",
+    "expandRoute": "Visa hela rutten",
+    "collapseRoute": "Visa kompakt rutt"
   },
   "traces": {
     "type": "Trace-typ",

@@ -44,10 +44,31 @@ const ROUTE_SORT_KEYS: Record<string, string> = {
 const nodeLabel = (n: ResolvedNode) => n.name ?? formatHex(n.publicKey);
 
 // A run of route hops as a hash chain (reusing the packet path renderer); hops are high-confidence.
-function HopChain({ hops, initialConnector }: { hops: RouteHop[]; initialConnector?: string }) {
+function HopChain({
+  hops,
+  initialConnector,
+  compact = true,
+}: {
+  hops: RouteHop[];
+  initialConnector?: string;
+  compact?: boolean;
+}) {
+  const { t } = useTranslation();
+  const preview =
+    compact && hops.length > 4 ? [...hops.slice(0, 2), null, hops[hops.length - 1]!] : hops;
   return (
     <>
-      {hops.map((hop, i) => {
+      {preview.map((hop, i) => {
+        if (!hop)
+          return (
+            <span
+              key="omitted"
+              className="whitespace-nowrap rounded border border-border px-1.5 py-0.5 text-xs text-text-muted"
+              aria-label={t('routes.omittedHops', { count: hops.length - 3 })}
+            >
+              +{hops.length - 3}
+            </span>
+          );
         const resolved: ResolvedHop = { confidence: 'high', nodes: hop.node ? [hop.node] : [] };
         return (
           <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
@@ -77,6 +98,8 @@ const RouteHopChain = memo(function RouteHopChain({ route }: { route: KnownRoute
 function CrossRouteCard({ route }: { route: CrossIATARoute }) {
   const { t } = useTranslation();
   const { crossHop } = route;
+  const [expanded, setExpanded] = useState(false);
+  const isLong = route.sourceSegment.length > 4 || route.targetSegment.length > 4;
   return (
     <div className="bg-bg-base border border-border rounded px-3 py-2 flex flex-col gap-1.5">
       <div className="flex items-center justify-between gap-2">
@@ -92,7 +115,7 @@ function CrossRouteCard({ route }: { route: CrossIATARoute }) {
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-1 font-mono text-[13px]">
-        <HopChain hops={route.sourceSegment} />
+        <HopChain hops={route.sourceSegment} compact={!expanded} />
         <span className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
           {route.sourceSegment.length > 0 && (
             <span className="shrink-0 text-warn" aria-hidden>
@@ -111,8 +134,18 @@ function CrossRouteCard({ route }: { route: CrossIATARoute }) {
             {nodeLabel(crossHop.toNode)}
           </span>
         </span>
-        <HopChain hops={route.targetSegment} initialConnector="⇒" />
+        <HopChain hops={route.targetSegment} initialConnector="⇒" compact={!expanded} />
       </div>
+      {isLong && (
+        <button
+          type="button"
+          aria-expanded={expanded}
+          onClick={() => setExpanded((value) => !value)}
+          className="self-start text-xs text-primary underline"
+        >
+          {t(expanded ? 'routes.collapseRoute' : 'routes.expandRoute')}
+        </button>
+      )}
     </div>
   );
 }
