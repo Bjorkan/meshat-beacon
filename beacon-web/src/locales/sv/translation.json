@@ -253,6 +253,8 @@
     "noAdvertsHeard": "Inga adverts hörda"
   },
   "map": {
+    "noDrawablePaths": "Ingen verifierad rutt att visa",
+    "noDrawablePathsHint": "Paketets observationer innehåller ingen rutt med tillräckliga positionsuppgifter.",
     "settings": "Kartinställningar",
     "nodeType": "Nodtyp",
     "clustering": "Klustring",

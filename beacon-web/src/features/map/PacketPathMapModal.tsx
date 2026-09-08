@@ -96,7 +96,9 @@ export function PacketPathMapModal({
 
   return (
     <ModalOverlay label={t('map.packetPathLabel')} onClose={onClose}>
-      <div className="h-full w-full lg:w-[860px] lg:max-w-[92vw] bg-bg-surface flex flex-col">
+      <div
+        className={`${paths.length > 0 ? 'h-full lg:w-[860px]' : 'max-h-[85vh] lg:w-[540px]'} w-full lg:max-w-[92vw] bg-bg-surface flex flex-col overflow-y-auto`}
+      >
         <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
           <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
             {t('map.packetPath')}
@@ -115,7 +117,7 @@ export function PacketPathMapModal({
           </div>
         </div>
 
-        {blockedMessage != null && (
+        {paths.length > 0 && blockedMessage != null && (
           <div
             role="note"
             className="shrink-0 px-3 py-2 border-b border-warn/20 bg-warn/5 text-[12px] font-mono text-text-normal"
@@ -124,30 +126,49 @@ export function PacketPathMapModal({
           </div>
         )}
 
-        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-          <div className="h-[55vh] max-lg:shrink-0 lg:h-auto lg:flex-1 min-h-0 bg-bg-base">
-            <PacketPathMap paths={paths} selectedKey={selectedKey} styleId={styleId} />
+        {paths.length === 0 ? (
+          <div className="space-y-4 p-5 font-mono text-sm">
+            <h2 className="font-semibold text-text-bright">{t('map.noDrawablePaths')}</h2>
+            <p role="note" className="text-text-normal">
+              {blockedMessage ?? t('map.noDrawablePathsHint')}
+            </p>
+            <dl className="space-y-2 text-xs text-text-muted">
+              <div>
+                <dt>{t('fields.hash')}</dt>
+                <dd className="break-all text-text-normal">{detail.packetHash.toUpperCase()}</dd>
+              </div>
+              <div>
+                <dt>{t('details.observations')}</dt>
+                <dd>{detail.observations.length}</dd>
+              </div>
+            </dl>
           </div>
-          <div className="lg:w-[220px] lg:border-l border-t lg:border-t-0 border-border flex flex-col min-h-0 overflow-y-auto">
-            <div className="sticky top-0 bg-bg-surface z-10 border-b border-border-subtle">
-              <Row
-                active={selectedKey === null}
-                label={t('map.allPaths')}
-                onClick={() => setSelectedKey(null)}
-              />
+        ) : (
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+            <div className="h-[55vh] max-lg:shrink-0 lg:h-auto lg:flex-1 min-h-0 bg-bg-base">
+              <PacketPathMap paths={paths} selectedKey={selectedKey} styleId={styleId} />
             </div>
-            {paths.map((p) => (
-              <Row
-                key={p.key}
-                active={selectedKey === p.key}
-                color={p.color}
-                label={p.key === 'trace' ? t('map.traceRoute') : p.label}
-                meta={formatPropagation(p.propagationMs)}
-                onClick={() => setSelectedKey(p.key)}
-              />
-            ))}
+            <div className="lg:w-[220px] lg:border-l border-t lg:border-t-0 border-border flex flex-col min-h-0 overflow-y-auto">
+              <div className="sticky top-0 bg-bg-surface z-10 border-b border-border-subtle">
+                <Row
+                  active={selectedKey === null}
+                  label={t('map.allPaths')}
+                  onClick={() => setSelectedKey(null)}
+                />
+              </div>
+              {paths.map((p) => (
+                <Row
+                  key={p.key}
+                  active={selectedKey === p.key}
+                  color={p.color}
+                  label={p.key === 'trace' ? t('map.traceRoute') : p.label}
+                  meta={formatPropagation(p.propagationMs)}
+                  onClick={() => setSelectedKey(p.key)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </ModalOverlay>
   );

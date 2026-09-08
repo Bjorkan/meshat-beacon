@@ -126,7 +126,11 @@ describe('PacketPathMapModal', () => {
     render(<PacketPathMapModal detail={shortHash} onClose={() => {}} />);
     // no observer rows: every candidate was withheld
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mini-map')).toBeNull();
     expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*2B hashes/);
+    expect(screen.queryByTestId('mini-map')).toBeNull();
+    expect(screen.queryByText('All paths')).toBeNull();
+    expect(screen.getByText('AABBCCDD')).toBeInTheDocument();
   });
 
   it('draws a 2-byte route when the DB reports no collisions', () => {
@@ -183,6 +187,7 @@ describe('PacketPathMapModal', () => {
     } as unknown as PacketDetail;
     render(<PacketPathMapModal detail={ambiguous} onClose={() => {}} />);
     expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('mini-map')).toBeNull();
     expect(screen.getByRole('note')).toHaveTextContent(/more than one node/);
   });
 
@@ -201,6 +206,7 @@ describe('PacketPathMapModal', () => {
       ],
     } as unknown as PacketDetail;
     render(<PacketPathMapModal detail={stitched} onClose={() => {}} />);
+    expect(screen.queryByTestId('mini-map')).toBeNull();
     expect(screen.getByRole('note')).toHaveTextContent(/too far apart/);
   });
 

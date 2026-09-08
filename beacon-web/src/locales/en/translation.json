@@ -253,6 +253,8 @@
     "noAdvertsHeard": "No adverts heard"
   },
   "map": {
+    "noDrawablePaths": "No verified route to display",
+    "noDrawablePathsHint": "This packet has no route with sufficient location information.",
     "settings": "Map Settings",
     "nodeType": "Node Type",
     "clustering": "Clustering",
