@@ -1,3 +1,4 @@
+import { observerClientKey, observerClientLabel } from './observer-client';
 import { useMemo } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
@@ -79,10 +80,10 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
     },
     {
       header: 'Type',
-      label: t('entities.type'),
+      label: t('entities.client'),
       className: 'text-text-muted',
       sortValue: (obs) => obs.observerType ?? null,
-      cell: (obs) => obs.observerType ?? '—',
+      cell: (obs) => observerClientLabel(obs.observerType),
     },
     {
       header: 'Radio',
@@ -147,7 +148,7 @@ function renderObserverCard(obs: ObserverSummary, t: TFunction) {
       </div>
       <div className="flex min-w-0 items-start gap-2 text-text-muted">
         {obs.iata && <span className="shrink-0 text-text-normal">{obs.iata}</span>}
-        <span className="min-w-0 break-all">{obs.observerType ?? '—'}</span>
+        <span className="min-w-0 break-all">{observerClientLabel(obs.observerType)}</span>
       </div>
       {radio && <div className="text-text-muted">{radio}</div>}
     </div>
@@ -220,7 +221,7 @@ export function ObserverTable({
   const typeOptions = useMemo(() => {
     const types = new Set<string>();
     for (const obs of observers) {
-      if (obs.observerType) types.add(obs.observerType);
+      if (obs.observerType) types.add(observerClientKey(obs.observerType));
     }
     return [...types].sort();
   }, [observers]);

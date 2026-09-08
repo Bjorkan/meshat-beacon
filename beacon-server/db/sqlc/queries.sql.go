@@ -2809,7 +2809,12 @@ WITH observer_base AS (
       WHERE po.observer_id = o.id
       ORDER BY po.heard_at DESC LIMIT 1
     ) = ANY($1::bpchar[]))
-    AND ($2 = '' OR o.observer_type = $2)
+    AND ($2 = '' OR CASE $2
+      WHEN 'meshcore' THEN trim(o.observer_type) ~* '^(?:[^/]+/)?meshcore([/:]|$)'
+      WHEN 'meshcoretomqtt' THEN trim(o.observer_type) ~* '^(?:[^/]+/)?meshcoretomqtt([/:]|$)'
+      WHEN 'meshcore-ha' THEN trim(o.observer_type) ~* '^(?:[^/]+/)?meshcore-?ha([/:]|$)'
+      WHEN 'kiekr' THEN trim(o.observer_type) ~* '^(?:[^/]+/)?kiekr([-/:]|$)'
+      ELSE o.observer_type = $2 END)
     AND ($3 = '' OR ob.broker_name = $3)
     AND ($4 = '' OR CASE
       WHEN GREATEST(COALESCE(o.last_status_at, o.last_seen), o.last_seen) > NOW() - INTERVAL '5 minutes' THEN 'online'

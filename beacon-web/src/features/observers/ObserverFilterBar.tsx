@@ -1,3 +1,4 @@
+import { observerClientLabel } from './observer-client';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchBar, type SearchFieldOption } from '../../components/SearchBar';
@@ -70,9 +71,9 @@ export function ObserverFilterBar({
         fullWidth={fullWidth}
       />
       <SelectDropdown
-        label={t('filters.type')}
+        label={t('entities.client')}
         options={[...new Set([...typeOptions, ...(typeFilter ? [typeFilter] : [])])].map(
-          (type) => ({ value: type, label: type }),
+          (type) => ({ value: type, label: observerClientLabel(type) }),
         )}
         value={typeFilter}
         onChange={onTypeChange}

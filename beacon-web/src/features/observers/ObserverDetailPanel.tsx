@@ -1,3 +1,4 @@
+import { observerClientLabel } from './observer-client';
 import { ApiError } from '../../api/generated/client';
 import type { Observer, AdvertObservation } from './types';
 import { useQuery } from '@tanstack/react-query';
@@ -226,7 +227,9 @@ export function ObserverDetailPanel({
               />
             </div>
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
-              {observer.observerType && <Badge variant="default">{observer.observerType}</Badge>}
+              {observer.observerType && (
+                <Badge variant="default">{observerClientLabel(observer.observerType)}</Badge>
+              )}
               <IataChip>{observer.iata}</IataChip>
               {observer.scopes?.map((s) => (
                 <ScopeTag key={s}>{s}</ScopeTag>
@@ -259,8 +262,14 @@ export function ObserverDetailPanel({
             <RadioSection observer={observer} noiseFloor={stats?.noise_floor} />
           )}
 
-          {(observer.firmwareVersion || observer.softwareVersion || observer.hardwareModel) && (
+          {(observer.observerType ||
+            observer.firmwareVersion ||
+            observer.softwareVersion ||
+            observer.hardwareModel) && (
             <Section title={t('details.firmware')}>
+              {observer.observerType && (
+                <Field label={t('details.clientIdentifier')} value={observer.observerType} />
+              )}
               <div className="flex flex-col gap-0.5 font-mono text-[13px]">
                 {observer.firmwareVersion && (
                   <Field label={t('details.version')} value={observer.firmwareVersion} />

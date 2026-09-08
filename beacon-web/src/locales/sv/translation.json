@@ -183,7 +183,8 @@
     "iata": "IATA",
     "snr": "SNR",
     "rssi": "RSSI",
-    "propagation": "Prop"
+    "propagation": "Prop",
+    "client": "Klient"
   },
   "channels": {
     "open": "Öppna {{name}}",
@@ -223,7 +224,8 @@
     "seen": "Sedd",
     "packet": "Paket",
     "statistics": "Statistik",
-    "noiseFloor": "Brusgolv"
+    "noiseFloor": "Brusgolv",
+    "clientIdentifier": "Klientidentifierare / bygge"
   },
   "nodes": {
     "pathsThrough": "Sökvägar genom noden",

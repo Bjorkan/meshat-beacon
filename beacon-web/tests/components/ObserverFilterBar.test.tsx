@@ -23,8 +23,8 @@ it('keeps an active type visible and clearable with no result-derived options', 
       scopeOptions={[]}
     />,
   );
-  const trigger = screen.getByRole('combobox', { name: 'Type' });
-  expect(trigger).toHaveTextContent('meshcore');
+  const trigger = screen.getByRole('combobox', { name: 'Client' });
+  expect(trigger).toHaveTextContent('MeshCore');
   fireEvent.keyDown(trigger, { key: 'ArrowDown' });
   fireEvent.click(screen.getByRole('option', { name: 'All' }));
   expect(change).toHaveBeenCalledWith('');

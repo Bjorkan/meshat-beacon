@@ -183,7 +183,8 @@
     "iata": "IATA",
     "snr": "SNR",
     "rssi": "RSSI",
-    "propagation": "Prop"
+    "propagation": "Prop",
+    "client": "Client"
   },
   "channels": {
     "open": "Open {{name}}",
@@ -223,7 +224,8 @@
     "seen": "Seen",
     "packet": "Packet",
     "statistics": "Statistics",
-    "noiseFloor": "Noise floor"
+    "noiseFloor": "Noise floor",
+    "clientIdentifier": "Client identifier / build"
   },
   "nodes": {
     "pathsThrough": "Paths through this node",

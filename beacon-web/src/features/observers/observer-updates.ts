@@ -1,3 +1,4 @@
+import { observerClientKey } from './observer-client';
 import type { ObserverSummary } from './types';
 import type { WsObserverStatus } from '../../types/ws';
 
@@ -59,7 +60,13 @@ export function observerListUpdateRequiresRefetch(
 
   if (context.status && (prev.status === context.status) !== (next.status === context.status))
     return true;
-  if (context.type && (prev.observerType === context.type) !== (next.observerType === context.type))
+  if (
+    context.type &&
+    (prev.observerType === context.type ||
+      observerClientKey(prev.observerType ?? '') === context.type) !==
+      (next.observerType === context.type ||
+        observerClientKey(next.observerType ?? '') === context.type)
+  )
     return true;
   if (
     context.name &&
