@@ -1,3 +1,4 @@
+import { RANGE_OPTIONS } from './ranges';
 import { Segmented } from './Segmented';
 import { useTranslation } from 'react-i18next';
 import { SelectDropdown } from '../../components/SelectDropdown';
@@ -94,12 +95,6 @@ function GraphIcon() {
     </svg>
   );
 }
-
-export const RANGE_OPTIONS = [
-  { value: '24h', label: '24h' },
-  { value: '7d', label: '7d' },
-  { value: '30d', label: '30d' },
-];
 
 interface Props {
   tab: StatsTab;

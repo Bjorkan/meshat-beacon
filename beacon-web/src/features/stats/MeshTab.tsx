@@ -1,5 +1,5 @@
 import { Segmented } from './Segmented';
-import { RANGE_OPTIONS } from './StatsSubHeader';
+import { RANGE_OPTIONS } from './ranges';
 import { nodeTypeLabel } from '../../lib/node-types';
 import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
