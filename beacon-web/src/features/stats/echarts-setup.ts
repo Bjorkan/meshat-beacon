@@ -5,6 +5,7 @@
 import * as echarts from 'echarts/core';
 import { LineChart, BarChart, PieChart, GaugeChart, GraphChart } from 'echarts/charts';
 import {
+  AriaComponent,
   GridComponent,
   TitleComponent,
   TooltipComponent,
@@ -21,6 +22,7 @@ echarts.use([
   PieChart,
   GaugeChart,
   GraphChart,
+  AriaComponent,
   GridComponent,
   TitleComponent,
   TooltipComponent,

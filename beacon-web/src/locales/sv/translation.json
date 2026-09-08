@@ -402,7 +402,8 @@
     "inspectNodes": "Visa noder",
     "snapshotWindow": "Ögonblicksbild · Senaste {{hours}} timmarna",
     "rangeAnalysis": "Trafik över tid",
-    "chartTimeRange": "Tidsintervall för trafikdiagram"
+    "chartTimeRange": "Tidsintervall för trafikdiagram",
+    "other": "Övrigt"
   },
   "packets": {
     "noPackets": "Inga paket",

@@ -322,58 +322,69 @@ export function donutOption(
   };
 }
 
-// Vertical bars for the payload-type breakdown. Replaced the old donut: with 10+ slivers the legend
-// needed scrolling, names truncated, and thin slices couldn't be compared by eye — bars label every
-// category inline and need no legend at all.
+// Horizontal categories keep long names level. Bound the long tail to six types plus
+// Other, preserving the total without squeezing dozens of labels into one chart.
 export function typeBarOption(
   items: { name: string; value: number; color?: string }[],
   c: ChartColors,
+  otherLabel = 'Other',
 ): EChartsOption {
-  const crowded = items.length > 5;
-  // Top labels collide on short bars once every category shows a value; keep them only on
-  // bars tall enough to stand clear (full value stays in the tooltip either way).
-  const tallest = items.reduce((m, it) => Math.max(m, it.value), 0);
+  const ranked = [...items].sort((a, b) => b.value - a.value);
+  const visible =
+    ranked.length > 7
+      ? [
+          ...ranked.slice(0, 6),
+          {
+            name: otherLabel,
+            value: ranked.slice(6).reduce((sum, item) => sum + item.value, 0),
+            color: c.textMuted,
+          },
+        ]
+      : ranked;
   return {
     animation: false,
     backgroundColor: 'transparent',
-    grid: { left: 44, right: 10, top: 18, bottom: crowded ? 52 : 24 },
+    aria: {
+      enabled: true,
+      label: { description: items.map((item) => `${item.name}: ${item.value}`).join('; ') },
+    },
+    grid: { left: 130, right: 40, top: 8, bottom: 24 },
     tooltip: { trigger: 'item', ...tooltipStyle(c), formatter: '{b}: {c}' },
-    xAxis: {
+    xAxis: valueAxis(c),
+    yAxis: {
       type: 'category',
-      data: items.map((it) => it.name),
-      axisLine: { lineStyle: { color: c.border } },
+      inverse: true,
+      data: visible.map((item) => item.name),
+      axisLine: { show: false },
       axisTick: { show: false },
-      // slant only when there are enough categories for labels to collide
       axisLabel: {
         color: c.textNormal,
         fontFamily: MONO,
-        fontSize: 9,
+        fontSize: 11,
         interval: 0,
-        rotate: crowded ? 36 : 0,
-        width: 92,
+        width: 120,
         overflow: 'truncate',
       },
     },
-    yAxis: valueAxis(c),
     series: [
       {
         type: 'bar',
-        barMaxWidth: 28,
-        data: items.map((it, i) => ({
-          value: it.value,
+        barMaxWidth: 18,
+        data: visible.map((item, i) => ({
+          name: item.name,
+          value: item.value,
           itemStyle: {
-            color: it.color ?? c.series[i % c.series.length],
-            borderRadius: [4, 4, 0, 0],
+            color: item.color ?? c.series[i % c.series.length],
+            borderRadius: [0, 3, 3, 0],
           },
         })),
         label: {
           show: true,
-          position: 'top',
+          position: 'right',
           color: c.textBright,
           fontFamily: MONO,
-          fontSize: 9,
-          formatter: (p: { value: number }) =>
-            tallest > 0 && p.value / tallest >= 0.12 ? formatCount(p.value) : '',
+          fontSize: 10,
+          formatter: (p: { value: number }) => formatCount(p.value),
         },
       },
     ],

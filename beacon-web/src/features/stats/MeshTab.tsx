@@ -161,7 +161,10 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
     [payload.data],
   );
   const payloadTotal = useMemo(() => payloadItems.reduce((a, p) => a + p.value, 0), [payloadItems]);
-  const payloadOption = useMemo(() => typeBarOption(payloadItems, colors), [payloadItems, colors]);
+  const payloadOption = useMemo(
+    () => typeBarOption(payloadItems, colors, t('stats.other')),
+    [payloadItems, colors, t],
+  );
 
   const observerRows = useMemo(
     () =>
@@ -311,7 +314,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
               {formatCount(payloadTotal)} obs
             </span>
           }
-          height={208}
+          height={240}
           option={payloadOption}
           isLoading={payload.isLoading}
           isError={payload.isError}

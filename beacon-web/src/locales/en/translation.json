@@ -402,7 +402,8 @@
     "inspectNodes": "Inspect nodes",
     "snapshotWindow": "Snapshot · Last {{hours}} hours",
     "rangeAnalysis": "Traffic over time",
-    "chartTimeRange": "Traffic chart time range"
+    "chartTimeRange": "Traffic chart time range",
+    "other": "Other"
   },
   "packets": {
     "noPackets": "No packets",
