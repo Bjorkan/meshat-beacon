@@ -8,6 +8,7 @@ import {
   presetBarsOption,
   airtimeOption,
   receiveErrorsOption,
+  batteryOption,
 } from '../../../src/features/stats/chartOptions';
 import type { ChartColors } from '../../../src/features/stats/chartTheme';
 import type { TelemetryPoint } from '../../../src/features/stats/types';
@@ -233,5 +234,30 @@ describe('time axis labels', () => {
     const weekly = observationsAreaOption([], colors, undefined, '7d') as Record<string, any>;
     expect(weekly.xAxis.axisLabel.formatter(morning)).toBe('6/9');
     expect(weekly.xAxis.axisLabel.formatter(new Date(2026, 8, 7).getTime())).toBe('7/9');
+  });
+});
+
+describe('batteryOption', () => {
+  it('gives millivolt fluctuations operational context and precise tooltip values', () => {
+    const opt = batteryOption(
+      [point(1000, { batteryMv: 4170 }), point(2000, { batteryMv: 4173 })],
+      colors,
+    ) as Record<string, any>;
+    expect(opt.yAxis.min).toBe(0);
+    expect(opt.yAxis.max({ max: 4.173 })).toBe(5);
+    expect(opt.series[0].data).toEqual([
+      [1000, 4.17],
+      [2000, 4.173],
+    ]);
+    expect(opt.tooltip.valueFormatter(4.17)).toBe('4.170 V');
+  });
+  it('extends the domain for higher-voltage supplies and tolerates missing readings', () => {
+    const opt = batteryOption(
+      [point(1000, {}), point(2000, { batteryMv: 12800 })],
+      colors,
+    ) as Record<string, any>;
+    expect(opt.yAxis.max({ max: 12.8 })).toBeGreaterThan(12.8);
+    expect(opt.yAxis.max({ max: 0 })).toBe(5);
+    expect(opt.tooltip.valueFormatter(null)).toBe('—');
   });
 });

@@ -475,15 +475,36 @@ function metricLineOption(
     delta?: boolean;
     area?: boolean;
     range?: '24h' | '7d' | '30d';
+    voltage?: boolean;
   },
 ): EChartsOption {
   return {
     animation: false,
     backgroundColor: 'transparent',
     grid: { left: 50, right: 14, top: 14, bottom: 22 },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c) },
+    tooltip: {
+      trigger: 'axis',
+      ...tooltipStyle(c),
+      ...(o.voltage
+        ? {
+            valueFormatter: (value: unknown) =>
+              typeof value === 'number' ? `${value.toFixed(3)} V` : '—',
+          }
+        : {}),
+    },
     xAxis: timeAxis(c, o.range),
-    yAxis: valueAxis(c, { scale: true }),
+    // Voltage retains a zero baseline and at least a 5 V span. Expand for higher-voltage
+    // supplies without assuming a battery chemistry or clipping their readings.
+    yAxis: valueAxis(
+      c,
+      o.voltage
+        ? {
+            min: 0,
+            max: (extent: { max: number }) => Math.max(5, Math.ceil(extent.max * 1.05)),
+            name: 'V',
+          }
+        : { scale: true },
+    ),
     series: [
       {
         name: o.name,
@@ -509,6 +530,7 @@ export const batteryOption = (
   metricLineOption(p, c, {
     name,
     color: c.primary,
+    voltage: true,
     accessor: (x) => (x.batteryMv == null ? null : +(x.batteryMv / 1000).toFixed(3)),
     range,
   });
