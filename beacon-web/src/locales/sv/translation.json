@@ -164,7 +164,6 @@
   },
   "entities": {
     "optionalColumns": "Extra kolumner:",
-    "columnCoverage": "{{populated}} av {{total}} inlästa noder har data i kolumnen.",
     "name": "Namn",
     "type": "Typ",
     "radio": "Radio",

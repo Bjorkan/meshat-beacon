@@ -270,10 +270,6 @@ export function NodeTable({
       })),
     [t, optionalColumns, sort.header],
   );
-  const coverage = {
-    Radio: nodes.filter((node) => formatRadioWithTitle(node.radio, node.radioTitle) != null).length,
-    Neighbors: nodes.filter((node) => node.knownNeighborCount > 0).length,
-  };
   // Only sortings with clear user-facing meaning become mobile actions; Type/Radio stay
   // desktop-only rather than exposing lexical implementation orderings as detached actions.
   const mobileSortOptions = useMemo<MobileSortOption[]>(
@@ -316,14 +312,7 @@ export function NodeTable({
         <div className="hidden shrink-0 flex-wrap items-center gap-4 border-b border-border px-4 py-2 font-mono text-xs text-text-muted lg:flex">
           <span>{t('entities.optionalColumns')}</span>
           {(['Radio', 'Neighbors'] as const).map((header) => (
-            <label
-              key={header}
-              className="flex cursor-pointer items-center gap-2"
-              title={t('entities.columnCoverage', {
-                populated: coverage[header],
-                total: loadedCount,
-              })}
-            >
+            <label key={header} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
                 checked={optionalColumns[header] || sort.header === header}
@@ -335,9 +324,6 @@ export function NodeTable({
                 }}
               />
               {t(header === 'Radio' ? 'entities.radio' : 'entities.neighbors')}
-              <span className="tabular-nums">
-                ({coverage[header]}/{loadedCount})
-              </span>
             </label>
           ))}
         </div>
