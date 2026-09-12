@@ -19,6 +19,7 @@ function driftClass(seconds: number) {
 function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
   return [
     {
+      id: 'node',
       header: 'Node',
       label: t('stats.node'),
       cell: (e) => (
@@ -32,6 +33,7 @@ function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
       sortValue: (e) => e.nodeName ?? e.nodeId,
     },
     {
+      id: 'drift',
       header: 'Drift',
       label: t('stats.drift'),
       className: 'tabular-nums',
@@ -47,12 +49,14 @@ function clockColumns(t: TFunction): Column<ClockDriftEntry>[] {
       sortValue: (e) => Math.abs(e.clockDriftSeconds),
     },
     {
+      id: 'checked',
       header: 'Checked',
       label: t('stats.checked'),
       cell: (e) => <Timestamp value={e.clockCheckedAt} />,
       sortValue: (e) => e.clockCheckedAt,
     },
     {
+      id: 'iatas',
       header: 'IATAs',
       cell: (e) => (
         <div className="flex flex-wrap gap-1">
@@ -72,22 +76,22 @@ function clockMobileSortOptions(t: TFunction): MobileSortOption[] {
     {
       id: 'largest-drift',
       label: t('sort.largestDrift'),
-      sort: { columnId: 'Drift', direction: 'desc' },
+      sort: { columnId: 'drift', direction: 'desc' },
     },
     {
       id: 'smallest-drift',
       label: t('sort.smallestDrift'),
-      sort: { columnId: 'Drift', direction: 'asc' },
+      sort: { columnId: 'drift', direction: 'asc' },
     },
     {
       id: 'recently-checked',
       label: t('sort.recentlyChecked'),
-      sort: { columnId: 'Checked', direction: 'desc' },
+      sort: { columnId: 'checked', direction: 'desc' },
     },
     {
       id: 'oldest-checked',
       label: t('sort.oldestChecked'),
-      sort: { columnId: 'Checked', direction: 'asc' },
+      sort: { columnId: 'checked', direction: 'asc' },
     },
   ];
 }
@@ -111,7 +115,7 @@ export function ClockDriftTab() {
         onSelect={() => {}}
         isLoading={clockDrift.isLoading}
         emptyLabel={clockDrift.isError ? t('common.failedToLoad') : t('stats.noRepeatersOutOfSync')}
-        defaultSort={{ columnId: 'Drift', direction: 'desc' }}
+        defaultSort={{ columnId: 'drift', direction: 'desc' }}
         mobileSortOptions={clockMobileSortOptions(t)}
       />
     </div>
