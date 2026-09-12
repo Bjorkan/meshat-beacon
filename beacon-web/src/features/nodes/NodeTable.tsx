@@ -1,3 +1,4 @@
+import { nodeSortId } from './node-sort';
 import { nodeTypeLabel } from '../../lib/node-types';
 import { useCallback, useMemo, useState } from 'react';
 import { type TFunction } from 'i18next';
@@ -24,13 +25,6 @@ import type { NodeSummary } from './types';
 
 const nodeId = (n: NodeSummary) => n.id; // stable id accessor for the paged hook's dedup
 
-const NODE_SORT_BY_HEADER = {
-  Name: 'name',
-  Type: 'type',
-  Radio: 'radio',
-  Neighbors: 'neighbors',
-} as const;
-
 export interface NodeTableViewState {
   typeFilter: string;
   pathsFilter: MultibyteFilter;
@@ -52,6 +46,7 @@ interface NodeTableProps {
 function nodeColumns(t: TFunction): Column<NodeSummary>[] {
   return [
     {
+      id: 'name',
       header: 'Name',
       size: 40,
       label: t('entities.name'),
@@ -63,6 +58,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       ),
     },
     {
+      id: 'type',
       header: 'Type',
       label: t('entities.type'),
       sortValue: (node) => node.nodeTypeName,
@@ -78,6 +74,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       ),
     },
     {
+      id: 'radio',
       header: 'Radio',
       size: 12,
       label: t('entities.radio'),
@@ -93,6 +90,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       },
     },
     {
+      id: 'iatas',
       header: 'IATAs',
       label: t('entities.iatas'),
       cell: (node) =>
@@ -112,6 +110,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
         ),
     },
     {
+      id: 'neighbors',
       header: 'Neighbors',
       size: 8,
       label: t('entities.neighbors'),
@@ -125,6 +124,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
         ),
     },
     {
+      id: 'location',
       header: 'Location',
       label: t('entities.location'),
       className: 'text-text-muted',
@@ -189,7 +189,7 @@ export function NodeTable({
   onRowIntent,
 }: NodeTableProps) {
   const { t } = useTranslation();
-  const [optionalColumns, setOptionalColumns] = useState({ Radio: false, Neighbors: false });
+  const [optionalColumns, setOptionalColumns] = useState({ radio: false, neighbors: false });
   const { iatas, regionKey } = useRegion();
   const { typeFilter, pathsFilter, tracesFilter, scopeFilter, sort, search, searchField } =
     viewState;
@@ -211,8 +211,7 @@ export function NodeTable({
     search,
   );
 
-  const serverSort =
-    NODE_SORT_BY_HEADER[sort.columnId as keyof typeof NODE_SORT_BY_HEADER] ?? 'name';
+  const serverSort = nodeSortId(sort.columnId);
 
   const listOptions = useMemo(
     () =>
@@ -265,9 +264,10 @@ export function NodeTable({
       nodeColumns(t).map((column) => ({
         ...column,
         hidden:
-          column.header in optionalColumns &&
-          !optionalColumns[column.header as keyof typeof optionalColumns] &&
-          sort.columnId !== column.header,
+          column.id !== undefined &&
+          column.id in optionalColumns &&
+          !optionalColumns[column.id as keyof typeof optionalColumns] &&
+          sort.columnId !== column.id,
       })),
     [t, optionalColumns, sort.columnId],
   );
@@ -275,17 +275,17 @@ export function NodeTable({
   // desktop-only rather than exposing lexical implementation orderings as detached actions.
   const mobileSortOptions = useMemo<MobileSortOption[]>(
     () => [
-      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Name', direction: 'asc' } },
-      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'Name', direction: 'desc' } },
+      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'name', direction: 'asc' } },
+      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'name', direction: 'desc' } },
       {
         id: 'neighbors-most',
         label: t('sort.mostNeighbors'),
-        sort: { columnId: 'Neighbors', direction: 'desc' },
+        sort: { columnId: 'neighbors', direction: 'desc' },
       },
       {
         id: 'neighbors-fewest',
         label: t('sort.fewestNeighbors'),
-        sort: { columnId: 'Neighbors', direction: 'asc' },
+        sort: { columnId: 'neighbors', direction: 'asc' },
       },
     ],
     [t],
@@ -312,7 +312,7 @@ export function NodeTable({
 
         <div className="hidden shrink-0 flex-wrap items-center gap-4 border-b border-border px-4 py-2 font-mono text-xs text-text-muted lg:flex">
           <span>{t('entities.optionalColumns')}</span>
-          {(['Radio', 'Neighbors'] as const).map((header) => (
+          {(['radio', 'neighbors'] as const).map((header) => (
             <label key={header} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -321,10 +321,10 @@ export function NodeTable({
                   const checked = event.target.checked;
                   setOptionalColumns((prev) => ({ ...prev, [header]: checked }));
                   if (!checked && sort.columnId === header)
-                    onViewStateChange({ sort: { columnId: 'Name', direction: 'asc' } });
+                    onViewStateChange({ sort: { columnId: 'name', direction: 'asc' } });
                 }}
               />
-              {t(header === 'Radio' ? 'entities.radio' : 'entities.neighbors')}
+              {t(header === 'radio' ? 'entities.radio' : 'entities.neighbors')}
             </label>
           ))}
         </div>

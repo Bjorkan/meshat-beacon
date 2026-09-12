@@ -3,21 +3,8 @@ import { Outlet, useNavigate, useParams, useRouter, useSearch } from '@tanstack/
 import { NodeTable, type NodeTableViewState } from '../features/nodes/NodeTable';
 import { NodeDetailPanel } from '../features/nodes/NodeDetailPanel';
 import type { MultibyteFilter } from '../features/nodes/NodeFilterBar';
-import type { SortState } from '../components/DataTable';
+import { nodeSortId } from '../features/nodes/node-sort';
 import { useOverlays } from './overlays';
-
-const HEADER_TO_SORT = {
-  Name: 'name',
-  Type: 'type',
-  Radio: 'radio',
-  Neighbors: 'neighbors',
-} as const;
-const SORT_TO_HEADER: Record<string, SortState['columnId']> = {
-  name: 'Name',
-  type: 'Type',
-  radio: 'Radio',
-  neighbors: 'Neighbors',
-};
 
 function nodeViewState(search: Record<string, unknown>): NodeTableViewState {
   return {
@@ -30,7 +17,7 @@ function nodeViewState(search: Record<string, unknown>): NodeTableViewState {
       : '') as MultibyteFilter,
     scopeFilter: typeof search.ns === 'string' ? search.ns : '',
     sort: {
-      columnId: SORT_TO_HEADER[typeof search.nsort === 'string' ? search.nsort : 'name'] ?? 'Name',
+      columnId: nodeSortId(search.nsort),
       direction: search.ndir === 'desc' ? 'desc' : 'asc',
     },
     search: typeof search.nq === 'string' ? search.nq : '',
@@ -51,9 +38,7 @@ export function NodesRoute() {
         to: '.',
         replace: options?.replace,
         search: (prev) => {
-          const sortName = patch.sort
-            ? (HEADER_TO_SORT[patch.sort.columnId as keyof typeof HEADER_TO_SORT] ?? 'name')
-            : undefined;
+          const sortName = patch.sort ? nodeSortId(patch.sort.columnId) : undefined;
           return {
             ...prev,
             ...(patch.typeFilter !== undefined ? { nt: patch.typeFilter || undefined } : {}),

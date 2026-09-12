@@ -38,7 +38,7 @@ vi.mock('../../src/features/nodes/NodeTable', () => ({
         node-search
       </button>
       <button
-        onClick={() => props.onViewStateChange({ sort: { columnId: 'Radio', direction: 'desc' } })}
+        onClick={() => props.onViewStateChange({ sort: { columnId: 'radio', direction: 'desc' } })}
       >
         node-sort
       </button>
@@ -127,7 +127,7 @@ describe('controlled list route state', () => {
       pathsFilter: 'true',
       tracesFilter: 'false',
       scopeFilter: '#east',
-      sort: { columnId: 'Radio', direction: 'desc' },
+      sort: { columnId: 'radio', direction: 'desc' },
     });
 
     fireEvent.click(screen.getByText('node-search'));
