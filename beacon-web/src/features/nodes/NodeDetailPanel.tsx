@@ -213,22 +213,24 @@ export function NodeDetailPanel({
             )}
           </Section>
 
-          {(hasLocation || node.locationSource) && !(hasLocation && !onViewOnMap) && (
+          {(hasLocation || node.locationSource) && (
             <Section title={t('details.location')}>
-              {hasLocation && onViewOnMap ? (
+              {hasLocation ? (
                 <div className="flex flex-col gap-1.5">
                   <NodeLocationMapLazy node={node} />
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-[13px]">
                     {node.locationSource && (
                       <Field label={t('details.source')} value={node.locationSource} />
                     )}
-                    <button
-                      type="button"
-                      onClick={() => onViewOnMap(node.id)}
-                      className="font-mono text-[11px] text-primary hover:underline"
-                    >
-                      {t('nodes.viewOnMap')}
-                    </button>
+                    {onViewOnMap && (
+                      <button
+                        type="button"
+                        onClick={() => onViewOnMap(node.id)}
+                        className="font-mono text-[11px] text-primary hover:underline"
+                      >
+                        {t('nodes.viewOnMap')}
+                      </button>
+                    )}
                   </div>
                 </div>
               ) : (

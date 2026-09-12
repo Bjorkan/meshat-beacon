@@ -158,12 +158,12 @@ describe('NodeDetailPanel location', () => {
     expect(onViewOnMap).toHaveBeenCalledWith('node-self');
   });
 
-  it('hides the mini map and the link when already shown on the map', async () => {
+  it('shows the mini map without a redundant navigation link on the main map', async () => {
     mockGetNode.mockResolvedValue(located);
     renderPanel();
 
     await screen.findByText('Timestamps');
-    expect(screen.queryByTestId('node-location-map')).toBeNull();
+    expect(await screen.findByTestId('node-location-map')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /view on map/i })).toBeNull();
   });
 });
