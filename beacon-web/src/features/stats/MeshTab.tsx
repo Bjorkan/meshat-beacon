@@ -59,12 +59,14 @@ interface MeshTabProps {
 function scopeColumns(t: TFunction): Column<ScopeStats>[] {
   return [
     {
+      id: 'scope',
       header: 'Scope',
       size: 40,
       cell: (scope) => <span className="text-text-normal">{scope.name}</span>,
       sortValue: (scope) => scope.name,
     },
     {
+      id: 'packets',
       header: 'Packets',
       label: t('stats.packets'),
       className: (scope) =>
@@ -73,6 +75,7 @@ function scopeColumns(t: TFunction): Column<ScopeStats>[] {
       sortValue: (scope) => scope.packetCount,
     },
     {
+      id: 'observers',
       header: 'Observers',
       label: t('stats.observers'),
       className: (scope) =>
@@ -81,6 +84,7 @@ function scopeColumns(t: TFunction): Column<ScopeStats>[] {
       sortValue: (scope) => scope.observerCount,
     },
     {
+      id: 'nodes',
       header: 'Nodes',
       label: t('stats.nodes'),
       className: (scope) =>
@@ -96,19 +100,19 @@ function scopeMobileSortOptions(t: TFunction): MobileSortOption[] {
     {
       id: 'most-packets',
       label: t('sort.mostPackets'),
-      sort: { columnId: 'Packets', direction: 'desc' },
+      sort: { columnId: 'packets', direction: 'desc' },
     },
     {
       id: 'most-observers',
       label: t('sort.mostObservers'),
-      sort: { columnId: 'Observers', direction: 'desc' },
+      sort: { columnId: 'observers', direction: 'desc' },
     },
     {
       id: 'most-nodes',
       label: t('sort.mostNodes'),
-      sort: { columnId: 'Nodes', direction: 'desc' },
+      sort: { columnId: 'nodes', direction: 'desc' },
     },
-    { id: 'scope-asc', label: t('sort.scopeAZ'), sort: { columnId: 'Scope', direction: 'asc' } },
+    { id: 'scope-asc', label: t('sort.scopeAZ'), sort: { columnId: 'scope', direction: 'asc' } },
   ];
 }
 
@@ -367,7 +371,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
               selectedKey={null}
               onSelect={() => {}}
               emptyLabel={t('common.noData')}
-              defaultSort={{ columnId: 'Packets', direction: 'desc' }}
+              defaultSort={{ columnId: 'packets', direction: 'desc' }}
               mobileSortOptions={scopeMobileSortOptions(t)}
             />
           )}
