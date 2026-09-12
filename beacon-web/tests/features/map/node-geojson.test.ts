@@ -188,6 +188,23 @@ describe('buildFocusedNeighborEdges', () => {
     };
   }
 
+  it('omits SNR with zero reliable samples, including duplicate IATA rows', () => {
+    const edges = buildFocusedNeighborEdges(
+      sel,
+      [nb({ snr: 5, snrSampleCount: 0 }), nb({ snr: 0, snrSampleCount: 0 })],
+      NOW,
+    );
+    expect(edges.features[0]!.properties.snr).toBeUndefined();
+    expect(edges.features[0]!.properties.snrSampleCount).toBeUndefined();
+    const reliable = buildFocusedNeighborEdges(
+      sel,
+      [nb({ snr: 5, snrSampleCount: 0 }), nb({ snr: 0, snrSampleCount: 2 })],
+      NOW,
+    );
+    expect(reliable.features[0]!.properties.snr).toBe(0);
+    expect(reliable.features[0]!.properties.snrSampleCount).toBe(2);
+  });
+
   it('returns empty when nothing is selected', () => {
     expect(buildFocusedNeighborEdges(null, [nb({})], NOW).features).toEqual([]);
   });

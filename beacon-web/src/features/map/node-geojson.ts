@@ -142,7 +142,7 @@ export function buildNeighborEdges(
   return { type: 'FeatureCollection', features: [...features.values()] };
 }
 
-// The selected node's edges, coloured by observation count and freshness. Data comes from the node
+// The selected node's edges, coloured by trusted aggregate SNR and freshness. Data comes from the node
 // detail endpoint (GET /nodes/{id}/neighbors), which unlike the list's bare neighborIds carries
 // observationCount + lastSeen + coords. That endpoint returns one row per (neighbor, iata), so rows
 // are folded per neighbor: obs summed, lastSeen taken at its freshest. `now` defaults to the current
@@ -173,25 +173,25 @@ export function buildFocusedNeighborEdges(
   >();
   for (const nb of neighbors) {
     if (nb.id === selected.id || nb.lat == null || nb.lng == null) continue;
+    const samples = nb.snr != null ? Math.max(0, nb.snrSampleCount ?? 1) : 0;
+    const total = samples > 0 ? nb.snr! * samples : 0;
+    const snrLastSeen = samples > 0 ? (nb.snrLastSeen ?? 0) : 0;
     const prev = byId.get(nb.id);
     if (prev) {
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
-      prev.snrLastSeen = Math.max(prev.snrLastSeen, nb.snrLastSeen ?? 0);
-      if (nb.snr != null) {
-        const weight = Math.max(1, nb.snrSampleCount ?? 1);
-        prev.snrTotal += nb.snr * weight;
-        prev.snrSamples += weight;
-      }
+      prev.snrLastSeen = Math.max(prev.snrLastSeen, snrLastSeen);
+      prev.snrTotal += total;
+      prev.snrSamples += samples;
     } else {
       byId.set(nb.id, {
         lng: nb.lng,
         lat: nb.lat,
         obs: nb.observationCount,
         lastSeen: nb.lastSeen,
-        snrLastSeen: nb.snrLastSeen ?? 0,
-        snrTotal: nb.snr != null ? nb.snr * Math.max(1, nb.snrSampleCount ?? 1) : 0,
-        snrSamples: nb.snr != null ? Math.max(1, nb.snrSampleCount ?? 1) : 0,
+        snrLastSeen,
+        snrTotal: total,
+        snrSamples: samples,
       });
     }
   }

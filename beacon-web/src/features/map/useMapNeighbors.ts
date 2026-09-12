@@ -7,7 +7,7 @@ import type {
 } from 'maplibre-gl';
 import type { FeatureCollection, LineString } from 'geojson';
 import type { NeighborEdgeProps } from './node-geojson';
-import { OBS_STOPS, SNR_STOPS, NO_SNR_COLOR, AGE } from './neighbor-thresholds';
+import { SNR_STOPS, NO_SNR_COLOR, AGE } from './neighbor-thresholds';
 import { NEIGHBORS_SOURCE_ID, NEIGHBORS_LINE_LAYER_ID } from './types';
 import { syncMapOverlayLayerOrder } from './map-layer-order';
 
@@ -34,8 +34,7 @@ const NEIGHBOR_OPACITY = [
   ['case', ['get', 'selected'], 0.9, 0.3],
 ] as ExpressionSpecification;
 
-// Colour selected links by their aggregated, trusted SNR when available. Older edges keep
-// the observation-confidence scale, so sparse historical data does not masquerade as RF quality.
+// Colour every link by trusted aggregate SNR; observation counts never imply RF quality.
 function neighborLineColor(danger: string, warn: string, green: string): ExpressionSpecification {
   return [
     'case',
@@ -49,18 +48,6 @@ function neighborLineColor(danger: string, warn: string, green: string): Express
       SNR_STOPS.warn,
       warn,
       SNR_STOPS.green,
-      green,
-    ],
-    ['has', 'obs'],
-    [
-      'interpolate',
-      ['linear'],
-      ['log10', ['max', 1, ['get', 'obs']]],
-      OBS_STOPS.danger,
-      danger,
-      OBS_STOPS.warn,
-      warn,
-      OBS_STOPS.green,
       green,
     ],
     NO_SNR_COLOR,
