@@ -1,3 +1,4 @@
+import { observerSortId } from './observer-sort';
 import { observerClientKey, observerClientLabel } from './observer-client';
 import { useMemo } from 'react';
 import { type TFunction } from 'i18next';
@@ -23,14 +24,6 @@ import type { ObserverSummary } from './types';
 
 const observerId = (o: ObserverSummary) => o.id; // stable id accessor for the paged hook's dedup
 
-const OBSERVER_SORT_BY_HEADER = {
-  Name: 'name',
-  Type: 'type',
-  Radio: 'radio',
-  IATA: 'iata',
-  Status: 'status',
-} as const;
-
 export interface ObserverTableViewState {
   search: string;
   searchField: string;
@@ -55,6 +48,7 @@ interface ObserverTableProps {
 function observerColumns(t: TFunction): Column<ObserverSummary>[] {
   return [
     {
+      id: 'name',
       header: 'Name',
       label: t('entities.name'),
       sortValue: (obs) => obs.displayName ?? formatHex(obs.id),
@@ -79,6 +73,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       ),
     },
     {
+      id: 'type',
       header: 'Type',
       label: t('entities.client'),
       className: 'text-text-muted',
@@ -86,6 +81,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       cell: (obs) => observerClientLabel(obs.observerType),
     },
     {
+      id: 'radio',
       header: 'Radio',
       label: t('entities.radio'),
       className: 'text-text-muted',
@@ -100,12 +96,14 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
       },
     },
     {
+      id: 'iata',
       header: 'IATA',
       className: 'text-text-normal',
       sortValue: (obs) => obs.iata,
       cell: (obs) => (obs.iata ? obs.iata : <span className="text-text-dim">—</span>),
     },
     {
+      id: 'status',
       header: 'Status',
       label: t('entities.status'),
       sortValue: (obs) => deriveObserverStatus(obs),
@@ -173,8 +171,7 @@ export function ObserverTable({
 
   const brokerNames = useMemo(() => brokers?.map((b) => b.name) ?? [], [brokers]);
 
-  const serverSort =
-    OBSERVER_SORT_BY_HEADER[sort.columnId as keyof typeof OBSERVER_SORT_BY_HEADER] ?? 'name';
+  const serverSort = observerSortId(sort.columnId);
 
   // Page the region's observers 50 at a time. Filtering and ordering are server-side, so every page
   // is globally sorted without eagerly downloading the full observer set.
@@ -232,17 +229,17 @@ export function ObserverTable({
   // lexically, so Online first needs desc and Offline first needs asc.
   const mobileSortOptions = useMemo<MobileSortOption[]>(
     () => [
-      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Name', direction: 'asc' } },
-      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'Name', direction: 'desc' } },
+      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'name', direction: 'asc' } },
+      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'name', direction: 'desc' } },
       {
         id: 'online-first',
         label: t('sort.onlineFirst'),
-        sort: { columnId: 'Status', direction: 'desc' },
+        sort: { columnId: 'status', direction: 'desc' },
       },
       {
         id: 'offline-first',
         label: t('sort.offlineFirst'),
-        sort: { columnId: 'Status', direction: 'asc' },
+        sort: { columnId: 'status', direction: 'asc' },
       },
     ],
     [t],

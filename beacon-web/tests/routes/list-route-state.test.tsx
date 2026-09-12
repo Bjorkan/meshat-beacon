@@ -56,6 +56,11 @@ vi.mock('../../src/features/observers/ObserverTable', () => ({
       <button onClick={() => props.onViewStateChange({ search: 'typed' }, { replace: true })}>
         observer-search
       </button>
+      <button
+        onClick={() => props.onViewStateChange({ sort: { columnId: 'status', direction: 'asc' } })}
+      >
+        observer-sort
+      </button>
     </div>
   ),
 }));
@@ -160,11 +165,16 @@ describe('controlled list route state', () => {
       typeFilter: 'mqtt',
       brokerFilter: 'broker',
       scopeFilter: '#west',
-      sort: { columnId: 'Status', direction: 'desc' },
+      sort: { columnId: 'status', direction: 'desc' },
     });
     fireEvent.click(screen.getByText('observer-search'));
     expect(latestNavigation().replace).toBe(true);
     expect(latestNavigation().search(routeState.search).oq).toBe('typed');
+    fireEvent.click(screen.getByText('observer-sort'));
+    expect(latestNavigation().search(routeState.search)).toMatchObject({
+      osort: 'status',
+      odir: undefined,
+    });
   });
 
   it('controls Channels and Traces filters through their route params', () => {

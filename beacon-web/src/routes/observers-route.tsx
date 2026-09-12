@@ -2,23 +2,8 @@ import { useCallback, useMemo } from 'react';
 import { Outlet, useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router';
 import { ObserverTable, type ObserverTableViewState } from '../features/observers/ObserverTable';
 import { ObserverDetailPanel } from '../features/observers/ObserverDetailPanel';
-import type { SortState } from '../components/DataTable';
+import { observerSortId } from '../features/observers/observer-sort';
 import { useOverlays } from './overlays';
-
-const HEADER_TO_SORT = {
-  Name: 'name',
-  Type: 'type',
-  Radio: 'radio',
-  IATA: 'iata',
-  Status: 'status',
-} as const;
-const SORT_TO_HEADER: Record<string, SortState['columnId']> = {
-  name: 'Name',
-  type: 'Type',
-  radio: 'Radio',
-  iata: 'IATA',
-  status: 'Status',
-};
 
 function observerViewState(search: Record<string, unknown>): ObserverTableViewState {
   return {
@@ -29,7 +14,7 @@ function observerViewState(search: Record<string, unknown>): ObserverTableViewSt
     brokerFilter: typeof search.ob === 'string' ? search.ob : '',
     scopeFilter: typeof search.os === 'string' ? search.os : '',
     sort: {
-      columnId: SORT_TO_HEADER[typeof search.osort === 'string' ? search.osort : 'name'] ?? 'Name',
+      columnId: observerSortId(search.osort),
       direction: search.odir === 'desc' ? 'desc' : 'asc',
     },
   };
@@ -48,9 +33,7 @@ export function ObserversRoute() {
         to: '.',
         replace: options?.replace,
         search: (prev) => {
-          const sortName = patch.sort
-            ? (HEADER_TO_SORT[patch.sort.columnId as keyof typeof HEADER_TO_SORT] ?? 'name')
-            : undefined;
+          const sortName = patch.sort ? observerSortId(patch.sort.columnId) : undefined;
           return {
             ...prev,
             ...(patch.search !== undefined ? { oq: patch.search || undefined } : {}),
