@@ -38,19 +38,19 @@ export function TalkersTab({ range }: TalkersTabProps) {
       {
         id: 'most-adverts',
         label: t('sort.mostAdverts'),
-        sort: { columnId: '__advertCount', direction: 'desc' },
+        sort: { columnId: 'advertCount', direction: 'desc' },
       },
       {
         id: 'most-flood',
         label: t('sort.mostFlood'),
-        sort: { columnId: 'Flood', direction: 'desc' },
+        sort: { columnId: 'floodAdvertCount', direction: 'desc' },
       },
       {
         id: 'most-direct',
         label: t('sort.mostDirect'),
-        sort: { columnId: 'Direct', direction: 'desc' },
+        sort: { columnId: 'directAdvertCount', direction: 'desc' },
       },
-      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'Node', direction: 'asc' } },
+      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'node', direction: 'asc' } },
     ],
     [t],
   );
@@ -68,12 +68,14 @@ export function TalkersTab({ range }: TalkersTabProps) {
       {
         // Hidden sort-only column: the API's natural total-advert ranking has no visible desktop
         // column, but mobile needs it as the explicit default option. Desktop never renders it.
-        header: '__advertCount',
+        id: 'advertCount',
+        header: 'Total adverts',
         hidden: true,
         cell: () => null,
         sortValue: (a) => a.advertCount,
       },
       {
+        id: 'node',
         header: 'Node',
         label: t('stats.node'),
         cell: (a) => (
@@ -97,12 +99,14 @@ export function TalkersTab({ range }: TalkersTabProps) {
         sortValue: (a) => a.nodeName ?? a.nodeId,
       },
       {
+        id: 'floodAdvertCount',
         header: 'Flood',
         className: 'tabular-nums',
         cell: (a) => split(a.floodAdvertCount),
         sortValue: (a) => a.floodAdvertCount,
       },
       {
+        id: 'directAdvertCount',
         header: 'Direct',
         className: 'tabular-nums',
         cell: (a) => split(a.directAdvertCount),
@@ -139,7 +143,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
             emptyLabel={
               topAdvertisers.isError ? t('common.failedToLoad') : t('stats.noAdvertisers')
             }
-            defaultSort={{ columnId: '__advertCount', direction: 'desc' }}
+            defaultSort={{ columnId: 'advertCount', direction: 'desc' }}
             mobileSortOptions={advertiserMobileSortOptions}
           />
         </div>
