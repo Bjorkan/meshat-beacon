@@ -139,7 +139,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
             emptyLabel={
               topAdvertisers.isError ? t('common.failedToLoad') : t('stats.noAdvertisers')
             }
-            defaultSort={{ header: '__advertCount', direction: 'desc' }}
+            defaultSort={{ columnId: '__advertCount', direction: 'desc' }}
             mobileSortOptions={advertiserMobileSortOptions}
           />
         </div>

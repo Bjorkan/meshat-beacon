@@ -211,7 +211,8 @@ export function NodeTable({
     search,
   );
 
-  const serverSort = NODE_SORT_BY_HEADER[sort.header as keyof typeof NODE_SORT_BY_HEADER] ?? 'name';
+  const serverSort =
+    NODE_SORT_BY_HEADER[sort.columnId as keyof typeof NODE_SORT_BY_HEADER] ?? 'name';
 
   const listOptions = useMemo(
     () =>
@@ -266,9 +267,9 @@ export function NodeTable({
         hidden:
           column.header in optionalColumns &&
           !optionalColumns[column.header as keyof typeof optionalColumns] &&
-          sort.header !== column.header,
+          sort.columnId !== column.header,
       })),
-    [t, optionalColumns, sort.header],
+    [t, optionalColumns, sort.columnId],
   );
   // Only sortings with clear user-facing meaning become mobile actions; Type/Radio stay
   // desktop-only rather than exposing lexical implementation orderings as detached actions.
@@ -315,12 +316,12 @@ export function NodeTable({
             <label key={header} className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
-                checked={optionalColumns[header] || sort.header === header}
+                checked={optionalColumns[header] || sort.columnId === header}
                 onChange={(event) => {
                   const checked = event.target.checked;
                   setOptionalColumns((prev) => ({ ...prev, [header]: checked }));
-                  if (!checked && sort.header === header)
-                    onViewStateChange({ sort: { header: 'Name', direction: 'asc' } });
+                  if (!checked && sort.columnId === header)
+                    onViewStateChange({ sort: { columnId: 'Name', direction: 'asc' } });
                 }}
               />
               {t(header === 'Radio' ? 'entities.radio' : 'entities.neighbors')}

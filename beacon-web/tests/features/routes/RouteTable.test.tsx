@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 import { RouteTable } from '../../../src/features/routes/RouteTable';
@@ -218,5 +218,55 @@ describe('RouteTable search', () => {
     renderTable();
 
     expect(await screen.findByText('42')).toBeInTheDocument();
+  });
+});
+
+describe('RouteTable semantic mobile sorting', () => {
+  it('maps each explicit choice to a fresh server page and marks only that choice active', async () => {
+    vi.spyOn(window, 'matchMedia').mockImplementation((query) => ({
+      matches: true,
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }));
+    renderTable();
+    const bar = await screen.findByLabelText('Sort');
+    const choices = [
+      ['Newest', 'last_seen', 'desc'],
+      ['Oldest', 'first_seen', 'asc'],
+      ['Most observed', 'observations', 'desc'],
+      ['Shortest route', 'hops', 'asc'],
+      ['Longest route', 'hops', 'desc'],
+    ];
+    expect(
+      within(bar)
+        .getAllByRole('button')
+        .map((button) => button.textContent),
+    ).toEqual(choices.map(([label]) => label));
+    expect(within(bar).getByRole('button', { name: 'Newest' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    for (const [label, sort, direction] of choices) {
+      fireEvent.click(within(screen.getByLabelText('Sort')).getByRole('button', { name: label }));
+      await waitFor(() =>
+        expect(mockGetKnownRoutesPage).toHaveBeenLastCalledWith(
+          expect.objectContaining({ sort, direction, pageToken: undefined }),
+        ),
+      );
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: label })).toHaveAttribute('aria-pressed', 'true'),
+      );
+      expect(
+        within(screen.getByLabelText('Sort'))
+          .getAllByRole('button')
+          .filter((button) => button.getAttribute('aria-pressed') === 'true'),
+      ).toHaveLength(1);
+    }
+    vi.restoreAllMocks();
   });
 });

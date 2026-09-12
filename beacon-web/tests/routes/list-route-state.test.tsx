@@ -38,7 +38,7 @@ vi.mock('../../src/features/nodes/NodeTable', () => ({
         node-search
       </button>
       <button
-        onClick={() => props.onViewStateChange({ sort: { header: 'Radio', direction: 'desc' } })}
+        onClick={() => props.onViewStateChange({ sort: { columnId: 'Radio', direction: 'desc' } })}
       >
         node-sort
       </button>
@@ -127,7 +127,7 @@ describe('controlled list route state', () => {
       pathsFilter: 'true',
       tracesFilter: 'false',
       scopeFilter: '#east',
-      sort: { header: 'Radio', direction: 'desc' },
+      sort: { columnId: 'Radio', direction: 'desc' },
     });
 
     fireEvent.click(screen.getByText('node-search'));
@@ -160,7 +160,7 @@ describe('controlled list route state', () => {
       typeFilter: 'mqtt',
       brokerFilter: 'broker',
       scopeFilter: '#west',
-      sort: { header: 'Status', direction: 'desc' },
+      sort: { columnId: 'Status', direction: 'desc' },
     });
     fireEvent.click(screen.getByText('observer-search'));
     expect(latestNavigation().replace).toBe(true);

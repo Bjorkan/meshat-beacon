@@ -33,14 +33,6 @@ const inputClass =
 // stable id accessor for the paginator's dedup (module-level so the memo isn't rebuilt each render)
 const routeId = (r: KnownRoute) => String(r.id);
 
-const ROUTE_SORT_KEYS: Record<string, string> = {
-  IATA: 'iata',
-  Hops: 'hops',
-  Obs: 'observations',
-  'First seen': 'first_seen',
-  'Last seen': 'last_seen',
-};
-
 const nodeLabel = (n: ResolvedNode) => n.name ?? formatHex(n.publicKey);
 
 // A run of route hops as a hash chain (reusing the packet path renderer); hops are high-confidence.
@@ -153,11 +145,13 @@ function CrossRouteCard({ route }: { route: CrossIATARoute }) {
 function routeColumns(t: TFunction): Column<KnownRoute>[] {
   return [
     {
+      id: 'iata',
       header: 'IATA',
       sortValue: (r) => r.iata,
       cell: (r) => <Badge variant="default">{r.iata}</Badge>,
     },
     {
+      id: 'hops',
       header: 'Hops',
       label: t('packets.hops'),
       sortValue: (r) => r.hopCount,
@@ -169,12 +163,14 @@ function routeColumns(t: TFunction): Column<KnownRoute>[] {
       cell: (r) => <RouteHopChain route={r} />,
     },
     {
+      id: 'observations',
       header: 'Obs',
       className: 'text-text-muted',
       sortValue: (r) => r.observationCount,
       cell: (r) => r.observationCount.toLocaleString(),
     },
     {
+      id: 'first_seen',
       header: 'First seen',
       label: t('routes.firstSeen'),
       className: 'text-text-muted',
@@ -182,6 +178,7 @@ function routeColumns(t: TFunction): Column<KnownRoute>[] {
       cell: (r) => <Timestamp value={r.firstSeen} />,
     },
     {
+      id: 'last_seen',
       header: 'Last seen',
       label: t('routes.lastSeen'),
       className: 'text-text-muted',
@@ -195,19 +192,19 @@ function routeColumns(t: TFunction): Column<KnownRoute>[] {
 // desktop column above never creates a mobile option by itself.
 function routeMobileSortOptions(t: TFunction): MobileSortOption[] {
   return [
-    { id: 'newest', label: t('sort.newest'), sort: { columnId: 'Last seen', direction: 'desc' } },
-    { id: 'oldest', label: t('sort.oldest'), sort: { columnId: 'First seen', direction: 'asc' } },
+    { id: 'newest', label: t('sort.newest'), sort: { columnId: 'last_seen', direction: 'desc' } },
+    { id: 'oldest', label: t('sort.oldest'), sort: { columnId: 'first_seen', direction: 'asc' } },
     {
       id: 'most-observed',
       label: t('sort.mostObserved'),
-      sort: { columnId: 'Obs', direction: 'desc' },
+      sort: { columnId: 'observations', direction: 'desc' },
     },
     {
       id: 'shortest',
       label: t('sort.shortestRoute'),
-      sort: { columnId: 'Hops', direction: 'asc' },
+      sort: { columnId: 'hops', direction: 'asc' },
     },
-    { id: 'longest', label: t('sort.longestRoute'), sort: { columnId: 'Hops', direction: 'desc' } },
+    { id: 'longest', label: t('sort.longestRoute'), sort: { columnId: 'hops', direction: 'desc' } },
   ];
 }
 
@@ -249,7 +246,7 @@ export function RouteTable() {
   const columns = useMemo(() => routeColumns(t), [t]);
 
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortState>({ header: 'Last seen', direction: 'desc' });
+  const [sort, setSort] = useState<SortState>({ columnId: 'last_seen', direction: 'desc' });
 
   // Path search form: source→dest hashes, scoped exclusively by the global region picker. One IATA
   // uses /routes/search; two+ use /routes/cross across directed pairs. Hashes + ≥1 IATA required.
@@ -282,7 +279,7 @@ export function RouteTable() {
   } = useInfinitePages<KnownRoute, string | undefined>({
     options: routeQueries.list({
       iatas,
-      sort: ROUTE_SORT_KEYS[sort.header] ?? 'last_seen',
+      sort: sort.columnId,
       direction: sort.direction,
     }),
     getId: routeId,

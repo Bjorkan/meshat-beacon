@@ -367,7 +367,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
               selectedKey={null}
               onSelect={() => {}}
               emptyLabel={t('common.noData')}
-              defaultSort={{ header: 'Packets', direction: 'desc' }}
+              defaultSort={{ columnId: 'Packets', direction: 'desc' }}
               mobileSortOptions={scopeMobileSortOptions(t)}
             />
           )}

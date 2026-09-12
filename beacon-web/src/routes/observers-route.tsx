@@ -12,7 +12,7 @@ const HEADER_TO_SORT = {
   IATA: 'iata',
   Status: 'status',
 } as const;
-const SORT_TO_HEADER: Record<string, SortState['header']> = {
+const SORT_TO_HEADER: Record<string, SortState['columnId']> = {
   name: 'Name',
   type: 'Type',
   radio: 'Radio',
@@ -29,7 +29,7 @@ function observerViewState(search: Record<string, unknown>): ObserverTableViewSt
     brokerFilter: typeof search.ob === 'string' ? search.ob : '',
     scopeFilter: typeof search.os === 'string' ? search.os : '',
     sort: {
-      header: SORT_TO_HEADER[typeof search.osort === 'string' ? search.osort : 'name'] ?? 'Name',
+      columnId: SORT_TO_HEADER[typeof search.osort === 'string' ? search.osort : 'name'] ?? 'Name',
       direction: search.odir === 'desc' ? 'desc' : 'asc',
     },
   };
@@ -49,7 +49,7 @@ export function ObserversRoute() {
         replace: options?.replace,
         search: (prev) => {
           const sortName = patch.sort
-            ? (HEADER_TO_SORT[patch.sort.header as keyof typeof HEADER_TO_SORT] ?? 'name')
+            ? (HEADER_TO_SORT[patch.sort.columnId as keyof typeof HEADER_TO_SORT] ?? 'name')
             : undefined;
           return {
             ...prev,

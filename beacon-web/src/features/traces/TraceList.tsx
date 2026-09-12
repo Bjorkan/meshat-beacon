@@ -206,7 +206,7 @@ export function TraceList({
   const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
-  const [sort, setSort] = useState<SortState>({ header: 'Last seen', direction: 'desc' });
+  const [sort, setSort] = useState<SortState>({ columnId: 'Last seen', direction: 'desc' });
   const typeOptions = [
     { value: '', label: t('common.all') },
     { value: 'TRACE', label: 'Trace' },

@@ -174,7 +174,7 @@ export function ObserverTable({
   const brokerNames = useMemo(() => brokers?.map((b) => b.name) ?? [], [brokers]);
 
   const serverSort =
-    OBSERVER_SORT_BY_HEADER[sort.header as keyof typeof OBSERVER_SORT_BY_HEADER] ?? 'name';
+    OBSERVER_SORT_BY_HEADER[sort.columnId as keyof typeof OBSERVER_SORT_BY_HEADER] ?? 'name';
 
   // Page the region's observers 50 at a time. Filtering and ordering are server-side, so every page
   // is globally sorted without eagerly downloading the full observer set.

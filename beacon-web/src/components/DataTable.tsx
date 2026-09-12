@@ -14,6 +14,8 @@ import { SkeletonRows } from './SkeletonRows';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
 export interface Column<T> {
+  // Stable identity, independent of displayed or translated text.
+  id?: string;
   header: string;
   label?: string;
   cell: (row: T) => ReactNode;
@@ -28,7 +30,7 @@ export interface Column<T> {
 
 export type SortDirection = 'asc' | 'desc';
 export interface SortState {
-  header: string;
+  columnId: string;
   direction: SortDirection;
 }
 
@@ -53,7 +55,7 @@ interface DataTableProps<T> {
   onRowIntent?: (key: string) => void;
   isLoading?: boolean;
   emptyLabel: string;
-  defaultSort?: { header: string; direction?: SortDirection };
+  defaultSort?: { columnId: string; direction?: SortDirection };
   sort?: SortState;
   onSortChange?: (sort: SortState) => void;
   // Server mode keeps API order while TanStack retains the sortable header state.
@@ -73,7 +75,7 @@ interface DataTableProps<T> {
 const END_REACHED_THRESHOLD_PX = 200;
 
 function sortStateToTanStack(sort: SortState): SortingState {
-  return sort.header ? [{ id: sort.header, desc: sort.direction === 'desc' }] : [];
+  return sort.columnId ? [{ id: sort.columnId, desc: sort.direction === 'desc' }] : [];
 }
 
 // TanStack owns the column, row and sorting models. Desktop and mobile are two presentations of the
@@ -101,13 +103,13 @@ export function DataTable<T>({
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
   const [internalSort, setInternalSort] = useState<SortState>(() => ({
-    header: defaultSort?.header ?? '',
+    columnId: defaultSort?.columnId ?? '',
     direction: defaultSort?.direction ?? 'asc',
   }));
   const sort = controlledSort ?? internalSort;
   const sorting = useMemo(() => sortStateToTanStack(sort), [sort]);
   const columnVisibility = useMemo(
-    () => Object.fromEntries(columns.map((column) => [column.header, !column.hidden])),
+    () => Object.fromEntries(columns.map((column) => [column.id ?? column.header, !column.hidden])),
     [columns],
   );
   const visibleColumnCount = columns.filter((column) => !column.hidden).length;
@@ -117,7 +119,7 @@ export function DataTable<T>({
       columns
         .filter((column) => !column.hidden)
         .map((column) => ({
-          id: column.header,
+          id: column.id ?? column.header,
           header: column.label ?? column.header,
           accessorFn: column.sortValue,
           cell: (context) => column.cell(context.row.original),
@@ -135,7 +137,7 @@ export function DataTable<T>({
       columns
         .filter((column) => column.hidden && column.sortValue)
         .map((column) => ({
-          id: column.header,
+          id: column.id ?? column.header,
           header: column.label ?? column.header,
           accessorFn: column.sortValue,
           cell: () => null,
@@ -161,7 +163,7 @@ export function DataTable<T>({
     onSortingChange: (updater) => {
       const next = typeof updater === 'function' ? updater(sorting) : updater;
       const nextSort: SortState = next[0]
-        ? { header: next[0].id, direction: next[0].desc ? 'desc' : 'asc' }
+        ? { columnId: next[0].id, direction: next[0].desc ? 'desc' : 'asc' }
         : sort;
       if (onSortChange) onSortChange(nextSort);
       else setInternalSort(nextSort);
@@ -195,7 +197,10 @@ export function DataTable<T>({
   // Explicit semantic mobile sort: the selected option mirrors the shared sort state; tapping an
   // option drives the same state (and server query mapping) as tapping a desktop header.
   function applyMobileSort(option: MobileSortOption) {
-    const nextSort: SortState = { header: option.sort.columnId, direction: option.sort.direction };
+    const nextSort: SortState = {
+      columnId: option.sort.columnId,
+      direction: option.sort.direction,
+    };
     if (onSortChange) onSortChange(nextSort);
     else setInternalSort(nextSort);
   }
@@ -215,7 +220,7 @@ export function DataTable<T>({
           >
             {mobileSortOptions.map((option) => {
               const selected =
-                sort.header === option.sort.columnId && sort.direction === option.sort.direction;
+                sort.columnId === option.sort.columnId && sort.direction === option.sort.direction;
               return (
                 <button
                   key={option.id}
@@ -346,7 +351,7 @@ export function DataTable<T>({
               >
                 {headerGroup.headers.map((header) => {
                   const direction = header.column.getIsSorted();
-                  const sourceColumn = columns.find((c) => c.header === header.column.id);
+                  const sourceColumn = columns.find((c) => (c.id ?? c.header) === header.column.id);
                   return (
                     <th
                       key={header.id}

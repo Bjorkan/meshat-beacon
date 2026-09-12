@@ -111,7 +111,7 @@ export function ClockDriftTab() {
         onSelect={() => {}}
         isLoading={clockDrift.isLoading}
         emptyLabel={clockDrift.isError ? t('common.failedToLoad') : t('stats.noRepeatersOutOfSync')}
-        defaultSort={{ header: 'Drift', direction: 'desc' }}
+        defaultSort={{ columnId: 'Drift', direction: 'desc' }}
         mobileSortOptions={clockMobileSortOptions(t)}
       />
     </div>

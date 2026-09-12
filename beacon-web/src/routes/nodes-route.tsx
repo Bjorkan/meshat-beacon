@@ -12,7 +12,7 @@ const HEADER_TO_SORT = {
   Radio: 'radio',
   Neighbors: 'neighbors',
 } as const;
-const SORT_TO_HEADER: Record<string, SortState['header']> = {
+const SORT_TO_HEADER: Record<string, SortState['columnId']> = {
   name: 'Name',
   type: 'Type',
   radio: 'Radio',
@@ -30,7 +30,7 @@ function nodeViewState(search: Record<string, unknown>): NodeTableViewState {
       : '') as MultibyteFilter,
     scopeFilter: typeof search.ns === 'string' ? search.ns : '',
     sort: {
-      header: SORT_TO_HEADER[typeof search.nsort === 'string' ? search.nsort : 'name'] ?? 'Name',
+      columnId: SORT_TO_HEADER[typeof search.nsort === 'string' ? search.nsort : 'name'] ?? 'Name',
       direction: search.ndir === 'desc' ? 'desc' : 'asc',
     },
     search: typeof search.nq === 'string' ? search.nq : '',
@@ -52,7 +52,7 @@ export function NodesRoute() {
         replace: options?.replace,
         search: (prev) => {
           const sortName = patch.sort
-            ? (HEADER_TO_SORT[patch.sort.header as keyof typeof HEADER_TO_SORT] ?? 'name')
+            ? (HEADER_TO_SORT[patch.sort.columnId as keyof typeof HEADER_TO_SORT] ?? 'name')
             : undefined;
           return {
             ...prev,

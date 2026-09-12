@@ -264,7 +264,7 @@ describe('DataTable controlled sorting', () => {
       selectedKey: null,
       onSelect: () => {},
       emptyLabel: 'none',
-      sort: { header: 'ID', direction: 'asc' as const },
+      sort: { columnId: 'ID', direction: 'asc' as const },
       onSortChange: () => {},
     };
     const { container, rerender } = render(<DataTable {...props} sortReady={false} />);
@@ -290,7 +290,7 @@ describe('DataTable controlled sorting', () => {
         selectedKey={null}
         onSelect={() => {}}
         emptyLabel="none"
-        sort={{ header: 'ID', direction: 'asc' }}
+        sort={{ columnId: 'ID', direction: 'asc' }}
         onSortChange={onSortChange}
         sortMode="server"
       />,
@@ -301,7 +301,7 @@ describe('DataTable controlled sorting', () => {
       'a',
     ]);
     fireEvent.click(screen.getByRole('button', { name: /ID/ }));
-    expect(onSortChange).toHaveBeenCalledWith({ header: 'ID', direction: 'desc' });
+    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'ID', direction: 'desc' });
   });
 
   it('reports sort changes to a controlled caller instead of mutating local state', () => {
@@ -315,12 +315,12 @@ describe('DataTable controlled sorting', () => {
         selectedKey={null}
         onSelect={() => {}}
         emptyLabel="none"
-        sort={{ header: '', direction: 'asc' }}
+        sort={{ columnId: '', direction: 'asc' }}
         onSortChange={onSortChange}
       />,
     );
     fireEvent.click(screen.getByRole('button', { name: /ID/ }));
-    expect(onSortChange).toHaveBeenCalledWith({ header: 'ID', direction: 'asc' });
+    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'ID', direction: 'asc' });
   });
 });
 
@@ -338,11 +338,47 @@ describe('DataTable hidden sort columns', () => {
         selectedKey={null}
         onSelect={() => {}}
         emptyLabel="none"
-        defaultSort={{ header: '__rank', direction: 'desc' }}
+        defaultSort={{ columnId: '__rank', direction: 'desc' }}
       />,
     );
     expect(screen.queryByText(/__rank/)).not.toBeInTheDocument();
     const cells = container.querySelectorAll(mobile ? 'dd' : 'tbody td');
     expect([...cells].map((cell) => cell.textContent)).toEqual(['b', 'a']);
+  });
+});
+
+describe('DataTable stable sort identity', () => {
+  it.each([false, true])('preserves sorting when display headers change (mobile=%s)', (mobile) => {
+    setMobile(mobile);
+    const props = {
+      rows,
+      rowKey: (r: Row) => r.id,
+      selectedKey: null,
+      onSelect: vi.fn(),
+      emptyLabel: 'none',
+      defaultSort: { columnId: 'identity', direction: 'desc' as const },
+      mobileSortOptions: [
+        { id: 'az', label: 'Name A–Z', sort: { columnId: 'identity', direction: 'asc' as const } },
+      ],
+    };
+    const cols = (header: string): Column<Row>[] => [
+      { id: 'identity', header, cell: (r) => r.id, sortValue: (r) => r.id },
+      { id: 'extra', header: 'Extra sortable column', cell: () => null, sortValue: (r) => r.id },
+    ];
+    const { container, rerender } = render(<DataTable {...props} columns={cols('Original')} />);
+    const order = () =>
+      [...container.querySelectorAll(mobile ? 'dd:nth-child(2)' : 'tbody tr td:first-child')]
+        .map((cell) => cell.textContent)
+        .filter(Boolean);
+    expect(order()).toEqual(['b', 'a']);
+    rerender(<DataTable {...props} columns={cols('Renamed')} />);
+    expect(order()).toEqual(['b', 'a']);
+    fireEvent.click(screen.getByRole('button', { name: mobile ? 'Name A–Z' : /Renamed/ }));
+    expect(order()).toEqual(['a', 'b']);
+    if (mobile) {
+      const options = within(screen.getByLabelText('Sort')).getAllByRole('button');
+      expect(options).toHaveLength(1);
+      expect(options[0]).toHaveAttribute('aria-pressed', 'true');
+    }
   });
 });
