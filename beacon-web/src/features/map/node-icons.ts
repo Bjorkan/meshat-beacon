@@ -1,3 +1,4 @@
+import { nodeTypeColor } from '../node-type-colors';
 import { NODE_ICON_UNKNOWN, nodeIconId, NODE_TYPE_NAMES } from './types';
 
 // Marker icons: per-type SVGs recolored and rasterized to MapLibre images (unknown type = canvas ring).
@@ -23,16 +24,8 @@ function svgText(type: string, observer: boolean, isDark: boolean): string | und
   return set[`./markers/${style}/${type}${observer ? '-observer' : ''}.svg`];
 }
 
-// Per-type node color (theme palette var + hard fallback). Drives the glyph via the SVG's currentColor.
-const NODE_TYPE_COLOR: Record<string, { colorVar: string; fallback: string }> = {
-  companion: { colorVar: '--palette-primary', fallback: '#3B82F6' },
-  repeater: { colorVar: '--palette-secondary', fallback: '#A78BFA' },
-  room_server: { colorVar: '--palette-green', fallback: '#22C55E' },
-  sensor: { colorVar: '--palette-warn', fallback: '#EAB308' },
-};
-
 // Observer is a ROLE pip layered on any type; keep a fixed accent so it reads consistently and
-// contrasts the (theme-tinted) node color.
+// contrasts the semantic node color.
 export const OBSERVER_COLOR = '#c79bff';
 
 // On the light basemaps the hollow Wireframe glyph loses contrast, so a near-white disc is filled
@@ -167,7 +160,7 @@ export async function rasterizeNodeIcon(id: string, isDark: boolean): Promise<Ra
   const styles = getComputedStyle(document.documentElement);
 
   if (id === NODE_ICON_UNKNOWN) {
-    const muted = styles.getPropertyValue('--palette-text-muted').trim() || '#73737B';
+    const muted = nodeTypeColor('unknown');
     return { data: drawRing(muted, scale), pixelRatio: scale };
   }
   if (id === SELECTION_RING_ICON_ID) {
@@ -179,10 +172,9 @@ export async function rasterizeNodeIcon(id: string, isDark: boolean): Promise<Ra
   if (!id.startsWith(PREFIX)) return null;
   const observer = id.endsWith('-observer');
   const type = id.slice(PREFIX.length).replace(/-observer$/, '');
-  const color = NODE_TYPE_COLOR[type];
   const svg = svgText(type, observer, isDark);
-  if (!color || !svg) return null;
-  const nodeColor = styles.getPropertyValue(color.colorVar).trim() || color.fallback;
+  if (!svg) return null;
+  const nodeColor = nodeTypeColor(type);
   // light basemaps use the hollow Wireframe glyph -> give it a solid backing for contrast
   const backing = isDark ? undefined : WIREFRAME_BACKING;
   const data = await rasterizeSvg(styleSvg(svg, nodeColor, isDark), scale, MARKER_SIZE, backing);
