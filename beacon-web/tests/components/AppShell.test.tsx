@@ -22,11 +22,11 @@ const wsManager = {
 
 const defaultMatchMedia = window.matchMedia;
 
-function renderShell() {
+function renderShell(defaultSelection = ALL_REGIONS) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={client}>
-      <RegionProvider defaultSelection={ALL_REGIONS}>
+      <RegionProvider defaultSelection={defaultSelection}>
         <AppShell activeTab="Packets" onTabChange={() => {}} wsManager={wsManager}>
           <div />
         </AppShell>
@@ -332,6 +332,16 @@ describe('region picker root region', () => {
     expect(regionRows.map((b) => b.textContent).join('|')).toContain('Gotland');
   });
 
+  it('starts individual IATA selection from the normalized stored root', async () => {
+    renderShell({ regions: ['sweden'], iatas: [] });
+    const trigger = screen.getByRole('button', { name: /REGION/ });
+    await waitFor(() => expect(trigger).toHaveTextContent('SWE'));
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole('button', { name: /ARN.*Stockholm/ }));
+    expect(trigger).toHaveTextContent('ARN');
+    expect(trigger).not.toHaveTextContent('SWE');
+  });
+
   it('matches the root choice on both SWE and Sverige', async () => {
     renderShell();
     const trigger = screen.getByRole('button', { name: /REGION/ });
@@ -346,4 +356,16 @@ describe('region picker root region', () => {
     fireEvent.change(input, { target: { value: 'sverige' } });
     expect(screen.getByText('Sverige')).toBeInTheDocument();
   });
+});
+
+it('keeps generic All Regions when a lone Sverige region has no root metadata', async () => {
+  const region = { id: 1, slug: 'sverige', name: 'Sverige', iatas: ['STO'] };
+  vi.mocked(getIatas).mockResolvedValue([{ iata: 'STO' }]);
+  vi.mocked(getRegions).mockResolvedValue([region]);
+  vi.mocked(getRegion).mockResolvedValue(region);
+  renderShell();
+  fireEvent.click(screen.getByRole('button', { name: /REGION/ }));
+  await screen.findByText('Sverige');
+  expect(screen.getByText('All Regions')).toBeInTheDocument();
+  expect(screen.queryByText('SWE')).toBeNull();
 });

@@ -144,7 +144,7 @@ function regionSummaryLabel(
 
 // Grouped multi-select: regions (each expands to its member IATAs) on top, then individual IATAs.
 // Toggling keeps the dropdown open so several can be picked; "All Regions" clears the selection.
-// With a configured root region, the top choice borrows the root's SWE/Sverige identity while
+// With a configured root region, the top choice borrows the root's configured identity while
 // keeping the empty no-filter semantics internally.
 function RegionSelector() {
   const { t } = useTranslation();
@@ -201,18 +201,22 @@ function RegionSelectorPanel() {
   const { data: iatas, isError: iatasError } = useQuery(iataQueries.list());
 
   const toggleRegion = (slug: string) => {
-    const has = selection.regions.includes(slug);
+    const has = effectiveSelection.regions.includes(slug);
     setSelection({
-      ...selection,
-      regions: has ? selection.regions.filter((s) => s !== slug) : [...selection.regions, slug],
+      ...effectiveSelection,
+      regions: has
+        ? effectiveSelection.regions.filter((s) => s !== slug)
+        : [...effectiveSelection.regions, slug],
     });
   };
 
   const toggleIata = (code: string) => {
-    const has = selection.iatas.includes(code);
+    const has = effectiveSelection.iatas.includes(code);
     setSelection({
-      ...selection,
-      iatas: has ? selection.iatas.filter((c) => c !== code) : [...selection.iatas, code],
+      ...effectiveSelection,
+      iatas: has
+        ? effectiveSelection.iatas.filter((c) => c !== code)
+        : [...effectiveSelection.iatas, code],
     });
   };
 

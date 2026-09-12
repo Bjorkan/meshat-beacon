@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { regionQueries } from '../api/queries';
 import {
   resolveIatas,
+  normalizeSelection,
   regionKey as toRegionKey,
   serializeSelection,
   type RegionSelection,
@@ -81,10 +82,11 @@ export interface RegionFilter {
 // The resolved geographic filter consumers pass to queries: the flattened IATA list plus a stable key.
 export function useRegion(): RegionFilter {
   const { selection } = useRegionSelection();
-  const { regionIatas } = useRegions();
+  const { regionIatas, regions } = useRegions();
+  const rootSlug = regions.find((region) => region.isRoot)?.slug ?? null;
 
   return useMemo(() => {
-    const iatas = resolveIatas(selection, regionIatas);
+    const iatas = resolveIatas(normalizeSelection(selection, rootSlug), regionIatas);
     return { iatas, regionKey: toRegionKey(iatas) };
-  }, [selection, regionIatas]);
+  }, [selection, rootSlug, regionIatas]);
 }

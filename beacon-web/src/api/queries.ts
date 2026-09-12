@@ -81,23 +81,12 @@ export const regionQueries = {
       queryFn: async () => {
         const summaries = await getRegions();
         const details = await Promise.all(summaries.map((s) => getRegion(s.id)));
-        // Carry the summary's root identity onto the detail (the detail endpoint may lag
-        // behind the summary on shortCode/isRoot until swagger is regenerated). If the
-        // backend predates root metadata entirely, fall back to the single-region
-        // deployment convention: one region named "Sverige" with slug "sverige".
-        return details.map((d, i) => {
-          const summary = summaries[i];
-          let shortCode = d.shortCode ?? summary?.shortCode;
-          let isRoot = d.isRoot ?? summary?.isRoot;
-          if (isRoot == null && shortCode == null && summaries.length === 1 && summary) {
-            const single = details[0];
-            if (single && single.slug === 'sverige' && single.name === 'Sverige') {
-              shortCode = 'SWE';
-              isRoot = true;
-            }
-          }
-          return { ...d, shortCode, isRoot };
-        });
+        // Root identity comes exclusively from server metadata; never infer deployment geography.
+        return details.map((detail, i) => ({
+          ...detail,
+          shortCode: detail.shortCode ?? summaries[i]?.shortCode,
+          isRoot: detail.isRoot ?? summaries[i]?.isRoot,
+        }));
       },
       staleTime: 5 * 60_000,
     }),

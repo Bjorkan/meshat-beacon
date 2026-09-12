@@ -423,3 +423,24 @@ Beacon.
 
 Beacon stands on the shoulders of giants. See [SHOULDERS.md](SHOULDERS.md) for
 the full list of open source projects that make this possible.
+
+### Deployment root region
+
+Set `root: true` on at most one configured region and optionally provide a
+`short_code`. The frontend uses that region's name/code for the all-data choice
+and omits its duplicate row. For example, a Swedish deployment can configure:
+
+```yaml
+regions:
+  - slug: sverige
+    name: Sverige
+    short_code: SWE
+    root: true
+    iatas: [STO, GOT]
+```
+
+The root choice applies no IATA filter, including when restoring a selection
+containing only its slug. Newly discovered IATAs therefore remain visible.
+Ordinary regions still expand to their configured membership. Without explicit
+root metadata the selector retains the generic **All Regions** choice; names,
+slugs and the number of configured regions never designate a root automatically.
