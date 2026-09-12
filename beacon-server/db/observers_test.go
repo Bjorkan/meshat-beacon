@@ -432,7 +432,7 @@ func TestListObserverAdverts_Pagination(t *testing.T) {
 	rows := make([]sqlc.ListObserverAdvertsRow, 3)
 	for i := range rows {
 		rows[i] = sqlc.ListObserverAdvertsRow{
-			ID:      int64(i + 1),
+			ID:      int64(3 - i),
 			HeardAt: heardAt,
 		}
 	}
@@ -452,8 +452,11 @@ func TestListObserverAdverts_Pagination(t *testing.T) {
 	if !page.HasMore {
 		t.Error("expected HasMore true")
 	}
-	if page.NextCursor == nil {
-		t.Error("expected NextCursor to be set")
+	if page.NextCursor == nil || *page.NextCursor != 2 {
+		t.Errorf("expected cursor 2 after newest IDs 3 and 2, got %v", page.NextCursor)
+	}
+	if page.Items[0].ID != 3 || page.Items[1].ID != 2 {
+		t.Fatalf("expected newest observations first, got %+v", page.Items)
 	}
 }
 

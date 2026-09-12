@@ -340,6 +340,7 @@ export const observerQueries = {
       queryKey: ['observer-adverts', id] as const,
       queryFn: () => getObserverAdverts(id, { limit: 50 }),
       staleTime: 30_000,
+      refetchInterval: 30_000,
       refetchOnWindowFocus: false,
     }),
 };

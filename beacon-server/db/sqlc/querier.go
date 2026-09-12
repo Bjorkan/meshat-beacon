@@ -153,7 +153,7 @@ type Querier interface {
 	ListNodes(ctx context.Context, arg ListNodesParams) ([]ListNodesRow, error)
 	ListObservationsForPacket(ctx context.Context, packetHash []byte) ([]ListObservationsForPacketRow, error)
 	// Returns advert packets (payload_type=4) heard by a specific observer.
-	// Pass cursor=0 to start from the beginning, or the last seen id for pagination.
+	// Pass cursor=0 to start with the newest observations, or the last seen id for pagination.
 	ListObserverAdverts(ctx context.Context, arg ListObserverAdvertsParams) ([]ListObserverAdvertsRow, error)
 	// Keyset-paginated observer list. $6 preserves the legacy last_seen cursor; new clients round-trip
 	// nextPageToken, which supplies $11-$14 and remains correct for every supported sort field.

@@ -2719,8 +2719,8 @@ JOIN packets p ON p.packet_hash = po.packet_hash
 LEFT JOIN nodes n ON n.public_key = p.origin_pubkey
 WHERE po.observer_id = $1
   AND p.payload_type = 4
-  AND ($2 = 0 OR po.id > $2)
-ORDER BY po.id ASC
+  AND ($2 = 0 OR po.id < $2)
+ORDER BY po.id DESC
 LIMIT $3
 `
 
@@ -2744,7 +2744,7 @@ type ListObserverAdvertsRow struct {
 }
 
 // Returns advert packets (payload_type=4) heard by a specific observer.
-// Pass cursor=0 to start from the beginning, or the last seen id for pagination.
+// Pass cursor=0 to start with the newest observations, or the last seen id for pagination.
 func (q *Queries) ListObserverAdverts(ctx context.Context, arg ListObserverAdvertsParams) ([]ListObserverAdvertsRow, error) {
 	rows, err := q.db.Query(ctx, listObserverAdverts, arg.ObserverID, arg.Column2, arg.Limit)
 	if err != nil {

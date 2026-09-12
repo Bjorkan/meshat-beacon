@@ -103,8 +103,8 @@ type Reader interface {
 	// been seen forwarding packets for, ordered alphabetically.
 	GetObserverScopes(ctx context.Context, observerID uuid.UUID) ([]string, error)
 
-	// ListObserverAdverts returns a paginated list of advert packets heard by an observer.
-	// Pass cursor=0 to start from the beginning.
+	// ListObserverAdverts returns advert observations newest first (descending observation ID).
+	// Pass cursor=0 for the latest page; subsequent pages contain IDs below the cursor.
 	ListObserverAdverts(ctx context.Context, observerID uuid.UUID, cursor int64, limit int32) (Page[AdvertObservation], error)
 
 	// ListNodes returns a keyset-paginated list of nodes with optional filters and ordering.

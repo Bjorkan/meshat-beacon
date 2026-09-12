@@ -166,7 +166,11 @@ describe('global WebSocket to Query cache policy', () => {
     client.setQueryData(packetKey, page<PacketSummary>([]));
     client.setQueryData(packetDetailKey, { packetHash: 'AA11' });
 
-    syncPacketObservation(client, { packetHash: 'AA11' } as WsPacketObservation['data']);
+    syncPacketObservation(client, {
+      packetHash: 'AA11',
+      packet: { payloadType: 5 },
+      observation: { observerId: 'obs-1' },
+    } as WsPacketObservation['data']);
     expect(client.getQueryState(packetDetailKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(packetKey)?.isInvalidated).toBe(true);
 
@@ -177,6 +181,26 @@ describe('global WebSocket to Query cache policy', () => {
     expect(client.getQueryState(nodeKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(observerKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(channelKey)?.isInvalidated).toBe(true);
+  });
+
+  it('refreshes only the receiving observer adverts and heals them after a gap', () => {
+    const client = new QueryClient();
+    const key = observerQueries.adverts('obs-1').queryKey;
+    const otherKey = observerQueries.adverts('obs-2').queryKey;
+    client.setQueryData(key, { items: [] });
+    client.setQueryData(otherKey, { items: [] });
+    const event = {
+      packetHash: 'advert',
+      packet: { payloadType: 5 },
+      observation: { observerId: 'obs-1' },
+    } as WsPacketObservation['data'];
+    syncPacketObservation(client, event);
+    expect(client.getQueryState(key)?.isInvalidated).toBe(false);
+    syncPacketObservation(client, { ...event, packet: { ...event.packet, payloadType: 4 } });
+    expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+    healLiveQueryCaches(client);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(true);
   });
 
   it('reconnect healing refetches only one fresh packet page instead of replaying cached cursors', async () => {

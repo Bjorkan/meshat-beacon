@@ -209,6 +209,9 @@ export function syncPacketObservation(
   queryClient: QueryClient,
   data: WsPacketObservation['data'],
 ): void {
+  if (data.packet.payloadType === 4) {
+    invalidateExact(queryClient, observerQueries.adverts(data.observation.observerId).queryKey);
+  }
   // The mounted packet route keeps its high-volume live buffer locally, so refetching history for
   // every event would be wasteful. Mark every history variant stale without refetching instead:
   // inactive routes then self-heal immediately on remount, while the mounted route stays responsive.
@@ -223,5 +226,6 @@ export function healLiveQueryCaches(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: nodeQueries.all(), refetchType: 'active' });
   void queryClient.invalidateQueries({ queryKey: ['map-nodes'], refetchType: 'active' });
   void queryClient.invalidateQueries({ queryKey: observerQueries.all(), refetchType: 'active' });
+  void queryClient.invalidateQueries({ queryKey: ['observer-adverts'], refetchType: 'active' });
   void queryClient.invalidateQueries({ queryKey: channelQueries.all(), refetchType: 'active' });
 }
