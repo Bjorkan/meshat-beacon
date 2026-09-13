@@ -1,12 +1,15 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- inspecting ECharts option shapes */
 import { describe, it, expect } from 'vitest';
 import {
   buildNeighbourGraph,
   buildEgoGraph,
+  neighbourGraphOption,
   obsColor,
   ageOpacity,
   nodeNameMatches,
 } from '../../../src/features/stats/neighbour-graph';
 import type { NodeSummary, NodeNeighbor } from '../../../src/features/nodes/types';
+import type { ChartColors } from '../../../src/features/stats/chartTheme';
 
 function neighbor(overrides: Partial<NodeNeighbor>): NodeNeighbor {
   return {
@@ -41,6 +44,24 @@ function node(overrides: Partial<NodeSummary>): NodeSummary {
 
 // obsColor takes explicit palette colours so the test is theme-independent.
 const C = { danger: '#ff0000', warn: '#ffff00', green: '#00ff00' };
+const COLORS: ChartColors = {
+  primary: '#3b82f6',
+  primaryDim: '#1e40af',
+  secondary: '#a78bfa',
+  green: '#22c55e',
+  warn: '#f59e0b',
+  danger: '#ef4444',
+  textBright: '#fff',
+  textNormal: '#ccc',
+  textMuted: '#999',
+  textDim: '#666',
+  bgBase: '#000',
+  bgSurface: '#111',
+  bgRaised: '#222',
+  border: '#333',
+  borderSubtle: '#2a2a2a',
+  series: ['#s0'],
+};
 
 describe('buildNeighbourGraph', () => {
   it('returns an empty graph for no nodes', () => {
@@ -178,7 +199,7 @@ describe('buildNeighbourGraph', () => {
     expect(g.links).toEqual([]);
   });
 
-  it('keeps dense overview graphs free of persistent labels', () => {
+  it('labels at most 30 of the most connected overview nodes', () => {
     const ids = Array.from({ length: 100 }, (_, i) => String(i));
     const g = buildNeighbourGraph(
       ids.map((id) =>
@@ -191,7 +212,33 @@ describe('buildNeighbourGraph', () => {
       100,
     );
     expect(g.nodes).toHaveLength(100);
-    expect(g.nodes.every((n) => !n.label?.show)).toBe(true);
+    expect(g.nodes.filter((n) => n.label?.show)).toHaveLength(30);
+  });
+
+  it('keeps a high-degree hub labeled when the overview exceeds the label limit', () => {
+    const leafIds = Array.from({ length: 31 }, (_, i) => `leaf-${i}`);
+    const g = buildNeighbourGraph(
+      [
+        node({ id: 'hub', neighborIds: leafIds }),
+        ...leafIds.map((id) => node({ id, neighborIds: ['hub'] })),
+      ],
+      100,
+    );
+    expect(g.nodes.find((n) => n.id === 'hub')?.label?.show).toBe(true);
+    expect(g.nodes.filter((n) => n.label?.show)).toHaveLength(30);
+  });
+
+  it('labels every node in a small overview and prioritizes the hub', () => {
+    const g = buildNeighbourGraph(
+      [
+        node({ id: 'hub', neighborIds: ['a', 'b'] }),
+        node({ id: 'a', neighborIds: ['hub'] }),
+        node({ id: 'b', neighborIds: ['hub'] }),
+      ],
+      10,
+    );
+    expect(g.nodes.every((n) => n.label?.show)).toBe(true);
+    expect(g.nodes.find((n) => n.id === 'hub')?.degree).toBe(2);
   });
 
   it('renders only nodes that participate in a displayed edge', () => {
@@ -275,9 +322,21 @@ describe('buildEgoGraph', () => {
     expect(g.nodes[0]!.category).toBe(0); // companion
   });
 
-  it('labels only the focused node persistently', () => {
+  it('labels the focused node and every neighbour in a small ego graph', () => {
     const g = buildEgoGraph(center, [neighbor({ id: 'a' })], NOW);
-    expect(g.nodes.map((n) => n.label?.show)).toEqual([true, false]);
+    expect(g.nodes.map((n) => n.label?.show)).toEqual([true, true]);
+  });
+
+  it('limits a large ego graph to the strongest 30 labels including the center', () => {
+    const neighbors = Array.from({ length: 40 }, (_, i) =>
+      neighbor({ id: `n${String(i).padStart(2, '0')}`, observationCount: i + 1, lastSeen: i }),
+    );
+    const g = buildEgoGraph(center, neighbors, NOW);
+    const labeled = g.nodes.filter((n) => n.label?.show);
+    expect(labeled).toHaveLength(30);
+    expect(labeled.map((n) => n.id)).toContain('c');
+    expect(labeled.map((n) => n.id)).toContain('n39');
+    expect(labeled.map((n) => n.id)).not.toContain('n00');
   });
 
   it('folds per-iata rows: obs summed, freshest lastSeen wins', () => {
@@ -315,5 +374,32 @@ describe('buildEgoGraph', () => {
   it("maps a neighbour's node type to a category index", () => {
     const g = buildEgoGraph(center, [neighbor({ id: 'a', nodeTypeName: 'sensor' })], NOW);
     expect(g.nodes.find((n) => n.id === 'a')!.category).toBe(3);
+  });
+});
+
+describe('neighbourGraphOption', () => {
+  it('only lists categories represented by rendered nodes', () => {
+    const graph = buildNeighbourGraph(
+      [
+        node({ id: 'c', nodeTypeName: 'companion', neighborIds: ['r'] }),
+        node({ id: 'r', nodeTypeName: 'repeater', neighborIds: ['c'] }),
+      ],
+      10,
+    );
+    const option = neighbourGraphOption(graph, COLORS) as Record<string, any>;
+    expect(option.legend[0].data).toEqual(['Companion', 'Repeater']);
+    expect(option.series[0].labelLayout).toEqual({ hideOverlap: true });
+  });
+
+  it('includes Other only when an unknown node type is rendered', () => {
+    const graph = buildNeighbourGraph(
+      [
+        node({ id: 'known', nodeTypeName: 'sensor', neighborIds: ['unknown'] }),
+        node({ id: 'unknown', nodeTypeName: 'future_type', neighborIds: ['known'] }),
+      ],
+      10,
+    );
+    const option = neighbourGraphOption(graph, COLORS) as Record<string, any>;
+    expect(option.legend[0].data).toEqual(['Sensor', 'Other']);
   });
 });

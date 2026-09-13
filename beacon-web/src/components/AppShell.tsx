@@ -18,12 +18,7 @@ import { MeshatWordmark } from './MeshatWordmark';
 import { LanguageSelector } from './LanguageSelector';
 import { iataQueries } from '../api/queries';
 import type { Region } from '../types/api';
-import {
-  ENABLED_TABS,
-  ENABLED_THEME_IDS,
-  selectableThemes,
-  GITHUB_URL,
-} from '../lib/constants';
+import { ENABLED_TABS, ENABLED_THEME_IDS, selectableThemes, GITHUB_URL } from '../lib/constants';
 import type { WsManager } from '../api/ws-manager';
 // header widgets: WS status, region picker, theme picker
 

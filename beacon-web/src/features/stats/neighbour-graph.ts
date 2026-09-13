@@ -37,6 +37,7 @@ export interface NeighbourGraph {
 const OTHER_CATEGORY = NODE_TYPE_NAMES.length;
 const MIN_SIZE = 6;
 const MAX_SIZE = 34;
+const MAX_PERSISTENT_LABELS = 30;
 // Case-insensitive substring match for the graph search; an empty query matches nothing.
 export function nodeNameMatches(name: string, query: string): boolean {
   const q = query.trim().toLowerCase();
@@ -86,6 +87,16 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
   const participantIndex = new Map<string, number>();
   participants.forEach((n, i) => participantIndex.set(n.id, i));
   const maxDegree = participants.reduce((m, n) => Math.max(m, retainedDegree.get(n.id) ?? 0), 0);
+  const labeledIds = new Set(
+    [...participants]
+      .sort(
+        (a, b) =>
+          (retainedDegree.get(b.id) ?? 0) - (retainedDegree.get(a.id) ?? 0) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )
+      .slice(0, MAX_PERSISTENT_LABELS)
+      .map((n) => n.id),
+  );
 
   const graphNodes: GraphNode[] = participants.map((n) => {
     const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(n.nodeTypeName);
@@ -97,7 +108,7 @@ export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): Neighbou
       nodeTypeName: n.nodeTypeName,
       degree,
       symbolSize: symbolSize(degree, maxDegree),
-      label: { show: false },
+      label: { show: labeledIds.has(n.id) },
     };
   });
 
@@ -139,6 +150,7 @@ function egoNode(
   nodeTypeName: string,
   size: number,
   degree: number,
+  showLabel: boolean,
 ): GraphNode {
   const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(nodeTypeName);
   return {
@@ -148,7 +160,7 @@ function egoNode(
     nodeTypeName,
     degree,
     symbolSize: size,
-    label: { show: size === CENTER_SIZE },
+    label: { show: showLabel },
   };
 }
 
@@ -180,8 +192,17 @@ export function buildEgoGraph(
     }
   }
 
+  const labeledNeighborIds = new Set(
+    [...folded]
+      .sort(
+        ([aId, a], [bId, b]) =>
+          b.obs - a.obs || b.lastSeen - a.lastSeen || (aId < bId ? -1 : aId > bId ? 1 : 0),
+      )
+      .slice(0, MAX_PERSISTENT_LABELS - 1)
+      .map(([id]) => id),
+  );
   const nodes: GraphNode[] = [
-    egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size),
+    egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size, true),
   ];
   const links: GraphLink[] = [];
   for (const [id, n] of folded) {
@@ -192,7 +213,7 @@ export function buildEgoGraph(
       obs: n.obs,
       ageDays: Math.max(0, (now - n.lastSeen) / 86_400_000),
     });
-    nodes.push(egoNode(id, n.name, n.nodeTypeName, NEIGHBOUR_SIZE, 0));
+    nodes.push(egoNode(id, n.name, n.nodeTypeName, NEIGHBOUR_SIZE, 0, labeledNeighborIds.has(id)));
   }
   return { nodes, links, total: nodes.length, capped: false };
 }
@@ -216,6 +237,8 @@ export function neighbourGraphOption(
 ): EChartsOption {
   const ego = !!opts.ego;
   const big = graph.nodes.length > 500; // settle without animating once the full mesh gets dense
+  const categories = graphCategories(c, opts.t);
+  const usedCategories = new Set(graph.nodes.map((node) => node.category));
   // weighted edges (ego view) get an obs→colour, freshness→opacity line; plain mesh edges stay uniform
   const links = graph.links.map((l) =>
     l.obs != null
@@ -255,7 +278,7 @@ export function neighbourGraphOption(
     },
     legend: [
       {
-        data: graphCategories(c, opts.t).map((cat) => cat.name),
+        data: categories.filter((_, index) => usedCategories.has(index)).map((cat) => cat.name),
         bottom: 4,
         left: 'center',
         icon: 'circle',
@@ -272,7 +295,7 @@ export function neighbourGraphOption(
         roam: true,
         draggable: true,
         scaleLimit: { min: 0.2, max: 8 },
-        categories: graphCategories(c, opts.t),
+        categories,
         force: ego
           ? {
               repulsion: 320,
