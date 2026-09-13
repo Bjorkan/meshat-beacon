@@ -27,6 +27,13 @@ back to Swedish (which in turn is complete and mirrors the English source).
 Please keep related text grouped by feature and prefer short, descriptive keys
 over copying the English sentence into the key.
 
+Standalone headings, labels, controls, placeholders, statuses, empty/error
+states, and tooltips use sentence case. Inline noun substitutions, suffixes,
+compact time/count fragments, units, and grammatical continuations follow the
+grammar of their context. Preserve product names, protocol terms, acronyms,
+hashes, hashtags, identifiers, and API/wire-format field names. Split a key when
+standalone and inline contexts genuinely require different casing.
+
 First-time visitors get Swedish regardless of browser language; a language
 chosen in the picker is stored and always wins.
 

@@ -175,14 +175,14 @@ describe('PayloadBreakdown — DISCOVER_RESP', () => {
 
   it('labels a full public key vs. an 8-byte prefix', () => {
     const { unmount } = render(<PayloadBreakdown payload={respPayload} />);
-    expect(screen.getByText(/Public Key/)).toBeInTheDocument();
+    expect(screen.getByText(/Public key/)).toBeInTheDocument();
     unmount();
     render(
       <PayloadBreakdown
         payload={{ ...respPayload, pubKey: 'abcdef0011223344', pubKeyPrefixOnly: true }}
       />,
     );
-    expect(screen.getByText(/Key Prefix/)).toBeInTheDocument();
+    expect(screen.getByText(/Key prefix/)).toBeInTheDocument();
   });
 });
 

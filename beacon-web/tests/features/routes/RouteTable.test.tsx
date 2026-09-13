@@ -92,8 +92,8 @@ describe('RouteTable search', () => {
     renderTable({ regions: [], iatas: ['AAA'] });
     await screen.findByText('Find path');
 
-    fireEvent.change(screen.getByPlaceholderText('from hash'), { target: { value: 'aa11' } });
-    fireEvent.change(screen.getByPlaceholderText('to hash'), { target: { value: 'bb22' } });
+    fireEvent.change(screen.getByPlaceholderText('From hash'), { target: { value: 'aa11' } });
+    fireEvent.change(screen.getByPlaceholderText('To hash'), { target: { value: 'bb22' } });
     fireEvent.click(screen.getByText('Search'));
 
     await waitFor(() => expect(mockSearchKnownRoutes).toHaveBeenCalledWith('AAA', 'aa11', 'bb22'));
@@ -120,8 +120,8 @@ describe('RouteTable search', () => {
     renderTable({ regions: [], iatas: ['AAA', 'BBB'] });
     await screen.findByText('Find path');
 
-    fireEvent.change(screen.getByPlaceholderText('from hash'), { target: { value: 'aa11' } });
-    fireEvent.change(screen.getByPlaceholderText('to hash'), { target: { value: 'bb22' } });
+    fireEvent.change(screen.getByPlaceholderText('From hash'), { target: { value: 'aa11' } });
+    fireEvent.change(screen.getByPlaceholderText('To hash'), { target: { value: 'bb22' } });
     fireEvent.click(screen.getByText('Search'));
 
     await waitFor(() =>

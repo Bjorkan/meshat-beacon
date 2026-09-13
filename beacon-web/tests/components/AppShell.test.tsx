@@ -242,18 +242,18 @@ describe('region picker filter', () => {
     expect(screen.queryByText('YVR')).not.toBeInTheDocument();
   });
 
-  it('filters out the All Regions row unless it matches', async () => {
+  it('filters out the All regions row unless it matches', async () => {
     renderShell();
     const input = await openPicker();
 
     fireEvent.change(input, { target: { value: 'yvr' } });
-    expect(screen.queryByText('All Regions')).not.toBeInTheDocument();
+    expect(screen.queryByText('All regions')).not.toBeInTheDocument();
 
     fireEvent.change(input, { target: { value: 'all' } });
-    expect(screen.getByText('All Regions')).toBeInTheDocument();
+    expect(screen.getByText('All regions')).toBeInTheDocument();
 
     fireEvent.change(input, { target: { value: '' } });
-    expect(screen.getByText('All Regions')).toBeInTheDocument();
+    expect(screen.getByText('All regions')).toBeInTheDocument();
   });
 
   it('reports no matches without leaving a dangling group header', async () => {
@@ -264,7 +264,7 @@ describe('region picker filter', () => {
     expect(screen.getByText('No matches')).toBeInTheDocument();
     expect(screen.queryByText('Regions')).not.toBeInTheDocument();
     expect(screen.queryByText('IATA')).not.toBeInTheDocument();
-    expect(screen.queryByText('All Regions')).not.toBeInTheDocument();
+    expect(screen.queryByText('All regions')).not.toBeInTheDocument();
   });
 
   it('clears the query on Escape before closing the picker', async () => {
@@ -274,10 +274,10 @@ describe('region picker filter', () => {
 
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(screen.getByPlaceholderText(/Filter/)).toHaveValue('');
-    expect(screen.getByText('All Regions')).toBeInTheDocument();
+    expect(screen.getByText('All regions')).toBeInTheDocument();
 
     fireEvent.keyDown(screen.getByPlaceholderText(/Filter/), { key: 'Escape' });
-    expect(screen.queryByText('All Regions')).not.toBeInTheDocument();
+    expect(screen.queryByText('All regions')).not.toBeInTheDocument();
   });
 
   it('drops the query when the picker is reopened', async () => {
@@ -324,7 +324,7 @@ describe('region picker root region', () => {
 
     await waitFor(() => expect(screen.getByText('Sverige')).toBeInTheDocument());
     expect(screen.getAllByText('SWE').length).toBeGreaterThanOrEqual(1);
-    expect(screen.queryByText('All Regions')).not.toBeInTheDocument();
+    expect(screen.queryByText('All regions')).not.toBeInTheDocument();
     // root region is not repeated under the Regions group; non-root regions still render.
     // Buttons with a checkbox are region rows; the top SWE Sverige row has a spacer instead.
     const buttons = screen.getAllByRole('button');
@@ -359,7 +359,7 @@ describe('region picker root region', () => {
   });
 });
 
-it('keeps generic All Regions when a lone Sverige region has no root metadata', async () => {
+it('keeps generic All regions when a lone Sverige region has no root metadata', async () => {
   const region = { id: 1, slug: 'sverige', name: 'Sverige', iatas: ['STO'] };
   vi.mocked(getIatas).mockResolvedValue([{ iata: 'STO' }]);
   vi.mocked(getRegions).mockResolvedValue([region]);
@@ -367,6 +367,6 @@ it('keeps generic All Regions when a lone Sverige region has no root metadata', 
   renderShell();
   fireEvent.click(screen.getByRole('button', { name: /REGION/ }));
   await screen.findByText('Sverige');
-  expect(screen.getByText('All Regions')).toBeInTheDocument();
+  expect(screen.getByText('All regions')).toBeInTheDocument();
   expect(screen.queryByText('SWE')).toBeNull();
 });

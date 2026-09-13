@@ -134,7 +134,7 @@ describe('PacketExpansion', () => {
   it('formats the spread as first/last converted from milliseconds, not re-scaled', () => {
     usePacketDetail.mockReturnValue({ isLoading: true });
     render(<PacketExpansion {...props} packet={pkt({ firstHeardAt: 1000, lastHeardAt: 3500 })} />);
-    expect(screen.getByText('spread 2.500s')).toBeInTheDocument();
+    expect(screen.getByText('Spread 2.500s')).toBeInTheDocument();
   });
 
   it('renders the observation table once data resolves', () => {

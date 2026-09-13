@@ -14,6 +14,35 @@ function translationKeys(value: object, prefix = ''): string[] {
   });
 }
 
+function translationValue(catalog: object, path: string): string {
+  return path.split('.').reduce<unknown>((value, key) => {
+    if (value == null || typeof value !== 'object') return undefined;
+    return (value as Record<string, unknown>)[key];
+  }, catalog) as string;
+}
+
+const STANDALONE_COPY_KEYS = [
+  'common.reload',
+  'common.tryAgain',
+  'common.yes',
+  'common.no',
+  'common.dismiss',
+  'entities.lastHeardAgo',
+  'channels.key',
+  'channels.noKey',
+  'channels.keyKnown',
+  'channels.hashtag',
+  'details.clockInSync',
+  'map.fainterOlder',
+  'routes.fromHash',
+  'routes.toHash',
+  'traces.noPath',
+  'traces.analyze',
+  'stats.byCount',
+  'packets.scrollTop',
+  'packets.spread',
+] as const;
+
 describe('internationalization', () => {
   const values = new Map<string, string>();
 
@@ -57,6 +86,26 @@ describe('internationalization', () => {
     expect(swedish.stats.repeatersOutOfSync).toContain('room servers');
     expect(swedish.navigation.tabs.traces).toBe('Traces');
     expect(swedish.stats.payloadTypes).toContain('Payload');
+  });
+
+  it.each([
+    ['English', english],
+    ['Swedish', swedish],
+  ])('starts known standalone %s copy with an uppercase letter', (_, catalog) => {
+    for (const key of STANDALONE_COPY_KEYS) {
+      const value = translationValue(catalog, key);
+      const firstLetter = value.match(/\p{L}/u)?.[0];
+      expect(firstLetter, key).toBe(firstLetter?.toLocaleUpperCase());
+    }
+  });
+
+  it('keeps inline fragments grammatical instead of capitalizing the whole catalog', () => {
+    expect(english.common.ageAgo).toBe('{{age}} ago');
+    expect(english.common.sortedAscending).toBe('sorted ascending');
+    expect(english.details.clockAhead).toBe('ahead');
+    expect(swedish.entities.nodes).toBe('noder');
+    expect(swedish.stats.seenToday).toBe('sedd idag');
+    expect(swedish.packets.nodeToNode).toBe('nod-till-nod');
   });
 
   it('switches language, persists the choice, and updates the document language', async () => {

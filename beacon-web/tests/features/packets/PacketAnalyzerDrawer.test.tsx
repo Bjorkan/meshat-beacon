@@ -182,7 +182,7 @@ describe('PacketAnalyzerDrawer TRACE path data', () => {
       />,
     );
     expect(screen.queryByText('Path SNR Data')).not.toBeInTheDocument();
-    expect(screen.getByText('Path Data')).toBeInTheDocument();
+    expect(screen.getByText('Path data')).toBeInTheDocument();
     // the first trace hop renders its high-confidence node name as primary, tinted green.
     expect(screen.getByText('Node A').className).toContain('text-green');
   });

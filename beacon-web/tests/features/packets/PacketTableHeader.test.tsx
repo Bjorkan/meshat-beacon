@@ -19,7 +19,7 @@ describe('PacketTableHeader', () => {
       expect(screen.getByText(h)).toBeInTheDocument();
     }
     expect(screen.queryByText('IATA')).not.toBeInTheDocument();
-    expect(screen.queryByText('Hash Size')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hash size')).not.toBeInTheDocument();
   });
 
   it('is hidden below lg and shares the exact grid with rows', () => {
