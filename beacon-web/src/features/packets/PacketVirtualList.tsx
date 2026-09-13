@@ -125,7 +125,11 @@ export function PacketVirtualList({
   });
 
   return (
-    <div ref={parentRef} className="flex-1 overflow-y-auto px-4 pb-10" onScroll={handleScroll}>
+    <div
+      ref={parentRef}
+      className={`flex-1 overflow-y-auto pb-10${isMobile ? ' px-4' : ''}`}
+      onScroll={handleScroll}
+    >
       <PacketTableHeader />
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
         {virtualizer.getVirtualItems().map((virtualRow) => {

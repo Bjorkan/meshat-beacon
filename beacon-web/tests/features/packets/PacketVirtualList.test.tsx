@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { PacketVirtualList } from '../../../src/features/packets/PacketVirtualList';
 import type { PacketSummary } from '../../../src/types/api';
@@ -323,6 +323,7 @@ describe('PacketVirtualList responsive row', () => {
       <PacketVirtualList packets={[pkt('AA11')]} expandedHash={null} {...handlers} />,
     );
 
+    expect(container.firstElementChild).toHaveClass('px-4');
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
     const card = container.querySelector('button.w-full');
     expect(card).not.toBeNull();
@@ -336,6 +337,7 @@ describe('PacketVirtualList responsive row', () => {
       <PacketVirtualList packets={[pkt('AA11')]} expandedHash={null} {...makeHandlers()} />,
     );
 
+    expect(container.firstElementChild).not.toHaveClass('px-4');
     expect(screen.getByRole('button')).toHaveAttribute('aria-expanded', 'false');
     expect(container.querySelector('[aria-pressed]')).toBeNull();
   });
