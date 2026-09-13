@@ -176,6 +176,7 @@ type stubDB struct {
 	setCapabilityCalls []setCapabilityCall
 
 	upsertNodeCalls            int
+	upsertNodeID               uuid.UUID
 	nodeCoordinatesChanged     bool
 	upsertChannelCalls         int
 	upsertChannelHashOnlyCalls int
@@ -226,7 +227,7 @@ func (s *stubDB) InsertObservation(_ context.Context, _ InsertObservationParams)
 func (s *stubDB) SetNodeDefaultScope(_ context.Context, _ uuid.UUID, _ int32) error { return nil }
 func (s *stubDB) UpsertNode(_ context.Context, _ UpsertNodeParams, _ RadioSettings) (uuid.UUID, bool, error) {
 	s.upsertNodeCalls++
-	return uuid.Nil, s.nodeCoordinatesChanged, nil
+	return s.upsertNodeID, s.nodeCoordinatesChanged, nil
 }
 func (s *stubDB) UpsertNodeIATA(_ context.Context, _ uuid.UUID, _ string) error { return nil }
 func (s *stubDB) UpsertNodeShortID(_ context.Context, _ uuid.UUID, _ string, _ []byte) error {
@@ -355,7 +356,7 @@ func TestRunCapabilityDetection_HashSizeOne_DoesNothing(t *testing.T) {
 	}
 }
 
-func TestRunCapabilityDetection_NonTrace_HashSize2_SetsPaths(t *testing.T) {
+func TestRunCapabilityDetection_NonTrace_HashSize2_SetsPathsAndTraces(t *testing.T) {
 	w, db := newTestWorker()
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	w.runCapabilityDetection(context.Background(), 4, 2, []uuid.UUID{nodeID})
@@ -365,8 +366,8 @@ func TestRunCapabilityDetection_NonTrace_HashSize2_SetsPaths(t *testing.T) {
 	if !db.setCapabilityCalls[0].paths {
 		t.Error("expected paths=true for non-trace hashSize 2")
 	}
-	if db.setCapabilityCalls[0].traces {
-		t.Error("expected traces=false for non-trace hashSize 2")
+	if !db.setCapabilityCalls[0].traces {
+		t.Error("expected traces=true because multibyte paths imply firmware with multibyte traces")
 	}
 }
 

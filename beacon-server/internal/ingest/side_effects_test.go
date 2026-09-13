@@ -212,6 +212,24 @@ func TestHandlePacket_Advert_SkipsChannelIATA(t *testing.T) {
 	}
 }
 
+func TestHandlePacket_Advert_ZeroHopMultibyteMode_SetsOriginCapabilities(t *testing.T) {
+	w, db := newTestWorker()
+	db.observationInserted = true
+	db.upsertNodeID = uuid.New()
+	packet := buildAdvertPacket(t, false)
+	packet.PathLength = byte((3 - 1) << 6) // mode 2: 3-byte hashes, zero accumulated hops
+
+	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, packet))
+
+	if len(db.setCapabilityCalls) != 1 {
+		t.Fatalf("expected one capability update for the advert origin, got %d", len(db.setCapabilityCalls))
+	}
+	call := db.setCapabilityCalls[0]
+	if call.nodeID != db.upsertNodeID || !call.paths || !call.traces {
+		t.Errorf("unexpected capability update: %+v", call)
+	}
+}
+
 func buildTracePacket(t *testing.T) *meshcore.Packet {
 	t.Helper()
 	payload, err := (&meshcore.Trace{Tag: 0xdeadbeef, AuthCode: 1}).ToBytes()
@@ -372,6 +390,14 @@ func TestHandlePacket_Trace_TwoByteHashes_UniqueResolution_UpsertsHopNeighbor(t 
 	if db.upsertNeighborCalls != 1 {
 		t.Errorf("expected 1 trace neighbor upsert for a uniquely-resolved 2-byte pair, got %d", db.upsertNeighborCalls)
 	}
+	if len(db.setCapabilityCalls) != 2 {
+		t.Fatalf("expected capability evidence for both trace hops, got %d calls", len(db.setCapabilityCalls))
+	}
+	for _, call := range db.setCapabilityCalls {
+		if call.paths || !call.traces {
+			t.Errorf("unexpected trace capability update: %+v", call)
+		}
+	}
 }
 
 // If a trace hash matches more than one node in the database — i.e. there IS
@@ -388,6 +414,9 @@ func TestHandlePacket_Trace_AmbiguousResolution_SkipsHopNeighbor(t *testing.T) {
 
 	if db.upsertNeighborCalls != 0 {
 		t.Errorf("expected 0 trace neighbor upserts for an ambiguous hash, got %d", db.upsertNeighborCalls)
+	}
+	if len(db.setCapabilityCalls) != 0 {
+		t.Errorf("expected 0 capability updates for an ambiguous trace, got %d", len(db.setCapabilityCalls))
 	}
 }
 

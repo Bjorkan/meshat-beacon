@@ -345,6 +345,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	// below), so the "physical route" hashes for resolvedPath/known-route purposes come
 	// instead from the TRACE payload's own embedded PathHashes (the path being probed).
 	var traceRawHashes [][]byte
+	var traceHashSize uint8
 	// 1-byte source/destination hashes for ambiguous prefix resolution (REQUEST, RESPONSE,
 	// TEXT_MESSAGE, PATH, ANON_REQ's destination). GRP_TXT/GRP_DATA/TRACE have no such
 	// fields and are left nil.
@@ -529,7 +530,8 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		trace, err := meshcore.TraceFromBytes(packet.Payload)
 		if err == nil {
 			traceTag = uint32ToBytes(trace.Tag)
-			hashSize := int(trace.PathHashSize())
+			traceHashSize = trace.PathHashSize()
+			hashSize := int(traceHashSize)
 			hashes := make([]string, 0)
 			rawHashes := make([][]byte, 0)
 			for i := 0; i+hashSize <= len(trace.PathHashes); i += hashSize {
@@ -812,10 +814,16 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		log.Printf("ingest[%s]: path resolution failed: %v", w.cfg.BrokerName, err)
 	}
 	var resolvedIDs []uuid.UUID
-	for _, entries := range resolved {
-		for _, e := range entries {
-			resolvedIDs = append(resolvedIDs, e.NodeID)
+	seenCapabilityHashes := make(map[string]struct{}, len(hashes))
+	for _, hash := range hashes {
+		key := hex.EncodeToString(hash)
+		entries := resolved[key]
+		if _, duplicate := seenCapabilityHashes[key]; duplicate || len(entries) != 1 {
+			resolvedIDs = nil
+			break
 		}
+		seenCapabilityHashes[key] = struct{}{}
+		resolvedIDs = append(resolvedIDs, entries[0].NodeID)
 	}
 	if len(hashes) > 0 && resolved != nil {
 		allHigh := true
@@ -880,7 +888,11 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 			prevID, prevOK = currID, currOK
 		}
 	}
-	w.runCapabilityDetection(ctx, packet.PayloadType(), packet.PathHashSize(), resolvedIDs)
+	capabilityHashSize := packet.PathHashSize()
+	if packet.PayloadType() == meshcore.PayloadTypeTrace {
+		capabilityHashSize = traceHashSize
+	}
+	w.runCapabilityDetection(ctx, packet.PayloadType(), capabilityHashSize, resolvedIDs)
 
 	var resolvedSource, resolvedDestination *api.ResolvedHop
 	if packet.PayloadType() == meshcore.PayloadTypeAdvert && originPubkey != nil {

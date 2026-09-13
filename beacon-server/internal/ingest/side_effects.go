@@ -13,6 +13,7 @@ import (
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
+	"github.com/google/uuid"
 	"github.com/meshcore-go/meshcore-go"
 )
 
@@ -103,6 +104,9 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 			log.Printf("ingest[%s]: db: upsert node failed: %v", w.cfg.BrokerName, err)
 			return
 		}
+		// The signed advert identifies its origin exactly. Its configured path hash width
+		// is therefore capability evidence even when the advert was heard with zero hops.
+		w.runCapabilityDetection(ctx, packet.PayloadType(), packet.PathHashSize(), []uuid.UUID{nodeID})
 		// invalidate cache for this node
 		if w.onNodeUpsert != nil {
 			w.onNodeUpsert(ctx, nodeID)

@@ -15,7 +15,8 @@ import (
 // Rules (from design doc):
 //   - hash_size == 1: do nothing (proves nothing about firmware)
 //   - duplicate hash prefixes within the path: skip entirely
-//   - non-trace + hash_size 2 or 3 → supports_multibyte_paths = TRUE
+//   - non-trace + hash_size 2 or 3 → both flags TRUE (path support requires
+//     firmware 1.14+, which also supports multibyte traces from 1.11+)
 //   - trace (0x09)  + hash_size 2 or 4 → supports_multibyte_traces = TRUE
 func (w *Worker) runCapabilityDetection(ctx context.Context, payloadType uint8, hashSize uint8, resolvedNodeIDs []uuid.UUID) {
 	if hashSize < 2 {
@@ -24,7 +25,7 @@ func (w *Worker) runCapabilityDetection(ctx context.Context, payloadType uint8, 
 	for _, nodeID := range resolvedNodeIDs {
 		switch {
 		case payloadType != 0x09 && (hashSize == 2 || hashSize == 3):
-			_ = w.db.SetNodeCapability(ctx, nodeID, true, false)
+			_ = w.db.SetNodeCapability(ctx, nodeID, true, true)
 		case payloadType == 0x09 && (hashSize == 2 || hashSize == 4):
 			_ = w.db.SetNodeCapability(ctx, nodeID, false, true)
 		}
