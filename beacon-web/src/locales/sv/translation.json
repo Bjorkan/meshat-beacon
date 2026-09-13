@@ -4,7 +4,8 @@
     "direction": "ltr"
   },
   "app": {
-    "tagline": "Nätverksanalys för MeshCore"
+    "tagline": "Nätverksanalys för MeshCore",
+    "footerAttribution": "Meshats fork of Beacon"
   },
   "common": {
     "retry": "Försök igen",

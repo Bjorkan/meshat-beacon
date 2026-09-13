@@ -6,7 +6,6 @@ import { RegionProvider } from '../../src/hooks/useRegion';
 import { ALL_REGIONS } from '../../src/hooks/region-selection';
 import { getIatas, getRegions, getRegion } from '../../src/api/client';
 import type { WsManager } from '../../src/api/ws-manager';
-import pkg from '../../package.json';
 
 vi.mock('../../src/api/client', () => ({
   getIatas: vi.fn(),
@@ -46,10 +45,12 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
-  it('footer shows the package.json version', () => {
+  it('footer shows the product attribution without a version', () => {
     vi.mocked(getIatas).mockResolvedValue([]);
     renderShell();
-    expect(screen.getByText(`Meshat.se v${pkg.version}`)).toBeInTheDocument();
+    const footer = screen.getByText('Meshats fork of Beacon').closest('footer');
+    expect(footer).toBeInTheDocument();
+    expect(footer).not.toHaveTextContent(/v\d+\.\d+\.\d+/);
   });
 
   it('region picker shows an error state when the IATA list fails to load', async () => {

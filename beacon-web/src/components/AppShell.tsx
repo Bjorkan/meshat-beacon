@@ -22,7 +22,6 @@ import {
   ENABLED_TABS,
   ENABLED_THEME_IDS,
   selectableThemes,
-  APP_NAME,
   GITHUB_URL,
 } from '../lib/constants';
 import type { WsManager } from '../api/ws-manager';
@@ -538,9 +537,7 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
       </main>
 
       <footer className="hidden lg:flex items-center px-4 py-1.5 bg-bg-surface border-t border-border font-mono text-[11px] text-text-dim shrink-0">
-        <span>
-          {APP_NAME} v{__APP_VERSION__}
-        </span>
+        <span>{t('app.footerAttribution')}</span>
       </footer>
 
       <BottomNav activeTab={activeTab} onTabChange={onTabChange} />
