@@ -6,7 +6,7 @@ import { ScopeTag } from '../../components/ScopeTag';
 import { payloadTypeVariant } from '../../components/badge-utils';
 import { PAYLOAD_TYPE_NAMES, shortRouteTypeName, type PayloadTypeValue } from '../../types/enums';
 import type { PacketSummary } from '../../types/api';
-import { GRID_TEMPLATE } from './packet-grid';
+import { GRID_TEMPLATE, PACKET_TABLE_X_PADDING } from './packet-grid';
 import { InlinePacketPath } from './InlinePacketPath';
 
 interface PacketTableRowProps {
@@ -45,7 +45,7 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className="grid w-full items-center gap-x-2 px-2 py-1 text-left text-[11px] cursor-pointer"
+        className={`grid w-full items-center gap-x-2 ${PACKET_TABLE_X_PADDING} py-1 text-left text-[11px] cursor-pointer`}
         style={{ gridTemplateColumns: GRID_TEMPLATE }}
       >
         {/* Fixed square cell so the chevron spins in place: as a grid item a bare

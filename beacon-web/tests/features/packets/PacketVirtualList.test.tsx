@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { PacketVirtualList } from '../../../src/features/packets/PacketVirtualList';
-import { GRID_MIN_WIDTH } from '../../../src/features/packets/packet-grid';
+import { GRID_MIN_WIDTH, PACKET_TABLE_X_PADDING } from '../../../src/features/packets/packet-grid';
 import type { PacketSummary } from '../../../src/types/api';
 
 // PacketExpansion fetches through usePacketDetail; stub it so the list renders without a query client.
@@ -276,6 +276,51 @@ describe('PacketVirtualList horizontal containment', () => {
     } finally {
       setMobile(false);
     }
+  });
+});
+
+// The table surface contract from issue #84: the desktop scroll region runs full-bleed (no dead
+// gutter — see #76) while header and row CONTENT share the toolbar's px-4 gutter via one token.
+// Backgrounds and separators stay on the outer elements so they reach the true surface edge, and
+// the grid minimum width accounts for the wider gutter.
+describe('PacketVirtualList desktop surface', () => {
+  it('keeps the desktop scroll region edge-to-edge with no container padding', () => {
+    const { container } = renderWithClient(
+      <PacketVirtualList packets={many(30)} expandedHash={null} {...makeHandlers()} />,
+    );
+
+    const root = scroller(container);
+    expect(root).not.toHaveClass('px-4');
+    expect(root).not.toHaveClass('px-2');
+  });
+
+  it('applies the shared content gutter to header and rows, not the scroll container', () => {
+    const { container } = renderWithClient(
+      <PacketVirtualList packets={[pkt('AA11')]} expandedHash={null} {...makeHandlers()} />,
+    );
+
+    const header = screen.getAllByText('Hash')[0]!.parentElement as HTMLElement;
+    const row = screen.getByRole('button');
+    expect(header).toHaveClass(PACKET_TABLE_X_PADDING);
+    expect(row).toHaveClass(PACKET_TABLE_X_PADDING);
+    // the gutter belongs inside the surface: the scroll region itself must stay clean
+    const root = scroller(container);
+    for (const cls of root.className.split(/\s+/)) {
+      if (cls.startsWith('px-')) throw new Error(`scroll container must not carry ${cls}`);
+    }
+  });
+
+  it('applies the shared content gutter to the expansion surface', () => {
+    renderWithClient(
+      <PacketVirtualList packets={[pkt('AA11')]} expandedHash="AA11" {...makeHandlers()} />,
+    );
+
+    expect(screen.getByTestId('packet-expansion')).toHaveClass(PACKET_TABLE_X_PADDING);
+  });
+
+  it('sizes GRID_MIN_WIDTH for the shared gutter', () => {
+    // 41.5rem of fixed/minmax tracks + 8 × 0.5rem gaps + the 2rem gutter
+    expect(GRID_MIN_WIDTH).toBe('47.5rem');
   });
 });
 

@@ -6,6 +6,7 @@ import { Timestamp } from '../../components/Timestamp';
 import { usePacketDetail } from './usePacketDetail';
 import { ObservationTable } from './ObservationTable';
 import { buildPacketPathResult } from '../map/packet-path';
+import { PACKET_TABLE_X_PADDING } from './packet-grid';
 
 // Roughly what fits the scroll cap; observations are unbounded server-side.
 const SKELETON_ROW_CAP = 12;
@@ -66,7 +67,7 @@ export function PacketExpansion({
     <div
       data-testid="packet-expansion"
       id={`packet-expansion-${packet.packetHash}`}
-      className="bg-bg-surface border-l-2 border-primary pl-6 pr-3 py-2"
+      className={`bg-bg-surface border-l-2 border-primary ${PACKET_TABLE_X_PADDING} py-2`}
     >
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-2 text-[11px] whitespace-nowrap">
         <span className="text-text-muted">

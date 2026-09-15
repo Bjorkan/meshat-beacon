@@ -134,7 +134,10 @@ export function PacketVirtualList({
       {/* Desktop grids own their horizontal overflow here: the wrapper holds the header and the
           virtualized rows at the grid's real minimum width so a narrowed container scrolls this
           region instead of clipping columns or widening the page. One wrapper (not separate
-          header/body scrollers) keeps the sticky header and rows aligned while scrolled. */}
+          header/body scrollers) keeps the sticky header and rows aligned while scrolled.
+          The scroll region itself stays edge-to-edge (no dead gutter — see #76); the deliberate
+          content gutter lives inside header/rows via PACKET_TABLE_X_PADDING, matching the
+          toolbar above, so backgrounds and separators terminate at the true surface edge. */}
       <div style={isMobile ? undefined : { minWidth: GRID_MIN_WIDTH }}>
         <PacketTableHeader />
         <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
