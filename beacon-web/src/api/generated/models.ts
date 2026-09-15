@@ -3,11 +3,13 @@
 
 export type AdvertObservation = { heardAt?: number; hopCount?: number; iata?: string; id?: number; nodeName?: string; nodePublicKey?: string; packetHash?: string; payloadType?: number; payloadTypeName?: string; rssi?: number; snr?: number; };
 
-export type Channel = { channelHash?: string; hashtag?: string; id?: number; isHashtag?: boolean; keyFingerprint?: string; keyKnown?: boolean; lastSeen?: number; messageCount?: number; name?: string; };
+export type Channel = { channelHash?: string; hashtag?: string; id?: number; isHashtag?: boolean; keyFingerprint?: string; keyKnown?: boolean; kind?: ChannelKind; lastSeen?: number; messageCount?: number; name?: string; };
+
+export type ChannelKind = "public" | "private" | "hashtag" | "unknown";
 
 export type ChannelMessage = { channelHash?: string; content?: string; id?: number; observationCount?: number; packetHash?: string; senderName?: string; sentAt?: number; };
 
-export type ChannelSummary = { channelHash?: string; id?: number; isHashtag?: boolean; keyKnown?: boolean; lastSeen?: number; name?: string; };
+export type ChannelSummary = { channelHash?: string; id?: number; isHashtag?: boolean; keyKnown?: boolean; kind?: ChannelKind; lastSeen?: number; name?: string; };
 
 export type ClockDriftEntry = { clockCheckedAt?: number; clockDriftSeconds?: number; iatas?: Array<NodeIATA>; nodeId?: string; nodeName?: string; nodeType?: number; nodeTypeName?: string; };
 

@@ -1398,6 +1398,20 @@ func (mr *MockQuerierMockRecorder) TouchPackets(ctx, arg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TouchPackets", reflect.TypeOf((*MockQuerier)(nil).TouchPackets), ctx, arg)
 }
 
+// UpdateConfiguredChannelMetadata mocks base method.
+func (m *MockQuerier) UpdateConfiguredChannelMetadata(ctx context.Context, arg db.UpdateConfiguredChannelMetadataParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConfiguredChannelMetadata", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateConfiguredChannelMetadata indicates an expected call of UpdateConfiguredChannelMetadata.
+func (mr *MockQuerierMockRecorder) UpdateConfiguredChannelMetadata(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConfiguredChannelMetadata", reflect.TypeOf((*MockQuerier)(nil).UpdateConfiguredChannelMetadata), ctx, arg)
+}
+
 // UpdateObserverRegionScope mocks base method.
 func (m *MockQuerier) UpdateObserverRegionScope(ctx context.Context, arg db.UpdateObserverRegionScopeParams) error {
 	m.ctrl.T.Helper()

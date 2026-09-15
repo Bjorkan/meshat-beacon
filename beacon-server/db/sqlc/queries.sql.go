@@ -4045,6 +4045,39 @@ func (q *Queries) TouchPackets(ctx context.Context, arg TouchPacketsParams) erro
 	return err
 }
 
+const updateConfiguredChannelMetadata = `-- name: UpdateConfiguredChannelMetadata :exec
+UPDATE channels SET
+  name = $1,
+  hashtag = $2,
+  is_hashtag = $3,
+  is_public = $4,
+  key_known = TRUE
+WHERE channel_hash = $5
+  AND key_fingerprint = $6
+`
+
+type UpdateConfiguredChannelMetadataParams struct {
+	Name           *string `json:"name"`
+	Hashtag        *string `json:"hashtag"`
+	IsHashtag      *bool   `json:"is_hashtag"`
+	IsPublic       *bool   `json:"is_public"`
+	ChannelHash    []byte  `json:"channel_hash"`
+	KeyFingerprint []byte  `json:"key_fingerprint"`
+}
+
+// Refresh semantic metadata for an already-observed channel without changing activity timestamps.
+func (q *Queries) UpdateConfiguredChannelMetadata(ctx context.Context, arg UpdateConfiguredChannelMetadataParams) error {
+	_, err := q.db.Exec(ctx, updateConfiguredChannelMetadata,
+		arg.Name,
+		arg.Hashtag,
+		arg.IsHashtag,
+		arg.IsPublic,
+		arg.ChannelHash,
+		arg.KeyFingerprint,
+	)
+	return err
+}
+
 const updateObserverRegionScope = `-- name: UpdateObserverRegionScope :exec
 UPDATE observers SET region_scope = $2 WHERE id = $1
 `
@@ -4124,22 +4157,36 @@ func (q *Queries) UpdateObserverStatus(ctx context.Context, arg UpdateObserverSt
 
 const upsertChannel = `-- name: UpsertChannel :one
 
-INSERT INTO channels (channel_hash, key_fingerprint, name, hashtag, is_hashtag, key_known, last_seen)
-VALUES ($1, $2::bytea, $3, $4, $5, ($2 IS NOT NULL), NOW())
+INSERT INTO channels (channel_hash, key_fingerprint, name, hashtag, is_hashtag, is_public, key_known, last_seen)
+VALUES (
+  $1,
+  $2::bytea,
+  $3,
+  $4,
+  $5,
+  $6,
+  ($2 IS NOT NULL),
+  NOW()
+)
 ON CONFLICT (channel_hash, key_fingerprint) DO UPDATE SET
   last_seen     = NOW(),
   name          = COALESCE(EXCLUDED.name, channels.name),
-  message_count = CASE WHEN $6 THEN channels.message_count + 1 ELSE channels.message_count END
+  hashtag       = EXCLUDED.hashtag,
+  is_hashtag    = EXCLUDED.is_hashtag,
+  is_public     = EXCLUDED.is_public,
+  key_known     = TRUE,
+  message_count = CASE WHEN $7::boolean THEN channels.message_count + 1 ELSE channels.message_count END
 RETURNING id, channel_hash, key_fingerprint, name, hashtag, is_hashtag, is_public, key_known, first_seen, last_seen, message_count
 `
 
 type UpsertChannelParams struct {
-	ChannelHash  []byte  `json:"channel_hash"`
-	Column2      []byte  `json:"column_2"`
-	Name         *string `json:"name"`
-	Hashtag      *string `json:"hashtag"`
-	IsHashtag    *bool   `json:"is_hashtag"`
-	MessageCount *int64  `json:"message_count"`
+	ChannelHash      []byte  `json:"channel_hash"`
+	KeyFingerprint   []byte  `json:"key_fingerprint"`
+	Name             *string `json:"name"`
+	Hashtag          *string `json:"hashtag"`
+	IsHashtag        *bool   `json:"is_hashtag"`
+	IsPublic         *bool   `json:"is_public"`
+	IncrementMessage bool    `json:"increment_message"`
 }
 
 // ============================================================
@@ -4150,11 +4197,12 @@ type UpsertChannelParams struct {
 func (q *Queries) UpsertChannel(ctx context.Context, arg UpsertChannelParams) (Channel, error) {
 	row := q.db.QueryRow(ctx, upsertChannel,
 		arg.ChannelHash,
-		arg.Column2,
+		arg.KeyFingerprint,
 		arg.Name,
 		arg.Hashtag,
 		arg.IsHashtag,
-		arg.MessageCount,
+		arg.IsPublic,
+		arg.IncrementMessage,
 	)
 	var i Channel
 	err := row.Scan(

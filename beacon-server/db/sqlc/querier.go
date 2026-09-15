@@ -233,6 +233,8 @@ type Querier interface {
 	// from regressing a newer write-through (e.g. a status update).
 	TouchObservers(ctx context.Context, arg TouchObserversParams) error
 	TouchPackets(ctx context.Context, arg TouchPacketsParams) error
+	// Refresh semantic metadata for an already-observed channel without changing activity timestamps.
+	UpdateConfiguredChannelMetadata(ctx context.Context, arg UpdateConfiguredChannelMetadataParams) error
 	// Records the observer's own OTA-reported region scope, from the "self"
 	// field of a /neighbors report. Always known (not queried OTA), so this
 	// unconditionally overwrites, unlike the neighbor-side region_scope.

@@ -1,10 +1,12 @@
+export type ChannelKind = 'public' | 'private' | 'hashtag' | 'unknown';
+
 export interface ChannelSummary {
   id: number;
   name: string | null;
   channelHash: string;
   lastSeen: number; // epoch ms, time of most recent message
-  isHashtag: boolean;
   keyKnown: boolean;
+  kind: ChannelKind;
 }
 
 export interface ChannelDetail extends ChannelSummary {
@@ -15,7 +17,7 @@ export interface ChannelDetail extends ChannelSummary {
 
 export function channelDisplayName(ch: ChannelSummary): string {
   if (!ch.name) return ch.channelHash;
-  if (ch.isHashtag || ch.name === 'Public') return ch.name;
+  if (ch.kind === 'hashtag' || ch.kind === 'public') return ch.name;
   return `#${ch.name}`;
 }
 

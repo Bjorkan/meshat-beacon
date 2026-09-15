@@ -268,10 +268,11 @@ type ChannelKeysConfig struct {
 	Keys map[string]ExplicitKeyConfig `yaml:"keys"`
 }
 
-// ExplicitKeyConfig holds an explicit channel key and optional display name.
+// ExplicitKeyConfig holds an explicit channel key and its semantic metadata.
 type ExplicitKeyConfig struct {
-	Key  string `yaml:"key"`  // hex-encoded key bytes
-	Name string `yaml:"name"` // optional display name
+	Key    string `yaml:"key"`    // hex-encoded key bytes
+	Name   string `yaml:"name"`   // optional display name
+	Public bool   `yaml:"public"` // true only for the MeshCore public channel
 }
 
 // IATAConfig holds optional overrides for a known IATA code.

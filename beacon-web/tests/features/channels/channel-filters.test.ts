@@ -10,16 +10,16 @@ const ch = (over: Partial<ChannelSummary>): ChannelSummary => ({
   name: null,
   channelHash: 'ab',
   lastSeen: 0,
-  isHashtag: false,
   keyKnown: false,
+  kind: 'unknown',
   ...over,
 });
 
 const NONE: ChannelFilters = { search: '', searchField: 'name', keyFilter: '', hashtagFilter: '' };
 
 const channels: ChannelSummary[] = [
-  ch({ id: 1, name: 'Public', keyKnown: true, channelHash: '11' }),
-  ch({ id: 2, name: 'weather', isHashtag: true, keyKnown: true, channelHash: '22' }),
+  ch({ id: 1, name: 'Public', keyKnown: true, kind: 'public', channelHash: '11' }),
+  ch({ id: 2, name: 'weather', kind: 'hashtag', keyKnown: true, channelHash: '22' }),
   ch({ id: 3, name: null, keyKnown: false, channelHash: 'deadbeef' }),
 ];
 

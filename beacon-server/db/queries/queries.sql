@@ -880,13 +880,37 @@ ON CONFLICT (node_id, iata) DO NOTHING;
 -- name: UpsertChannel :one
 -- Upsert a channel by (hash, key_fingerprint). Pass NULL fingerprint for
 -- hash-only records (key unknown). Returns the channel row.
-INSERT INTO channels (channel_hash, key_fingerprint, name, hashtag, is_hashtag, key_known, last_seen)
-VALUES ($1, $2::bytea, $3, $4, $5, ($2 IS NOT NULL), NOW())
+INSERT INTO channels (channel_hash, key_fingerprint, name, hashtag, is_hashtag, is_public, key_known, last_seen)
+VALUES (
+  sqlc.arg(channel_hash),
+  sqlc.arg(key_fingerprint)::bytea,
+  sqlc.narg(name),
+  sqlc.narg(hashtag),
+  sqlc.arg(is_hashtag),
+  sqlc.arg(is_public),
+  (sqlc.arg(key_fingerprint) IS NOT NULL),
+  NOW()
+)
 ON CONFLICT (channel_hash, key_fingerprint) DO UPDATE SET
   last_seen     = NOW(),
   name          = COALESCE(EXCLUDED.name, channels.name),
-  message_count = CASE WHEN $6 THEN channels.message_count + 1 ELSE channels.message_count END
+  hashtag       = EXCLUDED.hashtag,
+  is_hashtag    = EXCLUDED.is_hashtag,
+  is_public     = EXCLUDED.is_public,
+  key_known     = TRUE,
+  message_count = CASE WHEN sqlc.arg(increment_message)::boolean THEN channels.message_count + 1 ELSE channels.message_count END
 RETURNING *;
+
+-- name: UpdateConfiguredChannelMetadata :exec
+-- Refresh semantic metadata for an already-observed channel without changing activity timestamps.
+UPDATE channels SET
+  name = sqlc.narg(name),
+  hashtag = sqlc.narg(hashtag),
+  is_hashtag = sqlc.arg(is_hashtag),
+  is_public = sqlc.arg(is_public),
+  key_known = TRUE
+WHERE channel_hash = sqlc.arg(channel_hash)
+  AND key_fingerprint = sqlc.arg(key_fingerprint);
 
 -- name: UpsertChannelHashOnly :one
 INSERT INTO channels (channel_hash, last_seen)

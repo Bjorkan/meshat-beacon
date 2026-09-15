@@ -48,6 +48,14 @@ definitions:
       keyKnown:
         description: true if Beacon has a decryption key for this channel
         type: boolean
+      kind:
+        allOf:
+        - $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind'
+        enum:
+        - public
+        - private
+        - hashtag
+        - unknown
       lastSeen:
         description: epoch ms, time of most recent message
         type: integer
@@ -57,6 +65,18 @@ definitions:
         description: display name from config or nil
         type: string
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind:
+    enum:
+    - public
+    - private
+    - hashtag
+    - unknown
+    type: string
+    x-enum-varnames:
+    - ChannelKindPublic
+    - ChannelKindPrivate
+    - ChannelKindHashtag
+    - ChannelKindUnknown
   github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelMessage:
     properties:
       channelHash:
@@ -94,6 +114,14 @@ definitions:
       keyKnown:
         description: true if Beacon has a decryption key for this channel
         type: boolean
+      kind:
+        allOf:
+        - $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind'
+        enum:
+        - public
+        - private
+        - hashtag
+        - unknown
       lastSeen:
         description: epoch ms, time of most recent message
         type: integer

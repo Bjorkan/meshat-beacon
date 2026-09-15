@@ -24,8 +24,8 @@ export function filterChannels(
     }
     if (filters.keyFilter === 'known' && !ch.keyKnown) return false;
     if (filters.keyFilter === 'unknown' && ch.keyKnown) return false;
-    if (filters.hashtagFilter === 'true' && !ch.isHashtag) return false;
-    if (filters.hashtagFilter === 'false' && ch.isHashtag) return false;
+    if (filters.hashtagFilter === 'true' && ch.kind !== 'hashtag') return false;
+    if (filters.hashtagFilter === 'false' && ch.kind === 'hashtag') return false;
     return true;
   });
 }

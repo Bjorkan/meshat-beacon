@@ -57,10 +57,12 @@ channel_keys:
 
   # Explicit keys: provide the channel hash (hex) and key (hex) directly.
   # An optional name can be set for display purposes.
+  # Set public: true for the public channel; other explicit keys are private.
   keys:
     "11":
       key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
       name: "Public"
+      public: true
 
 # Regional transport scopes for matching TRANSPORT_FLOOD packets.
 # Plain names have # prepended automatically (e.g. "bc" → "#bc").

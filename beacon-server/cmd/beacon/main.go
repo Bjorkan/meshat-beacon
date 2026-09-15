@@ -176,6 +176,7 @@ func main() {
 			Fingerprint: fingerprint,
 			Hashtag:     tag,
 			Name:        "#" + tag,
+			Kind:        keystore.ChannelKindHashtag,
 		}
 		if !keystore.EntryExists(entries[hashHex], entry) {
 			entries[hashHex] = append(entries[hashHex], entry)
@@ -190,14 +191,34 @@ func main() {
 			log.Printf("warning: invalid channel key for hash %s, skipping: %v", hashHex, err)
 			continue
 		}
+		kind := keystore.ChannelKindPrivate
+		if keyCfg.Public {
+			kind = keystore.ChannelKindPublic
+		}
 		entry := keystore.Entry{
 			Key:         key,
 			Fingerprint: keystore.Fingerprint(key),
 			Name:        keyCfg.Name,
+			Kind:        kind,
 		}
 		if !keystore.EntryExists(entries[hashHex], entry) {
 			entries[hashHex] = append(entries[hashHex], entry)
 			log.Printf("config: loaded explicit channel key for hash %s name=%q", hashHex, keyCfg.Name)
+		}
+	}
+
+	// Refresh semantic metadata on channels that were decrypted before channel kinds were
+	// persisted. Matching by hash and fingerprint keeps one-byte hash collisions isolated.
+	for hashHex, channelEntries := range entries {
+		channelHash, err := hex.DecodeString(hashHex)
+		if err != nil || len(channelHash) != 1 {
+			log.Printf("warning: invalid channel hash %q, skipping metadata sync", hashHex)
+			continue
+		}
+		for _, entry := range channelEntries {
+			if err := store.UpdateConfiguredChannelMetadata(ctx, channelHash, entry); err != nil {
+				log.Printf("config: failed to sync channel metadata for hash %s: %v", hashHex, err)
+			}
 		}
 	}
 

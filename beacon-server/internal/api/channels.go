@@ -3,6 +3,28 @@
 
 package api
 
+type ChannelKind string
+
+const (
+	ChannelKindPublic  ChannelKind = "public"
+	ChannelKindPrivate ChannelKind = "private"
+	ChannelKindHashtag ChannelKind = "hashtag"
+	ChannelKindUnknown ChannelKind = "unknown"
+)
+
+func ClassifyChannel(keyKnown, isHashtag, isPublic bool) ChannelKind {
+	switch {
+	case !keyKnown:
+		return ChannelKindUnknown
+	case isHashtag:
+		return ChannelKindHashtag
+	case isPublic:
+		return ChannelKindPublic
+	default:
+		return ChannelKindPrivate
+	}
+}
+
 // ChannelMessage represents a single decrypted channel message.
 // Only messages for channels with a known key are stored and returned.
 type ChannelMessage struct {
@@ -17,12 +39,13 @@ type ChannelMessage struct {
 
 // ChannelSummary is the minimal channel representation used in list responses.
 type ChannelSummary struct {
-	ID          int     `json:"id"`
-	Name        *string `json:"name,omitempty"` // display name from config or nil
-	ChannelHash string  `json:"channelHash"`    // hex-encoded single-byte hash
-	LastSeen    int64   `json:"lastSeen"`       // epoch ms, time of most recent message
-	IsHashtag   bool    `json:"isHashtag"`      // true if key was derived from a hashtag PSK
-	KeyKnown    bool    `json:"keyKnown"`       // true if Beacon has a decryption key for this channel
+	ID          int         `json:"id"`
+	Name        *string     `json:"name,omitempty"` // display name from config or nil
+	ChannelHash string      `json:"channelHash"`    // hex-encoded single-byte hash
+	LastSeen    int64       `json:"lastSeen"`       // epoch ms, time of most recent message
+	IsHashtag   bool        `json:"isHashtag"`      // true if key was derived from a hashtag PSK
+	KeyKnown    bool        `json:"keyKnown"`       // true if Beacon has a decryption key for this channel
+	Kind        ChannelKind `json:"kind" enums:"public,private,hashtag,unknown"`
 }
 
 // Channel is the full channel representation including decryption metadata.

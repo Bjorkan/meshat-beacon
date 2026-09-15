@@ -55,8 +55,8 @@ const channel: ChannelSummary = {
   name: 'Public',
   channelHash: 'ch1',
   lastSeen: 3000,
-  isHashtag: false,
   keyKnown: true,
+  kind: 'public',
 };
 
 beforeEach(() => {
@@ -64,6 +64,17 @@ beforeEach(() => {
 });
 
 describe('MessagePanel row keys', () => {
+  it('shows one semantic channel badge', () => {
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(
+      <QueryClientProvider client={qc}>
+        <MessagePanel channel={{ ...channel, name: 'General' }} heardCounts={{}} regionKey="*" />
+      </QueryClientProvider>,
+    );
+    expect(screen.getByText('Public', { selector: 'span' })).toBeInTheDocument();
+    expect(screen.queryByText('Key known')).not.toBeInTheDocument();
+  });
+
   it('keys rows without React key warnings when live messages lack an id', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });

@@ -61,12 +61,12 @@ export function ChannelList({
 
   const { data: channels, isLoading } = useQuery(channelQueries.list({ regionKey, iatas }));
 
-  // "Public" pinned first, then named channels, then unnamed by most recent
+  // Public pinned first, then named channels, then unnamed by most recent.
   const sortedChannels = useMemo(
     () =>
       [...(channels ?? [])].sort((a, b) => {
-        const aPub = a.name === 'Public' ? 1 : 0;
-        const bPub = b.name === 'Public' ? 1 : 0;
+        const aPub = a.kind === 'public' ? 1 : 0;
+        const bPub = b.kind === 'public' ? 1 : 0;
         if (aPub !== bPub) return bPub - aPub;
         if (a.name && !b.name) return -1;
         if (!a.name && b.name) return 1;

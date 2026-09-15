@@ -105,6 +105,7 @@ channel_keys:
     "11":
       key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
       name: "Public"
+      public: true
 
 
 # Regional transport scopes for matching TRANSPORT_FLOOD packets.

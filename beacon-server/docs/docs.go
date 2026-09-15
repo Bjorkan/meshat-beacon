@@ -2559,6 +2559,19 @@ const docTemplate = `{
                     "description": "true if Beacon has a decryption key for this channel",
                     "type": "boolean"
                 },
+                "kind": {
+                    "enum": [
+                        "public",
+                        "private",
+                        "hashtag",
+                        "unknown"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind"
+                        }
+                    ]
+                },
                 "lastSeen": {
                     "description": "epoch ms, time of most recent message",
                     "type": "integer"
@@ -2571,6 +2584,21 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind": {
+            "type": "string",
+            "enum": [
+                "public",
+                "private",
+                "hashtag",
+                "unknown"
+            ],
+            "x-enum-varnames": [
+                "ChannelKindPublic",
+                "ChannelKindPrivate",
+                "ChannelKindHashtag",
+                "ChannelKindUnknown"
+            ]
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelMessage": {
             "type": "object",
@@ -2621,6 +2649,19 @@ const docTemplate = `{
                 "keyKnown": {
                     "description": "true if Beacon has a decryption key for this channel",
                     "type": "boolean"
+                },
+                "kind": {
+                    "enum": [
+                        "public",
+                        "private",
+                        "hashtag",
+                        "unknown"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind"
+                        }
+                    ]
                 },
                 "lastSeen": {
                     "description": "epoch ms, time of most recent message",

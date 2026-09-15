@@ -195,6 +195,8 @@
     "noKey": "No key",
     "keyKnown": "Key known",
     "hashtag": "Hashtag",
+    "public": "Public",
+    "private": "Private",
     "unknownKeyWarning": "Key not known, messages may not be decrypted",
     "noMessages": "No messages"
   },

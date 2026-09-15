@@ -195,6 +195,8 @@
     "noKey": "Ingen nyckel",
     "keyKnown": "Nyckel känd",
     "hashtag": "Hashtagg",
+    "public": "Publik",
+    "private": "Privat",
     "unknownKeyWarning": "Nyckeln är okänd, meddelanden kanske inte kan dekrypteras",
     "noMessages": "Inga meddelanden"
   },

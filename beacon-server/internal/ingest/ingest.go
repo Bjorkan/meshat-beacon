@@ -166,7 +166,7 @@ type DB interface {
 
 	// UpsertChannel upserts a channel row by (hash, keyFingerprint) and returns its integer ID.
 	// Pass nil keyFingerprint to record a hash-only row when the key is unknown.
-	UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string) (int, error)
+	UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string, kind keystore.ChannelKind) (int, error)
 
 	// UpsertChannelHashOnly upserts a hash-only channel row for cases where the
 	// channel key is unknown. Uses the partial unique index to ensure only one

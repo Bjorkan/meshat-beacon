@@ -128,7 +128,7 @@ func TestHandlePayloadTypeSideEffects_GrpTxt_KnownKey_OnlyUpsertsKeyedChannel(t 
 	psk := make([]byte, 16)
 	channelHash := byte(0x42)
 	w.keys = &mapKeys{entries: map[byte][]keystore.Entry{
-		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Public", Hashtag: "public"}},
+		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Public", Kind: keystore.ChannelKindPublic}},
 	}}
 	packet := buildGrpTxtPacket(t, channelHash, psk)
 

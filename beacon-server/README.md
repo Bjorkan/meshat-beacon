@@ -159,11 +159,12 @@ channel_keys:
     - meshcore
 
   # Explicit keys: channel hash (hex) and key (hex), with optional display name.
-  # The public MeshCore channel key is included in config.yaml.example.
+  # Mark the public MeshCore channel explicitly; other keyed channels are private.
   keys:
     "11":
       key: "8b3387e9c5cdea6ac9e5edbaa115cd72"
       name: "Public"
+      public: true
 
 # Regional transport scopes for matching TRANSPORT_FLOOD packets.
 # Plain names have # prepended automatically (e.g. "bc" → "#bc").

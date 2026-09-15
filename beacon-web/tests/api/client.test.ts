@@ -271,8 +271,8 @@ describe('getChannels', () => {
     name: 'Public',
     channelHash: '8b',
     lastSeen: 1000,
-    isHashtag: false,
     keyKnown: true,
+    kind: 'public',
   };
 
   it('sends a single-IATA region as the singular iata param the server honors', async () => {
@@ -315,6 +315,14 @@ describe('getChannels', () => {
     await expect(getChannels()).rejects.toThrow(
       'Invalid ChannelSummary response: missing keyKnown',
     );
+  });
+
+  it('rejects a generated response without semantic channel classification', async () => {
+    mockFetchOnce({
+      items: [{ id: 1, name: 'Public', channelHash: '8b', lastSeen: 1000, keyKnown: true }],
+    });
+
+    await expect(getChannels()).rejects.toThrow('Invalid ChannelSummary response: missing kind');
   });
 });
 

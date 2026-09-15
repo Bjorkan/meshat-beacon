@@ -62,7 +62,7 @@ func DecryptGroupText(ctx context.Context, db DB, keys ChannelKeyStore, packetHa
 		return nil, nil
 	}
 
-	channelID, err := db.UpsertChannel(ctx, channelHashBytes, usedEntry.Fingerprint, usedEntry.Name, usedEntry.Hashtag)
+	channelID, err := db.UpsertChannel(ctx, channelHashBytes, usedEntry.Fingerprint, usedEntry.Name, usedEntry.Hashtag, usedEntry.Kind)
 	if err != nil {
 		return nil, fmt.Errorf("upsert channel: %w", err)
 	}

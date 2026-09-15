@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { channelQueries } from '../../api/queries';
 import { Badge } from '../../components/Badge';
+import { ChannelKindBadge } from './ChannelKindBadge';
 import { EmptyState } from '../../components/EmptyState';
 import { Timestamp } from '../../components/Timestamp';
 import { LoadingPill } from '../../components/LoadingPill';
@@ -215,12 +216,7 @@ export function MessagePanel({
           </span>
         </div>
         <div className="flex gap-1">
-          {channel.keyKnown ? (
-            <Badge variant="advert">{t('channels.keyKnown')}</Badge>
-          ) : (
-            <Badge variant="offline">{t('channels.noKey')}</Badge>
-          )}
-          {channel.isHashtag && <Badge variant="group">{t('channels.hashtag')}</Badge>}
+          <ChannelKindBadge kind={channel.kind} />
         </div>
       </div>
 

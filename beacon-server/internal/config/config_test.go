@@ -157,3 +157,28 @@ func TestResolve_RouteDefaults(t *testing.T) {
 		t.Errorf("RouteMinObservations = %d, want 3", r.RouteMinObservations)
 	}
 }
+
+func TestChannelPublicFlagIsExplicit(t *testing.T) {
+	path := t.TempDir() + "/config.yaml"
+	err := os.WriteFile(path, []byte(`channel_keys:
+  keys:
+    "11":
+      name: General
+      public: true
+    "22":
+      name: Public
+    "33":
+      name: Public
+      public: false
+`), 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.ChannelKeys.Keys["11"].Public || cfg.ChannelKeys.Keys["22"].Public || cfg.ChannelKeys.Keys["33"].Public {
+		t.Fatal("public channel classification must depend only on the explicit flag")
+	}
+}

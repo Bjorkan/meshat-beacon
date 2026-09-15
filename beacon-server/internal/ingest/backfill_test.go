@@ -35,7 +35,7 @@ func TestDecryptGroupText_Success(t *testing.T) {
 	psk := make([]byte, 16)
 	channelHash := byte(0x11)
 	keys := &mapKeys{entries: map[byte][]keystore.Entry{
-		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Public", Hashtag: "public"}},
+		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Renamed public", Kind: keystore.ChannelKindPublic}},
 	}}
 	raw := encryptedGroupText(t, channelHash, psk, "ded", "hello")
 
@@ -54,6 +54,9 @@ func TestDecryptGroupText_Success(t *testing.T) {
 	}
 	if db.upsertChannelCalls != 1 {
 		t.Errorf("expected UpsertChannel to be called once, got %d", db.upsertChannelCalls)
+	}
+	if db.upsertChannelKind != keystore.ChannelKindPublic {
+		t.Errorf("expected public channel provenance, got %q", db.upsertChannelKind)
 	}
 }
 

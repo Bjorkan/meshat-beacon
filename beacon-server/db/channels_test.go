@@ -11,6 +11,8 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	mockdb "github.com/MeshCore-Beacon/beacon-server/db/sqlc/mock"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/mock/gomock"
 )
@@ -325,5 +327,70 @@ func TestListChannelMessages_DBError(t *testing.T) {
 	_, err := store.ListChannelMessages(context.Background(), nil, time.Time{}, 10, nil, "", 0)
 	if err == nil {
 		t.Fatal("expected error, got nil")
+	}
+}
+
+func TestChannelKinds_ListAndDetail(t *testing.T) {
+	for _, tc := range []struct {
+		name                   string
+		known, hashtag, public bool
+		want                   api.ChannelKind
+	}{
+		{"Renamed public channel", true, false, true, api.ChannelKindPublic},
+		{"Public", true, false, false, api.ChannelKindPrivate},
+		{"#weather", true, true, false, api.ChannelKindHashtag},
+		{"Unknown", false, false, false, api.ChannelKindUnknown},
+		{"Unknown with stale flags", false, true, true, api.ChannelKindUnknown},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			mock := mockdb.NewMockQuerier(gomock.NewController(t))
+			row := sqlc.Channel{ID: 1, Name: &tc.name, KeyKnown: &tc.known, IsHashtag: &tc.hashtag, IsPublic: &tc.public}
+			mock.EXPECT().ListChannels(gomock.Any(), gomock.Any()).Return([]sqlc.Channel{row}, nil)
+			mock.EXPECT().GetChannelByID(gomock.Any(), int32(1)).Return(row, nil)
+			store := &Store{q: mock}
+			page, err := store.ListChannels(context.Background(), 10, nil, nil, 0)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ch, err := store.GetChannel(context.Background(), 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if page.Items[0].Kind != tc.want || ch.Kind != tc.want {
+				t.Fatalf("list kind %q, detail kind %q; want %q", page.Items[0].Kind, ch.Kind, tc.want)
+			}
+		})
+	}
+}
+
+func TestConfiguredChannelKindPersistence(t *testing.T) {
+	for _, kind := range []keystore.ChannelKind{keystore.ChannelKindPublic, keystore.ChannelKindPrivate, keystore.ChannelKindHashtag} {
+		t.Run(string(kind), func(t *testing.T) {
+			mock := mockdb.NewMockQuerier(gomock.NewController(t))
+			name, tag := "Renamed", ""
+			if kind == keystore.ChannelKindHashtag {
+				tag = "weather"
+			}
+			var tagPtr *string
+			if tag != "" {
+				tagPtr = &tag
+			}
+			hashtag, public := kind == keystore.ChannelKindHashtag, kind == keystore.ChannelKindPublic
+			hash, fingerprint := []byte{0xab}, []byte{1, 2, 3, 4, 5, 6, 7, 8}
+			mock.EXPECT().UpsertChannel(gomock.Any(), sqlc.UpsertChannelParams{
+				ChannelHash: hash, KeyFingerprint: fingerprint, Name: &name, Hashtag: tagPtr, IsHashtag: &hashtag, IsPublic: &public,
+			}).Return(sqlc.Channel{ID: 7}, nil)
+			mock.EXPECT().UpdateConfiguredChannelMetadata(gomock.Any(), sqlc.UpdateConfiguredChannelMetadataParams{
+				ChannelHash: hash, KeyFingerprint: fingerprint, Name: &name, Hashtag: tagPtr, IsHashtag: &hashtag, IsPublic: &public,
+			}).Return(nil)
+			store := &Store{q: mock}
+			id, err := store.UpsertChannel(context.Background(), hash, fingerprint, name, tag, kind)
+			if err != nil || id != 7 {
+				t.Fatalf("id=%d err=%v", id, err)
+			}
+			if err := store.UpdateConfiguredChannelMetadata(context.Background(), hash, keystore.Entry{Fingerprint: fingerprint, Name: name, Hashtag: tag, Kind: kind}); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

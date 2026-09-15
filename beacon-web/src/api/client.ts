@@ -97,8 +97,8 @@ function toChannelSummary(model: Models.ChannelSummary): ChannelSummary {
     name: model.name ?? null,
     channelHash: requiredField(model.channelHash, 'ChannelSummary', 'channelHash'),
     lastSeen: requiredField(model.lastSeen, 'ChannelSummary', 'lastSeen'),
-    isHashtag: requiredField(model.isHashtag, 'ChannelSummary', 'isHashtag'),
     keyKnown: requiredField(model.keyKnown, 'ChannelSummary', 'keyKnown'),
+    kind: requiredField(model.kind, 'ChannelSummary', 'kind'),
   };
 }
 

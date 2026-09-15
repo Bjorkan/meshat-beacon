@@ -12,11 +12,12 @@ import (
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
+	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string) (int, error) {
+func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string, kind keystore.ChannelKind) (int, error) {
 	var namePtr, hashtagPtr *string
 	if name != "" {
 		namePtr = &name
@@ -24,19 +25,41 @@ func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFinger
 	if hashtag != "" {
 		hashtagPtr = &hashtag
 	}
-	isHashtag := hashtag != ""
+	isHashtag := kind == keystore.ChannelKindHashtag
+	isPublic := kind == keystore.ChannelKindPublic
 	row, err := s.q.UpsertChannel(ctx, sqlc.UpsertChannelParams{
-		ChannelHash:  channelHash,
-		Column2:      keyFingerprint, // key_fingerprint
-		Name:         namePtr,
-		Hashtag:      hashtagPtr,
-		IsHashtag:    &isHashtag,
-		MessageCount: nil, // message count bumped separately by InsertChannelMessage
+		ChannelHash:      channelHash,
+		KeyFingerprint:   keyFingerprint,
+		Name:             namePtr,
+		Hashtag:          hashtagPtr,
+		IsHashtag:        &isHashtag,
+		IsPublic:         &isPublic,
+		IncrementMessage: false, // message count bumped separately by InsertChannelMessage
 	})
 	if err != nil {
 		return 0, err
 	}
 	return int(row.ID), nil
+}
+
+func (s *Store) UpdateConfiguredChannelMetadata(ctx context.Context, channelHash []byte, entry keystore.Entry) error {
+	var name, hashtag *string
+	if entry.Name != "" {
+		name = &entry.Name
+	}
+	if entry.Hashtag != "" {
+		hashtag = &entry.Hashtag
+	}
+	isHashtag := entry.Kind == keystore.ChannelKindHashtag
+	isPublic := entry.Kind == keystore.ChannelKindPublic
+	return s.q.UpdateConfiguredChannelMetadata(ctx, sqlc.UpdateConfiguredChannelMetadataParams{
+		Name:           name,
+		Hashtag:        hashtag,
+		IsHashtag:      &isHashtag,
+		IsPublic:       &isPublic,
+		ChannelHash:    channelHash,
+		KeyFingerprint: entry.Fingerprint,
+	})
 }
 
 func (s *Store) UpsertChannelHashOnly(ctx context.Context, channelHash []byte) (int, error) {
@@ -97,13 +120,17 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 	}
 	items := make([]api.ChannelSummary, 0, len(rows))
 	for _, v := range rows {
+		isHashtag := v.IsHashtag != nil && *v.IsHashtag
+		isPublic := v.IsPublic != nil && *v.IsPublic
+		keyKnown := v.KeyKnown != nil && *v.KeyKnown
 		items = append(items, api.ChannelSummary{
 			ID:          int(v.ID),
 			Name:        v.Name,
 			ChannelHash: hex.EncodeToString(v.ChannelHash),
 			LastSeen:    v.LastSeen.Time.UnixMilli(),
-			IsHashtag:   v.IsHashtag != nil && *v.IsHashtag,
-			KeyKnown:    v.KeyKnown != nil && *v.KeyKnown,
+			IsHashtag:   isHashtag,
+			KeyKnown:    keyKnown,
+			Kind:        api.ClassifyChannel(keyKnown, isHashtag, isPublic),
 		})
 	}
 	var nextCursor *int64
@@ -131,6 +158,11 @@ func (s *Store) GetChannel(ctx context.Context, channelID int32) (*api.Channel, 
 			LastSeen:    row.LastSeen.Time.UnixMilli(),
 			IsHashtag:   row.IsHashtag != nil && *row.IsHashtag,
 			KeyKnown:    row.KeyKnown != nil && *row.KeyKnown,
+			Kind: api.ClassifyChannel(
+				row.KeyKnown != nil && *row.KeyKnown,
+				row.IsHashtag != nil && *row.IsHashtag,
+				row.IsPublic != nil && *row.IsPublic,
+			),
 		},
 		Hashtag:      row.Hashtag,
 		MessageCount: 0,

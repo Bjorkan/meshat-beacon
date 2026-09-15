@@ -179,6 +179,7 @@ type stubDB struct {
 	upsertNodeID               uuid.UUID
 	nodeCoordinatesChanged     bool
 	upsertChannelCalls         int
+	upsertChannelKind          keystore.ChannelKind
 	upsertChannelHashOnlyCalls int
 	upsertChannelIATACalls     int
 	upsertTraceIATACalls       int
@@ -283,8 +284,9 @@ func (s *stubDB) ResolvePathHashes(_ context.Context, _ [][]byte) (map[string][]
 	return nil, nil
 }
 
-func (s *stubDB) UpsertChannel(_ context.Context, _ []byte, _ []byte, _, _ string) (int, error) {
+func (s *stubDB) UpsertChannel(_ context.Context, _ []byte, _ []byte, _, _ string, kind keystore.ChannelKind) (int, error) {
 	s.upsertChannelCalls++
+	s.upsertChannelKind = kind
 	return 0, nil
 }
 

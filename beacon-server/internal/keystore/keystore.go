@@ -12,12 +12,21 @@ import (
 	"encoding/hex"
 )
 
+type ChannelKind string
+
+const (
+	ChannelKindPublic  ChannelKind = "public"
+	ChannelKindPrivate ChannelKind = "private"
+	ChannelKindHashtag ChannelKind = "hashtag"
+)
+
 // Entry holds a resolved channel key along with its metadata.
 type Entry struct {
 	Key         []byte // raw key bytes (16 bytes for hashtag channels)
 	Fingerprint []byte // first 8 bytes of SHA256(key)
 	Hashtag     string // set if derived from a hashtag, empty otherwise
 	Name        string // display name, may be empty
+	Kind        ChannelKind
 }
 
 // MapKeyStore maps channel hash hex → list of known key entries.
