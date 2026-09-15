@@ -257,7 +257,7 @@ func (s *Store) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error
 		MinFirmwareVersion:      row.MinFirmwareVersion,
 		FirstSeen:               row.FirstSeen.Time.UnixMilli(),
 		LastSeen:                row.LastSeen.Time.UnixMilli(),
-		Metadata:                row.Metadata,
+		Metadata:                jsonbToAny(row.Metadata),
 	}
 	neighbors, err := s.GetNodeNeighbors(ctx, nodeID)
 	if err != nil {

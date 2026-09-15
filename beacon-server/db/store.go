@@ -9,6 +9,7 @@ package db
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"time"
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
@@ -139,6 +140,21 @@ func uuidFromPgtype(u pgtype.UUID) uuid.UUID {
 // uuidToPgtype converts a plain uuid.UUID to a valid pgtype.UUID.
 func uuidToPgtype(id uuid.UUID) pgtype.UUID {
 	return pgtype.UUID{Bytes: id, Valid: true}
+}
+
+// jsonbToAny decodes a raw JSONB column into a plain JSON value for API
+// responses. Passing the raw []byte through an `any` field would make
+// encoding/json emit it base64-encoded. Undecodable content (not valid JSON)
+// is dropped rather than emitting invalid JSON for the whole response.
+func jsonbToAny(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	var v any
+	if err := json.Unmarshal(b, &v); err != nil {
+		return nil
+	}
+	return v
 }
 
 // tristate converts a *bool to a SQL-friendly string for the ListNodes filter:

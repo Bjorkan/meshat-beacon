@@ -227,3 +227,21 @@ func TestUpsertNodeNeighbor_DistanceCap_AllowsNearbyLink(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestJSONBToAny(t *testing.T) {
+	if jsonbToAny(nil) != nil {
+		t.Error("expected nil for empty JSONB")
+	}
+	obj := jsonbToAny([]byte(`{"model":"Heltec"}`))
+	m, ok := obj.(map[string]any)
+	if !ok || m["model"] != "Heltec" {
+		t.Errorf("expected decoded object, got %#v", obj)
+	}
+	if jsonbToAny([]byte(`[1,2]`)).([]any)[0] != float64(1) {
+		t.Error("expected decoded array")
+	}
+	// Undecodable content is dropped rather than emitting invalid JSON.
+	if jsonbToAny([]byte(`{oops`)) != nil {
+		t.Error("expected nil for undecodable JSONB")
+	}
+}
