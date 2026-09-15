@@ -173,18 +173,20 @@ export function ResolvedHopBlock({
   label,
   onViewNode,
   showSnr = true,
+  truncateLabel = false,
 }: {
   hop: ResolvedHop | undefined;
   label: string;
   onViewNode?: (nodeId: string) => void;
   showSnr?: boolean;
+  truncateLabel?: boolean;
 }) {
   const hasHover = useHasHover();
   const confidence: PathConfidence = hop?.confidence ?? 'none';
   const highNode = confidence === 'high' && hop?.nodes.length === 1 ? hop.nodes[0] : undefined;
   // High-confidence identity is primary; ambiguous/none deliberately keep the raw hash visible.
   const primaryLabel = highNode ? nodeLabel(highNode) : label;
-  const blockClass = `min-w-0 max-w-full [overflow-wrap:anywhere] px-1.5 py-px rounded-sm font-semibold ${HOP_BLOCK_CLASSES[confidence]}`;
+  const blockClass = `min-w-0 max-w-full ${truncateLabel ? 'truncate' : '[overflow-wrap:anywhere]'} px-1.5 py-px rounded-sm font-semibold ${HOP_BLOCK_CLASSES[confidence]}`;
   // mouse-only shortcut: a single high-confidence match jumps straight to the node (touch opens popover)
   const single = hasHover && highNode && onViewNode ? highNode : undefined;
   return (

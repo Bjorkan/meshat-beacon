@@ -130,8 +130,8 @@ describe('TraceList', () => {
     renderTraces();
     fireEvent.click(await screen.findByText('3F2A11C0'));
 
-    expect(await screen.findByText('First')).toBeInTheDocument();
-    expect(screen.getByText('Last')).toBeInTheDocument();
+    expect(await screen.findByRole('columnheader', { name: 'First heard' })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Last heard' })).toBeInTheDocument();
     // First/Last show a relative label (same here, 122ms apart); the exact ms is in the hover tooltip
     const labels = screen.getAllByText(`${timeAgoMs(1717689045001)} ago`);
     expect(labels).toHaveLength(2);
@@ -142,7 +142,7 @@ describe('TraceList', () => {
     await waitFor(() => expect(screen.getByRole('tooltip').textContent).toMatch(/\.123$/)); // Last, ms preserved
   });
 
-  it('calls onAnalyze with the packet hash when a packet row is clicked', async () => {
+  it('opens Analyze explicitly without making the entire packet row clickable', async () => {
     mockGetTraces.mockResolvedValue([tag('3f2a11c0', 2)]);
     mockGetTraceDetail.mockResolvedValue(detail);
 
@@ -151,6 +151,8 @@ describe('TraceList', () => {
     fireEvent.click(await screen.findByText('3F2A11C0'));
     const rows = await screen.findAllByText('ROUTE_REQUEST');
     fireEvent.click(rows[0]);
+    expect(onAnalyze).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: /Analyze/ })[0]);
 
     expect(onAnalyze).toHaveBeenCalledWith('hash-aaa');
   });

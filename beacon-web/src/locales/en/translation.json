@@ -335,6 +335,8 @@
     "collapseRoute": "Show compact route"
   },
   "traces": {
+    "firstHeard": "First heard",
+    "lastHeard": "Last heard",
     "type": "Trace type",
     "path": "Path",
     "firstSeen": "First seen",

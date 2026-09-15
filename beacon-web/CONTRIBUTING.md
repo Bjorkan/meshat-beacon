@@ -94,6 +94,14 @@ because the root `tsconfig.json` has `files: []`.
 
 ---
 
+## Browser layout tests
+
+From `beacon-web`, install Chromium once with `npx playwright install chromium`, then
+run `npm run test:browser`. Playwright starts a local Vite server and supplies mocked
+API/WebSocket responses; no running backend is needed. The trace detail suite checks
+column alignment, path containment, compact containers, keyboard navigation and touch
+interaction. Screenshots and failure traces are written to `test-results/`.
+
 ## Commit messages
 
 Use the conventional commits format:

@@ -28,3 +28,7 @@ Thumbs.db
 .references/
 notes.md
 roadmap.md
+
+# Browser test artifacts
+beacon-web/test-results/
+beacon-web/playwright-report/

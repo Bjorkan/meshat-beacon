@@ -335,6 +335,8 @@
     "collapseRoute": "Visa kompakt rutt"
   },
   "traces": {
+    "firstHeard": "Första hörd",
+    "lastHeard": "Senaste hörd",
     "type": "Trace-typ",
     "path": "Sökväg",
     "firstSeen": "Först sedd",
