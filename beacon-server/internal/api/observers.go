@@ -7,23 +7,23 @@ import "github.com/google/uuid"
 
 // ObserverSummary is the minimal observer representation used in list responses.
 type ObserverSummary struct {
-	ID           uuid.UUID `json:"id"`
-	DisplayName  *string   `json:"displayName,omitempty"`  // friendly name from /status messages
-	ObserverType *string   `json:"observerType,omitempty"` // e.g. "meshcoretomqtt", "meshcoreha"
-	IATA         string    `json:"iata"`                   // most recently heard IATA
-	Status       string    `json:"status"`                 // "online" or "offline" derived from last_status_at
-	Radio        *string   `json:"radio,omitempty"`        // friendly radio param string: freqMhz,BwKhz,SF e.g. "910.525,62.5,7"
-	RadioTitle   *string   `json:"radioTitle,omitempty"`   // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
-	Scopes       []string  `json:"scopes,omitempty"`       // list of observer forwarded scopes matched to config
+	ID           uuid.UUID `json:"id" binding:"required"`
+	DisplayName  *string   `json:"displayName,omitempty"`                            // friendly name from /status messages
+	ObserverType *string   `json:"observerType,omitempty"`                           // e.g. "meshcoretomqtt", "meshcoreha"
+	IATA         string    `json:"iata" binding:"required"`                          // most recently heard IATA
+	Status       string    `json:"status" enums:"online,offline" binding:"required"` // "online" or "offline" derived from last_status_at
+	Radio        *string   `json:"radio,omitempty"`                                  // friendly radio param string: freqMhz,BwKhz,SF e.g. "910.525,62.5,7"
+	RadioTitle   *string   `json:"radioTitle,omitempty"`                             // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
+	Scopes       []string  `json:"scopes,omitempty"`                                 // list of observer forwarded scopes matched to config
 }
 
 // ObserverBroker represents a single MQTT broker an observer has been seen on,
 // including timestamps for diagnosing partial outages — e.g. distinguishing
 // "observer is down" from "one broker stopped delivering for this observer".
 type ObserverBroker struct {
-	Name         string `json:"name"`         // broker name e.g. "meshat.se"
-	LastSeenAt   int64  `json:"lastSeenAt"`   // epoch ms, last time observer was seen on this broker
-	LastPacketAt int64  `json:"lastPacketAt"` // epoch ms, last packet received via this broker; 0 if none
+	Name         string `json:"name" binding:"required"`         // broker name e.g. "meshat.se"
+	LastSeenAt   int64  `json:"lastSeenAt" binding:"required"`   // epoch ms, last time observer was seen on this broker
+	LastPacketAt int64  `json:"lastPacketAt" binding:"required"` // epoch ms, last packet received via this broker; 0 if none
 }
 
 // Observer is the full observer representation including radio config,
@@ -31,7 +31,7 @@ type ObserverBroker struct {
 type Observer struct {
 	OwnerNode *ObserverOwnerNode `json:"ownerNode,omitempty"`
 	ObserverSummary
-	PublicKey        string           `json:"publicKey"` // hex-encoded public key
+	PublicKey        string           `json:"publicKey" binding:"required"` // hex-encoded public key
 	SoftwareVersion  *string          `json:"softwareVersion,omitempty"`
 	HardwareModel    *string          `json:"hardwareModel,omitempty"`
 	FirmwareVersion  *string          `json:"firmwareVersion,omitempty"`
@@ -42,17 +42,17 @@ type Observer struct {
 	RadioCR          *int16           `json:"radioCr,omitempty"`      // coding rate denominator
 	BatteryLevel     *float32         `json:"batteryLevel,omitempty"` // volts, nil if mains powered
 	UptimeSeconds    *int64           `json:"uptimeSeconds,omitempty"`
-	StatusMetadata   any              `json:"statusMetadata,omitempty"` // raw /status JSON payload
-	LastStatusAt     *int64           `json:"lastStatusAt,omitempty"`   // epoch ms
-	FirstSeen        int64            `json:"firstSeen"`                // epoch ms
-	LastSeen         int64            `json:"lastSeen"`                 // epoch ms
-	ObservationCount int64            `json:"observationCount"`
-	Brokers          []ObserverBroker `json:"brokers"` // broker names this observer has been seen on
+	StatusMetadata   any              `json:"statusMetadata,omitempty"`     // raw /status JSON payload
+	LastStatusAt     *int64           `json:"lastStatusAt,omitempty"`       // epoch ms
+	FirstSeen        int64            `json:"firstSeen" binding:"required"` // epoch ms
+	LastSeen         int64            `json:"lastSeen" binding:"required"`  // epoch ms
+	ObservationCount int64            `json:"observationCount" binding:"required"`
+	Brokers          []ObserverBroker `json:"brokers" binding:"required"` // broker names this observer has been seen on
 }
 
 // ObserverTelemetryPoint is a single telemetry snapshot for an observer.
 type ObserverTelemetryPoint struct {
-	T             int64    `json:"t"` // epoch ms
+	T             int64    `json:"t" binding:"required"` // epoch ms
 	BatteryMV     *int32   `json:"batteryMv,omitempty"`
 	AirtimeTxPct  *float32 `json:"airtimeTxPct,omitempty"`
 	AirtimeRxPct  *float32 `json:"airtimeRxPct,omitempty"`
@@ -65,14 +65,14 @@ type ObserverTelemetryPoint struct {
 // ObserverTelemetry is the full telemetry response for an observer.
 // Range and interval reflect the query parameters used.
 type ObserverTelemetry struct {
-	Range    string                   `json:"range"`
-	Interval string                   `json:"interval"`
-	Points   []ObserverTelemetryPoint `json:"points"`
+	Range    string                   `json:"range" binding:"required"`
+	Interval string                   `json:"interval" binding:"required"`
+	Points   []ObserverTelemetryPoint `json:"points" binding:"required"`
 }
 
 // ObserverOwnerNode is the resolved public node relationship, never raw broker/auth metadata.
 type ObserverOwnerNode struct {
-	ID        uuid.UUID `json:"id"`
+	ID        uuid.UUID `json:"id" binding:"required"`
 	Name      *string   `json:"name,omitempty"`
-	PublicKey string    `json:"publicKey"`
+	PublicKey string    `json:"publicKey" binding:"required"`
 }

@@ -1,118 +1,25 @@
-// Response shapes for the /stats/* endpoints and observer telemetry. Verified against beacon-server.
+import type * as Models from '../../api/generated/models';
+import type { NullableFields } from '../../api/model-types';
 
-import type { NodeIATA } from '../nodes/types';
-
-export interface StatsOverview {
-  totalPackets: number;
-  totalObservations: number;
-  activeObservers: number;
-  activeIatas: number;
-  windowHours: number;
-}
-
-export interface ObservationPoint {
-  hour: number; // epoch ms, start of the hourly bucket
-  iata: string;
-  observationCount: number;
-  uniquePackets: number;
-  activeObservers: number;
-}
-
-export interface PayloadBreakdownItem {
-  payloadType: number;
-  payloadTypeName: string;
-  count: number;
-}
-
-export interface TopNode {
-  nodeId: string;
-  nodeName: string | null;
-  nodeType: number;
-  nodeTypeName: string;
-  iata: string;
-  observationCount: number;
-  lastHeard: number; // epoch ms
-}
-
-export interface TopObserver {
-  observerId: string;
-  displayName: string | null;
-  observerType: string | null;
-  iata: string;
-  observationCount: number;
-}
-
-export interface TopAdvertiser {
-  nodeId: string;
-  nodeName: string | null;
-  nodeType: number;
-  nodeTypeName: string;
-  iata: string;
-  advertCount: number;
-  // advertCount split by route: flood = route type 0/1 (broadcast, no path), direct = 2/3 (routed).
-  // floodAdvertCount + directAdvertCount === advertCount.
-  floodAdvertCount: number;
-  directAdvertCount: number;
-  lastHeard: number; // epoch ms
-}
-
-// grouped by decrypted sender display-name, not node identity: same-named pubkeys merge, a rename splits
-export interface TopTalker {
-  senderName: string;
-  messageCount: number;
-  lastSent: number; // epoch ms
-}
-
-// A repeater/room server whose latest advert-derived clock drift exceeds the server threshold.
-// Only out-of-sync nodes appear; the list is ordered worst-drift-first (by magnitude).
-export interface ClockDriftEntry {
-  nodeId: string;
-  nodeName: string | null;
-  nodeType: number;
-  nodeTypeName: string;
-  clockDriftSeconds: number; // signed; +ve = device ahead of server
-  clockCheckedAt: number; // epoch ms
-  iatas?: NodeIATA[];
-}
-
-export interface RadioPreset {
-  preset: string; // "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
-  iata: string;
-  sourceType: string; // "observer" or "node"
-  count: number;
-  suggestedTitle?: string; // MeshCore suggested-settings title, only on confident matches
-  codingRate?: number;
-}
-
-export interface NodeTypeCount {
-  nodeType: number;
-  nodeTypeName: string;
-  count: number;
-}
-
-export interface ScopeStats {
-  name: string; // normalized scope name e.g. "#bc"
-  packetCount: number;
-  observerCount: number;
-  nodeCount: number;
-}
-
-export interface TelemetryPoint {
-  t: number; // epoch ms
-  batteryMv: number | null;
-  airtimeTxPct: number | null;
-  airtimeRxPct: number | null;
-  noiseFloorDb: number | null;
-  uptimeSeconds: number | null;
-  queueLength: number | null;
-  receiveErrors: number | null;
-}
-
-export interface ObserverTelemetry {
-  range: string;
-  interval: string;
+export type StatsOverview = Models.StatsOverview;
+export type ObservationPoint = Models.ObservationPoint;
+export type PayloadBreakdownItem = Models.PayloadBreakdownItem;
+export type TopNode = NullableFields<Models.TopNode, 'nodeName'>;
+export type TopObserver = NullableFields<Models.TopObserver, 'displayName' | 'observerType'>;
+export type TopAdvertiser = NullableFields<Models.TopAdvertiser, 'nodeName'>;
+export type TopTalker = Models.TopTalker;
+export type ClockDriftEntry = NullableFields<Models.ClockDriftEntry, 'nodeName'>;
+export type RadioPreset = Models.RadioPreset;
+export type NodeTypeCount = Models.NodeTypeCount;
+export type ScopeStats = Models.ScopeStats;
+// Missing measurements become null gaps for charts rather than artificial zeroes.
+export type TelemetryPoint = NullableFields<
+  Models.ObserverTelemetryPoint,
+  Exclude<keyof Models.ObserverTelemetryPoint, 't'>
+>;
+export type ObserverTelemetry = Omit<Models.ObserverTelemetry, 'points'> & {
   points: TelemetryPoint[];
-}
+};
 
 // Sub-tab + time-range identifiers shared across the Stats page.
 export type StatsTab = 'mesh' | 'talkers' | 'clockdrift' | 'observer' | 'graph';

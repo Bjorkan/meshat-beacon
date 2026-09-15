@@ -114,6 +114,56 @@ function toChannelMessage(model: Models.ChannelMessage): ChannelMessage {
   };
 }
 
+// Nested schema models retain required fields and enum unions from the generated contract.
+function toPage<T>(page: {
+  items: T[];
+  hasMore: boolean;
+  nextCursor?: number | null;
+  nextPageToken?: string | null;
+}): CursorPage<T> {
+  return { ...page, nextCursor: page.nextCursor ?? null };
+}
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+function record(value: unknown, contract: string): Record<string, unknown> | undefined {
+  if (value == null) return undefined;
+  if (!isRecord(value)) throw new Error(`Invalid ${contract} response: expected object`);
+  return value;
+}
+function toNodeSummary(model: Models.NodeSummary): NodeSummary {
+  return { ...model, name: model.name ?? null, lat: model.lat ?? null, lng: model.lng ?? null };
+}
+function toNode(model: Models.Node): Node {
+  return {
+    ...model,
+    ...toNodeSummary(model),
+    locationSource: model.locationSource ?? null,
+    lastAdvertAt: model.lastAdvertAt ?? null,
+    minFirmwareVersion: model.minFirmwareVersion ?? null,
+    metadata: record(model.metadata, 'Node.metadata') ?? null,
+  };
+}
+function toObserverSummary(model: Models.ObserverSummary): ObserverSummary {
+  return model;
+}
+function toObserver(model: Models.Observer): Observer {
+  return { ...model, statusMetadata: record(model.statusMetadata, 'Observer.statusMetadata') };
+}
+function toPacketDetail(model: Models.Packet): PacketDetail {
+  return {
+    ...model,
+    parsedPayload:
+      typeof model.parsedPayload === 'string'
+        ? model.parsedPayload
+        : record(model.parsedPayload, 'Packet.parsedPayload'),
+    observations: model.observations.map((observation) => ({
+      ...observation,
+      propagationTimeMs: observation.propagationTimeMs ?? undefined,
+    })),
+  };
+}
+
 export function getPackets(
   iatas: string[] | undefined,
   params?: {
@@ -139,34 +189,56 @@ export function getPackets(
     q: params?.search,
     searchField: params?.search ? params.searchField : undefined,
     include: params?.includeResolvedPath ? 'resolvedPath' : undefined,
-  }) as Promise<CursorPage<PacketSummary>>;
+  }).then(toPage);
 }
 
 export function getPacketDetail(packetHash: string): Promise<PacketDetail> {
-  return rawGetPacketsPacketHash({ packetHash }) as Promise<PacketDetail>;
+  return rawGetPacketsPacketHash({ packetHash }).then(toPacketDetail);
 }
 
 export function getIatas(): Promise<IataCode[]> {
-  return rawGetIatas() as Promise<IataCode[]>;
+  return rawGetIatas();
 }
 
 // An IATA's GeoJSON border, or null when none is configured. Can't use request(): the endpoint
 // answers 204 (empty body) or a literal `null` for "no border", and request() always parses JSON.
+function isIataBorder(value: unknown): value is IataBorder {
+  if (!isRecord(value) || value.type !== 'Feature' || !isRecord(value.geometry)) return false;
+  if (value.properties !== null && !isRecord(value.properties)) return false;
+  if (value.id !== undefined && typeof value.id !== 'string' && typeof value.id !== 'number')
+    return false;
+  const numbers = (v: unknown): v is number[] =>
+    Array.isArray(v) && v.every((n: unknown) => typeof n === 'number' && Number.isFinite(n));
+  if (value.bbox !== undefined && (!numbers(value.bbox) || ![4, 6].includes(value.bbox.length)))
+    return false;
+  const ring = (v: unknown) =>
+    Array.isArray(v) && v.every((p: unknown) => numbers(p) && p.length >= 2);
+  const polygon = (v: unknown) => Array.isArray(v) && v.every(ring);
+  return value.geometry.type === 'Polygon'
+    ? polygon(value.geometry.coordinates)
+    : value.geometry.type === 'MultiPolygon' &&
+        Array.isArray(value.geometry.coordinates) &&
+        value.geometry.coordinates.every(polygon);
+}
+
 export async function getIataBorder(iata: string): Promise<IataBorder | null> {
   const url = new URL(`${API_BASE}/iatas/${iata}/border`, window.location.origin);
   const res = await fetch(url.toString());
   if (res.status === 204) return null;
   if (!res.ok) throw new ApiError(res.status, 'unknown', res.statusText);
-  const body = await res.json();
-  return (body ?? null) as IataBorder | null;
+  const body: unknown = await res.json();
+  if (body == null) return null;
+  if (!isIataBorder(body))
+    throw new Error('Invalid IATA border response: expected Polygon or MultiPolygon feature');
+  return body;
 }
 
 export function getRegions(): Promise<RegionSummary[]> {
-  return rawGetRegions() as Promise<RegionSummary[]>;
+  return rawGetRegions();
 }
 
 export function getRegion(regionId: number): Promise<Region> {
-  return rawGetRegionsRegionId({ regionId }) as Promise<Region>;
+  return rawGetRegionsRegionId({ regionId });
 }
 
 export async function getChannels(params?: {
@@ -212,13 +284,21 @@ export async function getChannelMessagesPage(
 }
 
 export function getBrokers(): Promise<BrokerStatus[]> {
-  return rawGetBrokers() as Promise<BrokerStatus[]>;
+  return rawGetBrokers();
 }
 
 // The authoritative list of configured transport scope names (e.g. "#bc", "#west"), used to populate
 // the scope filter dropdowns. The no-param /scopes endpoint returns the names directly.
 export function getScopes(): Promise<string[]> {
-  return rawGetScopes({}) as Promise<string[]>;
+  return rawGetScopes({}).then((value: unknown) => {
+    if (
+      !Array.isArray(value) ||
+      !value.every((item: unknown): item is string => typeof item === 'string')
+    ) {
+      throw new Error('Invalid scope names response: expected string array');
+    }
+    return value;
+  });
 }
 
 // Wrap a bare-array endpoint into a CursorPage so it can drive the cursor-paginated hooks. A page that
@@ -244,13 +324,13 @@ export async function getKnownRoutesPage(params?: {
     sort: params?.sort,
     direction: params?.direction,
     limit: params?.limit ?? DEFAULT_PAGE_SIZE,
-  }) as Promise<CursorPage<KnownRoute>>;
+  }).then(toPage);
 }
 
 // Search known routes for a path between two node hash prefixes within a single IATA. All three params
 // are required by the server.
 export function searchKnownRoutes(iata: string, from: string, to: string): Promise<KnownRoute[]> {
-  return rawGetRoutesSearch({ iata, from, to }) as Promise<KnownRoute[]>;
+  return rawGetRoutesSearch({ iata, from, to });
 }
 
 // Search routes that cross IATA boundaries, from a hash in one IATA to a hash in another. All four
@@ -261,7 +341,7 @@ export function searchCrossIATARoutes(
   toHash: string,
   toIata: string,
 ): Promise<CrossIATARoute[]> {
-  return rawGetRoutesCross({ fromHash, fromIata, toHash, toIata }) as Promise<CrossIATARoute[]>;
+  return rawGetRoutesCross({ fromHash, fromIata, toHash, toIata });
 }
 
 // Trace tags. /traces returns a bare array of per-tag summaries (ordered newest-heard first, cursor is
@@ -285,15 +365,15 @@ export function getTraces(
     until: params?.until,
     cursor: params?.cursor,
     limit: params?.limit,
-  }) as Promise<TraceTagSummary[]>;
+  });
 }
 
 export function getTraceDetail(tag: string): Promise<TraceDetail> {
-  return rawGetTracesTag({ tag }) as Promise<TraceDetail>;
+  return rawGetTracesTag({ tag });
 }
 
 export function getObserver(observerId: string): Promise<Observer> {
-  return rawGetObserversObserverId({ observerId }) as Promise<Observer>;
+  return rawGetObserversObserverId({ observerId }).then(toObserver);
 }
 
 export function getObserverAdverts(
@@ -304,7 +384,7 @@ export function getObserverAdverts(
     observerId,
     cursor: params?.cursor,
     limit: params?.limit ?? DEFAULT_PAGE_SIZE,
-  }) as Promise<CursorPage<AdvertObservation>>;
+  }).then(toPage);
 }
 
 // Paginated /nodes: returns the full cursor page so the caller can chain pages (cursor = the last
@@ -350,7 +430,7 @@ export function getNodesPage(
           : undefined,
     scope: params?.scope,
     neighbors: params?.neighbors || undefined,
-  }) as Promise<CursorPage<NodeSummary>>;
+  }).then((page) => toPage({ ...page, items: page.items.map(toNodeSummary) }));
 }
 
 // Paginated /observers, mirroring getNodesPage; used by the Observers table.
@@ -381,18 +461,18 @@ export function getObserversPage(
     status: params?.status,
     name: params?.name,
     scope: params?.scope,
-  }) as Promise<CursorPage<ObserverSummary>>;
+  }).then((page) => toPage({ ...page, items: page.items.map(toObserverSummary) }));
 }
 
 export function getNode(nodeId: string): Promise<Node> {
-  return rawGetNodesNodeId({ nodeId }) as Promise<Node>;
+  return rawGetNodesNodeId({ nodeId }).then(toNode);
 }
 
 // Every 2-byte node prefix claimed by more than one infra node, globally, as
 // lowercase hex. The path map draws a 2-byte route only when none of its hops'
 // prefixes appear here and every hop resolved high-confidence.
 export function getAmbiguousPrefix2(): Promise<string[]> {
-  return rawGetNodesAmbiguousPrefix2() as Promise<string[]>;
+  return rawGetNodesAmbiguousPrefix2();
 }
 
 export function getNodeObservations(
@@ -403,7 +483,7 @@ export function getNodeObservations(
     nodeId,
     cursor: params?.cursor,
     limit: params?.limit ?? DEFAULT_PAGE_SIZE,
-  }) as Promise<CursorPage<NodeObservation>>;
+  }).then(toPage);
 }
 
 export function getNodePathPackets(
@@ -414,39 +494,37 @@ export function getNodePathPackets(
     ...params,
     nodeId,
     iatas: iatasParam(params.iatas),
-  }) as Promise<CursorPage<PacketSummary>>;
+  }).then(toPage);
 }
 
 export function getNodeNeighbors(nodeId: string): Promise<NodeNeighbor[]> {
-  return rawGetNodesNodeIdNeighbors({ nodeId }) as Promise<NodeNeighbor[]>;
+  return rawGetNodesNodeIdNeighbors({ nodeId });
 }
 
 // stats endpoints
 
 export function getStatsOverview(iatas?: string[]): Promise<StatsOverview> {
-  return rawGetStatsOverview({ iatas: iatasParam(iatas) }) as Promise<StatsOverview>;
+  return rawGetStatsOverview({ iatas: iatasParam(iatas) });
 }
 
 export function getStatsObservations(
   iatas?: string[],
   since?: number,
 ): Promise<ObservationPoint[]> {
-  return rawGetStatsObservations({ iatas: iatasParam(iatas), since }) as Promise<
-    ObservationPoint[]
-  >;
+  return rawGetStatsObservations({ iatas: iatasParam(iatas), since });
 }
 
 export function getPayloadBreakdown(
   iatas?: string[],
   since?: number,
 ): Promise<PayloadBreakdownItem[]> {
-  return rawGetStatsPayloadBreakdown({ iatas: iatasParam(iatas), since }) as Promise<
-    PayloadBreakdownItem[]
-  >;
+  return rawGetStatsPayloadBreakdown({ iatas: iatasParam(iatas), since });
 }
 
 export function getTopNodes(iatas?: string[], limit = 10): Promise<TopNode[]> {
-  return rawGetStatsTopNodes({ iatas: iatasParam(iatas), limit }) as Promise<TopNode[]>;
+  return rawGetStatsTopNodes({ iatas: iatasParam(iatas), limit }).then((items) =>
+    items.map((item) => ({ ...item, nodeName: item.nodeName ?? null })),
+  );
 }
 
 export function getTopObservers(
@@ -454,9 +532,13 @@ export function getTopObservers(
   since?: number,
   limit = 10,
 ): Promise<TopObserver[]> {
-  return rawGetStatsTopObservers({ iatas: iatasParam(iatas), since, limit }) as Promise<
-    TopObserver[]
-  >;
+  return rawGetStatsTopObservers({ iatas: iatasParam(iatas), since, limit }).then((items) =>
+    items.map((item) => ({
+      ...item,
+      displayName: item.displayName ?? null,
+      observerType: item.observerType ?? null,
+    })),
+  );
 }
 
 export function getTopAdvertisers(
@@ -468,31 +550,33 @@ export function getTopAdvertisers(
     iatas: iatasParam(iatas),
     since,
     limit,
-  }) as Promise<TopAdvertiser[]>;
+  }).then((items) => items.map((item) => ({ ...item, nodeName: item.nodeName ?? null })));
 }
 
 export function getTopTalkers(iatas?: string[], since?: number, limit = 10): Promise<TopTalker[]> {
-  return rawGetStatsTopTalkers({ iatas: iatasParam(iatas), since, limit }) as Promise<TopTalker[]>;
+  return rawGetStatsTopTalkers({ iatas: iatasParam(iatas), since, limit });
 }
 
 export function getRadioPresets(iatas?: string[]): Promise<RadioPreset[]> {
-  return rawGetStatsRadioPresets({ iatas: iatasParam(iatas) }) as Promise<RadioPreset[]>;
+  return rawGetStatsRadioPresets({ iatas: iatasParam(iatas) });
 }
 
 export function getStatsNodeTypes(iatas?: string[]): Promise<NodeTypeCount[]> {
-  return rawGetStatsNodeTypes({ iatas: iatasParam(iatas) }) as Promise<NodeTypeCount[]>;
+  return rawGetStatsNodeTypes({ iatas: iatasParam(iatas) });
 }
 
 // Repeaters/room servers whose clock has drifted past the server threshold, worst-first. Not
 // time-windowed and top-N only (no cursor), so callers pass a generous limit and page client-side.
 export function getClockDrift(iatas?: string[], limit = 100): Promise<ClockDriftEntry[]> {
-  return rawGetStatsClockDrift({ iatas: iatasParam(iatas), limit }) as Promise<ClockDriftEntry[]>;
+  return rawGetStatsClockDrift({ iatas: iatasParam(iatas), limit }).then((items) =>
+    items.map((item) => ({ ...item, nodeName: item.nodeName ?? null })),
+  );
 }
 
 // renamed from getScopes to avoid colliding with the /scopes name list; this is the /stats/scopes
 // aggregate (packet/observer/node counts), reported globally regardless of the active region.
 export function getStatsScopes(): Promise<ScopeStats[]> {
-  return rawGetStatsScopes() as Promise<ScopeStats[]>;
+  return rawGetStatsScopes();
 }
 
 export function getObserverTelemetry(
@@ -506,7 +590,19 @@ export function getObserverTelemetry(
     range,
     interval,
     afterId,
-  }) as Promise<ObserverTelemetry>;
+  }).then((model) => ({
+    ...model,
+    points: model.points.map((point) => ({
+      ...point,
+      batteryMv: point.batteryMv ?? null,
+      airtimeTxPct: point.airtimeTxPct ?? null,
+      airtimeRxPct: point.airtimeRxPct ?? null,
+      noiseFloorDb: point.noiseFloorDb ?? null,
+      uptimeSeconds: point.uptimeSeconds ?? null,
+      queueLength: point.queueLength ?? null,
+      receiveErrors: point.receiveErrors ?? null,
+    })),
+  }));
 }
 
 export { ApiError };

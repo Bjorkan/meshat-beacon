@@ -14,9 +14,9 @@ import (
 
 // PacketLatestObserver is the most recent observer summary rolled into a packet list item.
 type PacketLatestObserver struct {
-	ID          uuid.UUID `json:"id"`
+	ID          uuid.UUID `json:"id" binding:"required"`
 	DisplayName *string   `json:"displayName,omitempty"`
-	IATA        string    `json:"iata"`
+	IATA        string    `json:"iata" binding:"required"`
 	// PathLength/PathBytes are cheap stored columns and are populated everywhere this summary
 	// appears. ResolvedPath is opt-in on REST packet list/backfill endpoints (include=resolvedPath)
 	// and is resolved in bounded page batches; the non-opt-in fast path remains unchanged. The WS
@@ -32,15 +32,15 @@ type PacketLatestObserver struct {
 // PacketSummary is the minimal packet representation used in list responses.
 // Includes the latest observation rolled in for display purposes.
 type PacketSummary struct {
-	PacketHash       string                `json:"packetHash"` // hex-encoded
-	PayloadType      int16                 `json:"payloadType"`
-	PayloadTypeName  string                `json:"payloadTypeName"`
-	RouteType        int16                 `json:"routeType"`
-	RouteTypeName    string                `json:"routeTypeName"`
-	Scope            *string               `json:"scope,omitempty"` // matched transport scope name e.g. "#bc"
-	FirstHeardAt     int64                 `json:"firstHeardAt"`    // epoch ms
-	LastHeardAt      int64                 `json:"lastHeardAt"`     // epoch ms
-	ObservationCount int32                 `json:"observationCount"`
+	PacketHash       string                `json:"packetHash" binding:"required"` // hex-encoded
+	PayloadType      int16                 `json:"payloadType" binding:"required"`
+	PayloadTypeName  string                `json:"payloadTypeName" binding:"required"`
+	RouteType        int16                 `json:"routeType" binding:"required"`
+	RouteTypeName    string                `json:"routeTypeName" binding:"required"`
+	Scope            *string               `json:"scope,omitempty"`                 // matched transport scope name e.g. "#bc"
+	FirstHeardAt     int64                 `json:"firstHeardAt" binding:"required"` // epoch ms
+	LastHeardAt      int64                 `json:"lastHeardAt" binding:"required"`  // epoch ms
+	ObservationCount int32                 `json:"observationCount" binding:"required"`
 	LatestObserver   *PacketLatestObserver `json:"latestObserver,omitempty"`
 	Summary          *string               `json:"summary,omitempty"` // human-readable payload summary
 }
@@ -48,26 +48,26 @@ type PacketSummary struct {
 // PacketPathLength is the decoded path_length byte from a packet observation.
 // The raw byte encodes both hash size and hop count in a bit-packed format (§2.5).
 type PacketPathLength struct {
-	Raw      string `json:"raw"`      // hex-encoded single byte
-	HashSize int16  `json:"hashSize"` // per-hop hash size in bytes (1, 2, or 3)
-	HopCount int16  `json:"hopCount"` // number of path hashes present
+	Raw      string `json:"raw" binding:"required"`      // hex-encoded single byte
+	HashSize int16  `json:"hashSize" binding:"required"` // per-hop hash size in bytes (1, 2, or 3)
+	HopCount int16  `json:"hopCount" binding:"required"` // number of path hashes present
 }
 
 // PacketObservationDetail is a full observation including radio settings and resolved path.
 type PacketObservationDetail struct {
-	ID                int64            `json:"id"`
-	ObserverID        uuid.UUID        `json:"observerId"`
+	ID                int64            `json:"id" binding:"required"`
+	ObserverID        uuid.UUID        `json:"observerId" binding:"required"`
 	ObserverName      *string          `json:"observerName,omitempty"`
-	IATA              string           `json:"iata"`
-	HeardAt           int64            `json:"heardAt"` // epoch ms
-	PathLength        PacketPathLength `json:"pathLength"`
+	IATA              string           `json:"iata" binding:"required"`
+	HeardAt           int64            `json:"heardAt" binding:"required"` // epoch ms
+	PathLength        PacketPathLength `json:"pathLength" binding:"required"`
 	PathBytes         *string          `json:"pathBytes,omitempty"` // hex-encoded accumulated path hashes
 	RSSI              *int16           `json:"rssi,omitempty"`
 	SNR               *float32         `json:"snr,omitempty"`
-	PropagationTimeMs *int32           `json:"propagationTimeMs"` // ms since first observation; 0 for first
+	PropagationTimeMs *int32           `json:"propagationTimeMs" binding:"required" extensions:"x-nullable"` // ms since first observation; 0 for first
 	Radio             *PacketRadio     `json:"radio,omitempty"`
-	SourceBroker      string           `json:"sourceBroker"`
-	ResolvedPath      []ResolvedHop    `json:"resolvedPath"` // per-observation resolved path hashes
+	SourceBroker      string           `json:"sourceBroker" binding:"required"`
+	ResolvedPath      []ResolvedHop    `json:"resolvedPath" binding:"required"` // per-observation resolved path hashes
 	// ResolvedSource/ResolvedDestination are the packet's endpoints, when the payload type
 	// carries a resolvable one: an exact match for ADVERT's full pubkey, an ambiguous
 	// hash-prefix match (like intermediate hops) for TEXT_MESSAGE/PATH/ANON_REQ's 1-byte
@@ -89,16 +89,16 @@ type PacketRadio struct {
 // ResolvedHop is a single hop in a packet's resolved path.
 // Confidence is "high" (exactly one match), "ambiguous" (multiple matches), or "none" (no match).
 type ResolvedHop struct {
-	Confidence string         `json:"confidence"` // "high", "ambiguous", or "none"
+	Confidence string         `json:"confidence" enums:"high,ambiguous,none" binding:"required"` // "high", "ambiguous", or "none"
 	SNR        *float32       `json:"snr,omitempty"`
-	Nodes      []ResolvedNode `json:"nodes"` // empty for "none", one for "high", multiple for "ambiguous"
+	Nodes      []ResolvedNode `json:"nodes" binding:"required"` // empty for "none", one for "high", multiple for "ambiguous"
 }
 
 // ResolvedNode is a node reference within a resolved path hop.
 type ResolvedNode struct {
-	ID        uuid.UUID `json:"id"`
+	ID        uuid.UUID `json:"id" binding:"required"`
 	Name      *string   `json:"name,omitempty"`
-	PublicKey string    `json:"publicKey"` // hex-encoded prefix used for resolution
+	PublicKey string    `json:"publicKey" binding:"required"` // hex-encoded prefix used for resolution
 	Latitude  *float64  `json:"latitude,omitempty"`
 	Longitude *float64  `json:"longitude,omitempty"`
 }
@@ -116,39 +116,39 @@ type ResolvedPathEntry struct {
 // PacketHeader holds the decoded header byte and its bit-packed fields.
 // The raw header byte encodes payload version, payload type, and route type (§2.3).
 type PacketHeader struct {
-	Raw             string `json:"raw"`             // hex-encoded single byte
-	RouteType       int16  `json:"routeType"`       // bits 0-1
-	RouteTypeName   string `json:"routeTypeName"`   // FLOOD, DIRECT, TRANSPORT_FLOOD, TRANSPORT_DIRECT
-	PayloadType     int16  `json:"payloadType"`     // bits 2-5
-	PayloadTypeName string `json:"payloadTypeName"` // advert, request, group_text, etc.
-	PayloadVersion  int16  `json:"payloadVersion"`  // bits 6-7
+	Raw             string `json:"raw" binding:"required"`             // hex-encoded single byte
+	RouteType       int16  `json:"routeType" binding:"required"`       // bits 0-1
+	RouteTypeName   string `json:"routeTypeName" binding:"required"`   // FLOOD, DIRECT, TRANSPORT_FLOOD, TRANSPORT_DIRECT
+	PayloadType     int16  `json:"payloadType" binding:"required"`     // bits 2-5
+	PayloadTypeName string `json:"payloadTypeName" binding:"required"` // advert, request, group_text, etc.
+	PayloadVersion  int16  `json:"payloadVersion" binding:"required"`  // bits 6-7
 }
 
 // PacketTransportCodes holds the decoded transport codes present in TRANSPORT_FLOOD
 // and TRANSPORT_DIRECT packets. RegionCode is transport_code_1; SubRegionCode is
 // transport_code_2 (reserved in v1, always 0 on the wire).
 type PacketTransportCodes struct {
-	RegionCode    int32 `json:"regionCode"`
-	SubRegionCode int32 `json:"subRegionCode"`
+	RegionCode    int32 `json:"regionCode" binding:"required"`
+	SubRegionCode int32 `json:"subRegionCode" binding:"required"`
 }
 
 // Packet is the full packet representation including all observations and resolved paths.
 type Packet struct {
-	PacketHash       string                    `json:"packetHash"`
-	Header           PacketHeader              `json:"header"`
+	PacketHash       string                    `json:"packetHash" binding:"required"`
+	Header           PacketHeader              `json:"header" binding:"required"`
 	TransportCodes   *PacketTransportCodes     `json:"transportCodes,omitempty"`
 	OriginPubkey     *string                   `json:"originPubkey,omitempty"` // hex-encoded; nil when not extractable from payload
-	ParsedPayload    json.RawMessage           `json:"parsedPayload,omitempty"`
-	RawPayload       string                    `json:"rawPayload"`            // hex-encoded payload bytes (excludes header and path)
-	Decrypted        bool                      `json:"decrypted"`             // true if group text was successfully decrypted
-	ChannelHash      *string                   `json:"channelHash,omitempty"` // hex-encoded single byte; non-nil for group_text/group_data
-	Scope            *string                   `json:"scope,omitempty"`       // matched transport scope name e.g. "#bc"
-	FirstHeardAt     int64                     `json:"firstHeardAt"`          // epoch ms
-	LastHeardAt      int64                     `json:"lastHeardAt"`           // epoch ms
-	FirstToLastMs    int64                     `json:"firstToLastMs"`         // ms between first and last observation
-	ObservationCount int32                     `json:"observationCount"`
+	ParsedPayload    json.RawMessage           `json:"parsedPayload,omitempty" swaggertype:"object"`
+	RawPayload       string                    `json:"rawPayload" binding:"required"`    // hex-encoded payload bytes (excludes header and path)
+	Decrypted        bool                      `json:"decrypted" binding:"required"`     // true if group text was successfully decrypted
+	ChannelHash      *string                   `json:"channelHash,omitempty"`            // hex-encoded single byte; non-nil for group_text/group_data
+	Scope            *string                   `json:"scope,omitempty"`                  // matched transport scope name e.g. "#bc"
+	FirstHeardAt     int64                     `json:"firstHeardAt" binding:"required"`  // epoch ms
+	LastHeardAt      int64                     `json:"lastHeardAt" binding:"required"`   // epoch ms
+	FirstToLastMs    int64                     `json:"firstToLastMs" binding:"required"` // ms between first and last observation
+	ObservationCount int32                     `json:"observationCount" binding:"required"`
 	ResolvedRoute    []ResolvedHop             `json:"resolvedRoute,omitempty"` // trace packets only: resolved intended route
-	Observations     []PacketObservationDetail `json:"observations"`
+	Observations     []PacketObservationDetail `json:"observations" binding:"required"`
 }
 
 // AdvertObservation extends PacketObservationSummary with node identity fields
@@ -162,12 +162,12 @@ type AdvertObservation struct {
 // PacketObservationSummary is a lightweight packet+observation pair used in
 // list contexts such as observer adverts and node observations.
 type PacketObservationSummary struct {
-	ID              int64    `json:"id"`         // observation ID, use as cursor for pagination
-	PacketHash      string   `json:"packetHash"` // hex-encoded
-	PayloadType     int16    `json:"payloadType"`
-	PayloadTypeName string   `json:"payloadTypeName"`
-	IATA            string   `json:"iata"`
-	HeardAt         int64    `json:"heardAt"` // epoch ms
+	ID              int64    `json:"id" binding:"required"`         // observation ID, use as cursor for pagination
+	PacketHash      string   `json:"packetHash" binding:"required"` // hex-encoded
+	PayloadType     int16    `json:"payloadType" binding:"required"`
+	PayloadTypeName string   `json:"payloadTypeName" binding:"required"`
+	IATA            string   `json:"iata" binding:"required"`
+	HeardAt         int64    `json:"heardAt" binding:"required"` // epoch ms
 	RSSI            *int16   `json:"rssi,omitempty"`
 	SNR             *float32 `json:"snr,omitempty"`
 	HopCount        *int16   `json:"hopCount,omitempty"`

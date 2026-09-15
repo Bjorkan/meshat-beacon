@@ -60,4 +60,4 @@ export const ROUTE_TYPE_NAMES: Record<RouteTypeValue, string> = {
   [RouteType.TRANSPORT_DIRECT]: 'TRANSPORT_DIRECT',
 };
 
-export type PathConfidence = 'high' | 'ambiguous' | 'none';
+export type PathConfidence = import('../api/generated/models').ResolvedHop['confidence'];

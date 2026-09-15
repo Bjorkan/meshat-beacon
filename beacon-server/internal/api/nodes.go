@@ -12,74 +12,74 @@ import (
 
 // NodeNeighbor represents a neighboring node relationship observed in a given IATA.
 type NodeNeighbor struct {
-	ID               uuid.UUID `json:"id"`
+	ID               uuid.UUID `json:"id" binding:"required"`
 	Name             *string   `json:"name,omitempty"`
-	PublicKey        string    `json:"publicKey"`
-	NodeType         int16     `json:"nodeType"`
-	NodeTypeName     string    `json:"nodeTypeName"`
+	PublicKey        string    `json:"publicKey" binding:"required"`
+	NodeType         int16     `json:"nodeType" binding:"required"`
+	NodeTypeName     string    `json:"nodeTypeName" binding:"required"`
 	Latitude         *float64  `json:"lat,omitempty"`
 	Longitude        *float64  `json:"lng,omitempty"`
-	IATA             string    `json:"iata"`
-	ObservationCount int64     `json:"observationCount"`
-	FirstSeen        int64     `json:"firstSeen"` // epoch ms
-	LastSeen         int64     `json:"lastSeen"`  // epoch ms
+	IATA             string    `json:"iata" binding:"required"`
+	ObservationCount int64     `json:"observationCount" binding:"required"`
+	FirstSeen        int64     `json:"firstSeen" binding:"required"` // epoch ms
+	LastSeen         int64     `json:"lastSeen" binding:"required"`  // epoch ms
 	SNR              *float32  `json:"snr,omitempty"`
-	SNRSampleCount   int64     `json:"snrSampleCount"`
+	SNRSampleCount   int64     `json:"snrSampleCount" binding:"required"`
 	SNRLastSeen      int64     `json:"snrLastSeen,omitempty"` // epoch ms of most recent reliable SNR sample
 }
 
 // NodeLinkMetric is the bulk, map-oriented quality summary for one known neighbor edge.
 type NodeLinkMetric struct {
-	NodeID         uuid.UUID `json:"nodeId"`
+	NodeID         uuid.UUID `json:"nodeId" binding:"required"`
 	SNR            *float32  `json:"snr,omitempty"`
-	SNRSampleCount int64     `json:"snrSampleCount"`
+	SNRSampleCount int64     `json:"snrSampleCount" binding:"required"`
 	SNRLastSeen    int64     `json:"snrLastSeen,omitempty"`
 }
 
 // NodeIATA represents a single IATA code and the last time the node was heard there.
 type NodeIATA struct {
-	IATA      string `json:"iata"`
-	LastHeard int64  `json:"lastHeard"` // epoch ms
+	IATA      string `json:"iata" binding:"required"`
+	LastHeard int64  `json:"lastHeard" binding:"required"` // epoch ms
 }
 
 // NodeSummary is the minimal node representation used in list responses.
 type NodeSummary struct {
-	ID                 uuid.UUID        `json:"id"`
-	PublicKey          string           `json:"publicKey"` // hex-encoded Ed25519 public key
-	NodeType           int16            `json:"nodeType"`  // 1=companion, 2=repeater, 3=room_server, 4=sensor
-	NodeTypeName       string           `json:"nodeTypeName"`
+	ID                 uuid.UUID        `json:"id" binding:"required"`
+	PublicKey          string           `json:"publicKey" binding:"required"` // hex-encoded Ed25519 public key
+	NodeType           int16            `json:"nodeType" binding:"required"`  // 1=companion, 2=repeater, 3=room_server, 4=sensor
+	NodeTypeName       string           `json:"nodeTypeName" binding:"required"`
 	Name               *string          `json:"name,omitempty"`
-	IsObserver         bool             `json:"isObserver"`             // true if this node is also a known observer
-	ObserverID         *uuid.UUID       `json:"observerId,omitempty"`   // UUID of the associated observer row, if any
-	Latitude           *float64         `json:"lat,omitempty"`          // decimal degrees, from advert AppData
-	Longitude          *float64         `json:"lng,omitempty"`          // decimal degrees, from advert AppData
-	Radio              *string          `json:"radio,omitempty"`        // shorthand: "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
-	RadioTitle         *string          `json:"radioTitle,omitempty"`   // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
-	IATAs              []NodeIATA       `json:"iatas"`                  // IATAs where this node has been heard, with last heard timestamps
-	DefaultScope       *string          `json:"defaultScope,omitempty"` // most recently matched transport scope name e.g. "#bc"
-	KnownNeighborCount int64            `json:"knownNeighborCount"`
+	IsObserver         bool             `json:"isObserver" binding:"required"` // true if this node is also a known observer
+	ObserverID         *uuid.UUID       `json:"observerId,omitempty"`          // UUID of the associated observer row, if any
+	Latitude           *float64         `json:"lat,omitempty"`                 // decimal degrees, from advert AppData
+	Longitude          *float64         `json:"lng,omitempty"`                 // decimal degrees, from advert AppData
+	Radio              *string          `json:"radio,omitempty"`               // shorthand: "freqMhz,bwKhz,sf" e.g. "910.525,62.5,7"
+	RadioTitle         *string          `json:"radioTitle,omitempty"`          // MeshCore suggested-settings title for the radio triple, e.g. "EU/UK (Narrow)"; absent when unknown
+	IATAs              []NodeIATA       `json:"iatas" binding:"required"`      // IATAs where this node has been heard, with last heard timestamps
+	DefaultScope       *string          `json:"defaultScope,omitempty"`        // most recently matched transport scope name e.g. "#bc"
+	KnownNeighborCount int64            `json:"knownNeighborCount" binding:"required"`
 	NeighborIDs        []uuid.UUID      `json:"neighborIds,omitempty"`   // only populated when the list request opts in; see ?neighbors=true
 	NeighborLinks      []NodeLinkMetric `json:"neighborLinks,omitempty"` // bulk link quality for the same optional map topology
 	// Stale is true when the node hasn't been seen (last_seen) within the configured
 	// staleness window (default 24h; internal/config.ResolvedConfig.NodeStaleThreshold).
 	// Applies to every node type, unlike ClockDriftSeconds/ClockOutOfSync on Node, which
 	// are repeater/room-server only.
-	Stale bool `json:"stale"`
+	Stale bool `json:"stale" binding:"required"`
 }
 
 // Node is the full node representation including firmware capability flags,
 // location source, and timing metadata.
 type Node struct {
 	NodeSummary
-	LocationSource          *string        `json:"locationSource,omitempty"`     // "advert" or "manual"
-	LastAdvertAt            *int64         `json:"lastAdvertAt,omitempty"`       // epoch ms, nil if no advert received
-	SupportsMultibytePaths  bool           `json:"supportsMultibytePaths"`       // firmware >= 1.14.0; detected via path hash size
-	SupportsMultibyteTraces bool           `json:"supportsMultibyteTraces"`      // firmware >= 1.11.0; detected via trace hash size
-	MinFirmwareVersion      *string        `json:"minFirmwareVersion,omitempty"` // derived from capability flags
-	FirstSeen               int64          `json:"firstSeen"`                    // epoch ms
-	LastSeen                int64          `json:"lastSeen"`                     // epoch ms
-	Metadata                any            `json:"metadata,omitempty"`           // raw JSONB metadata
-	Neighbors               []NodeNeighbor `json:"neighbors"`
+	LocationSource          *string        `json:"locationSource,omitempty"`                   // "advert" or "manual"
+	LastAdvertAt            *int64         `json:"lastAdvertAt,omitempty"`                     // epoch ms, nil if no advert received
+	SupportsMultibytePaths  bool           `json:"supportsMultibytePaths" binding:"required"`  // firmware >= 1.14.0; detected via path hash size
+	SupportsMultibyteTraces bool           `json:"supportsMultibyteTraces" binding:"required"` // firmware >= 1.11.0; detected via trace hash size
+	MinFirmwareVersion      *string        `json:"minFirmwareVersion,omitempty"`               // derived from capability flags
+	FirstSeen               int64          `json:"firstSeen" binding:"required"`               // epoch ms
+	LastSeen                int64          `json:"lastSeen" binding:"required"`                // epoch ms
+	Metadata                any            `json:"metadata,omitempty"`                         // raw JSONB metadata
+	Neighbors               []NodeNeighbor `json:"neighbors" binding:"required"`
 	// Clock drift, repeaters/room servers only (nodeType 2/3); omitted entirely for other
 	// node types or when no qualifying advert has been measured yet. Device minus server
 	// time, in seconds, from the advert's self-reported timestamp: +ve = device ahead.

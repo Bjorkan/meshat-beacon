@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getPackets,
+  getPacketDetail,
+  getNode,
+  getObserver,
+  getObserverTelemetry,
   getNodesPage,
   getObserversPage,
   getScopes,
@@ -622,5 +626,126 @@ describe('getIataBorder', () => {
   it('returns the GeoJSON Feature when a border exists', async () => {
     mockStatus(200, feature);
     await expect(getIataBorder('YOW')).resolves.toEqual(feature);
+  });
+});
+
+describe('generated-model domain adapters', () => {
+  it('normalizes omitted node values while preserving false, zero and nested link metrics', async () => {
+    mockFetchOnce({
+      id: 'node',
+      publicKey: 'ab',
+      nodeType: 2,
+      nodeTypeName: 'REPEATER',
+      iatas: [],
+      knownNeighborCount: 1,
+      isObserver: false,
+      stale: false,
+      lat: 0,
+      neighbors: [],
+      neighborLinks: [{ nodeId: 'peer', snr: 0, snrSampleCount: 1 }],
+      firstSeen: 0,
+      lastSeen: 1,
+      supportsMultibytePaths: false,
+      supportsMultibyteTraces: true,
+    });
+    const node = await getNode('node');
+    expect(node).toMatchObject({
+      name: null,
+      lat: 0,
+      lng: null,
+      metadata: null,
+      locationSource: null,
+      lastAdvertAt: null,
+      minFirmwareVersion: null,
+      supportsMultibytePaths: false,
+      neighborLinks: [{ nodeId: 'peer', snr: 0, snrSampleCount: 1 }],
+    });
+  });
+
+  it('keeps optional observer owner references and narrows dynamic status metadata', async () => {
+    const ownerNode = { id: 'owner', name: 'Owner', publicKey: 'ab' };
+    mockFetchOnce({
+      id: 'observer',
+      iata: 'YVR',
+      status: 'online',
+      publicKey: 'cd',
+      firstSeen: 1,
+      lastSeen: 2,
+      observationCount: 0,
+      brokers: [],
+      ownerNode,
+      statusMetadata: { stats: { noise_floor: -110 } },
+    });
+    expect(await getObserver('observer')).toMatchObject({
+      ownerNode,
+      statusMetadata: { stats: { noise_floor: -110 } },
+    });
+    mockFetchOnce({ statusMetadata: ['invalid'] });
+    await expect(getObserver('observer')).rejects.toThrow(
+      'Invalid Observer.statusMetadata response',
+    );
+  });
+
+  it('keeps parsed JSON payloads and normalizes null propagation time', async () => {
+    mockFetchOnce({
+      parsedPayload: { type: 'advert', name: 'Relay' },
+      observations: [{ id: 1, propagationTimeMs: null }],
+      resolvedRoute: [{ confidence: 'none', nodes: [] }],
+    });
+    expect(await getPacketDetail('ab')).toMatchObject({
+      parsedPayload: { type: 'advert', name: 'Relay' },
+      observations: [{ id: 1, propagationTimeMs: undefined }],
+      resolvedRoute: [{ confidence: 'none', nodes: [] }],
+    });
+    mockFetchOnce({ parsedPayload: [1, 2, 3], observations: [] });
+    await expect(getPacketDetail('ab')).rejects.toThrow('Invalid Packet.parsedPayload response');
+  });
+
+  it('turns absent telemetry measurements into gaps and keeps real zeroes', async () => {
+    mockFetchOnce({
+      range: '24h',
+      interval: '1h',
+      points: [{ t: 1, batteryMv: 0, airtimeRxPct: 0 }],
+    });
+    expect(await getObserverTelemetry('observer', '24h')).toEqual({
+      range: '24h',
+      interval: '1h',
+      points: [
+        {
+          t: 1,
+          batteryMv: 0,
+          airtimeRxPct: 0,
+          airtimeTxPct: null,
+          noiseFloorDb: null,
+          uptimeSeconds: null,
+          queueLength: null,
+          receiveErrors: null,
+        },
+      ],
+    });
+  });
+
+  it('normalizes absent legacy cursors without losing opaque pagination tokens', async () => {
+    mockFetchOnce({ items: [], hasMore: true, nextPageToken: 'opaque' });
+    expect(await getKnownRoutesPage()).toEqual({
+      items: [],
+      hasMore: true,
+      nextCursor: null,
+      nextPageToken: 'opaque',
+    });
+  });
+
+  it('rejects the filtered scope response shape when fetching the names-only contract', async () => {
+    mockFetchOnce([{ name: '#region', nodeCount: 1 }]);
+    await expect(getScopes()).rejects.toThrow('Invalid scope names response');
+  });
+
+  it('rejects a malformed GeoJSON border instead of asserting its type', async () => {
+    mockFetchOnce({
+      type: 'Feature',
+      properties: {},
+      geometry: { type: 'Polygon', coordinates: [[['wrong', 0]]] },
+    });
+    await expect(getIataBorder('YVR')).rejects.toThrow('Invalid IATA border response');
   });
 });

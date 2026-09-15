@@ -2504,6 +2504,14 @@ const docTemplate = `{
     "definitions": {
         "github_com_MeshCore-Beacon_beacon-server_internal_api.AdvertObservation": {
             "type": "object",
+            "required": [
+                "heardAt",
+                "iata",
+                "id",
+                "packetHash",
+                "payloadType",
+                "payloadTypeName"
+            ],
             "properties": {
                 "heardAt": {
                     "description": "epoch ms",
@@ -2546,6 +2554,15 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Channel": {
             "type": "object",
+            "required": [
+                "channelHash",
+                "id",
+                "isHashtag",
+                "keyKnown",
+                "kind",
+                "lastSeen",
+                "messageCount"
+            ],
             "properties": {
                 "channelHash": {
                     "description": "hex-encoded single-byte hash",
@@ -2613,6 +2630,15 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelMessage": {
             "type": "object",
+            "required": [
+                "channelHash",
+                "content",
+                "id",
+                "observationCount",
+                "packetHash",
+                "senderName",
+                "sentAt"
+            ],
             "properties": {
                 "channelHash": {
                     "description": "hex-encoded single-byte channel hash",
@@ -2645,6 +2671,12 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items",
+                "nextCursor",
+                "unknownCount"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -2656,7 +2688,8 @@ const docTemplate = `{
                     }
                 },
                 "nextCursor": {
-                    "type": "integer"
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "unknownCount": {
                     "type": "integer"
@@ -2665,6 +2698,14 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary": {
             "type": "object",
+            "required": [
+                "channelHash",
+                "id",
+                "isHashtag",
+                "keyKnown",
+                "kind",
+                "lastSeen"
+            ],
             "properties": {
                 "channelHash": {
                     "description": "hex-encoded single-byte hash",
@@ -2706,6 +2747,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ClockDriftEntry": {
             "type": "object",
+            "required": [
+                "clockCheckedAt",
+                "clockDriftSeconds",
+                "nodeId",
+                "nodeType",
+                "nodeTypeName"
+            ],
             "properties": {
                 "clockCheckedAt": {
                     "description": "epoch ms",
@@ -2738,6 +2786,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.CrossIATAHop": {
             "type": "object",
+            "required": [
+                "fromIata",
+                "fromNode",
+                "lastSeen",
+                "toIata",
+                "toNode"
+            ],
             "properties": {
                 "fromIata": {
                     "type": "string"
@@ -2769,6 +2824,12 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.CrossIATARoute": {
             "type": "object",
+            "required": [
+                "crossHop",
+                "sourceSegment",
+                "targetSegment",
+                "totalHops"
+            ],
             "properties": {
                 "crossHop": {
                     "description": "the boundary hop",
@@ -2799,23 +2860,41 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.IATA": {
             "type": "object",
+            "required": [
+                "displayName",
+                "iata",
+                "lat",
+                "lon"
+            ],
             "properties": {
                 "displayName": {
-                    "type": "string"
+                    "type": "string",
+                    "x-nullable": true
                 },
                 "iata": {
                     "type": "string"
                 },
                 "lat": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "lon": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 }
             }
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.KnownRoute": {
             "type": "object",
+            "required": [
+                "firstSeen",
+                "hopCount",
+                "hops",
+                "iata",
+                "id",
+                "lastSeen",
+                "observationCount"
+            ],
             "properties": {
                 "firstSeen": {
                     "description": "epoch ms",
@@ -2847,6 +2926,21 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Node": {
             "type": "object",
+            "required": [
+                "firstSeen",
+                "iatas",
+                "id",
+                "isObserver",
+                "knownNeighborCount",
+                "lastSeen",
+                "neighbors",
+                "nodeType",
+                "nodeTypeName",
+                "publicKey",
+                "stale",
+                "supportsMultibytePaths",
+                "supportsMultibyteTraces"
+            ],
             "properties": {
                 "clockCheckedAt": {
                     "type": "integer"
@@ -2972,6 +3066,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeIATA": {
             "type": "object",
+            "required": [
+                "iata",
+                "lastHeard"
+            ],
             "properties": {
                 "iata": {
                     "type": "string"
@@ -2984,6 +3082,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeLinkMetric": {
             "type": "object",
+            "required": [
+                "nodeId",
+                "snrSampleCount"
+            ],
             "properties": {
                 "nodeId": {
                     "type": "string"
@@ -3001,6 +3103,17 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeNeighbor": {
             "type": "object",
+            "required": [
+                "firstSeen",
+                "iata",
+                "id",
+                "lastSeen",
+                "nodeType",
+                "nodeTypeName",
+                "observationCount",
+                "publicKey",
+                "snrSampleCount"
+            ],
             "properties": {
                 "firstSeen": {
                     "description": "epoch ms",
@@ -3051,6 +3164,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeSummary": {
             "type": "object",
+            "required": [
+                "iatas",
+                "id",
+                "isObserver",
+                "knownNeighborCount",
+                "nodeType",
+                "nodeTypeName",
+                "publicKey",
+                "stale"
+            ],
             "properties": {
                 "defaultScope": {
                     "description": "most recently matched transport scope name e.g. \"#bc\"",
@@ -3129,6 +3252,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.NodeTypeCount": {
             "type": "object",
+            "required": [
+                "count",
+                "nodeType",
+                "nodeTypeName"
+            ],
             "properties": {
                 "count": {
                     "type": "integer"
@@ -3143,6 +3271,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObservationPoint": {
             "type": "object",
+            "required": [
+                "activeObservers",
+                "hour",
+                "iata",
+                "observationCount",
+                "uniquePackets"
+            ],
             "properties": {
                 "activeObservers": {
                     "type": "integer"
@@ -3164,6 +3299,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Observer": {
             "type": "object",
+            "required": [
+                "brokers",
+                "firstSeen",
+                "iata",
+                "id",
+                "lastSeen",
+                "observationCount",
+                "publicKey",
+                "status"
+            ],
             "properties": {
                 "batteryLevel": {
                     "description": "volts, nil if mains powered",
@@ -3258,7 +3403,11 @@ const docTemplate = `{
                 },
                 "status": {
                     "description": "\"online\" or \"offline\" derived from last_status_at",
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "online",
+                        "offline"
+                    ]
                 },
                 "statusMetadata": {
                     "description": "raw /status JSON payload"
@@ -3270,6 +3419,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverBroker": {
             "type": "object",
+            "required": [
+                "lastPacketAt",
+                "lastSeenAt",
+                "name"
+            ],
             "properties": {
                 "lastPacketAt": {
                     "description": "epoch ms, last packet received via this broker; 0 if none",
@@ -3287,6 +3441,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode": {
             "type": "object",
+            "required": [
+                "id",
+                "publicKey"
+            ],
             "properties": {
                 "id": {
                     "type": "string"
@@ -3301,6 +3459,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverSummary": {
             "type": "object",
+            "required": [
+                "iata",
+                "id",
+                "status"
+            ],
             "properties": {
                 "displayName": {
                     "description": "friendly name from /status messages",
@@ -3334,12 +3497,21 @@ const docTemplate = `{
                 },
                 "status": {
                     "description": "\"online\" or \"offline\" derived from last_status_at",
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "online",
+                        "offline"
+                    ]
                 }
             }
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverTelemetry": {
             "type": "object",
+            "required": [
+                "interval",
+                "points",
+                "range"
+            ],
             "properties": {
                 "interval": {
                     "type": "string"
@@ -3357,6 +3529,9 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverTelemetryPoint": {
             "type": "object",
+            "required": [
+                "t"
+            ],
             "properties": {
                 "airtimeRxPct": {
                     "type": "number"
@@ -3387,6 +3562,17 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Packet": {
             "type": "object",
+            "required": [
+                "decrypted",
+                "firstHeardAt",
+                "firstToLastMs",
+                "header",
+                "lastHeardAt",
+                "observationCount",
+                "observations",
+                "packetHash",
+                "rawPayload"
+            ],
             "properties": {
                 "channelHash": {
                     "description": "hex-encoded single byte; non-nil for group_text/group_data",
@@ -3428,10 +3614,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "parsedPayload": {
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
+                    "type": "object"
                 },
                 "rawPayload": {
                     "description": "hex-encoded payload bytes (excludes header and path)",
@@ -3455,6 +3638,14 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketHeader": {
             "type": "object",
+            "required": [
+                "payloadType",
+                "payloadTypeName",
+                "payloadVersion",
+                "raw",
+                "routeType",
+                "routeTypeName"
+            ],
             "properties": {
                 "payloadType": {
                     "description": "bits 2-5",
@@ -3484,6 +3675,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketLatestObserver": {
             "type": "object",
+            "required": [
+                "iata",
+                "id"
+            ],
             "properties": {
                 "displayName": {
                     "type": "string"
@@ -3522,6 +3717,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketObservationDetail": {
             "type": "object",
+            "required": [
+                "heardAt",
+                "iata",
+                "id",
+                "observerId",
+                "pathLength",
+                "propagationTimeMs",
+                "resolvedPath",
+                "sourceBroker"
+            ],
             "properties": {
                 "heardAt": {
                     "description": "epoch ms",
@@ -3548,7 +3753,8 @@ const docTemplate = `{
                 },
                 "propagationTimeMs": {
                     "description": "ms since first observation; 0 for first",
-                    "type": "integer"
+                    "type": "integer",
+                    "x-nullable": true
                 },
                 "radio": {
                     "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PacketRadio"
@@ -3584,6 +3790,14 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketObservationSummary": {
             "type": "object",
+            "required": [
+                "heardAt",
+                "iata",
+                "id",
+                "packetHash",
+                "payloadType",
+                "payloadTypeName"
+            ],
             "properties": {
                 "heardAt": {
                     "description": "epoch ms",
@@ -3619,6 +3833,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketPathLength": {
             "type": "object",
+            "required": [
+                "hashSize",
+                "hopCount",
+                "raw"
+            ],
             "properties": {
                 "hashSize": {
                     "description": "per-hop hash size in bytes (1, 2, or 3)",
@@ -3653,6 +3872,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketSummary": {
             "type": "object",
+            "required": [
+                "firstHeardAt",
+                "lastHeardAt",
+                "observationCount",
+                "packetHash",
+                "payloadType",
+                "payloadTypeName",
+                "routeType",
+                "routeTypeName"
+            ],
             "properties": {
                 "firstHeardAt": {
                     "description": "epoch ms",
@@ -3696,6 +3925,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PacketTransportCodes": {
             "type": "object",
+            "required": [
+                "regionCode",
+                "subRegionCode"
+            ],
             "properties": {
                 "regionCode": {
                     "type": "integer"
@@ -3707,6 +3940,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_AdvertObservation": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3727,6 +3964,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelMessage": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3747,6 +3988,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_KnownRoute": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3767,6 +4012,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_NodeSummary": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3787,6 +4036,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ObserverSummary": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3807,6 +4060,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_PacketObservationSummary": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3827,6 +4084,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_PacketSummary": {
             "type": "object",
+            "required": [
+                "hasMore",
+                "items"
+            ],
             "properties": {
                 "hasMore": {
                     "type": "boolean"
@@ -3847,6 +4108,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PayloadBreakdownItem": {
             "type": "object",
+            "required": [
+                "count",
+                "payloadType",
+                "payloadTypeName"
+            ],
             "properties": {
                 "count": {
                     "type": "integer"
@@ -3861,6 +4127,12 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.RadioPreset": {
             "type": "object",
+            "required": [
+                "count",
+                "iata",
+                "preset",
+                "sourceType"
+            ],
             "properties": {
                 "codingRate": {
                     "type": "integer"
@@ -3888,6 +4160,9 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.RawHop": {
             "type": "object",
+            "required": [
+                "hash"
+            ],
             "properties": {
                 "hash": {
                     "description": "hex-encoded path hash",
@@ -3901,6 +4176,12 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.Region": {
             "type": "object",
+            "required": [
+                "iatas",
+                "id",
+                "name",
+                "slug"
+            ],
             "properties": {
                 "centerLat": {
                     "description": "map center latitude",
@@ -3946,6 +4227,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.RegionSummary": {
             "type": "object",
+            "required": [
+                "id",
+                "name",
+                "slug"
+            ],
             "properties": {
                 "id": {
                     "type": "integer"
@@ -3969,10 +4255,19 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHop": {
             "type": "object",
+            "required": [
+                "confidence",
+                "nodes"
+            ],
             "properties": {
                 "confidence": {
                     "description": "\"high\", \"ambiguous\", or \"none\"",
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "high",
+                        "ambiguous",
+                        "none"
+                    ]
                 },
                 "nodes": {
                     "description": "empty for \"none\", one for \"high\", multiple for \"ambiguous\"",
@@ -3988,10 +4283,18 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite": {
             "type": "object",
+            "required": [
+                "confidence"
+            ],
             "properties": {
                 "confidence": {
                     "description": "\"high\", \"ambiguous\", or \"none\"",
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "high",
+                        "ambiguous",
+                        "none"
+                    ]
                 },
                 "nodeId": {
                     "type": "string"
@@ -4003,6 +4306,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedNode": {
             "type": "object",
+            "required": [
+                "id",
+                "publicKey"
+            ],
             "properties": {
                 "id": {
                     "type": "string"
@@ -4024,6 +4331,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.RouteHop": {
             "type": "object",
+            "required": [
+                "hashBytes",
+                "nodeId"
+            ],
             "properties": {
                 "hashBytes": {
                     "description": "hex-encoded hash prefix",
@@ -4070,6 +4381,12 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ScopeStats": {
             "type": "object",
+            "required": [
+                "name",
+                "nodeCount",
+                "observerCount",
+                "packetCount"
+            ],
             "properties": {
                 "name": {
                     "description": "normalized scope name e.g. \"#bc\"",
@@ -4091,6 +4408,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.StatsOverview": {
             "type": "object",
+            "required": [
+                "activeIatas",
+                "activeObservers",
+                "totalObservations",
+                "totalPackets",
+                "windowHours"
+            ],
             "properties": {
                 "activeIatas": {
                     "type": "integer"
@@ -4112,6 +4436,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TopAdvertiser": {
             "type": "object",
+            "required": [
+                "advertCount",
+                "directAdvertCount",
+                "floodAdvertCount",
+                "iata",
+                "lastHeard",
+                "nodeId",
+                "nodeType",
+                "nodeTypeName"
+            ],
             "properties": {
                 "advertCount": {
                     "type": "integer"
@@ -4146,6 +4480,14 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TopNode": {
             "type": "object",
+            "required": [
+                "iata",
+                "lastHeard",
+                "nodeId",
+                "nodeType",
+                "nodeTypeName",
+                "observationCount"
+            ],
             "properties": {
                 "iata": {
                     "type": "string"
@@ -4173,6 +4515,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TopObserver": {
             "type": "object",
+            "required": [
+                "iata",
+                "observationCount",
+                "observerId"
+            ],
             "properties": {
                 "displayName": {
                     "type": "string"
@@ -4193,6 +4540,11 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TopTalker": {
             "type": "object",
+            "required": [
+                "lastSent",
+                "messageCount",
+                "senderName"
+            ],
             "properties": {
                 "lastSent": {
                     "description": "epoch ms",
@@ -4208,6 +4560,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TraceDetail": {
             "type": "object",
+            "required": [
+                "packets",
+                "traceTag"
+            ],
             "properties": {
                 "packets": {
                     "description": "all packets observed for this trace",
@@ -4224,6 +4580,15 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TracePacket": {
             "type": "object",
+            "required": [
+                "firstHeardAt",
+                "lastHeardAt",
+                "packetHash",
+                "rawPath",
+                "resolvedRoute",
+                "routeType",
+                "routeTypeName"
+            ],
             "properties": {
                 "firstHeardAt": {
                     "description": "epoch ms",
@@ -4267,6 +4632,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.TraceTagSummary": {
             "type": "object",
+            "required": [
+                "firstHeardAt",
+                "iataCount",
+                "lastHeardAt",
+                "packetCount",
+                "pathHashes",
+                "snrValues",
+                "traceTag",
+                "traceType"
+            ],
             "properties": {
                 "firstHeardAt": {
                     "description": "epoch ms",
@@ -4311,7 +4686,11 @@ const docTemplate = `{
                 },
                 "traceType": {
                     "description": "TRACE or PING",
-                    "type": "string"
+                    "type": "string",
+                    "enum": [
+                        "TRACE",
+                        "PING"
+                    ]
                 }
             }
         },
@@ -4330,6 +4709,10 @@ const docTemplate = `{
         },
         "internal_api_handlers.BrokerStatus": {
             "type": "object",
+            "required": [
+                "connected",
+                "name"
+            ],
             "properties": {
                 "connected": {
                     "type": "boolean"

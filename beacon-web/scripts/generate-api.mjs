@@ -33,6 +33,9 @@ function refName(ref) {
 }
 
 function tsType(node = {}, refPrefix = '') {
+  if (node['x-nullable'] || node.nullable) {
+    return `(${tsType({ ...node, 'x-nullable': false, nullable: false }, refPrefix)}) | null`;
+  }
   if (node.$ref) return `${refPrefix}${refName(node.$ref)}`;
   if (node.allOf) return node.allOf.map((part) => tsType(part, refPrefix)).join(' & ');
   if (Array.isArray(node.enum) && node.enum.length)

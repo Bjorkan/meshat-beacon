@@ -5,9 +5,9 @@ package api
 
 // RegionSummary is the minimal region representation used in list responses.
 type RegionSummary struct {
-	ID        int     `json:"id"`
-	Slug      string  `json:"slug"` // URL-safe identifier e.g. "western-canada"
-	Name      string  `json:"name"`
+	ID        int     `json:"id" binding:"required"`
+	Slug      string  `json:"slug" binding:"required"` // URL-safe identifier e.g. "western-canada"
+	Name      string  `json:"name" binding:"required"`
 	ShortCode *string `json:"shortCode,omitempty"` // compact display code e.g. "SWE"
 	IsRoot    bool    `json:"isRoot,omitempty"`    // deployment root scope for the no-filter state
 }
@@ -17,8 +17,8 @@ type RegionSummary struct {
 type Region struct {
 	RegionSummary
 	Description *string  `json:"description,omitempty"`
-	CenterLat   *float64 `json:"centerLat,omitempty"` // map center latitude
-	CenterLng   *float64 `json:"centerLng,omitempty"` // map center longitude
-	ZoomLevel   *int     `json:"zoomLevel,omitempty"` // suggested map zoom level
-	IATAs       []string `json:"iatas"`               // member IATA codes
+	CenterLat   *float64 `json:"centerLat,omitempty"`      // map center latitude
+	CenterLng   *float64 `json:"centerLng,omitempty"`      // map center longitude
+	ZoomLevel   *int     `json:"zoomLevel,omitempty"`      // suggested map zoom level
+	IATAs       []string `json:"iatas" binding:"required"` // member IATA codes
 }

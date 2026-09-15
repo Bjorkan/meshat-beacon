@@ -28,6 +28,13 @@ definitions:
         type: integer
       snr:
         type: number
+    required:
+    - heardAt
+    - iata
+    - id
+    - packetHash
+    - payloadType
+    - payloadTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Channel:
     properties:
@@ -64,6 +71,14 @@ definitions:
       name:
         description: display name from config or nil
         type: string
+    required:
+    - channelHash
+    - id
+    - isHashtag
+    - keyKnown
+    - kind
+    - lastSeen
+    - messageCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelKind:
     enum:
@@ -100,6 +115,14 @@ definitions:
       sentAt:
         description: epoch ms, from the sender's embedded timestamp
         type: integer
+    required:
+    - channelHash
+    - content
+    - id
+    - observationCount
+    - packetHash
+    - senderName
+    - sentAt
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage:
     properties:
@@ -111,8 +134,14 @@ definitions:
         type: array
       nextCursor:
         type: integer
+        x-nullable: true
       unknownCount:
         type: integer
+    required:
+    - hasMore
+    - items
+    - nextCursor
+    - unknownCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary:
     properties:
@@ -141,6 +170,13 @@ definitions:
       name:
         description: display name from config or nil
         type: string
+    required:
+    - channelHash
+    - id
+    - isHashtag
+    - keyKnown
+    - kind
+    - lastSeen
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ClockDriftEntry:
     properties:
@@ -163,6 +199,12 @@ definitions:
         type: integer
       nodeTypeName:
         type: string
+    required:
+    - clockCheckedAt
+    - clockDriftSeconds
+    - nodeId
+    - nodeType
+    - nodeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.CrossIATAHop:
     properties:
@@ -181,6 +223,12 @@ definitions:
         allOf:
         - $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedNode'
         description: first node in target IATA
+    required:
+    - fromIata
+    - fromNode
+    - lastSeen
+    - toIata
+    - toNode
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.CrossIATARoute:
     properties:
@@ -200,17 +248,30 @@ definitions:
         type: array
       totalHops:
         type: integer
+    required:
+    - crossHop
+    - sourceSegment
+    - targetSegment
+    - totalHops
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.IATA:
     properties:
       displayName:
         type: string
+        x-nullable: true
       iata:
         type: string
       lat:
         type: number
+        x-nullable: true
       lon:
         type: number
+        x-nullable: true
+    required:
+    - displayName
+    - iata
+    - lat
+    - lon
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.KnownRoute:
     properties:
@@ -232,6 +293,14 @@ definitions:
         type: integer
       observationCount:
         type: integer
+    required:
+    - firstSeen
+    - hopCount
+    - hops
+    - iata
+    - id
+    - lastSeen
+    - observationCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Node:
     properties:
@@ -333,6 +402,20 @@ definitions:
       supportsMultibyteTraces:
         description: firmware >= 1.11.0; detected via trace hash size
         type: boolean
+    required:
+    - firstSeen
+    - iatas
+    - id
+    - isObserver
+    - knownNeighborCount
+    - lastSeen
+    - neighbors
+    - nodeType
+    - nodeTypeName
+    - publicKey
+    - stale
+    - supportsMultibytePaths
+    - supportsMultibyteTraces
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.NodeIATA:
     properties:
@@ -341,6 +424,9 @@ definitions:
       lastHeard:
         description: epoch ms
         type: integer
+    required:
+    - iata
+    - lastHeard
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.NodeLinkMetric:
     properties:
@@ -352,6 +438,9 @@ definitions:
         type: integer
       snrSampleCount:
         type: integer
+    required:
+    - nodeId
+    - snrSampleCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.NodeNeighbor:
     properties:
@@ -386,6 +475,16 @@ definitions:
         type: integer
       snrSampleCount:
         type: integer
+    required:
+    - firstSeen
+    - iata
+    - id
+    - lastSeen
+    - nodeType
+    - nodeTypeName
+    - observationCount
+    - publicKey
+    - snrSampleCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.NodeSummary:
     properties:
@@ -447,6 +546,15 @@ definitions:
           Applies to every node type, unlike ClockDriftSeconds/ClockOutOfSync on Node, which
           are repeater/room-server only.
         type: boolean
+    required:
+    - iatas
+    - id
+    - isObserver
+    - knownNeighborCount
+    - nodeType
+    - nodeTypeName
+    - publicKey
+    - stale
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.NodeTypeCount:
     properties:
@@ -456,6 +564,10 @@ definitions:
         type: integer
       nodeTypeName:
         type: string
+    required:
+    - count
+    - nodeType
+    - nodeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObservationPoint:
     properties:
@@ -470,6 +582,12 @@ definitions:
         type: integer
       uniquePackets:
         type: integer
+    required:
+    - activeObservers
+    - hour
+    - iata
+    - observationCount
+    - uniquePackets
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Observer:
     properties:
@@ -542,11 +660,23 @@ definitions:
         type: string
       status:
         description: '"online" or "offline" derived from last_status_at'
+        enum:
+        - online
+        - offline
         type: string
       statusMetadata:
         description: raw /status JSON payload
       uptimeSeconds:
         type: integer
+    required:
+    - brokers
+    - firstSeen
+    - iata
+    - id
+    - lastSeen
+    - observationCount
+    - publicKey
+    - status
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverBroker:
     properties:
@@ -559,6 +689,10 @@ definitions:
       name:
         description: broker name e.g. "meshat.se"
         type: string
+    required:
+    - lastPacketAt
+    - lastSeenAt
+    - name
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode:
     properties:
@@ -568,6 +702,9 @@ definitions:
         type: string
       publicKey:
         type: string
+    required:
+    - id
+    - publicKey
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverSummary:
     properties:
@@ -596,7 +733,14 @@ definitions:
         type: array
       status:
         description: '"online" or "offline" derived from last_status_at'
+        enum:
+        - online
+        - offline
         type: string
+    required:
+    - iata
+    - id
+    - status
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverTelemetry:
     properties:
@@ -608,6 +752,10 @@ definitions:
         type: array
       range:
         type: string
+    required:
+    - interval
+    - points
+    - range
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverTelemetryPoint:
     properties:
@@ -628,6 +776,8 @@ definitions:
         type: integer
       uptimeSeconds:
         type: integer
+    required:
+    - t
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Packet:
     properties:
@@ -660,9 +810,7 @@ definitions:
       packetHash:
         type: string
       parsedPayload:
-        items:
-          type: integer
-        type: array
+        type: object
       rawPayload:
         description: hex-encoded payload bytes (excludes header and path)
         type: string
@@ -676,6 +824,16 @@ definitions:
         type: string
       transportCodes:
         $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PacketTransportCodes'
+    required:
+    - decrypted
+    - firstHeardAt
+    - firstToLastMs
+    - header
+    - lastHeardAt
+    - observationCount
+    - observations
+    - packetHash
+    - rawPayload
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketHeader:
     properties:
@@ -697,6 +855,13 @@ definitions:
       routeTypeName:
         description: FLOOD, DIRECT, TRANSPORT_FLOOD, TRANSPORT_DIRECT
         type: string
+    required:
+    - payloadType
+    - payloadTypeName
+    - payloadVersion
+    - raw
+    - routeType
+    - routeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketLatestObserver:
     properties:
@@ -726,6 +891,9 @@ definitions:
         type: array
       resolvedSource:
         $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHop'
+    required:
+    - iata
+    - id
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketObservationDetail:
     properties:
@@ -748,6 +916,7 @@ definitions:
       propagationTimeMs:
         description: ms since first observation; 0 for first
         type: integer
+        x-nullable: true
       radio:
         $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PacketRadio'
       resolvedDestination:
@@ -773,6 +942,15 @@ definitions:
         type: number
       sourceBroker:
         type: string
+    required:
+    - heardAt
+    - iata
+    - id
+    - observerId
+    - pathLength
+    - propagationTimeMs
+    - resolvedPath
+    - sourceBroker
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketObservationSummary:
     properties:
@@ -797,6 +975,13 @@ definitions:
         type: integer
       snr:
         type: number
+    required:
+    - heardAt
+    - iata
+    - id
+    - packetHash
+    - payloadType
+    - payloadTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketPathLength:
     properties:
@@ -809,6 +994,10 @@ definitions:
       raw:
         description: hex-encoded single byte
         type: string
+    required:
+    - hashSize
+    - hopCount
+    - raw
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketRadio:
     properties:
@@ -850,6 +1039,15 @@ definitions:
       summary:
         description: human-readable payload summary
         type: string
+    required:
+    - firstHeardAt
+    - lastHeardAt
+    - observationCount
+    - packetHash
+    - payloadType
+    - payloadTypeName
+    - routeType
+    - routeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PacketTransportCodes:
     properties:
@@ -857,6 +1055,9 @@ definitions:
         type: integer
       subRegionCode:
         type: integer
+    required:
+    - regionCode
+    - subRegionCode
     type: object
   ? github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_AdvertObservation
   : properties:
@@ -870,6 +1071,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelMessage:
     properties:
@@ -883,6 +1087,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_KnownRoute:
     properties:
@@ -896,6 +1103,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_NodeSummary:
     properties:
@@ -909,6 +1119,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ObserverSummary:
     properties:
@@ -922,6 +1135,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   ? github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_PacketObservationSummary
   : properties:
@@ -935,6 +1151,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_PacketSummary:
     properties:
@@ -948,6 +1167,9 @@ definitions:
         type: integer
       nextPageToken:
         type: string
+    required:
+    - hasMore
+    - items
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PayloadBreakdownItem:
     properties:
@@ -957,6 +1179,10 @@ definitions:
         type: integer
       payloadTypeName:
         type: string
+    required:
+    - count
+    - payloadType
+    - payloadTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RadioPreset:
     properties:
@@ -980,6 +1206,11 @@ definitions:
           naming. Absent for unknown or ambiguous configurations — callers keep
           the raw label.
         type: string
+    required:
+    - count
+    - iata
+    - preset
+    - sourceType
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RawHop:
     properties:
@@ -989,6 +1220,8 @@ definitions:
       snr:
         description: signal-to-noise ratio in dB, if available
         type: number
+    required:
+    - hash
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Region:
     properties:
@@ -1021,6 +1254,11 @@ definitions:
       zoomLevel:
         description: suggested map zoom level
         type: integer
+    required:
+    - iatas
+    - id
+    - name
+    - slug
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RegionSummary:
     properties:
@@ -1037,11 +1275,19 @@ definitions:
       slug:
         description: URL-safe identifier e.g. "western-canada"
         type: string
+    required:
+    - id
+    - name
+    - slug
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHop:
     properties:
       confidence:
         description: '"high", "ambiguous", or "none"'
+        enum:
+        - high
+        - ambiguous
+        - none
         type: string
       nodes:
         description: empty for "none", one for "high", multiple for "ambiguous"
@@ -1050,16 +1296,25 @@ definitions:
         type: array
       snr:
         type: number
+    required:
+    - confidence
+    - nodes
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHopLite:
     properties:
       confidence:
         description: '"high", "ambiguous", or "none"'
+        enum:
+        - high
+        - ambiguous
+        - none
         type: string
       nodeId:
         type: string
       nodeName:
         type: string
+    required:
+    - confidence
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedNode:
     properties:
@@ -1074,6 +1329,9 @@ definitions:
       publicKey:
         description: hex-encoded prefix used for resolution
         type: string
+    required:
+    - id
+    - publicKey
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RouteHop:
     properties:
@@ -1086,6 +1344,9 @@ definitions:
         description: populated when node details are available
       nodeId:
         type: string
+    required:
+    - hashBytes
+    - nodeId
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ScopeDetail:
     properties:
@@ -1118,6 +1379,11 @@ definitions:
       packetCount:
         description: distinct packets matched to this scope
         type: integer
+    required:
+    - name
+    - nodeCount
+    - observerCount
+    - packetCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.StatsOverview:
     properties:
@@ -1132,6 +1398,12 @@ definitions:
       windowHours:
         description: always 24 for now
         type: integer
+    required:
+    - activeIatas
+    - activeObservers
+    - totalObservations
+    - totalPackets
+    - windowHours
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TopAdvertiser:
     properties:
@@ -1159,6 +1431,15 @@ definitions:
         type: integer
       nodeTypeName:
         type: string
+    required:
+    - advertCount
+    - directAdvertCount
+    - floodAdvertCount
+    - iata
+    - lastHeard
+    - nodeId
+    - nodeType
+    - nodeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TopNode:
     properties:
@@ -1177,6 +1458,13 @@ definitions:
         type: string
       observationCount:
         type: integer
+    required:
+    - iata
+    - lastHeard
+    - nodeId
+    - nodeType
+    - nodeTypeName
+    - observationCount
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TopObserver:
     properties:
@@ -1190,6 +1478,10 @@ definitions:
         type: string
       observerType:
         type: string
+    required:
+    - iata
+    - observationCount
+    - observerId
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TopTalker:
     properties:
@@ -1200,6 +1492,10 @@ definitions:
         type: integer
       senderName:
         type: string
+    required:
+    - lastSent
+    - messageCount
+    - senderName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TraceDetail:
     properties:
@@ -1211,6 +1507,9 @@ definitions:
       traceTag:
         description: hex-encoded 4-byte tag
         type: string
+    required:
+    - packets
+    - traceTag
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TracePacket:
     properties:
@@ -1242,6 +1541,14 @@ definitions:
       scope:
         description: transport scope name, if known
         type: string
+    required:
+    - firstHeardAt
+    - lastHeardAt
+    - packetHash
+    - rawPath
+    - resolvedRoute
+    - routeType
+    - routeTypeName
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.TraceTagSummary:
     properties:
@@ -1277,7 +1584,19 @@ definitions:
         type: string
       traceType:
         description: TRACE or PING
+        enum:
+        - TRACE
+        - PING
         type: string
+    required:
+    - firstHeardAt
+    - iataCount
+    - lastHeardAt
+    - packetCount
+    - pathHashes
+    - snrValues
+    - traceTag
+    - traceType
     type: object
   internal_api_handlers.APIError:
     properties:
@@ -1294,6 +1613,9 @@ definitions:
         type: boolean
       name:
         type: string
+    required:
+    - connected
+    - name
     type: object
 host: localhost:8080
 info:

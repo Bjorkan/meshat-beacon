@@ -17,10 +17,10 @@ import (
 // NextPageToken is the preferred opaque keyset cursor for sortable lists; callers should round-trip
 // it unchanged. HasMore is true when additional results exist beyond the current page.
 type Page[T any] struct {
-	Items         []T     `json:"items"`
+	Items         []T     `json:"items" binding:"required"`
 	NextCursor    *int64  `json:"nextCursor,omitempty"`
 	NextPageToken *string `json:"nextPageToken,omitempty"`
-	HasMore       bool    `json:"hasMore"`
+	HasMore       bool    `json:"hasMore" binding:"required"`
 }
 
 type Reader interface {

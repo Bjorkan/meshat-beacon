@@ -8,8 +8,8 @@ package api
 // DisplayName, Lat and Lng are optional — they are set via config file override
 // or remain nil if the IATA was auto-created from packet traffic.
 type IATA struct {
-	IATA        string   `json:"iata"`
-	DisplayName *string  `json:"displayName"`
-	Lat         *float64 `json:"lat"`
-	Lng         *float64 `json:"lon"`
+	IATA        string   `json:"iata" binding:"required"`
+	DisplayName *string  `json:"displayName" binding:"required" extensions:"x-nullable"`
+	Lat         *float64 `json:"lat" binding:"required" extensions:"x-nullable"`
+	Lng         *float64 `json:"lon" binding:"required" extensions:"x-nullable"`
 }
