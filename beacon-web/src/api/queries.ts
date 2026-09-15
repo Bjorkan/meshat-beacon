@@ -24,6 +24,7 @@ import {
   getNodeObservations,
   getNodePathPackets,
   getNodesPage,
+  getMeshCoreRegions,
   getObserver,
   getObserverAdverts,
   getObserverTelemetry,
@@ -109,6 +110,18 @@ export const iataQueries = {
     }),
 };
 
+// ── MeshCore Region discovery (map filter) ───────────────────────────────────────────────────
+
+export const meshcoreRegionQueries = {
+  all: () => ['meshcore-regions'] as const,
+  list: () =>
+    queryOptions({
+      queryKey: meshcoreRegionQueries.all(),
+      queryFn: getMeshCoreRegions,
+      staleTime: 60_000,
+    }),
+};
+
 // ── scopes + brokers ─────────────────────────────────────────────────────────────────────────
 
 export const scopeQueries = {
@@ -176,10 +189,13 @@ export const nodeQueries = {
 
   all: () => ['nodes'] as const,
   // Map variant: always requests neighborIds so the neighbor-lines toggle is a pure client-side
-  // render switch. Deliberately a different key from the filtered Nodes-table list.
+  // render switch. Deliberately a different key from the filtered Nodes-table list. meshcoreRegion
+  // is a server-side confirmed-MeshCore-Region filter; when set, every page contains only matching
+  // nodes, so markers, clusters and neighbor lines all honor it without client-side reconstruction.
   mapList: (args: {
     regionKey: string;
     iatas?: string[];
+    meshcoreRegion?: string;
   }): PagedOptions<NodeSummary, SortablePageParam> =>
     infiniteQueryOptions<
       CursorPage<NodeSummary>,
@@ -188,7 +204,7 @@ export const nodeQueries = {
       QueryKey,
       SortablePageParam
     >({
-      queryKey: ['map-nodes', args.regionKey] as const,
+      queryKey: ['map-nodes', args.regionKey, args.meshcoreRegion ?? ''] as const,
       queryFn: ({ pageParam }) =>
         getNodesPage(args.iatas, {
           cursor: typeof pageParam === 'number' ? pageParam : undefined,
@@ -196,6 +212,7 @@ export const nodeQueries = {
           sort: 'last_seen',
           direction: 'desc',
           neighbors: true,
+          meshcoreRegion: args.meshcoreRegion,
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
       initialPageParam: undefined,

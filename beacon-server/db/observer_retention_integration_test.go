@@ -55,7 +55,7 @@ func TestObserverRetentionIntegration(t *testing.T) {
 		}
 	}
 
-	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour)
+	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
 
 	// Minimal rows the observer-owned cascade tables need.
 	exec(`INSERT INTO iata_codes (iata) VALUES ('YVR')`)

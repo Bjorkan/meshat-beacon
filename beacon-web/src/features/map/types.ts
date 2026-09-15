@@ -33,6 +33,7 @@ export const DEFAULT_STYLE_ID = 'dark';
 
 export const MAP_CLUSTER_STORAGE_KEY = 'beacon-map-clustering';
 export const MAP_NODE_TYPE_STORAGE_KEY = 'beacon-map-node-type';
+export const MAP_MESHCORE_REGION_STORAGE_KEY = 'beacon-map-meshcore-region';
 
 // Map tiles follow the active app theme (Meshat Dark → dark basemap, Meshat Light → light
 // basemap). Anything not explicitly a light theme — including legacy/unknown ids — stays dark,

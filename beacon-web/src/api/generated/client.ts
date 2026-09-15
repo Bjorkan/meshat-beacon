@@ -62,12 +62,16 @@ export async function rawGetMessagesBackfill(params: { afterId: number; iatas?: 
   return request<Array<Models.ChannelMessage>>("/messages/backfill", { "afterId": params.afterId, "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "limit": params.limit });
 }
 
-export async function rawGetNodes(params: { type?: number; typeName?: string; iata?: string; iatas?: string; regionId?: number; region?: string; name?: string; scope?: string; pubkey?: string; pubkeyPrefix?: string; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; neighbors?: boolean; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }): Promise<Models.PageNodeSummary> {
-  return request<Models.PageNodeSummary>("/nodes", { "type": params.type, "typeName": params.typeName, "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "name": params.name, "scope": params.scope, "pubkey": params.pubkey, "pubkeyPrefix": params.pubkeyPrefix, "supportsMultibytePaths": params.supportsMultibytePaths, "supportsMultibyteTraces": params.supportsMultibyteTraces, "neighbors": params.neighbors, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetNodes(params: { type?: number; typeName?: string; iata?: string; iatas?: string; regionId?: number; region?: string; name?: string; scope?: string; pubkey?: string; pubkeyPrefix?: string; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; neighbors?: boolean; meshcoreRegion?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }): Promise<Models.PageNodeSummary> {
+  return request<Models.PageNodeSummary>("/nodes", { "type": params.type, "typeName": params.typeName, "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "name": params.name, "scope": params.scope, "pubkey": params.pubkey, "pubkeyPrefix": params.pubkeyPrefix, "supportsMultibytePaths": params.supportsMultibytePaths, "supportsMultibyteTraces": params.supportsMultibyteTraces, "neighbors": params.neighbors, "meshcoreRegion": params.meshcoreRegion, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
 }
 
 export async function rawGetNodesAmbiguousPrefix2(): Promise<Array<string>> {
   return request<Array<string>>("/nodes/ambiguous-prefix2", undefined);
+}
+
+export async function rawGetNodesMeshcoreRegions(): Promise<Array<Models.MeshCoreRegion>> {
+  return request<Array<Models.MeshCoreRegion>>("/nodes/meshcore-regions", undefined);
 }
 
 export async function rawGetNodesNodeId(params: { nodeId: string; }): Promise<Models.Node> {

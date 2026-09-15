@@ -34,6 +34,7 @@ import {
   MAP_NEIGHBOR_LINES_STORAGE_KEY,
   MAP_CLUSTER_STORAGE_KEY,
   MAP_NODE_TYPE_STORAGE_KEY,
+  MAP_MESHCORE_REGION_STORAGE_KEY,
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
   type NeighborLinesMode,
@@ -101,6 +102,21 @@ export function MapView({
     writePreference(MAP_NEIGHBOR_LINES_STORAGE_KEY, mode);
   }, []);
 
+  // MeshCore Region filter: a confirmed OTA region token ("" = All). Composes with the global
+  // IATA/region selector — the server intersects them. Changing it clears the node selection so a
+  // filtered-out node never lingers as a ghost marker or edge.
+  const [meshcoreRegionFilter, setMeshcoreRegionFilter] = useState(
+    () => urlView.meshcoreRegion ?? readPreference(MAP_MESHCORE_REGION_STORAGE_KEY) ?? '',
+  );
+  const handleMeshcoreRegionChange = useCallback(
+    (token: string) => {
+      setMeshcoreRegionFilter(token);
+      writePreference(MAP_MESHCORE_REGION_STORAGE_KEY, token);
+      onSelectNode(null);
+    },
+    [onSelectNode],
+  );
+
   // live packet-flow animation: opt-in per session (off by default, not persisted; a deep link can seed it)
   const [packetFlow, setPacketFlow] = useState(() => urlView.flow ?? false);
   const [packetFlowSession, setPacketFlowSession] = useState(0);
@@ -140,7 +156,7 @@ export function MapView({
     loadedCount,
     isPaging,
     isError: nodesError,
-  } = useMapNodesData(selectedIatas, regionKey);
+  } = useMapNodesData(selectedIatas, regionKey, meshcoreRegionFilter);
 
   // split memos: rebuild the FeatureCollection only when nodes change; a type-filter change just
   // re-filters the already-built collection instead of re-running the full transform over all nodes
@@ -277,9 +293,10 @@ export function MapView({
 
       flow: packetFlow,
       borders,
+      meshcoreRegion: meshcoreRegionFilter,
     };
     return buildMapParams(snapshot);
-  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders]);
+  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders, meshcoreRegionFilter]);
 
   useMapNodes(
     mapRef,
@@ -334,6 +351,8 @@ export function MapView({
             onNeighborLinesChange={handleNeighborLinesChange}
             borders={borders}
             onBordersChange={handleBordersChange}
+            meshcoreRegion={meshcoreRegionFilter}
+            onMeshcoreRegionChange={handleMeshcoreRegionChange}
             buildShareParams={buildShareParams}
           />
           <MapLegend

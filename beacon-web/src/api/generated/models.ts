@@ -23,6 +23,8 @@ export type IATA = { displayName: (string) | null; iata: string; lat: (number) |
 
 export type KnownRoute = { firstSeen: number; hopCount: number; hops: Array<RouteHop>; iata: string; id: number; lastSeen: number; observationCount: number; };
 
+export type MeshCoreRegion = { nodeCount: number; token: string; };
+
 export type Node = { clockCheckedAt?: number; clockDriftSeconds?: number; clockOutOfSync?: boolean; defaultScope?: string; firstSeen: number; iatas: Array<NodeIATA>; id: string; isObserver: boolean; knownNeighborCount: number; lastAdvertAt?: number; lastSeen: number; lat?: number; lng?: number; locationSource?: string; metadata?: unknown; minFirmwareVersion?: string; name?: string; neighborIds?: Array<string>; neighborLinks?: Array<NodeLinkMetric>; neighbors: Array<NodeNeighbor>; nodeType: number; nodeTypeName: string; observerId?: string; publicKey: string; radio?: string; radioTitle?: string; stale: boolean; supportsMultibytePaths: boolean; supportsMultibyteTraces: boolean; };
 
 export type NodeIATA = { iata: string; lastHeard: number; };

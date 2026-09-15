@@ -18,12 +18,14 @@ import (
 //
 // GET  /nodes                       → listNodes
 // GET  /nodes/ambiguous-prefix2     → listAmbiguousPrefix2
+// GET  /nodes/meshcore-regions      → listMeshCoreRegions
 // GET  /nodes/{nodeId}              → getNode
 // GET  /nodes/{nodeId}/observations → listNodeObservations
 func NodesRouter(reader api.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", listNodes(reader))
 	r.Get("/ambiguous-prefix2", listAmbiguousPrefix2(reader))
+	r.Get("/meshcore-regions", listMeshCoreRegions(reader))
 	r.Route("/{nodeId}", func(r chi.Router) {
 		r.Get("/", getNode(reader))
 		r.Get("/observations", listNodeObservations(reader))
@@ -51,6 +53,7 @@ func NodesRouter(reader api.Reader) http.Handler {
 //	@Param		supportsMultibytePaths	query		bool	false	"Filter by multibyte path support (true/false); omit for no filter"
 //	@Param		supportsMultibyteTraces	query		bool	false	"Filter by multibyte trace support (true/false); omit for no filter"
 //	@Param		neighbors				query		bool	false	"Include each node's known neighbor IDs (neighborIds field). Bare ?neighbors or ?neighbors=true enables it; omit/false for none"
+//	@Param		meshcoreRegion			query		string	false	"Filter by confirmed MeshCore OTA Region token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope"
 //	@Param		sort					query		string	false	"Sort field: name, type, radio, neighbors, last_seen (default last_seen)"
 //	@Param		direction				query		string	false	"Sort direction: asc or desc (default desc)"
 //	@Param		pageToken				query		string	false	"Opaque keyset cursor returned as nextPageToken"
@@ -126,6 +129,14 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 		}
 		name := r.URL.Query().Get("name")
 		scope := r.URL.Query().Get("scope")
+		meshcoreRegion := r.URL.Query().Get("meshcoreRegion")
+		if meshcoreRegion != "" {
+			if !validMeshCoreRegionToken(meshcoreRegion) {
+				respondError(w, http.StatusBadRequest, "meshcoreRegion must be a single MeshCore region token (letters, digits, *, -, _ or .), e.g. se")
+				return
+			}
+			meshcoreRegion = strings.ToLower(meshcoreRegion)
+		}
 		var supportsMultibytePaths *bool
 		if v := r.URL.Query().Get("supportsMultibytePaths"); v != "" {
 			b, err := strconv.ParseBool(v)
@@ -167,6 +178,7 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 			PubkeyPrefix:            pubkeyPrefix,
 			Name:                    name,
 			Scope:                   scope,
+			MeshCoreRegion:          meshcoreRegion,
 			LegacyCursor:            cursor,
 			PageToken:               pageToken,
 			Sort:                    sort,
@@ -179,6 +191,45 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 			return
 		}
 		respond(w, http.StatusOK, nodes)
+	}
+}
+
+// validMeshCoreRegionToken reports whether a client-supplied MeshCore Region
+// token is a single, non-empty exact token: letters, digits, "*", "-", "_" or
+// ".". No commas or whitespace — those are separators in stored values, and
+// matching stays exact rather than substring-based.
+func validMeshCoreRegionToken(token string) bool {
+	if token == "" || len(token) > 64 {
+		return false
+	}
+	for _, r := range token {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		case r == '*', r == '-', r == '_', r == '.':
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// listMeshCoreRegions godoc
+//
+//	@Summary	List MeshCore Regions
+//	@Description	Currently confirmed MeshCore OTA Region values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.
+//	@Tags		Nodes
+//	@Produce	json
+//	@Success	200		{array}		api.MeshCoreRegion
+//	@Failure	500		{object}	handlers.APIError
+//	@Router		/nodes/meshcore-regions [get]
+func listMeshCoreRegions(reader api.Reader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		regions, err := reader.ListMeshCoreRegions(r.Context())
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		respond(w, http.StatusOK, regions)
 	}
 }
 

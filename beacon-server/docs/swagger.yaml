@@ -302,6 +302,17 @@ definitions:
     - lastSeen
     - observationCount
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.MeshCoreRegion:
+    properties:
+      nodeCount:
+        type: integer
+      token:
+        description: normalized lowercase token, e.g. "se"
+        type: string
+    required:
+    - nodeCount
+    - token
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Node:
     properties:
       clockCheckedAt:
@@ -2000,6 +2011,11 @@ paths:
         in: query
         name: neighbors
         type: boolean
+      - description: Filter by confirmed MeshCore OTA Region token (case-insensitive
+          exact token, e.g. se). Unrelated to region/IATA and transport scope
+        in: query
+        name: meshcoreRegion
+        type: string
       - description: 'Sort field: name, type, radio, neighbors, last_seen (default
           last_seen)'
         in: query
@@ -2200,6 +2216,27 @@ paths:
           schema:
             $ref: '#/definitions/internal_api_handlers.APIError'
       summary: List ambiguous 2-byte prefixes
+      tags:
+      - Nodes
+  /nodes/meshcore-regions:
+    get:
+      description: Currently confirmed MeshCore OTA Region values with confirmed-node
+        counts, normalized to lowercase exact tokens. Distinct from Beacon geographic
+        regions and transport scopes.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.MeshCoreRegion'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: List MeshCore Regions
       tags:
       - Nodes
   /observers:

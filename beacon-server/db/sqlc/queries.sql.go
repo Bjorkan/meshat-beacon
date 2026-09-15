@@ -605,7 +605,7 @@ func (q *Queries) GetObserverBrokers(ctx context.Context, observerID uuid.UUID) 
 }
 
 const getObserverByID = `-- name: GetObserverByID :one
-SELECT id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope FROM observers WHERE id = $1
+SELECT id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope, region_scope_last_seen FROM observers WHERE id = $1
 `
 
 func (q *Queries) GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error) {
@@ -633,12 +633,13 @@ func (q *Queries) GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, 
 		&i.ObservationCount,
 		&i.Metadata,
 		&i.RegionScope,
+		&i.RegionScopeLastSeen,
 	)
 	return i, err
 }
 
 const getObserverByPubkey = `-- name: GetObserverByPubkey :one
-SELECT id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope FROM observers WHERE public_key = $1
+SELECT id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope, region_scope_last_seen FROM observers WHERE public_key = $1
 `
 
 func (q *Queries) GetObserverByPubkey(ctx context.Context, publicKey []byte) (Observer, error) {
@@ -666,6 +667,7 @@ func (q *Queries) GetObserverByPubkey(ctx context.Context, publicKey []byte) (Ob
 		&i.ObservationCount,
 		&i.Metadata,
 		&i.RegionScope,
+		&i.RegionScopeLastSeen,
 	)
 	return i, err
 }
@@ -2395,6 +2397,56 @@ func (q *Queries) ListKnownRoutes(ctx context.Context, arg ListKnownRoutesParams
 	return items, nil
 }
 
+const listMeshCoreRegions = `-- name: ListMeshCoreRegions :many
+WITH confirmed AS (
+  SELECT nn.neighbor_id AS node_id, unnest(string_to_array(nn.region_scope, ',')) AS token
+  FROM node_neighbors nn
+  WHERE nn.region_scope_last_seen >= $1::timestamptz
+    AND nn.region_scope IS NOT NULL
+  UNION ALL
+  SELECT n.id AS node_id, unnest(string_to_array(o.region_scope, ',')) AS token
+  FROM observers o
+  JOIN nodes n ON n.public_key = o.public_key
+  WHERE o.region_scope_last_seen >= $1::timestamptz
+    AND o.region_scope IS NOT NULL
+)
+SELECT lower(btrim(token)) AS token, COUNT(DISTINCT node_id)::bigint AS node_count
+FROM confirmed
+WHERE btrim(token) <> ''
+GROUP BY lower(btrim(token))
+ORDER BY node_count DESC, lower(btrim(token)) ASC
+`
+
+type ListMeshCoreRegionsRow struct {
+	Token     string `json:"token"`
+	NodeCount int64  `json:"node_count"`
+}
+
+// Discovered MeshCore OTA Region values with confirmed-node counts, using the
+// same trust rules as the node filter: observer self reports and neighbor
+// entries answered with status == "responded", both fresh within the cutoff.
+// Comma-separated stored values are split and normalized (lowercase, trimmed)
+// into exact tokens; "*" is a literal token, not a wildcard for every region.
+func (q *Queries) ListMeshCoreRegions(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]ListMeshCoreRegionsRow, error) {
+	rows, err := q.db.Query(ctx, listMeshCoreRegions, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListMeshCoreRegionsRow{}
+	for rows.Next() {
+		var i ListMeshCoreRegionsRow
+		if err := rows.Scan(&i.Token, &i.NodeCount); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listMessagesAfterID = `-- name: ListMessagesAfterID :many
 SELECT DISTINCT ON (cm.id) cm.id, cm.channel_id, cm.packet_hash, cm.sender_name, cm.sender_pubkey, cm.content, cm.sent_at, encode(cm.packet_hash, 'hex') as packet_hash_hex, c.channel_hash,
 (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = cm.packet_hash) AS observation_count
@@ -2559,11 +2611,11 @@ WITH node_base AS (
       ) link
     ) ELSE NULL END::jsonb AS neighbor_links
   FROM nodes n
-  LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $18::timestamptz
+  LEFT JOIN node_iatas ni ON ni.node_id = n.id AND ni.last_heard >= $20::timestamptz
   LEFT JOIN transport_scopes ts ON ts.id = n.default_scope_id
   WHERE
     ($1 = 0 OR n.node_type = $1)
-    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= $18::timestamptz))
+    AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY($2::bpchar[]) AND last_heard >= $20::timestamptz))
     AND (
       $3::text = 'any'
       OR ($3::text = 'true' AND n.supports_multibyte_paths = TRUE)
@@ -2579,6 +2631,23 @@ WITH node_base AS (
     AND ($7::timestamptz IS NULL OR n.last_seen < $7)
     AND ($9::text = '' OR ts.name = $9::text)
     AND ($11::text = '' OR encode(n.public_key, 'hex') ILIKE $11 || '%')
+    -- MeshCore Region filter: a node counts as confirmed for the token when its
+    -- own observer self-report OR any trustworthy fresh neighbor OTA answer
+    -- carries that exact token (comma tokens normalized via
+    -- region_scope_has_token; freshness bounded by the cutoff param).
+    AND (
+      $18::text = ''
+      OR n.public_key IN (
+        SELECT o.public_key FROM observers o
+        WHERE o.region_scope_last_seen >= $19::timestamptz
+          AND region_scope_has_token(o.region_scope, $18::text)
+      )
+      OR n.id IN (
+        SELECT nn.neighbor_id FROM node_neighbors nn
+        WHERE nn.region_scope_last_seen >= $19::timestamptz
+          AND region_scope_has_token(nn.region_scope, $18::text)
+      )
+    )
   GROUP BY n.id, ts.name
 ), node_keyed AS (
   SELECT node_base.id, node_base.public_key, node_base.node_type, node_base.name, node_base.latitude, node_base.longitude, node_base.last_seen, node_base.radio_freq_mhz, node_base.radio_sf, node_base.radio_bw_khz, node_base.default_scope_name, node_base.iatas, node_base.is_observer, node_base.observer_id, node_base.known_neighbor_count, node_base.neighbor_ids, node_base.neighbor_links,
@@ -2649,6 +2718,8 @@ type ListNodesParams struct {
 	Column15         bool               `json:"column_15"`
 	Column16         string             `json:"column_16"`
 	Column17         uuid.UUID          `json:"column_17"`
+	Column18         string             `json:"column_18"`
+	Column19         pgtype.Timestamptz `json:"column_19"`
 	MembershipCutoff pgtype.Timestamptz `json:"membership_cutoff"`
 }
 
@@ -2695,6 +2766,8 @@ func (q *Queries) ListNodes(ctx context.Context, arg ListNodesParams) ([]ListNod
 		arg.Column15,
 		arg.Column16,
 		arg.Column17,
+		arg.Column18,
+		arg.Column19,
 		arg.MembershipCutoff,
 	)
 	if err != nil {
@@ -4221,7 +4294,7 @@ func (q *Queries) UpdateConfiguredChannelMetadata(ctx context.Context, arg Updat
 }
 
 const updateObserverRegionScope = `-- name: UpdateObserverRegionScope :exec
-UPDATE observers SET region_scope = $2 WHERE id = $1
+UPDATE observers SET region_scope = $2, region_scope_last_seen = NOW() WHERE id = $1
 `
 
 type UpdateObserverRegionScopeParams struct {
@@ -4231,7 +4304,9 @@ type UpdateObserverRegionScopeParams struct {
 
 // Records the observer's own OTA-reported region scope, from the "self"
 // field of a /neighbors report. Always known (not queried OTA), so this
-// unconditionally overwrites, unlike the neighbor-side region_scope.
+// unconditionally overwrites, unlike the neighbor-side region_scope. A fresh
+// report is a fresh confirmation, so the confirmation timestamp is refreshed
+// too.
 func (q *Queries) UpdateObserverRegionScope(ctx context.Context, arg UpdateObserverRegionScopeParams) error {
 	_, err := q.db.Exec(ctx, updateObserverRegionScope, arg.ID, arg.RegionScope)
 	return err
@@ -4631,11 +4706,12 @@ func (q *Queries) UpsertNodeIATA(ctx context.Context, arg UpsertNodeIATAParams) 
 const upsertNodeNeighbor = `-- name: UpsertNodeNeighbor :exec
 
 INSERT INTO node_neighbors (
-  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen
 )
 VALUES (
   $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
-  CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5
+  CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5,
+  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
@@ -4647,7 +4723,13 @@ ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
                       END,
   snr_sample_count  = node_neighbors.snr_sample_count + CASE WHEN EXCLUDED.snr IS NULL THEN 0 ELSE 1 END,
   snr_last_seen     = CASE WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr_last_seen ELSE NOW() END,
-  region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope)
+  region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope),
+  -- A timeout passes NULL region_scope: preserve the old value AND its old
+  -- confirmation timestamp, so stale OTA answers never look freshly confirmed.
+  region_scope_last_seen = CASE
+    WHEN EXCLUDED.region_scope IS NOT NULL THEN NOW()
+    ELSE node_neighbors.region_scope_last_seen
+  END
 `
 
 type UpsertNodeNeighborParams struct {
@@ -4704,7 +4786,7 @@ VALUES ($1, 'unknown', NOW())
 ON CONFLICT (public_key) DO UPDATE SET
   last_seen         = NOW(),
   observation_count = observers.observation_count + 1
-RETURNING id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope
+RETURNING id, public_key, display_name, observer_type, software_version, hardware_model, firmware_version, firmware_build, radio_freq_mhz, radio_sf, radio_bw_khz, radio_cr, battery_level, uptime_seconds, status_metadata, last_status_at, first_seen, last_seen, observation_count, metadata, region_scope, region_scope_last_seen
 `
 
 // ============================================================
@@ -4735,6 +4817,7 @@ func (q *Queries) UpsertObserver(ctx context.Context, publicKey []byte) (Observe
 		&i.ObservationCount,
 		&i.Metadata,
 		&i.RegionScope,
+		&i.RegionScopeLastSeen,
 	)
 	return i, err
 }

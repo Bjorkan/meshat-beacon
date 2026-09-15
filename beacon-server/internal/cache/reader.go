@@ -40,6 +40,7 @@ const (
 	keyNodeNeighborsPrefix     = "beacon:node:neighbors:"
 	keyNodesByIDsPrefix        = "beacon:nodes:ids:"
 	keyAmbiguousPrefix2        = "beacon:nodes:ambiguous-prefix2"
+	keyMeshCoreRegions         = "beacon:nodes:meshcore-regions"
 	keyObserverPrefix          = "beacon:observer:"
 	keyObserverScopesPrefix    = "beacon:observer:scopes:"
 )
@@ -343,6 +344,15 @@ func (cr *CachedReader) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map
 func (cr *CachedReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
 	return getOrSet(ctx, cr.c, keyAmbiguousPrefix2, cr.ttl.Stats, func() ([]string, error) {
 		return cr.inner.ListAmbiguousPrefix2(ctx)
+	})
+}
+
+// ListMeshCoreRegions implements [api.Reader]. Confirmed MeshCore Region
+// values shift with /neighbors traffic, so the stats TTL (short) applies —
+// the map selector should follow the data closely, not lag behind it.
+func (cr *CachedReader) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
+	return getOrSet(ctx, cr.c, keyMeshCoreRegions, cr.ttl.Stats, func() ([]api.MeshCoreRegion, error) {
+		return cr.inner.ListMeshCoreRegions(ctx)
 	})
 }
 

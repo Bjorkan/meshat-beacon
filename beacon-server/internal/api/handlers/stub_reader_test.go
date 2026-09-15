@@ -38,6 +38,7 @@ type stubReader struct {
 	getNode                      func(ctx context.Context, nodeID uuid.UUID) (*api.Node, error)
 	getNodeNeighbors             func(ctx context.Context, nodeID uuid.UUID) ([]api.NodeNeighbor, error)
 	listNodeObservations         func(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (api.Page[api.PacketObservationSummary], error)
+	listMeshCoreRegions          func(ctx context.Context) ([]api.MeshCoreRegion, error)
 	listPackets                  func(ctx context.Context, params api.PacketListParams) (api.Page[api.PacketSummary], error)
 	listPacketsAfterID           func(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32, includeResolvedPath bool) ([]api.PacketSummary, error)
 	getPacket                    func(ctx context.Context, packetHash []byte) (*api.Packet, error)
@@ -206,6 +207,13 @@ func (s stubReader) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]a
 }
 
 func (s stubReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (s stubReader) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
+	if s.listMeshCoreRegions != nil {
+		return s.listMeshCoreRegions(ctx)
+	}
 	return nil, nil
 }
 

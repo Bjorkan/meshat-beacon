@@ -56,7 +56,7 @@ func TestChannelListingIntegration(t *testing.T) {
 	}
 
 	exec("INSERT INTO iata_codes(iata) VALUES ('YVR'), ('YYJ'), ('YOW')")
-	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour)
+	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
 	list := func(limit int32, hash []byte, iatas []string, cursor int64, key string) api.ChannelPage {
 		t.Helper()
 		page, err := store.ListChannels(ctx, limit, hash, iatas, cursor, key)

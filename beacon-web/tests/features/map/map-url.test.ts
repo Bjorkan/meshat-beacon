@@ -97,7 +97,7 @@ describe('parseMapView', () => {
 
   it('combines every param into one view', () => {
     const params = new URLSearchParams(
-      'lat=53.31&lng=-113.58&zoom=9&clustering=off&node_type=repeater&neighbor_lines=on&flow=on&borders=on',
+      'lat=53.31&lng=-113.58&zoom=9&clustering=off&node_type=repeater&neighbor_lines=on&flow=on&borders=on&meshcore_region=SE',
     );
     expect(parseMapView(params)).toEqual({
       center: [-113.58, 53.31],
@@ -107,7 +107,20 @@ describe('parseMapView', () => {
       neighborLines: 'on',
       flow: true,
       borders: true,
+      meshcoreRegion: 'se',
     });
+  });
+
+  it('reads a meshcore_region token, lowercasing and dropping malformed values', () => {
+    expect(parseMapView(new URLSearchParams('meshcore_region=SE'))).toEqual({
+      meshcoreRegion: 'se',
+    });
+    expect(parseMapView(new URLSearchParams('meshcore_region=*'))).toEqual({
+      meshcoreRegion: '*',
+    });
+    expect(parseMapView(new URLSearchParams('meshcore_region=se,no'))).toEqual({});
+    expect(parseMapView(new URLSearchParams('meshcore_region=se no'))).toEqual({});
+    expect(parseMapView(new URLSearchParams('meshcore_region='))).toEqual({});
   });
 });
 
@@ -118,9 +131,9 @@ describe('buildMapParams', () => {
     clustered: false,
     nodeType: 'repeater',
     neighborLines: 'on',
-    styleId: 'liberty',
     flow: true,
     borders: true,
+    meshcoreRegion: 'se',
   };
 
   it('emits every managed key with rounded camera values', () => {
@@ -134,11 +147,16 @@ describe('buildMapParams', () => {
       style: null,
       flow: 'on',
       borders: 'on',
+      meshcore_region: 'se',
     });
   });
 
   it('deletes node_type (null) when the filter is All', () => {
     expect(buildMapParams({ ...snapshot, nodeType: '' }).node_type).toBeNull();
+  });
+
+  it('deletes meshcore_region (null) when the filter is All', () => {
+    expect(buildMapParams({ ...snapshot, meshcoreRegion: '' }).meshcore_region).toBeNull();
   });
 
   it('round-trips through parseMapView (modulo rounding)', () => {
@@ -151,6 +169,7 @@ describe('buildMapParams', () => {
       neighborLines: 'on',
       flow: true,
       borders: true,
+      meshcoreRegion: 'se',
     });
   });
 

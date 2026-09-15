@@ -27,6 +27,7 @@ type Store struct {
 	staleThreshold      time.Duration // see api.NodeSummary.Stale
 	neighborMaxKm       float64       // direct LoRa sanity cap for node_neighbors edges (0 = unlimited)
 	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
+	meshcoreRegionFresh time.Duration // how long a MeshCore OTA region confirmation counts as fresh
 	presetCatalogue     *radiopreset.Catalogue
 }
 
@@ -45,8 +46,10 @@ func (s *Store) SetPresetCatalogue(cat *radiopreset.Catalogue) {
 // direct LoRa hop (0 = unlimited); see internal/config.ResolvedConfig.NeighborMaxKm.
 // nodeIATATTL bounds current node-to-IATA membership; see
 // internal/config.ResolvedConfig.NodeIATAMembershipTTL.
-func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, neighborMaxKm float64, nodeIATATTL time.Duration) *Store {
-	return &Store{q: sqlc.New(pool), clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold, neighborMaxKm: neighborMaxKm, nodeIATATTL: nodeIATATTL}
+// meshcoreRegionFresh bounds how long a MeshCore OTA region confirmation counts
+// as fresh; see internal/config.ResolvedConfig.MeshCoreRegionFreshness.
+func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, neighborMaxKm float64, nodeIATATTL, meshcoreRegionFresh time.Duration) *Store {
+	return &Store{q: sqlc.New(pool), clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold, neighborMaxKm: neighborMaxKm, nodeIATATTL: nodeIATATTL, meshcoreRegionFresh: meshcoreRegionFresh}
 }
 
 // membershipCutoff is the oldest last_heard that still counts as current node-to-IATA
@@ -54,6 +57,12 @@ func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, 
 // current scope uses this same cutoff so badges, filters, and stats agree.
 func (s *Store) membershipCutoff() pgtype.Timestamptz {
 	return pgtype.Timestamptz{Time: time.Now().Add(-s.nodeIATATTL), Valid: true}
+}
+
+// meshcoreRegionCutoff is the oldest region_scope_last_seen that still counts
+// as a fresh MeshCore OTA region confirmation.
+func (s *Store) meshcoreRegionCutoff() pgtype.Timestamptz {
+	return pgtype.Timestamptz{Time: time.Now().Add(-s.meshcoreRegionFresh), Valid: true}
 }
 
 // ResolvePathHashes resolves path hash prefixes to nodes GLOBALLY — across

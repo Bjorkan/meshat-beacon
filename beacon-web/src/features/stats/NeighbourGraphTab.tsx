@@ -20,7 +20,7 @@ export function NeighbourGraphTab() {
   // "All regions" is 5k+ nodes — too heavy for the canvas force layout, so gate the fetch off and
   // prompt for a region instead of freezing the browser.
   const isAll = regionKey === '*';
-  const { nodes, loadedCount, isPaging, isError } = useMapNodesData(iatas, regionKey, {
+  const { nodes, loadedCount, isPaging, isError } = useMapNodesData(iatas, regionKey, '', {
     enabled: !isAll,
   });
   const colors = useChartColors();

@@ -283,6 +283,8 @@
     "liveNeighborHint": "Live hides the ambient neighbor mesh so packet paths stay readable; selecting a node still shows only that node’s neighbors.",
     "neighborLines": "Neighbor lines",
     "iataBorders": "IATA borders",
+    "meshcoreRegion": "MeshCore Region",
+    "meshcoreRegionHint": "Only nodes whose MeshCore OTA region was recently confirmed. Composes with the global region selector.",
     "on": "On",
     "off": "Off",
     "selected": "Selected",

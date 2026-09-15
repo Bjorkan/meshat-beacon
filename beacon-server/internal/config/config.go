@@ -66,6 +66,9 @@ type ResolvedConfig struct {
 	// ObserverDeleteAfter is how long an observer can go unheard before the cleanup job
 	// deletes it; see ObserversConfig.
 	ObserverDeleteAfter time.Duration
+	// MeshCoreRegionFreshness is how long a MeshCore OTA region confirmation counts as
+	// fresh; see NeighborsConfig.
+	MeshCoreRegionFreshness time.Duration
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -217,6 +220,13 @@ type NeighborsConfig struct {
 	// containing even one such impossible pair is discarded whole.
 	// Defaults to 150 km if not set.
 	MaxDistanceKm float64 `yaml:"max_distance_km"`
+	// RegionScopeFreshness is how long a MeshCore OTA region confirmation
+	// (observer self-report or a neighbor entry answered with
+	// status == "responded") keeps counting as current for the map's MeshCore
+	// Region filter and discovery. A timeout/failure preserves the old value
+	// and its old confirmation timestamp. Defaults to 168h (7 days) if not
+	// set, matching the /neighbors retention window.
+	RegionScopeFreshness duration `yaml:"region_scope_freshness"`
 }
 
 // ObserversConfig controls observer row retention behaviour.
@@ -399,11 +409,12 @@ func Resolve(cfg *Config) ResolvedConfig {
 		PresenceFlushInterval: cfg.Presence.FlushInterval.Duration,
 		PresencePacketTTL:     cfg.Presence.PacketTTL.Duration,
 
-		ClockDriftThreshold:   cfg.Nodes.ClockDriftThreshold.Duration,
-		NodeStaleThreshold:    cfg.Nodes.StaleThreshold.Duration,
-		NodeDeleteAfter:       cfg.Nodes.DeleteAfter.Duration,
-		NodeIATAMembershipTTL: cfg.Nodes.IATAMembershipTTL.Duration,
-		ObserverDeleteAfter:   cfg.Observers.DeleteAfter.Duration,
+		ClockDriftThreshold:     cfg.Nodes.ClockDriftThreshold.Duration,
+		NodeStaleThreshold:      cfg.Nodes.StaleThreshold.Duration,
+		NodeDeleteAfter:         cfg.Nodes.DeleteAfter.Duration,
+		NodeIATAMembershipTTL:   cfg.Nodes.IATAMembershipTTL.Duration,
+		ObserverDeleteAfter:     cfg.Observers.DeleteAfter.Duration,
+		MeshCoreRegionFreshness: cfg.Neighbors.RegionScopeFreshness.Duration,
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -464,17 +475,22 @@ func Resolve(cfg *Config) ResolvedConfig {
 	if r.ObserverDeleteAfter == 0 {
 		r.ObserverDeleteAfter = 14 * 24 * time.Hour
 	}
+	if r.MeshCoreRegionFreshness == 0 {
+		// Same default as neighbors.retention (7 days) — independently configurable, just
+		// the same starting point, so region confirmations age with the neighbor edges.
+		r.MeshCoreRegionFreshness = 7 * 24 * time.Hour
+	}
 	return r
 }
 
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
 		r.MaxConnsPerIP, r.ViewRefreshInterval, r.ReconfirmInterval, r.CleanupInterval,
 		r.PresenceFlushInterval, r.PresencePacketTTL, r.ClockDriftThreshold,
-		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter,
+		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter, r.MeshCoreRegionFreshness,
 	)
 }

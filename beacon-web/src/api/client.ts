@@ -40,6 +40,7 @@ import {
   rawGetIatas,
   rawGetNodes,
   rawGetNodesAmbiguousPrefix2,
+  rawGetNodesMeshcoreRegions,
   rawGetNodesNodeId,
   rawGetNodesNodeIdNeighbors,
   rawGetNodesNodeIdObservations,
@@ -404,6 +405,7 @@ export function getNodesPage(
     supportsMultibyteTraces?: 'true' | 'false';
     scope?: string;
     neighbors?: boolean; // include each node's neighborIds (?neighbors=true)
+    meshcoreRegion?: string; // confirmed MeshCore OTA Region token (exact, server-normalized)
   },
 ): Promise<CursorPage<NodeSummary>> {
   return rawGetNodes({
@@ -430,7 +432,13 @@ export function getNodesPage(
           : undefined,
     scope: params?.scope,
     neighbors: params?.neighbors || undefined,
+    meshcoreRegion: params?.meshcoreRegion,
   }).then((page) => toPage({ ...page, items: page.items.map(toNodeSummary) }));
+}
+
+// Confirmed MeshCore OTA Region values (with node counts) for the map's MeshCore Region selector.
+export function getMeshCoreRegions(): Promise<Models.MeshCoreRegion[]> {
+  return rawGetNodesMeshcoreRegions();
 }
 
 // Paginated /observers, mirroring getNodesPage; used by the Observers table.

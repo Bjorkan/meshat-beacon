@@ -152,6 +152,12 @@ type Querier interface {
 	ListChannels(ctx context.Context, arg ListChannelsParams) ([]Channel, error)
 	ListIATAs(ctx context.Context) ([]IataCode, error)
 	ListKnownRoutes(ctx context.Context, arg ListKnownRoutesParams) ([]ListKnownRoutesRow, error)
+	// Discovered MeshCore OTA Region values with confirmed-node counts, using the
+	// same trust rules as the node filter: observer self reports and neighbor
+	// entries answered with status == "responded", both fresh within the cutoff.
+	// Comma-separated stored values are split and normalized (lowercase, trimmed)
+	// into exact tokens; "*" is a literal token, not a wildcard for every region.
+	ListMeshCoreRegions(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]ListMeshCoreRegionsRow, error)
 	// Returns messages after the given message ID, ordered oldest first.
 	// Used for WS reconnect backfill.
 	ListMessagesAfterID(ctx context.Context, arg ListMessagesAfterIDParams) ([]ListMessagesAfterIDRow, error)
@@ -251,7 +257,9 @@ type Querier interface {
 	UpdateConfiguredChannelMetadata(ctx context.Context, arg UpdateConfiguredChannelMetadataParams) error
 	// Records the observer's own OTA-reported region scope, from the "self"
 	// field of a /neighbors report. Always known (not queried OTA), so this
-	// unconditionally overwrites, unlike the neighbor-side region_scope.
+	// unconditionally overwrites, unlike the neighbor-side region_scope. A fresh
+	// report is a fresh confirmation, so the confirmation timestamp is refreshed
+	// too.
 	UpdateObserverRegionScope(ctx context.Context, arg UpdateObserverRegionScopeParams) error
 	UpdateObserverStatus(ctx context.Context, arg UpdateObserverStatusParams) (uuid.UUID, error)
 	// ============================================================

@@ -42,6 +42,14 @@ type NodeIATA struct {
 	LastHeard int64  `json:"lastHeard" binding:"required"` // epoch ms
 }
 
+// MeshCoreRegion is a discovered MeshCore OTA Region value with the number of
+// nodes that currently confirm it. Distinct from Beacon's geographic regions
+// and transport scopes.
+type MeshCoreRegion struct {
+	Token     string `json:"token" binding:"required"` // normalized lowercase token, e.g. "se"
+	NodeCount int64  `json:"nodeCount" binding:"required"`
+}
+
 // NodeSummary is the minimal node representation used in list responses.
 type NodeSummary struct {
 	ID                 uuid.UUID        `json:"id" binding:"required"`

@@ -226,6 +226,12 @@ type Reader interface {
 	// database, a high-confidence 2-byte hit is as trustworthy as a 3-byte one.
 	ListAmbiguousPrefix2(ctx context.Context) ([]string, error)
 
+	// ListMeshCoreRegions returns the MeshCore OTA Region values currently
+	// confirmed by fresh observer self-reports or neighbor OTA answers, with
+	// confirmed-node counts. Tokens are normalized (lowercase, trimmed); "*"
+	// is a literal token, not a wildcard.
+	ListMeshCoreRegions(ctx context.Context) ([]MeshCoreRegion, error)
+
 	// GetKnownRoutesByNode returns all known routes in a given IATA that contain
 	// the specified node UUID anywhere in their hop sequence.
 	GetKnownRoutesByNode(ctx context.Context, iata string, nodeID uuid.UUID) ([]KnownRoute, error)

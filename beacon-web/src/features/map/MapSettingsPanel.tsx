@@ -1,10 +1,13 @@
 import { readPreference, writePreference } from '../../lib/storage';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from './SegmentedControl';
 import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
 import { Section } from '../../components/DetailPanel';
 import { CopyLinkButton } from '../../components/CopyLinkButton';
+import { SelectDropdown } from '../../components/SelectDropdown';
+import { meshcoreRegionQueries } from '../../api/queries';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
 // Open/closed state persists across sessions; no click-outside dismiss, so it stays open while you pan.
@@ -66,6 +69,9 @@ interface MapSettingsPanelProps {
   onNeighborLinesChange: (mode: NeighborLinesMode) => void;
   borders: boolean;
   onBordersChange: (on: boolean) => void;
+  // confirmed MeshCore OTA Region token ("" = All); options are discovered server-side
+  meshcoreRegion: string;
+  onMeshcoreRegionChange: (token: string) => void;
   // builds deep-link params for the current view, evaluated at copy time (reads the live camera)
   buildShareParams: () => Record<string, string | null>;
 }
@@ -80,6 +86,8 @@ export function MapSettingsPanel({
   onNeighborLinesChange,
   borders,
   onBordersChange,
+  meshcoreRegion,
+  onMeshcoreRegionChange,
   buildShareParams,
 }: MapSettingsPanelProps) {
   const { t } = useTranslation();
@@ -94,6 +102,16 @@ export function MapSettingsPanel({
     { value: 'selected', label: t('map.selected') },
     { value: 'off', label: t('map.off') },
   ];
+  // Discovered MeshCore Region values (normalized tokens + confirmed-node counts). All is always
+  // offered; each token appears only when the server confirms it. If the currently selected token
+  // has aged out of discovery it stays pinned to the trigger so the filter remains clearable.
+  const { data: meshcoreRegions } = useQuery(meshcoreRegionQueries.list());
+  const meshcoreOptions = (meshcoreRegions ?? [])
+    .map((region) => ({ value: region.token, label: `${region.token} · ${region.nodeCount}` }))
+    .filter((option) => option.value === meshcoreRegion || option.value !== '');
+  if (meshcoreRegion && !meshcoreOptions.some((option) => option.value === meshcoreRegion)) {
+    meshcoreOptions.push({ value: meshcoreRegion, label: meshcoreRegion });
+  }
   // collapsed by default on mobile (the card would cover the map); a saved preference still wins
   const [open, setOpen] = useState(() => {
     const stored = readPreference(OPEN_STORAGE_KEY);
@@ -149,6 +167,21 @@ export function MapSettingsPanel({
               onChange={onTypeChange}
             />
           </Section>
+          {/* The trigger carries the label itself (matching the global region selector), so no
+              Section title here — the dropdown reads "MESHCORE REGION ▾ se · 12". */}
+          <div className="px-3 py-2.5 border-t border-border-subtle">
+            <SelectDropdown
+              label={t('map.meshcoreRegion')}
+              options={meshcoreOptions}
+              value={meshcoreRegion}
+              onChange={onMeshcoreRegionChange}
+              align="left"
+              fullWidth
+            />
+            <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+              {t('map.meshcoreRegionHint')}
+            </div>
+          </div>
           <Section title={t('map.clustering')}>
             <SegmentedControl
               ariaLabel={t('map.clustering')}

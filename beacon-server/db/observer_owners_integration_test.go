@@ -56,7 +56,7 @@ func TestObserverOwnerIntegration(t *testing.T) {
 		}
 	}
 
-	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour)
+	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
 	observerID, _, err := store.UpsertObserver(ctx, bytes.Repeat([]byte{1}, 32))
 	if err != nil {
 		t.Fatal(err)

@@ -45,7 +45,9 @@ describe('useMapNodesData', () => {
       })
       .mockResolvedValueOnce({ items: [node('c')], nextCursor: null, hasMore: false });
 
-    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ'), { wrapper: wrapper() });
+    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ', ''), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => expect(result.current.isPaging).toBe(false));
 
@@ -59,6 +61,7 @@ describe('useMapNodesData', () => {
       sort: 'last_seen',
       direction: 'desc',
       neighbors: true,
+      meshcoreRegion: '',
     });
   });
 
@@ -69,7 +72,9 @@ describe('useMapNodesData', () => {
       hasMore: false,
     });
 
-    const { result } = renderHook(() => useMapNodesData(undefined, '*'), { wrapper: wrapper() });
+    const { result } = renderHook(() => useMapNodesData(undefined, '*', ''), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => expect(result.current.isPaging).toBe(false));
     expect(result.current.loadedCount).toBe(1);
@@ -81,7 +86,9 @@ describe('useMapNodesData', () => {
       .mockResolvedValueOnce({ items: [node('a')], nextCursor: 1, hasMore: true })
       .mockRejectedValue(new Error('boom'));
 
-    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ'), { wrapper: wrapper() });
+    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ', ''), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => expect(result.current.isError).toBe(true));
     // the failed page must not re-arm the auto-chain effect: exactly page 1 + one failed page 2
@@ -95,7 +102,9 @@ describe('useMapNodesData', () => {
       .mockResolvedValueOnce({ items: [node('a'), node('b')], nextCursor: 5, hasMore: true })
       .mockResolvedValueOnce({ items: [node('b'), node('c')], nextCursor: null, hasMore: false });
 
-    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ'), { wrapper: wrapper() });
+    const { result } = renderHook(() => useMapNodesData(['YYZ'], 'YYZ', ''), {
+      wrapper: wrapper(),
+    });
 
     await waitFor(() => expect(result.current.isPaging).toBe(false));
     expect(result.current.nodes.map((n) => n.id)).toEqual(['a', 'b', 'c']); // b not doubled

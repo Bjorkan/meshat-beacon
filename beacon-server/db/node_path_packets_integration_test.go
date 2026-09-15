@@ -80,7 +80,7 @@ func TestNodePathPacketsIntegration(t *testing.T) {
 	addPacket("09", 5, "fe", 1, 1, "YVR")     // unresolved
 	addPacket("10", 5, "aabbcc", 3, 1, "YVR")
 	exec("INSERT INTO packet_observations(packet_hash,observer_id,iata,heard_at,path_length_byte,hash_size,hop_count,path_bytes) VALUES (decode('01','hex'),$1,'YVR',now(),1,2,1,decode('aabb','hex'))", observers[1])
-	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour)
+	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
 	page, err := store.ListNodePathPackets(ctx, selected, []string{"YVR"}, nil, 50)
 	if err != nil {
 		t.Fatal(err)

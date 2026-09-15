@@ -92,6 +92,7 @@ export interface MapSearch {
   neighbor_lines?: 'on' | 'selected' | 'off';
   flow?: boolean;
   borders?: boolean;
+  meshcore_region?: string;
 }
 
 export function validateMapSearch(search: Record<string, unknown>): MapSearch {
@@ -106,6 +107,7 @@ export function validateMapSearch(search: Record<string, unknown>): MapSearch {
     neighbor_lines: mapView.neighborLines,
     flow: mapView.flow,
     borders: mapView.borders,
+    meshcore_region: mapView.meshcoreRegion,
   };
 }
 

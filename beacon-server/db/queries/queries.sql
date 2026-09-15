@@ -814,6 +814,23 @@ WITH node_base AS (
     AND ($7::timestamptz IS NULL OR n.last_seen < $7)
     AND ($9::text = '' OR ts.name = $9::text)
     AND ($11::text = '' OR encode(n.public_key, 'hex') ILIKE $11 || '%')
+    -- MeshCore Region filter: a node counts as confirmed for the token when its
+    -- own observer self-report OR any trustworthy fresh neighbor OTA answer
+    -- carries that exact token (comma tokens normalized via
+    -- region_scope_has_token; freshness bounded by the cutoff param).
+    AND (
+      $18::text = ''
+      OR n.public_key IN (
+        SELECT o.public_key FROM observers o
+        WHERE o.region_scope_last_seen >= $19::timestamptz
+          AND region_scope_has_token(o.region_scope, $18::text)
+      )
+      OR n.id IN (
+        SELECT nn.neighbor_id FROM node_neighbors nn
+        WHERE nn.region_scope_last_seen >= $19::timestamptz
+          AND region_scope_has_token(nn.region_scope, $18::text)
+      )
+    )
   GROUP BY n.id, ts.name
 ), node_keyed AS (
   SELECT node_base.*,
@@ -1396,11 +1413,12 @@ ORDER BY hop_count ASC, last_seen DESC;
 -- On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 -- a stable map link quality while making recent RF conditions matter more than old samples.
 INSERT INTO node_neighbors (
-  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen
 )
 VALUES (
   $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
-  CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5
+  CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5,
+  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
@@ -1412,13 +1430,21 @@ ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
                       END,
   snr_sample_count  = node_neighbors.snr_sample_count + CASE WHEN EXCLUDED.snr IS NULL THEN 0 ELSE 1 END,
   snr_last_seen     = CASE WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr_last_seen ELSE NOW() END,
-  region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope);
+  region_scope      = COALESCE(EXCLUDED.region_scope, node_neighbors.region_scope),
+  -- A timeout passes NULL region_scope: preserve the old value AND its old
+  -- confirmation timestamp, so stale OTA answers never look freshly confirmed.
+  region_scope_last_seen = CASE
+    WHEN EXCLUDED.region_scope IS NOT NULL THEN NOW()
+    ELSE node_neighbors.region_scope_last_seen
+  END;
 
 -- name: UpdateObserverRegionScope :exec
 -- Records the observer's own OTA-reported region scope, from the "self"
 -- field of a /neighbors report. Always known (not queried OTA), so this
--- unconditionally overwrites, unlike the neighbor-side region_scope.
-UPDATE observers SET region_scope = $2 WHERE id = $1;
+-- unconditionally overwrites, unlike the neighbor-side region_scope. A fresh
+-- report is a fresh confirmation, so the confirmation timestamp is refreshed
+-- too.
+UPDATE observers SET region_scope = $2, region_scope_last_seen = NOW() WHERE id = $1;
 
 -- name: GetNodeNeighbors :many
 -- Returns the neighbors of a node with details, ordered by most recently seen.
@@ -1500,6 +1526,30 @@ JOIN nodes n ON n.id = ns.node_id
 WHERE n.node_type IN (2, 3)
 GROUP BY ns.prefix_2
 HAVING COUNT(DISTINCT ns.node_id) > 1;
+
+-- name: ListMeshCoreRegions :many
+-- Discovered MeshCore OTA Region values with confirmed-node counts, using the
+-- same trust rules as the node filter: observer self reports and neighbor
+-- entries answered with status == "responded", both fresh within the cutoff.
+-- Comma-separated stored values are split and normalized (lowercase, trimmed)
+-- into exact tokens; "*" is a literal token, not a wildcard for every region.
+WITH confirmed AS (
+  SELECT nn.neighbor_id AS node_id, unnest(string_to_array(nn.region_scope, ',')) AS token
+  FROM node_neighbors nn
+  WHERE nn.region_scope_last_seen >= $1::timestamptz
+    AND nn.region_scope IS NOT NULL
+  UNION ALL
+  SELECT n.id AS node_id, unnest(string_to_array(o.region_scope, ',')) AS token
+  FROM observers o
+  JOIN nodes n ON n.public_key = o.public_key
+  WHERE o.region_scope_last_seen >= $1::timestamptz
+    AND o.region_scope IS NOT NULL
+)
+SELECT lower(btrim(token)) AS token, COUNT(DISTINCT node_id)::bigint AS node_count
+FROM confirmed
+WHERE btrim(token) <> ''
+GROUP BY lower(btrim(token))
+ORDER BY node_count DESC, lower(btrim(token)) ASC;
 
 -- name: RefreshHourlyStats :exec
 REFRESH MATERIALIZED VIEW CONCURRENTLY mv_hourly_iata_stats;

@@ -589,6 +589,12 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by confirmed MeshCore OTA Region token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope",
+                        "name": "meshcoreRegion",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Sort field: name, type, radio, neighbors, last_seen (default last_seen)",
                         "name": "sort",
                         "in": "query"
@@ -657,6 +663,35 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    }
+                }
+            }
+        },
+        "/nodes/meshcore-regions": {
+            "get": {
+                "description": "Currently confirmed MeshCore OTA Region values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Nodes"
+                ],
+                "summary": "List MeshCore Regions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.MeshCoreRegion"
                             }
                         }
                     },
@@ -2921,6 +2956,22 @@ const docTemplate = `{
                 },
                 "observationCount": {
                     "type": "integer"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.MeshCoreRegion": {
+            "type": "object",
+            "required": [
+                "nodeCount",
+                "token"
+            ],
+            "properties": {
+                "nodeCount": {
+                    "type": "integer"
+                },
+                "token": {
+                    "description": "normalized lowercase token, e.g. \"se\"",
+                    "type": "string"
                 }
             }
         },

@@ -159,6 +159,8 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 		Column15:         cursorEmpty,
 		Column16:         cursorKey,
 		Column17:         cursorID,
+		Column18:         params.MeshCoreRegion,
+		Column19:         s.meshcoreRegionCutoff(),
 		MembershipCutoff: s.membershipCutoff(),
 	})
 	if err != nil {
@@ -340,6 +342,20 @@ func (s *Store) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
 	out := make([]string, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, hex.EncodeToString(r))
+	}
+	return out, nil
+}
+
+// ListMeshCoreRegions returns the currently confirmed MeshCore OTA Region
+// values with confirmed-node counts, normalized to lowercase trimmed tokens.
+func (s *Store) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
+	rows, err := s.q.ListMeshCoreRegions(ctx, s.meshcoreRegionCutoff())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]api.MeshCoreRegion, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, api.MeshCoreRegion{Token: r.Token, NodeCount: r.NodeCount})
 	}
 	return out, nil
 }

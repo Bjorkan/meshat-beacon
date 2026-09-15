@@ -143,12 +143,17 @@ type NodeListParams struct {
 	PubkeyPrefix            string
 	Name                    string
 	Scope                   string
-	LegacyCursor            int64
-	PageToken               *PageToken
-	Sort                    string
-	Direction               SortDirection
-	Limit                   int32
-	IncludeNeighbors        bool
+	// MeshCoreRegion is an OTA "region scope" token (e.g. "se") that confirmed
+	// nodes must match. Unrelated to the geographic region/IATA and transport
+	// scope concepts: it filters by MeshCore's plaintext region configuration
+	// confirmed by a fresh observer self-report or neighbor OTA answer.
+	MeshCoreRegion   string
+	LegacyCursor     int64
+	PageToken        *PageToken
+	Sort             string
+	Direction        SortDirection
+	Limit            int32
+	IncludeNeighbors bool
 }
 
 type ObserverListParams struct {

@@ -112,7 +112,7 @@ func main() {
 		log.Fatalf("migrations failed: %v", err)
 	}
 
-	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL)
+	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL, resolved.MeshCoreRegionFreshness)
 
 	// ── MeshCore suggested radio settings (one fetch at startup, fail-open) ──────────────
 	presetCatalogue := radiopreset.Load(ctx, nil)

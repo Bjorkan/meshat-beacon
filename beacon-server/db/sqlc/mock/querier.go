@@ -949,6 +949,21 @@ func (mr *MockQuerierMockRecorder) ListKnownRoutes(ctx, arg any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListKnownRoutes", reflect.TypeOf((*MockQuerier)(nil).ListKnownRoutes), ctx, arg)
 }
 
+// ListMeshCoreRegions mocks base method.
+func (m *MockQuerier) ListMeshCoreRegions(ctx context.Context, dollar_1 pgtype.Timestamptz) ([]db.ListMeshCoreRegionsRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListMeshCoreRegions", ctx, dollar_1)
+	ret0, _ := ret[0].([]db.ListMeshCoreRegionsRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListMeshCoreRegions indicates an expected call of ListMeshCoreRegions.
+func (mr *MockQuerierMockRecorder) ListMeshCoreRegions(ctx, dollar_1 any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListMeshCoreRegions", reflect.TypeOf((*MockQuerier)(nil).ListMeshCoreRegions), ctx, dollar_1)
+}
+
 // ListMessagesAfterID mocks base method.
 func (m *MockQuerier) ListMessagesAfterID(ctx context.Context, arg db.ListMessagesAfterIDParams) ([]db.ListMessagesAfterIDRow, error) {
 	m.ctrl.T.Helper()

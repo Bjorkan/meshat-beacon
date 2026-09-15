@@ -7,6 +7,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -214,6 +215,57 @@ func TestListNodes_PubkeyPrefixParam_PassedThrough(t *testing.T) {
 	}
 	if gotPubkeyPrefix != "ab12" {
 		t.Errorf("expected pubkeyPrefix to be lowercased and passed through, got %q", gotPubkeyPrefix)
+	}
+}
+
+func TestListNodes_MeshCoreRegionParam_PassedThrough(t *testing.T) {
+	var got string
+	r := chi.NewRouter()
+	r.Get("/nodes", listNodes(stubReader{
+		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
+			got = params.MeshCoreRegion
+			return api.Page[api.NodeSummary]{}, nil
+		},
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/nodes?meshcoreRegion=SE", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if got != "se" {
+		t.Errorf("expected meshcoreRegion to be lowercased and passed through, got %q", got)
+	}
+}
+
+func TestListNodes_MeshCoreRegionParam_InvalidToken(t *testing.T) {
+	r := chi.NewRouter()
+	r.Get("/nodes", listNodes(stubReader{}))
+	for _, bad := range []string{"se,no", "se no", "%", "a b", "se/no"} {
+		req := httptest.NewRequest(http.MethodGet, "/nodes?meshcoreRegion="+url.QueryEscape(bad), nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != http.StatusBadRequest {
+			t.Errorf("expected 400 for meshcoreRegion=%q, got %d", bad, w.Code)
+		}
+	}
+}
+
+func TestListMeshCoreRegions_OK(t *testing.T) {
+	r := chi.NewRouter()
+	r.Get("/nodes/meshcore-regions", listMeshCoreRegions(stubReader{
+		listMeshCoreRegions: func(_ context.Context) ([]api.MeshCoreRegion, error) {
+			return []api.MeshCoreRegion{{Token: "se", NodeCount: 12}}, nil
+		},
+	}))
+	req := httptest.NewRequest(http.MethodGet, "/nodes/meshcore-regions", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), `"token":"se"`) || !strings.Contains(w.Body.String(), `"nodeCount":12`) {
+		t.Errorf("expected token se with count 12, got %s", w.Body.String())
 	}
 }
 

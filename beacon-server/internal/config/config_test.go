@@ -110,6 +110,9 @@ func TestResolve_Defaults(t *testing.T) {
 	if r.ObserverDeleteAfter != 14*24*time.Hour {
 		t.Errorf("expected ObserverDeleteAfter 336h (14 days), got %v", r.ObserverDeleteAfter)
 	}
+	if r.MeshCoreRegionFreshness != 7*24*time.Hour {
+		t.Errorf("expected MeshCoreRegionFreshness 168h (7 days), got %v", r.MeshCoreRegionFreshness)
+	}
 }
 
 func TestResolve_ExplicitValues(t *testing.T) {
