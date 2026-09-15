@@ -395,6 +395,21 @@ func (mr *MockQuerierMockRecorder) GetObserverLastIATA(ctx, observerID any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObserverLastIATA", reflect.TypeOf((*MockQuerier)(nil).GetObserverLastIATA), ctx, observerID)
 }
 
+// GetObserverOwnerNode mocks base method.
+func (m *MockQuerier) GetObserverOwnerNode(ctx context.Context, observerID uuid.UUID) (db.GetObserverOwnerNodeRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetObserverOwnerNode", ctx, observerID)
+	ret0, _ := ret[0].(db.GetObserverOwnerNodeRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetObserverOwnerNode indicates an expected call of GetObserverOwnerNode.
+func (mr *MockQuerierMockRecorder) GetObserverOwnerNode(ctx, observerID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObserverOwnerNode", reflect.TypeOf((*MockQuerier)(nil).GetObserverOwnerNode), ctx, observerID)
+}
+
 // GetObserverRadio mocks base method.
 func (m *MockQuerier) GetObserverRadio(ctx context.Context, id uuid.UUID) (db.GetObserverRadioRow, error) {
 	m.ctrl.T.Helper()
@@ -1114,6 +1129,21 @@ func (mr *MockQuerierMockRecorder) ListUndecryptedGroupTextPackets(ctx any) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUndecryptedGroupTextPackets", reflect.TypeOf((*MockQuerier)(nil).ListUndecryptedGroupTextPackets), ctx)
 }
 
+// ReconcileObserverOwners mocks base method.
+func (m *MockQuerier) ReconcileObserverOwners(ctx context.Context, nodeID pgtype.UUID) ([]uuid.UUID, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReconcileObserverOwners", ctx, nodeID)
+	ret0, _ := ret[0].([]uuid.UUID)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReconcileObserverOwners indicates an expected call of ReconcileObserverOwners.
+func (mr *MockQuerierMockRecorder) ReconcileObserverOwners(ctx, nodeID any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileObserverOwners", reflect.TypeOf((*MockQuerier)(nil).ReconcileObserverOwners), ctx, nodeID)
+}
+
 // ReconfirmNeighbors mocks base method.
 func (m *MockQuerier) ReconfirmNeighbors(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -1640,6 +1670,21 @@ func (m *MockQuerier) UpsertObserverBroker(ctx context.Context, arg db.UpsertObs
 func (mr *MockQuerierMockRecorder) UpsertObserverBroker(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertObserverBroker", reflect.TypeOf((*MockQuerier)(nil).UpsertObserverBroker), ctx, arg)
+}
+
+// UpsertObserverOwner mocks base method.
+func (m *MockQuerier) UpsertObserverOwner(ctx context.Context, arg db.UpsertObserverOwnerParams) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpsertObserverOwner", ctx, arg)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpsertObserverOwner indicates an expected call of UpsertObserverOwner.
+func (mr *MockQuerierMockRecorder) UpsertObserverOwner(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpsertObserverOwner", reflect.TypeOf((*MockQuerier)(nil).UpsertObserverOwner), ctx, arg)
 }
 
 // UpsertObserverScope mocks base method.

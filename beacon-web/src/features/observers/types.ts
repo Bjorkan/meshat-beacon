@@ -12,6 +12,7 @@ export interface ObserverSummary {
 }
 
 export interface Observer extends ObserverSummary {
+  ownerNode?: { id: string; name?: string; publicKey: string };
   publicKey: string;
   softwareVersion?: string;
   hardwareModel?: string;

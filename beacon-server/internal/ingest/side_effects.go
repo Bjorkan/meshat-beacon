@@ -107,6 +107,16 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		// The signed advert identifies its origin exactly. Its configured path hash width
 		// is therefore capability evidence even when the advert was heard with zero hops.
 		w.runCapabilityDetection(ctx, packet.PayloadType(), packet.PathHashSize(), []uuid.UUID{nodeID})
+		// Resolve owners learned before this node's first advert, and invalidate
+		// existing relationships too because this advert may rename the owner node.
+		ownerObservers, ownerErr := w.db.ReconcileObserverOwners(ctx, nodeID)
+		if ownerErr != nil {
+			log.Printf("ingest[%s]: owner reconciliation failed: %v", w.cfg.BrokerName, ownerErr)
+		} else if w.onObserverUpsert != nil {
+			for _, id := range ownerObservers {
+				w.onObserverUpsert(ctx, id)
+			}
+		}
 		// invalidate cache for this node
 		if w.onNodeUpsert != nil {
 			w.onNodeUpsert(ctx, nodeID)

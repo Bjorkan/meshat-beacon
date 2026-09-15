@@ -13,6 +13,7 @@ import (
 	mockdb "github.com/MeshCore-Beacon/beacon-server/db/sqlc/mock"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/mock/gomock"
 )
@@ -205,6 +206,7 @@ func TestGetObserver_OnlineStatus(t *testing.T) {
 		GetObserverBrokers(gomock.Any(), observerID).
 		Return([]sqlc.GetObserverBrokersRow{}, nil)
 
+	mock.EXPECT().GetObserverOwnerNode(gomock.Any(), observerID).Return(sqlc.GetObserverOwnerNodeRow{}, pgx.ErrNoRows)
 	mock.EXPECT().
 		GetObserverScopes(gomock.Any(), observerID).
 		Return([]string{"default"}, nil)
@@ -248,6 +250,7 @@ func TestGetObserver_OfflineStatus(t *testing.T) {
 		GetObserverBrokers(gomock.Any(), observerID).
 		Return([]sqlc.GetObserverBrokersRow{}, nil)
 
+	mock.EXPECT().GetObserverOwnerNode(gomock.Any(), observerID).Return(sqlc.GetObserverOwnerNodeRow{}, pgx.ErrNoRows)
 	mock.EXPECT().
 		GetObserverScopes(gomock.Any(), observerID).
 		Return([]string{}, nil)
@@ -293,6 +296,7 @@ func TestGetObserver_BrokerLastPacketAtNil(t *testing.T) {
 			},
 		}, nil)
 
+	mock.EXPECT().GetObserverOwnerNode(gomock.Any(), observerID).Return(sqlc.GetObserverOwnerNodeRow{}, pgx.ErrNoRows)
 	mock.EXPECT().
 		GetObserverScopes(gomock.Any(), observerID).
 		Return([]string{}, nil)

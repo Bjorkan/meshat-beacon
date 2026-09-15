@@ -182,3 +182,18 @@ func TestChannelPublicFlagIsExplicit(t *testing.T) {
 		t.Fatal("public channel classification must depend only on the explicit flag")
 	}
 }
+
+func TestOwnerMetadataIsOptIn(t *testing.T) {
+	cfg, err := Load(t.TempDir() + "/missing.yaml")
+	if err != nil || cfg.Ingest.OwnerMetadata {
+		t.Fatal("owner metadata must default off", err)
+	}
+	path := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(path, []byte("ingest:\n  owner_metadata: true\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err = Load(path)
+	if err != nil || !cfg.Ingest.OwnerMetadata {
+		t.Fatal("explicit opt in not loaded", err)
+	}
+}

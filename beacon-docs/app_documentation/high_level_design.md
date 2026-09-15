@@ -191,7 +191,7 @@ Each client identifies itself differently. The detection sources, in priority or
 Observers publish to three subtopics under `meshcore/{IATA}/{pubkey}/`:
 - `/packets`: the raw packet stream we use for everything else
 - `/status`: periodic observer health (battery, uptime, queue depth, radio stats, software identity)
-- `/internal`: PII (owner email/name from JWT). Admin-only on the broker. We use Role 2 so we do not subscribe to `/internal`.
+- `/internal`: PII (owner email/name from JWT). Admin-only on the broker. The normal worker uses Role 2 and ignores `/internal`. An optional separately credentialed Role 1 worker reads only `/internal` when `ingest.owner_metadata` is enabled.
 
 The ingest service subscribes to `meshcore/#` and routes by subtopic. Packets go to the observation pipeline; status messages update the observer row.
 
@@ -764,7 +764,13 @@ The ingest service subscribes to `meshcore/#` on both brokers and routes incomin
 3. Upsert `observer_brokers` row for the source broker
 
 ### For `/internal` messages
-Not subscribed (Role 2 access).
+
+The optional Role 1 worker validates `origin_id`, broker timestamp and
+`jwt_payload.owner`, persisting only the owner public key and provenance in
+`observer_owners`. Missing owner in a complete claim snapshot clears the mapping;
+malformed or older metadata cannot replace it. Exact node-key resolution runs on
+metadata updates and node adverts. Only the resolved node reference is projected
+as `ownerNode` in observer details. See the server README for configuration.
 
 ---
 
@@ -943,12 +949,12 @@ The Flutter app could let users set up notifications for specific events: a keyw
 Letsmesh has a feature where users can remote console into their own observer and run commands via MQTT, useful for diagnosing a misbehaving repeater or just managing it without going onsite. The auth flow uses the public key set as the owner on the observer: users authenticate to the web UI by signing a challenge with their companion device (USB-to-web), proving they own the pubkey, and the server then proxies a console session to the observer over MQTT.
 
 For Tower, this requires a few things we don't have in v1:
-- A privileged ingest path that subscribes to the broker's `/internal` subtopic to populate the private `observer_owners` table with the canonical owner pubkey for each observer. This requires a Role 1 SUBSCRIBER account.
+- The optional privileged ingest path now subscribes to the broker's `/internal` subtopic to populate the private `observer_owners` table with the canonical owner pubkey for each observer. This requires a Role 1 SUBSCRIBER account.
 - A companion-device WebAuthn-style flow on the web frontend for signing the owner challenge.
 - An MQTT command path back to the observer (so we'd be publishing as well as subscribing, a change from our current Role 2 read-only stance).
 - A scoped command surface on the console (which commands are safe to expose, rate limits, audit logging).
 
-The `observer_owners` table in the schema is already shaped to support this. It's intentionally never exposed via the public API since the owner pubkey is private auth material until the console feature ships.
+The `observer_owners` table in the schema is already shaped to support this. The private row and unresolved claims remain internal. Observer details expose only an optional resolved public node reference; contact fields and authentication payloads are never projected.
 
 ---
 

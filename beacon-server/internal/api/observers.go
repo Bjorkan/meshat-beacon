@@ -29,6 +29,7 @@ type ObserverBroker struct {
 // Observer is the full observer representation including radio config,
 // telemetry, broker memberships and raw status metadata.
 type Observer struct {
+	OwnerNode *ObserverOwnerNode `json:"ownerNode,omitempty"`
 	ObserverSummary
 	PublicKey        string           `json:"publicKey"` // hex-encoded public key
 	SoftwareVersion  *string          `json:"softwareVersion,omitempty"`
@@ -67,4 +68,11 @@ type ObserverTelemetry struct {
 	Range    string                   `json:"range"`
 	Interval string                   `json:"interval"`
 	Points   []ObserverTelemetryPoint `json:"points"`
+}
+
+// ObserverOwnerNode is the resolved public node relationship, never raw broker/auth metadata.
+type ObserverOwnerNode struct {
+	ID        uuid.UUID `json:"id"`
+	Name      *string   `json:"name,omitempty"`
+	PublicKey string    `json:"publicKey"`
 }

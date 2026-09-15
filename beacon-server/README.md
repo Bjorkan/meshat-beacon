@@ -230,6 +230,32 @@ must be defined here — they are not auto-created.
 
 ---
 
+### Optional observer owner metadata
+
+Set `ingest.owner_metadata: true` in `config.yaml` and provide `MQTT_OWNER_USERNAME`
+and `MQTT_OWNER_PASSWORD` for a separate Role 1 subscriber on the same
+`MQTT_BROKER_URL`. The connection uses client ID `beacon-meshat.se-owners` and
+subscribes only to `meshcore/+/+/internal`. Normal packet/status ingest continues
+with its existing credentials. Missing owner credentials disable this optional
+connection with a log message; a denied or unavailable feed does not stop normal ingest.
+
+The broker must reserve `/internal` for broker-generated, authenticated metadata and
+restrict read access. Beacon expects the broker envelope
+`{"origin_id":"<observer public key>","timestamp":1700000000000,"jwt_payload":{"owner":"<64-hex node public key>"}}`.
+It validates both public keys and matching observer identity, and applies the same
+IATA allowlist as normal ingest. Each envelope is a complete JWT-claim snapshot:
+an absent, null or empty `owner` clears the relationship; malformed keys/envelopes
+are ignored. Older timestamps cannot overwrite newer metadata.
+
+Only the owner key, resolved node ID, broker provenance and metadata time enter the
+private owner model. Email, JWTs and trust metadata are neither stored nor logged.
+The observer API exposes `ownerNode` with only the existing node's ID, name and
+public key. Unresolved owner keys remain private until a matching node advert arrives.
+The detail view opens that node through the existing overlay. Owner changes and
+node adverts invalidate the server cache; open details refresh within 30 seconds.
+The feed is not retained: newly enabled installations learn ownership on the next
+broker publication, and unavailable feeds leave the last stored mapping in place.
+
 ## Authentication
 
 API authentication is not yet implemented. Beacon is intended for trusted

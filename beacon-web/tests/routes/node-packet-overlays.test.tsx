@@ -23,8 +23,16 @@ vi.mock('../../src/hooks/useRegion', () => {
 vi.mock('../../src/api/client', async (original) => ({
   ...(await original<object>()),
   getNode: vi.fn().mockResolvedValue({}),
+  getObserver: vi.fn().mockResolvedValue({}),
+  getObserverAdverts: vi.fn().mockResolvedValue([]),
   getNodeObservations: vi.fn().mockResolvedValue({ items: [] }),
   getNodeNeighbors: vi.fn().mockResolvedValue([]),
+}));
+vi.mock('../../src/features/observers/ObserverTable', () => ({ ObserverTable: () => null }));
+vi.mock('../../src/features/observers/ObserverDetailPanel', () => ({
+  ObserverDetailPanel: ({ onSelectNode }: { onSelectNode: (id: string) => void }) => (
+    <button onClick={() => onSelectNode('owner-node')}>Open owner</button>
+  ),
 }));
 vi.mock('../../src/features/nodes/NodeTable', () => ({ NodeTable: () => null }));
 vi.mock('../../src/features/map/MapView', () => ({ MapView: () => null }));
@@ -117,4 +125,14 @@ describe('node observation analyzer transitions', () => {
     await waitFor(() => expect(screen.queryByTestId('analyzer')).toBeNull());
     expect(router.state.location.search.analyze).toBeUndefined();
   });
+});
+
+it('opens an observer owner in the existing node overlay and returns to the observer', async () => {
+  const router = await setup('/observers/obs-1');
+  fireEvent.click(await screen.findByRole('button', { name: 'Open owner' }));
+  expect(await screen.findByText('Node owner-node')).toBeInTheDocument();
+  expect(router.state.location.pathname).toBe('/observers/obs-1');
+  fireEvent.click(screen.getByRole('button', { name: 'Close node' }));
+  expect(screen.queryByText('Node owner-node')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: 'Open owner' })).toBeInTheDocument();
 });

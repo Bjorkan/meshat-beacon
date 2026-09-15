@@ -37,9 +37,11 @@ export type NodeTypeCount = { count?: number; nodeType?: number; nodeTypeName?: 
 
 export type ObservationPoint = { activeObservers?: number; hour?: number; iata?: string; observationCount?: number; uniquePackets?: number; };
 
-export type Observer = { batteryLevel?: number; brokers?: Array<ObserverBroker>; displayName?: string; firmwareBuild?: string; firmwareVersion?: string; firstSeen?: number; hardwareModel?: string; iata?: string; id?: string; lastSeen?: number; lastStatusAt?: number; observationCount?: number; observerType?: string; publicKey?: string; radio?: string; radioBwKhz?: number; radioCr?: number; radioFreqMhz?: number; radioSf?: number; radioTitle?: string; scopes?: Array<string>; softwareVersion?: string; status?: string; statusMetadata?: unknown; uptimeSeconds?: number; };
+export type Observer = { batteryLevel?: number; brokers?: Array<ObserverBroker>; displayName?: string; firmwareBuild?: string; firmwareVersion?: string; firstSeen?: number; hardwareModel?: string; iata?: string; id?: string; lastSeen?: number; lastStatusAt?: number; observationCount?: number; observerType?: string; ownerNode?: ObserverOwnerNode; publicKey?: string; radio?: string; radioBwKhz?: number; radioCr?: number; radioFreqMhz?: number; radioSf?: number; radioTitle?: string; scopes?: Array<string>; softwareVersion?: string; status?: string; statusMetadata?: unknown; uptimeSeconds?: number; };
 
 export type ObserverBroker = { lastPacketAt?: number; lastSeenAt?: number; name?: string; };
+
+export type ObserverOwnerNode = { id?: string; name?: string; publicKey?: string; };
 
 export type ObserverSummary = { displayName?: string; iata?: string; id?: string; observerType?: string; radio?: string; radioTitle?: string; scopes?: Array<string>; status?: string; };
 

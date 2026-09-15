@@ -265,6 +265,21 @@ func main() {
 	}
 
 	go broker.Start(ctx)
+	if cfg.Ingest.OwnerMetadata {
+		username, password := os.Getenv("MQTT_OWNER_USERNAME"), os.Getenv("MQTT_OWNER_PASSWORD")
+		if username == "" || password == "" {
+			log.Print("config: owner metadata disabled; MQTT_OWNER_USERNAME and MQTT_OWNER_PASSWORD are required")
+		} else {
+			ownerWorker := ingest.New(ingest.Config{
+				BrokerName: "meshat.se", URL: brokerCredential("MQTT_BROKER_URL", "MQTT_BROKER_1_URL"),
+				Username: username, Password: password, OwnerMetadataOnly: true, AllowedIATAs: allowedIATAs,
+			}, coalescer, h, keys, scopes)
+			if cr, ok := reader.(*cache.CachedReader); ok {
+				ownerWorker.SetCacheInvalidators(nil, nil, cr.InvalidateObserver)
+			}
+			go ownerWorker.Start(ctx)
+		}
+	}
 
 	scheduler := background.New([]background.Task{
 		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),

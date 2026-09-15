@@ -312,6 +312,7 @@ type RegionConfig struct {
 // Country codes are ISO 3166-1 alpha-2 (e.g. "CA", "US").
 // Continent codes are two-letter OurAirports codes: AF, AN, AS, EU, NA, OC, SA.
 type IngestFilterConfig struct {
+	OwnerMetadata bool `yaml:"owner_metadata"` // optional separate Role 1 subscription for owner claims
 	// AllowCountries is a list of ISO 3166-1 alpha-2 country codes to accept.
 	// Packets from observers in other countries are dropped at ingest.
 	AllowCountries []string `yaml:"allow_countries"`

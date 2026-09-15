@@ -204,6 +204,7 @@
     "noMessages": "Inga meddelanden"
   },
   "details": {
+    "owner": "Ägare",
     "summary": "Sammanfattning",
     "timestamps": "Tidsstämplar",
     "observations": "Observationer",

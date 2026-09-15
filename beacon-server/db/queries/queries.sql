@@ -1572,3 +1572,33 @@ OR (
             AND iata = nn.iata
       )
 ) > 1;
+
+-- name: UpsertObserverOwner :execrows
+-- Only a broker-owned internal feed may write this relationship. No contact/JWT data is stored.
+INSERT INTO observer_owners(observer_id, owner_pubkey, owner_node_id, source, metadata_at)
+VALUES (@observer_id, @owner_pubkey::bytea, (SELECT id FROM nodes WHERE public_key = @owner_pubkey), @source, @metadata_at)
+ON CONFLICT (observer_id) DO UPDATE SET
+  owner_pubkey = EXCLUDED.owner_pubkey,
+  owner_node_id = EXCLUDED.owner_node_id,
+  source = EXCLUDED.source,
+  metadata_at = EXCLUDED.metadata_at,
+  updated_at = NOW()
+WHERE observer_owners.metadata_at IS NULL OR EXCLUDED.metadata_at > observer_owners.metadata_at;
+
+-- name: ReconcileObserverOwners :many
+-- Return resolved as well as newly resolved observers so node renames invalidate their detail.
+WITH resolved AS (
+  UPDATE observer_owners SET owner_node_id = @node_id, updated_at = NOW()
+  WHERE owner_pubkey = (SELECT public_key FROM nodes WHERE id = @node_id)
+    AND owner_node_id IS DISTINCT FROM @node_id
+  RETURNING observer_id
+)
+SELECT observer_id FROM resolved
+UNION
+SELECT observer_id FROM observer_owners WHERE owner_node_id = @node_id;
+
+-- name: GetObserverOwnerNode :one
+-- The public projection contains only an existing node; unresolved claims stay private.
+SELECT n.id, n.name, n.public_key FROM observer_owners o
+JOIN nodes n ON n.id = o.owner_node_id AND n.public_key = o.owner_pubkey
+WHERE o.observer_id = $1;

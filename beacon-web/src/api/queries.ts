@@ -322,6 +322,7 @@ export const observerQueries = {
       queryKey: ['observer', id] as const,
       queryFn: () => getObserver(id),
       staleTime: 30_000,
+      refetchInterval: 30_000,
       refetchOnWindowFocus: false,
     }),
   adverts: (id: string) =>

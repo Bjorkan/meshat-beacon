@@ -157,6 +157,7 @@ cache:
 # If both are set an IATA passes if it matches either (OR semantics).
 # Omit this section entirely to accept packets from all IATAs (default).
 #ingest:
+#  owner_metadata: false # optional privileged owner feed; requires MQTT_OWNER_USERNAME/PASSWORD
 #  allow_countries: [CA, US]
 #  allow_continents: [NA]
 

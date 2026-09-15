@@ -63,6 +63,8 @@ type Querier interface {
 	GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error)
 	GetObserverByPubkey(ctx context.Context, publicKey []byte) (Observer, error)
 	GetObserverLastIATA(ctx context.Context, observerID uuid.UUID) (string, error)
+	// The public projection contains only an existing node; unresolved claims stay private.
+	GetObserverOwnerNode(ctx context.Context, observerID uuid.UUID) (GetObserverOwnerNodeRow, error)
 	GetObserverRadio(ctx context.Context, id uuid.UUID) (GetObserverRadioRow, error)
 	GetObserverScopes(ctx context.Context, observerID uuid.UUID) ([]string, error)
 	GetObserverTelemetry(ctx context.Context, arg GetObserverTelemetryParams) ([]GetObserverTelemetryRow, error)
@@ -191,6 +193,8 @@ type Querier interface {
 	// to the config after they'd already been ingested -- see
 	// internal/ingest.BackfillChannelMessages.
 	ListUndecryptedGroupTextPackets(ctx context.Context) ([]ListUndecryptedGroupTextPacketsRow, error)
+	// Return resolved as well as newly resolved observers so node renames invalidate their detail.
+	ReconcileObserverOwners(ctx context.Context, nodeID pgtype.UUID) ([]uuid.UUID, error)
 	// Delete node_neighbors where the neighbor has departed from node_short_ids
 	// for that IATA, or where its prefix_4 is now ambiguous.
 	ReconfirmNeighbors(ctx context.Context) error
@@ -295,6 +299,8 @@ type Querier interface {
 	// OBSERVER BROKERS
 	// ============================================================
 	UpsertObserverBroker(ctx context.Context, arg UpsertObserverBrokerParams) error
+	// Only a broker-owned internal feed may write this relationship. No contact/JWT data is stored.
+	UpsertObserverOwner(ctx context.Context, arg UpsertObserverOwnerParams) (int64, error)
 	UpsertObserverScope(ctx context.Context, arg UpsertObserverScopeParams) error
 	// ============================================================
 	// PACKETS

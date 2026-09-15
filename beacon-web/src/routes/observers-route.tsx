@@ -106,6 +106,7 @@ export function ObserverDetailRoute() {
       onClose={close}
       onAnalyzePacket={overlays.openPacket}
       onViewStats={overlays.viewObserverStats}
+      onSelectNode={overlays.setOverlayNodeId}
     />
   );
 }

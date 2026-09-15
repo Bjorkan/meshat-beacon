@@ -232,6 +232,7 @@ type ObserverOwner struct {
 	Source       *string            `json:"source"`
 	AddedAt      pgtype.Timestamptz `json:"added_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	MetadataAt   pgtype.Timestamptz `json:"metadata_at"`
 }
 
 type ObserverScope struct {

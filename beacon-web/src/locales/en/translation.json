@@ -204,6 +204,7 @@
     "noMessages": "No messages"
   },
   "details": {
+    "owner": "Owner",
     "summary": "Summary",
     "timestamps": "Timestamps",
     "observations": "Observations",

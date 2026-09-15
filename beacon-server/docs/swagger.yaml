@@ -509,6 +509,8 @@ definitions:
       observerType:
         description: e.g. "meshcoretomqtt", "meshcoreha"
         type: string
+      ownerNode:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode'
       publicKey:
         description: hex-encoded public key
         type: string
@@ -556,6 +558,15 @@ definitions:
         type: integer
       name:
         description: broker name e.g. "meshat.se"
+        type: string
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode:
+    properties:
+      id:
+        type: string
+      name:
+        type: string
+      publicKey:
         type: string
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverSummary:

@@ -654,6 +654,26 @@ func (q *Queries) GetObserverLastIATA(ctx context.Context, observerID uuid.UUID)
 	return iata, err
 }
 
+const getObserverOwnerNode = `-- name: GetObserverOwnerNode :one
+SELECT n.id, n.name, n.public_key FROM observer_owners o
+JOIN nodes n ON n.id = o.owner_node_id AND n.public_key = o.owner_pubkey
+WHERE o.observer_id = $1
+`
+
+type GetObserverOwnerNodeRow struct {
+	ID        uuid.UUID `json:"id"`
+	Name      *string   `json:"name"`
+	PublicKey []byte    `json:"public_key"`
+}
+
+// The public projection contains only an existing node; unresolved claims stay private.
+func (q *Queries) GetObserverOwnerNode(ctx context.Context, observerID uuid.UUID) (GetObserverOwnerNodeRow, error) {
+	row := q.db.QueryRow(ctx, getObserverOwnerNode, observerID)
+	var i GetObserverOwnerNodeRow
+	err := row.Scan(&i.ID, &i.Name, &i.PublicKey)
+	return i, err
+}
+
 const getObserverRadio = `-- name: GetObserverRadio :one
 SELECT radio_freq_mhz, radio_bw_khz, radio_sf, radio_cr
 FROM observers
@@ -3581,6 +3601,39 @@ func (q *Queries) ListUndecryptedGroupTextPackets(ctx context.Context) ([]ListUn
 	return items, nil
 }
 
+const reconcileObserverOwners = `-- name: ReconcileObserverOwners :many
+WITH resolved AS (
+  UPDATE observer_owners SET owner_node_id = $1, updated_at = NOW()
+  WHERE owner_pubkey = (SELECT public_key FROM nodes WHERE id = $1)
+    AND owner_node_id IS DISTINCT FROM $1
+  RETURNING observer_id
+)
+SELECT observer_id FROM resolved
+UNION
+SELECT observer_id FROM observer_owners WHERE owner_node_id = $1
+`
+
+// Return resolved as well as newly resolved observers so node renames invalidate their detail.
+func (q *Queries) ReconcileObserverOwners(ctx context.Context, nodeID pgtype.UUID) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, reconcileObserverOwners, nodeID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var observer_id uuid.UUID
+		if err := rows.Scan(&observer_id); err != nil {
+			return nil, err
+		}
+		items = append(items, observer_id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reconfirmNeighbors = `-- name: ReconfirmNeighbors :exec
 DELETE FROM node_neighbors nn
 WHERE NOT EXISTS (
@@ -4657,6 +4710,39 @@ type UpsertObserverBrokerParams struct {
 func (q *Queries) UpsertObserverBroker(ctx context.Context, arg UpsertObserverBrokerParams) error {
 	_, err := q.db.Exec(ctx, upsertObserverBroker, arg.ObserverID, arg.BrokerName)
 	return err
+}
+
+const upsertObserverOwner = `-- name: UpsertObserverOwner :execrows
+INSERT INTO observer_owners(observer_id, owner_pubkey, owner_node_id, source, metadata_at)
+VALUES ($1, $2::bytea, (SELECT id FROM nodes WHERE public_key = $2), $3, $4)
+ON CONFLICT (observer_id) DO UPDATE SET
+  owner_pubkey = EXCLUDED.owner_pubkey,
+  owner_node_id = EXCLUDED.owner_node_id,
+  source = EXCLUDED.source,
+  metadata_at = EXCLUDED.metadata_at,
+  updated_at = NOW()
+WHERE observer_owners.metadata_at IS NULL OR EXCLUDED.metadata_at > observer_owners.metadata_at
+`
+
+type UpsertObserverOwnerParams struct {
+	ObserverID  uuid.UUID          `json:"observer_id"`
+	OwnerPubkey []byte             `json:"owner_pubkey"`
+	Source      *string            `json:"source"`
+	MetadataAt  pgtype.Timestamptz `json:"metadata_at"`
+}
+
+// Only a broker-owned internal feed may write this relationship. No contact/JWT data is stored.
+func (q *Queries) UpsertObserverOwner(ctx context.Context, arg UpsertObserverOwnerParams) (int64, error) {
+	result, err := q.db.Exec(ctx, upsertObserverOwner,
+		arg.ObserverID,
+		arg.OwnerPubkey,
+		arg.Source,
+		arg.MetadataAt,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
 }
 
 const upsertObserverScope = `-- name: UpsertObserverScope :exec

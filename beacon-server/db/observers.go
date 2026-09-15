@@ -6,6 +6,7 @@ package db
 import (
 	"context"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -142,6 +144,12 @@ func (s *Store) GetObserver(ctx context.Context, observerID uuid.UUID) (*api.Obs
 		FirstSeen:        obs.FirstSeen.Time.UnixMilli(),
 		LastSeen:         obs.LastSeen.Time.UnixMilli(),
 		ObservationCount: *obs.ObservationCount,
+	}
+	owner, ownerErr := s.q.GetObserverOwnerNode(ctx, observerID)
+	if ownerErr == nil {
+		observer.OwnerNode = &api.ObserverOwnerNode{ID: owner.ID, Name: owner.Name, PublicKey: hex.EncodeToString(owner.PublicKey)}
+	} else if !errors.Is(ownerErr, pgx.ErrNoRows) {
+		return nil, ownerErr
 	}
 	scopes, err := s.GetObserverScopes(ctx, observerID)
 	if err != nil {

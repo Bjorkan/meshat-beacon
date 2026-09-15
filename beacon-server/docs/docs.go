@@ -3215,6 +3215,9 @@ const docTemplate = `{
                     "description": "e.g. \"meshcoretomqtt\", \"meshcoreha\"",
                     "type": "string"
                 },
+                "ownerNode": {
+                    "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode"
+                },
                 "publicKey": {
                     "description": "hex-encoded public key",
                     "type": "string"
@@ -3278,6 +3281,20 @@ const docTemplate = `{
                 },
                 "name": {
                     "description": "broker name e.g. \"meshat.se\"",
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "publicKey": {
                     "type": "string"
                 }
             }

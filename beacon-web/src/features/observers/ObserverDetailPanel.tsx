@@ -12,6 +12,7 @@ import {
   formatUptime,
   formatBattery,
   formatHex,
+  formatNodePrefix,
   formatSnr,
   snrLevel,
   SIGNAL_LEVEL_CLASSES,
@@ -143,6 +144,7 @@ interface ObserverDetailPanelProps {
   onClose: () => void;
   onAnalyzePacket?: (hash: string) => void;
   onViewStats?: (observerId: string) => void;
+  onSelectNode?: (nodeId: string) => void;
 }
 
 export function ObserverDetailPanel({
@@ -150,6 +152,7 @@ export function ObserverDetailPanel({
   onClose,
   onAnalyzePacket,
   onViewStats,
+  onSelectNode,
 }: ObserverDetailPanelProps) {
   const { t } = useTranslation();
   const {
@@ -235,6 +238,21 @@ export function ObserverDetailPanel({
                 <ScopeTag key={s}>{s}</ScopeTag>
               ))}
             </div>
+            {observer.ownerNode && (
+              <Field
+                label={t('details.owner')}
+                value={
+                  <button
+                    type="button"
+                    className="text-primary hover:underline cursor-pointer"
+                    title={observer.ownerNode.publicKey}
+                    onClick={() => onSelectNode?.(observer.ownerNode!.id)}
+                  >
+                    {observer.ownerNode.name || formatNodePrefix(observer.ownerNode.publicKey)}
+                  </button>
+                }
+              />
+            )}
             {onViewStats && (
               <button
                 type="button"

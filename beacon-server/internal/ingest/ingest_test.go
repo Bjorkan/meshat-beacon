@@ -405,3 +405,10 @@ func TestRunCapabilityDetection_NoNodes_DoesNothing(t *testing.T) {
 		t.Errorf("expected no capability calls for empty node list, got %d", len(db.setCapabilityCalls))
 	}
 }
+
+func (s *stubDB) UpsertObserverOwner(context.Context, uuid.UUID, []byte, string, time.Time) (bool, error) {
+	return true, nil
+}
+func (s *stubDB) ReconcileObserverOwners(context.Context, uuid.UUID) ([]uuid.UUID, error) {
+	return nil, nil
+}

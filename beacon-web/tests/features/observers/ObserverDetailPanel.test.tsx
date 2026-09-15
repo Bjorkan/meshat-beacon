@@ -135,3 +135,27 @@ describe('ObserverDetailPanel fetch failures', () => {
     expect(screen.queryByRole('alert')).toBeNull();
   });
 });
+
+it.each(['Named owner', undefined])('opens the resolved owner node with name %s', async (name) => {
+  const select = vi.fn();
+  mockGetObserver.mockResolvedValue({
+    ...observer,
+    ownerNode: { id: 'owner-node', name, publicKey: 'aabbcc' + '00'.repeat(29) },
+  });
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={client}>
+      <ObserverDetailPanel observerId="obs-1" onClose={() => {}} onSelectNode={select} />
+    </QueryClientProvider>,
+  );
+  const owner = await screen.findByRole('button', { name: name ?? 'AABBCC' });
+  expect(screen.getByText('Owner')).toBeInTheDocument();
+  fireEvent.click(owner);
+  expect(select).toHaveBeenCalledWith('owner-node');
+});
+
+it('omits the owner field when no resolved relationship is returned', async () => {
+  renderPanel();
+  await screen.findByText(observer.publicKey);
+  expect(screen.queryByText('Owner')).not.toBeInTheDocument();
+});

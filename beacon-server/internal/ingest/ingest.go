@@ -56,6 +56,8 @@ import (
 
 // Config holds the connection parameters for one broker.
 type Config struct {
+	// OwnerMetadataOnly uses separate privileged credentials and subscribes only to broker-owned /internal.
+	OwnerMetadataOnly bool
 	// BrokerName is a short human-readable label (e.g. "meshat.se") used in
 	// log messages and stored in packet_observations.source_broker.
 	BrokerName string
@@ -86,6 +88,9 @@ type Config struct {
 // DB is the minimal database interface the ingest pipeline depends on.
 // Wire in your real *pgxpool.Pool implementation here.
 type DB interface {
+	UpsertObserverOwner(ctx context.Context, observerID uuid.UUID, ownerPubkey []byte, source string, metadataAt time.Time) (bool, error)
+	ReconcileObserverOwners(ctx context.Context, nodeID uuid.UUID) ([]uuid.UUID, error)
+
 	// UpsertObserver upserts the observers row keyed on pubkey, and returns
 	// the Observer ID, Display Name and an error if any.
 	UpsertObserver(ctx context.Context, pubkey []byte) (uuid.UUID, string, error)
@@ -246,9 +251,13 @@ func New(cfg Config, db DB, h *hub.Hub, keys ChannelKeyStore, scopes ScopeStore)
 //
 // Intended usage: go worker.Start(ctx)
 func (w *Worker) Start(ctx context.Context) {
+	clientID := fmt.Sprintf("beacon-%s", w.cfg.BrokerName)
+	if w.cfg.OwnerMetadataOnly {
+		clientID += "-owners"
+	}
 	opts := mqtt.NewClientOptions().
 		AddBroker(w.cfg.URL).
-		SetClientID(fmt.Sprintf("beacon-%s", w.cfg.BrokerName)).
+		SetClientID(clientID).
 		SetUsername(w.cfg.Username).
 		SetPassword(w.cfg.Password).
 		SetAutoReconnect(true).
@@ -303,8 +312,12 @@ func (w *Worker) SetCacheInvalidators(
 func (w *Worker) subscribe(client mqtt.Client) {
 	// meshcore/{IATA}/{pubkey}/packets
 	// meshcore/{IATA}/{pubkey}/status
-	// We do NOT subscribe to /internal (Role 2 access).
-	tok := client.Subscribe("meshcore/#", 1, func(_ mqtt.Client, msg mqtt.Message) {
+	// Public workers discard internal messages even if broker ACLs deliver a wildcard match.
+	topic := "meshcore/#"
+	if w.cfg.OwnerMetadataOnly {
+		topic = "meshcore/+/+/internal"
+	}
+	tok := client.Subscribe(topic, 1, func(_ mqtt.Client, msg mqtt.Message) {
 		w.handleMessage(msg)
 	})
 	if tok.Wait() && tok.Error() != nil {
@@ -356,6 +369,12 @@ func (w *Worker) handleMessage(msg mqtt.Message) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
+	if w.cfg.OwnerMetadataOnly {
+		if subtopic == "internal" {
+			w.handleOwnerMetadata(ctx, pubkeyHex, msg.Payload())
+		}
+		return
+	}
 	switch subtopic {
 	case "packets":
 		w.handlePacket(ctx, iata, pubkeyHex, msg.Payload())
@@ -363,7 +382,7 @@ func (w *Worker) handleMessage(msg mqtt.Message) {
 		w.handleStatus(ctx, pubkeyHex, msg.Payload())
 	case "neighbors":
 		w.handleNeighbors(ctx, iata, pubkeyHex, msg.Payload())
-		// "internal" is intentionally not handled (Role 2 access)
+		// "internal" is handled only by the separately configured privileged worker
 	}
 }
 
