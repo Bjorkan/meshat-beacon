@@ -5,6 +5,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from '@tanstack/react-router';
 import { ThemeProvider } from './hooks/useTheme';
 import { SplashScreen } from './components/SplashScreen';
+import { TooltipProvider } from './components/Tooltip';
 import { router } from './router';
 import { queryClient } from './api/query-client';
 import { SelectionResetOnRegion } from './state/SelectionResetOnRegion';
@@ -15,10 +16,12 @@ export { SelectionResetOnRegion };
 export function App({ appRouter = router }: { appRouter?: typeof router }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <SplashScreen />
-        <RouterProvider router={appRouter} />
-      </ThemeProvider>
+      <TooltipProvider>
+        <ThemeProvider>
+          <SplashScreen />
+          <RouterProvider router={appRouter} />
+        </ThemeProvider>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

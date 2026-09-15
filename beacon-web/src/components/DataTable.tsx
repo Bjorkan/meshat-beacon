@@ -73,6 +73,9 @@ interface DataTableProps<T> {
 }
 
 const END_REACHED_THRESHOLD_PX = 200;
+// TanStack treats a new data reference as a change and schedules a state reset.
+// A fresh [] during loading makes that reset trigger another reset indefinitely.
+const EMPTY_ROWS: never[] = [];
 
 function sortStateToTanStack(sort: SortState): SortingState {
   return sort.columnId ? [{ id: sort.columnId, desc: sort.direction === 'desc' }] : [];
@@ -152,7 +155,7 @@ export function DataTable<T>({
   // React Compiler deliberately skips components using TanStack Table's imperative API.
   // eslint-disable-next-line react-hooks/incompatible-library
   const table = useReactTable({
-    data: rows ?? [],
+    data: rows ?? EMPTY_ROWS,
     columns: [...tableColumns, ...hiddenSortColumns],
     state: { sorting, columnVisibility },
     getRowId: (row) => rowKey(row),

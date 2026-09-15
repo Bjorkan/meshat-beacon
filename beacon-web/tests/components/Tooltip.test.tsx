@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { Tooltip } from '../../src/components/Tooltip';
+import { Tooltip, TooltipProvider } from '../../src/components/Tooltip';
 
 // mobile/touch == no hover-capable pointer; desktop == has hover. Interaction modality keys off
 // (hover: hover), not viewport width.
@@ -96,5 +96,25 @@ describe('Tooltip (mobile)', () => {
     fireEvent.click(screen.getByText('target'));
     expect(await screen.findByRole('tooltip')).toBeInTheDocument();
     expect(onParentClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('shared TooltipProvider', () => {
+  it('moves the visible tooltip between timestamp-like triggers under one provider', async () => {
+    setMobile(false);
+    render(
+      <TooltipProvider>
+        <Tooltip label="first absolute time">first</Tooltip>
+        <Tooltip label="last absolute time">last</Tooltip>
+      </TooltipProvider>,
+    );
+    fireEvent.pointerMove(screen.getByText('first'), { pointerType: 'mouse' });
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('first absolute time');
+    fireEvent.pointerLeave(screen.getByText('first'), { pointerType: 'mouse' });
+    fireEvent.pointerMove(document.body, { pointerType: 'mouse', clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(screen.getByText('last'), { pointerType: 'mouse' });
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent('last absolute time'),
+    );
   });
 });

@@ -17,8 +17,7 @@ import { snrLevel, SIGNAL_LEVEL_CLASSES, formatSnr } from '../../lib/formatters'
 import { TraceDetailPanel } from './TraceDetailPanel';
 import type { TraceTagSummary, TraceType } from '../../types/api';
 
-// Traces are modest in number and the list isn't streamed, so a single region-filtered fetch covers
-// the card list (the /traces cursor is sound if pagination is ever needed).
+// Fetch a bounded page; DataTable mounts only the visible rows and its overscan.
 const TRACE_LIST_LIMIT = 200;
 
 // "" = both; the backend takes TRACE or PING and omits the param to mean all.
@@ -244,6 +243,8 @@ export function TraceList({
           />
         </div>
         <DataTable
+          key={`${regionKey}:${typeFilter}`}
+          virtualize
           columns={columns}
           rows={tags}
           rowKey={(tag) => tag.traceTag}

@@ -188,6 +188,7 @@ test('Space activates the explicit action for a single packet', async ({ page })
 });
 
 test.describe('touch', () => {
+  test.skip(({ browserName }) => browserName !== 'chromium', 'Mobile emulation requires Chromium');
   test.use({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
 
   test('hop popovers and Analyze remain independent on mobile', async ({ page }) => {

@@ -9,6 +9,23 @@ import { getTraces, getTraceDetail, getRegions } from '../../../src/api/client';
 import { timeAgoMs } from '../../../src/lib/formatters';
 import type { TraceTagSummary, TraceDetail } from '../../../src/types/api';
 
+// jsdom has no viewport geometry; retain the real virtualizer with a measured viewport.
+vi.mock('@tanstack/react-virtual', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-virtual')>();
+  return {
+    ...actual,
+    useVirtualizer: (options: Parameters<typeof actual.useVirtualizer>[0]) =>
+      actual.useVirtualizer({
+        ...options,
+        observeElementRect: (_, callback) => {
+          callback({ width: 1200, height: 800 });
+          return () => {};
+        },
+        measureElement: () => 84,
+      }),
+  };
+});
+
 vi.mock('../../../src/api/client', () => ({
   getTraces: vi.fn(),
   getTraceDetail: vi.fn(),

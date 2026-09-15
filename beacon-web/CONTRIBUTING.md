@@ -96,11 +96,14 @@ because the root `tsconfig.json` has `files: []`.
 
 ## Browser layout tests
 
-From `beacon-web`, install Chromium once with `npx playwright install chromium`, then
-run `npm run test:browser`. Playwright starts a local Vite server and supplies mocked
+From `beacon-web`, install the browsers once with `npx playwright install chromium firefox`, then
+run `npm run test:browser`. Playwright builds and previews production assets and supplies mocked
 API/WebSocket responses; no running backend is needed. The trace detail suite checks
 column alignment, path containment, compact containers, keyboard navigation and touch
-interaction. Screenshots and failure traces are written to `test-results/`.
+interaction. The 200-row filter suite runs in Chromium and Firefox and covers responsiveness,
+loading, history and scrolling. Screenshots, timing attachments and failure traces are
+written to `test-results/`. See [browser profiling](tests/browser/README.md) for the
+performance regression workflow.
 
 ## Commit messages
 

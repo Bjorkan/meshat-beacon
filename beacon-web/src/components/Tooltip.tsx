@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { createContext, useContext, useState, type ReactNode } from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import * as Popover from '@radix-ui/react-popover';
 import { useHasHover } from '../hooks/useMediaQuery';
@@ -6,15 +6,37 @@ import { useHasHover } from '../hooks/useMediaQuery';
 const contentClass =
   'z-50 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg';
 
-export function Tooltip({
-  label,
-  children,
-  className = '',
-}: {
+const SharedTooltipContext = createContext(false);
+
+export function TooltipProvider({ children }: { children: ReactNode }) {
+  return (
+    <SharedTooltipContext value={true}>
+      <TooltipPrimitive.Provider delayDuration={0} skipDelayDuration={0}>
+        {children}
+      </TooltipPrimitive.Provider>
+    </SharedTooltipContext>
+  );
+}
+
+interface TooltipProps {
   label: ReactNode;
   children: ReactNode;
   className?: string;
-}) {
+}
+
+export function Tooltip(props: TooltipProps) {
+  const shared = useContext(SharedTooltipContext);
+  // App shares one provider. Isolated consumers (tests/embeds) remain self-contained.
+  return shared ? (
+    <TooltipContent {...props} />
+  ) : (
+    <TooltipProvider>
+      <TooltipContent {...props} />
+    </TooltipProvider>
+  );
+}
+
+function TooltipContent({ label, children, className = '' }: TooltipProps) {
   const hasHover = useHasHover();
   const [touchOpen, setTouchOpen] = useState(false);
   const trigger = <span className={`inline-flex whitespace-nowrap ${className}`}>{children}</span>;
@@ -44,21 +66,19 @@ export function Tooltip({
   }
 
   return (
-    <TooltipPrimitive.Provider delayDuration={0} skipDelayDuration={0}>
-      <TooltipPrimitive.Root>
-        <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
-        <TooltipPrimitive.Portal>
-          <TooltipPrimitive.Content
-            side="top"
-            sideOffset={6}
-            collisionPadding={6}
-            className={contentClass}
-          >
-            {label}
-            <TooltipPrimitive.Arrow className="fill-bg-raised" />
-          </TooltipPrimitive.Content>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
-    </TooltipPrimitive.Provider>
+    <TooltipPrimitive.Root>
+      <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          side="top"
+          sideOffset={6}
+          collisionPadding={6}
+          className={contentClass}
+        >
+          {label}
+          <TooltipPrimitive.Arrow className="fill-bg-raised" />
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
-import { render, fireEvent, screen, within } from '@testing-library/react';
+import { Profiler } from 'react';
+import { act, render, fireEvent, screen, within } from '@testing-library/react';
 import { DataTable, type Column } from '../../src/components/DataTable';
 
 interface Row {
@@ -406,5 +407,40 @@ describe('DataTable stable sort identity', () => {
       expect(options).toHaveLength(1);
       expect(options[0]).toHaveAttribute('aria-pressed', 'true');
     }
+  });
+});
+
+describe('DataTable loading transitions', () => {
+  it('settles after populated rows become undefined while the next filter loads', async () => {
+    let commits = 0;
+    const onRender = () => {
+      // Fail deterministically instead of letting a microtask reset loop hang the runner.
+      if (++commits > 20) throw new Error('DataTable entered an unbounded render loop');
+    };
+    function table(data: Row[] | undefined, isLoading = false) {
+      return (
+        <Profiler id="table" onRender={onRender}>
+          <DataTable
+            columns={columns}
+            rows={data}
+            rowKey={(row) => row.id}
+            selectedKey={null}
+            onSelect={() => {}}
+            emptyLabel="none"
+            isLoading={isLoading}
+            defaultSort={{ columnId: 'ID' }}
+          />
+        </Profiler>
+      );
+    }
+    const { rerender } = render(table(rows));
+    await act(async () => {});
+    rerender(table(undefined, true));
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(commits).toBeLessThan(10);
+    rerender(table([{ id: 'filtered' }]));
+    expect(screen.getByText('filtered')).toBeInTheDocument();
   });
 });
