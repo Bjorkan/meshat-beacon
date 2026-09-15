@@ -5,3 +5,7 @@ src/api/generated/
 # Design prototypes and generated logo previews
 colour-palettes/
 logo/
+
+# Generated browser test artifacts
+playwright-report/
+test-results/
