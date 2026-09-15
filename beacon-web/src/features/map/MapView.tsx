@@ -1,3 +1,4 @@
+import { useMapNeighborHighlight } from './useMapNeighborHighlight';
 import { readPreference, writePreference } from '../../lib/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -54,6 +55,7 @@ interface MapViewProps {
   wsManager: WsManager;
   // shared with the Nodes tab (lifted to the nodes route) so the open NodeDetailPanel stays live
   selectedNodeId: string | null;
+  hoveredNeighborId?: string | null;
   onSelectNode: (id: string | null) => void;
   onOpenPacket: (packetHash: string) => void;
   // validated /map search params, parsed by the router (parseMapViewSearch)
@@ -63,6 +65,7 @@ interface MapViewProps {
 export function MapView({
   wsManager,
   selectedNodeId,
+  hoveredNeighborId = null,
   onSelectNode,
   onOpenPacket,
   urlView,
@@ -298,6 +301,14 @@ export function MapView({
     packetFlow,
     mapThemeKey,
     onSelectNode,
+  );
+  useMapNeighborHighlight(
+    mapRef,
+    isReady,
+    hoveredNeighborId,
+    packetFlow,
+    mapThemeKey,
+    focusedNeighborPoints,
   );
   useMapBorders(mapRef, isReady, borderData, mapThemeKey);
   useMapPacketFlow(mapRef, isReady, packetFlow, wsManager, mapThemeKey, regionKey);

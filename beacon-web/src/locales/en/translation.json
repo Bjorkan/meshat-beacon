@@ -245,7 +245,11 @@
     "neighbors": "Neighbors",
     "neighborsCount": "Neighbors ({{count}})",
     "noKnownNeighbors": "No known neighbors",
-    "noRecentObservations": "No recent observations"
+    "noRecentObservations": "No recent observations",
+    "linkQualityUnknown": "Link quality unknown: no reliable SNR samples",
+    "linkQualitySnr": "Link SNR: {{snr}} dB",
+    "linkQualitySamples": "Samples: {{count}}",
+    "linkQualityUpdated": "Updated: {{time}}"
   },
   "observers": {
     "detail": "Observer detail",

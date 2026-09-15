@@ -35,9 +35,10 @@ export function nodesToFeatureCollection(
 }
 
 export interface NeighborEdgeProps {
+  neighborId?: string; // focused endpoint identity for transient inspection
   selected: boolean; // incident to the currently selected node — styled brighter
   // Present only on the selected node's edges (buildFocusedNeighborEdges): total observations of the
-  // link and its age in days. Drive the obs→color gradient and the freshness fade; absent edges (the
+  // link and its age in days. Counts are diagnostic; age drives the freshness fade. Ambient edges (the
   // ambient "on" mesh) render uniform.
   obs?: number;
   ageDays?: number;
@@ -197,12 +198,13 @@ export function buildFocusedNeighborEdges(
   }
 
   const features: Feature<LineString, NeighborEdgeProps>[] = [];
-  for (const n of byId.values()) {
+  for (const [neighborId, n] of byId) {
     features.push({
       type: 'Feature',
       geometry: { type: 'LineString', coordinates: [from, [n.lng, n.lat]] },
       properties: {
         selected: true,
+        neighborId,
         obs: n.obs,
         ageDays: Math.max(0, (now - (n.snrLastSeen || n.lastSeen)) / 86400000),
         ...(n.snrSamples > 0 ? { snr: n.snrTotal / n.snrSamples } : {}),

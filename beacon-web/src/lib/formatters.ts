@@ -1,7 +1,14 @@
+import { SNR_STOPS } from './signal';
+
 // hex and time display helpers
 
 export function formatHex(hex: string): string {
   return hex.slice(0, 8).toUpperCase();
+}
+
+// Compact node identity: the first three bytes, while callers retain the full key for diagnostics.
+export function formatNodePrefix(publicKey: string): string {
+  return publicKey.slice(0, 6).toUpperCase();
 }
 
 // The single absolute timestamp format used across the app: local YYYY-MM-DD HH:MM:SS (24h). Pass
@@ -30,9 +37,9 @@ export const SIGNAL_LEVEL_CLASSES: Record<SignalLevel, string> = {
 // roughly between -20 and +10 dB, so the old >=5/>=10 cutoffs painted healthy
 // positive links red. Aligned: green >= 5, yellow >= -5, red below.
 export function snrLevel(snr: number | null | undefined): SignalLevel | null {
-  if (snr == null) return null;
-  if (snr >= 5) return 'good';
-  if (snr >= -5) return 'mid';
+  if (snr == null || !Number.isFinite(snr)) return null;
+  if (snr >= SNR_STOPS.green) return 'good';
+  if (snr >= SNR_STOPS.warn) return 'mid';
   return 'bad';
 }
 

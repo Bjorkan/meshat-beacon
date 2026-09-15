@@ -227,6 +227,7 @@ describe('buildFocusedNeighborEdges', () => {
       [-76, 46],
     ]);
     expect(fc.features[0]!.properties.obs).toBe(42);
+    expect(fc.features[0]!.properties.neighborId).toBe('b');
     expect(fc.features[0]!.properties.selected).toBe(true);
     expect(fc.features[0]!.properties.ageDays).toBe(0);
   });
@@ -247,6 +248,7 @@ describe('buildFocusedNeighborEdges', () => {
     );
     expect(fc.features).toHaveLength(1);
     expect(fc.features[0]!.properties.obs).toBe(42);
+    expect(fc.features[0]!.properties.neighborId).toBe('b');
     expect(fc.features[0]!.properties.ageDays).toBeCloseTo(1);
   });
 

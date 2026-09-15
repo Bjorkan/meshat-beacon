@@ -20,42 +20,8 @@ import {
   SIGNAL_LEVEL_CLASSES,
 } from '../../lib/formatters';
 import { Timestamp } from '../../components/Timestamp';
-import type { NodeObservation, NodeNeighbor } from './types';
-
-function NodeNeighborRow({ neighbor, onClick }: { neighbor: NodeNeighbor; onClick?: () => void }) {
-  const { t } = useTranslation();
-  return (
-    <div
-      className={`bg-bg-base border border-border rounded px-3 py-2 ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
-      onClick={onClick}
-    >
-      <div className="flex items-center gap-2 text-[11px]">
-        <span
-          className={`font-mono font-semibold tracking-wider truncate ${neighbor.name ? 'text-primary' : 'text-text-dim italic'}`}
-        >
-          {neighbor.name ?? formatHex(neighbor.id)}
-        </span>
-        <Badge variant="default">
-          {nodeTypeLabel(neighbor.nodeTypeName, t('options.unknown'))}
-        </Badge>
-        <IataChip>{neighbor.iata}</IataChip>
-        <Timestamp
-          value={neighbor.lastSeen}
-          className="text-text-dim ml-auto font-mono text-[11px]"
-        />
-      </div>
-      <div className="font-mono text-[11px] text-text-muted mt-1 flex items-center gap-2">
-        <span className="truncate" title={neighbor.publicKey}>
-          {neighbor.publicKey}
-        </span>
-        <span className="shrink-0 text-text-dim">·</span>
-        <span className="shrink-0">
-          {t('stats.observationAbbrev', { count: neighbor.observationCount.toLocaleString() })}
-        </span>
-      </div>
-    </div>
-  );
-}
+import { NodeNeighborRow, type NeighborInteractionHandler } from './NodeNeighborRow';
+import type { NodeObservation } from './types';
 
 function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: () => void }) {
   const { t } = useTranslation();
@@ -109,9 +75,10 @@ interface NodeDetailPanelProps {
   onClose: () => void;
   onViewObserver: (observerId: string) => void;
   onViewNode?: (nodeId: string) => void;
+  onNeighborInteraction?: NeighborInteractionHandler;
   onAnalyzePacket?: (hash: string) => void;
   // Navigate to /map with this node preselected. Omitted when the panel is already shown on
-  // the map — the node is visible there, so no mini map and no link is rendered.
+  // the map, where the mini map remains available but this navigation link is unnecessary.
   onViewOnMap?: (nodeId: string) => void;
 }
 
@@ -120,6 +87,7 @@ export function NodeDetailPanel({
   onClose,
   onViewObserver,
   onViewNode,
+  onNeighborInteraction,
   onAnalyzePacket,
   onViewOnMap,
 }: NodeDetailPanelProps) {
@@ -309,6 +277,7 @@ export function NodeDetailPanel({
                   <NodeNeighborRow
                     key={`${n.id}-${n.iata}`}
                     neighbor={n}
+                    onInteraction={onNeighborInteraction}
                     onClick={onViewNode ? () => onViewNode(n.id) : undefined}
                   />
                 ))}

@@ -245,7 +245,11 @@
     "neighbors": "Grannar",
     "neighborsCount": "Grannar ({{count}})",
     "noKnownNeighbors": "Inga kända grannar",
-    "noRecentObservations": "Inga nya observationer"
+    "noRecentObservations": "Inga nya observationer",
+    "linkQualityUnknown": "Okänd länkkvalitet: inga tillförlitliga SNR-prover",
+    "linkQualitySnr": "Länkens SNR: {{snr}} dB",
+    "linkQualitySamples": "Prover: {{count}}",
+    "linkQualityUpdated": "Uppdaterad: {{time}}"
   },
   "observers": {
     "detail": "Observatörsdetaljer",
