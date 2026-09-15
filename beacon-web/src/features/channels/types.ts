@@ -30,3 +30,10 @@ export interface ChannelMessage {
   sentAt: number; // epoch ms, from the sender's embedded timestamp
   observationCount?: number;
 }
+
+export interface ChannelPage {
+  items: ChannelSummary[];
+  nextCursor: number | null;
+  hasMore: boolean;
+  unknownCount: number;
+}

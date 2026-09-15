@@ -9,6 +9,8 @@ export type ChannelKind = "public" | "private" | "hashtag" | "unknown";
 
 export type ChannelMessage = { channelHash?: string; content?: string; id?: number; observationCount?: number; packetHash?: string; senderName?: string; sentAt?: number; };
 
+export type ChannelPage = { hasMore?: boolean; items?: Array<ChannelSummary>; nextCursor?: number; unknownCount?: number; };
+
 export type ChannelSummary = { channelHash?: string; id?: number; isHashtag?: boolean; keyKnown?: boolean; kind?: ChannelKind; lastSeen?: number; name?: string; };
 
 export type ClockDriftEntry = { clockCheckedAt?: number; clockDriftSeconds?: number; iatas?: Array<NodeIATA>; nodeId?: string; nodeName?: string; nodeType?: number; nodeTypeName?: string; };
@@ -66,8 +68,6 @@ export type PacketTransportCodes = { regionCode?: number; subRegionCode?: number
 export type PageAdvertObservation = { hasMore?: boolean; items?: Array<AdvertObservation>; nextCursor?: number; nextPageToken?: string; };
 
 export type PageChannelMessage = { hasMore?: boolean; items?: Array<ChannelMessage>; nextCursor?: number; nextPageToken?: string; };
-
-export type PageChannelSummary = { hasMore?: boolean; items?: Array<ChannelSummary>; nextCursor?: number; nextPageToken?: string; };
 
 export type PageKnownRoute = { hasMore?: boolean; items?: Array<KnownRoute>; nextCursor?: number; nextPageToken?: string; };
 

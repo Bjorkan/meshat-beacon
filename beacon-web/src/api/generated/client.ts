@@ -30,8 +30,8 @@ export async function rawGetBrokers(): Promise<Array<Models.BrokerStatus>> {
   return request<Array<Models.BrokerStatus>>("/brokers", undefined);
 }
 
-export async function rawGetChannels(params: { hash?: string; iata?: string; iatas?: string; cursor?: number; limit?: number; }): Promise<Models.PageChannelSummary> {
-  return request<Models.PageChannelSummary>("/channels", { "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetChannels(params: { key?: "known" | "unknown" | "all"; hash?: string; iata?: string; iatas?: string; cursor?: number; limit?: number; }): Promise<Models.ChannelPage> {
+  return request<Models.ChannelPage>("/channels", { "key": params.key, "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "cursor": params.cursor, "limit": params.limit });
 }
 
 export async function rawGetChannelsChannelID(params: { channelID: number; }): Promise<Models.Channel> {

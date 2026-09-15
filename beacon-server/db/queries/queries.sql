@@ -944,18 +944,43 @@ ON CONFLICT (trace_tag, iata) DO UPDATE SET
 WHERE EXCLUDED.last_heard > trace_iatas.last_heard + INTERVAL '1 hour';
 
 -- name: ListChannels :many
--- Channels ordered by last seen, optionally filtered by hash and/or IATAs
--- (membership via channel_iatas). NULL hash / empty array skip those filters.
--- Pass cursor=0 to start from the beginning (cursor is last_seen epoch ms).
+-- Normal browsing only returns decryptable channels. Explicit diagnostics can request
+-- unknown or all channels; the aggregate below deliberately ignores page cursors.
 SELECT c.* FROM channels c
 WHERE (@channel_hash::bytea IS NULL OR c.channel_hash = @channel_hash)
   AND (COALESCE(cardinality(@iatas::bpchar[]), 0) = 0 OR c.channel_hash IN (
-    SELECT ci.channel_hash FROM channel_iatas ci
-    WHERE ci.iata = ANY(@iatas::bpchar[])
+    SELECT ci.channel_hash FROM channel_iatas ci WHERE ci.iata = ANY(@iatas::bpchar[])
   ))
+  -- Hide historical hash-only placeholders once fully decrypted. Preserve unresolved
+  -- collisions with a configured channel sharing the same one-byte hash.
+  AND (c.key_known IS TRUE OR NOT EXISTS (
+    SELECT 1 FROM channels known WHERE known.channel_hash = c.channel_hash AND known.key_known IS TRUE
+  ) OR EXISTS (
+    SELECT 1 FROM packets p WHERE p.channel_hash = c.channel_hash
+      AND p.payload_type = 5 AND p.decrypted IS NOT TRUE
+  ))
+  AND (@key_filter::text = 'all' OR
+       (@key_filter = 'unknown' AND c.key_known IS NOT TRUE) OR
+       (@key_filter = 'known' AND c.key_known IS TRUE))
   AND (@cursor_ts::timestamptz IS NULL OR c.last_seen < @cursor_ts)
 ORDER BY c.last_seen DESC
 LIMIT @page_limit;
+
+-- name: CountUnknownChannels :one
+SELECT COUNT(*) FROM channels c
+WHERE (@channel_hash::bytea IS NULL OR c.channel_hash = @channel_hash)
+  AND (COALESCE(cardinality(@iatas::bpchar[]), 0) = 0 OR c.channel_hash IN (
+    SELECT ci.channel_hash FROM channel_iatas ci WHERE ci.iata = ANY(@iatas::bpchar[])
+  ))
+  -- Hide historical hash-only placeholders once fully decrypted. Preserve unresolved
+  -- collisions with a configured channel sharing the same one-byte hash.
+  AND (c.key_known IS TRUE OR NOT EXISTS (
+    SELECT 1 FROM channels known WHERE known.channel_hash = c.channel_hash AND known.key_known IS TRUE
+  ) OR EXISTS (
+    SELECT 1 FROM packets p WHERE p.channel_hash = c.channel_hash
+      AND p.payload_type = 5 AND p.decrypted IS NOT TRUE
+  ))
+  AND c.key_known IS NOT TRUE;
 
 -- name: GetChannelByID :one
 SELECT * FROM channels WHERE id = $1;

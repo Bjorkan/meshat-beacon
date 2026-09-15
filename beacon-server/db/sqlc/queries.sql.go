@@ -13,6 +13,35 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countUnknownChannels = `-- name: CountUnknownChannels :one
+SELECT COUNT(*) FROM channels c
+WHERE ($1::bytea IS NULL OR c.channel_hash = $1)
+  AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR c.channel_hash IN (
+    SELECT ci.channel_hash FROM channel_iatas ci WHERE ci.iata = ANY($2::bpchar[])
+  ))
+  -- Hide historical hash-only placeholders once fully decrypted. Preserve unresolved
+  -- collisions with a configured channel sharing the same one-byte hash.
+  AND (c.key_known IS TRUE OR NOT EXISTS (
+    SELECT 1 FROM channels known WHERE known.channel_hash = c.channel_hash AND known.key_known IS TRUE
+  ) OR EXISTS (
+    SELECT 1 FROM packets p WHERE p.channel_hash = c.channel_hash
+      AND p.payload_type = 5 AND p.decrypted IS NOT TRUE
+  ))
+  AND c.key_known IS NOT TRUE
+`
+
+type CountUnknownChannelsParams struct {
+	ChannelHash []byte   `json:"channel_hash"`
+	Iatas       []string `json:"iatas"`
+}
+
+func (q *Queries) CountUnknownChannels(ctx context.Context, arg CountUnknownChannelsParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countUnknownChannels, arg.ChannelHash, arg.Iatas)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const deleteOldChannelIATAs = `-- name: DeleteOldChannelIATAs :exec
 DELETE FROM channel_iatas WHERE last_heard < $1
 `
@@ -2113,28 +2142,39 @@ const listChannels = `-- name: ListChannels :many
 SELECT c.id, c.channel_hash, c.key_fingerprint, c.name, c.hashtag, c.is_hashtag, c.is_public, c.key_known, c.first_seen, c.last_seen, c.message_count FROM channels c
 WHERE ($1::bytea IS NULL OR c.channel_hash = $1)
   AND (COALESCE(cardinality($2::bpchar[]), 0) = 0 OR c.channel_hash IN (
-    SELECT ci.channel_hash FROM channel_iatas ci
-    WHERE ci.iata = ANY($2::bpchar[])
+    SELECT ci.channel_hash FROM channel_iatas ci WHERE ci.iata = ANY($2::bpchar[])
   ))
-  AND ($3::timestamptz IS NULL OR c.last_seen < $3)
+  -- Hide historical hash-only placeholders once fully decrypted. Preserve unresolved
+  -- collisions with a configured channel sharing the same one-byte hash.
+  AND (c.key_known IS TRUE OR NOT EXISTS (
+    SELECT 1 FROM channels known WHERE known.channel_hash = c.channel_hash AND known.key_known IS TRUE
+  ) OR EXISTS (
+    SELECT 1 FROM packets p WHERE p.channel_hash = c.channel_hash
+      AND p.payload_type = 5 AND p.decrypted IS NOT TRUE
+  ))
+  AND ($3::text = 'all' OR
+       ($3 = 'unknown' AND c.key_known IS NOT TRUE) OR
+       ($3 = 'known' AND c.key_known IS TRUE))
+  AND ($4::timestamptz IS NULL OR c.last_seen < $4)
 ORDER BY c.last_seen DESC
-LIMIT $4
+LIMIT $5
 `
 
 type ListChannelsParams struct {
 	ChannelHash []byte             `json:"channel_hash"`
 	Iatas       []string           `json:"iatas"`
+	KeyFilter   string             `json:"key_filter"`
 	CursorTs    pgtype.Timestamptz `json:"cursor_ts"`
 	PageLimit   int32              `json:"page_limit"`
 }
 
-// Channels ordered by last seen, optionally filtered by hash and/or IATAs
-// (membership via channel_iatas). NULL hash / empty array skip those filters.
-// Pass cursor=0 to start from the beginning (cursor is last_seen epoch ms).
+// Normal browsing only returns decryptable channels. Explicit diagnostics can request
+// unknown or all channels; the aggregate below deliberately ignores page cursors.
 func (q *Queries) ListChannels(ctx context.Context, arg ListChannelsParams) ([]Channel, error) {
 	rows, err := q.db.Query(ctx, listChannels,
 		arg.ChannelHash,
 		arg.Iatas,
+		arg.KeyFilter,
 		arg.CursorTs,
 		arg.PageLimit,
 	)

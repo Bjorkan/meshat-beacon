@@ -276,7 +276,12 @@ describe('getChannels', () => {
   };
 
   it('sends a single-IATA region as the singular iata param the server honors', async () => {
-    const getUrl = mockFetchOnce({ items: [channel] });
+    const getUrl = mockFetchOnce({
+      items: [channel],
+      unknownCount: 57,
+      hasMore: false,
+      nextCursor: null,
+    });
 
     const channels = await getChannels({ iatas: ['YYZ'] });
 
@@ -284,11 +289,16 @@ describe('getChannels', () => {
     expect(url.pathname).toContain('/channels');
     expect(url.searchParams.get('iata')).toBe('YYZ');
     expect(url.searchParams.has('iatas')).toBe(false);
-    expect(channels).toEqual([channel]);
+    expect(channels).toEqual({
+      items: [channel],
+      unknownCount: 57,
+      hasMore: false,
+      nextCursor: null,
+    });
   });
 
   it('keeps the comma-joined iatas param for multi-IATA regions', async () => {
-    const getUrl = mockFetchOnce({ items: [] });
+    const getUrl = mockFetchOnce({ items: [], unknownCount: 0, hasMore: false, nextCursor: null });
 
     await getChannels({ iatas: ['YOW', 'YYZ'] });
 
@@ -298,13 +308,23 @@ describe('getChannels', () => {
   });
 
   it('omits both iata params for all regions', async () => {
-    const getUrl = mockFetchOnce({ items: [] });
+    const getUrl = mockFetchOnce({ items: [], unknownCount: 0, hasMore: false, nextCursor: null });
 
     await getChannels();
 
     const url = new URL(getUrl());
     expect(url.searchParams.has('iata')).toBe(false);
     expect(url.searchParams.has('iatas')).toBe(false);
+  });
+
+  it('preserves cursor, key diagnostics, hash and aggregate metadata', async () => {
+    const getUrl = mockFetchOnce({ items: [], unknownCount: 80, hasMore: true, nextCursor: 100 });
+    const page = await getChannels({ hash: 'ab', key: 'unknown', cursor: 200, limit: 2 });
+    const url = new URL(getUrl());
+    expect(url.searchParams.get('hash')).toBe('ab');
+    expect(url.searchParams.get('key')).toBe('unknown');
+    expect(url.searchParams.get('cursor')).toBe('200');
+    expect(page).toEqual({ items: [], unknownCount: 80, hasMore: true, nextCursor: 100 });
   });
 
   it('rejects a generated response that omits a required UI contract field', async () => {

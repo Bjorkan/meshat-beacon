@@ -100,19 +100,24 @@ func (s *Store) DeleteOldChannelIATAs(ctx context.Context, cutoff time.Time) err
 	return s.q.DeleteOldChannelIATAs(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
 
-func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64) (api.Page[api.ChannelSummary], error) {
+func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (api.ChannelPage, error) {
 	var cursorTS pgtype.Timestamptz
 	if cursor > 0 {
 		cursorTS = pgtype.Timestamptz{Time: time.UnixMilli(cursor), Valid: true}
 	}
 	rows, err := s.q.ListChannels(ctx, sqlc.ListChannelsParams{
+		KeyFilter:   keyFilter,
 		ChannelHash: hash,
 		Iatas:       iatas,
 		CursorTs:    cursorTS,
 		PageLimit:   limit + 1,
 	})
 	if err != nil {
-		return api.Page[api.ChannelSummary]{}, err
+		return api.ChannelPage{}, err
+	}
+	unknownCount, err := s.q.CountUnknownChannels(ctx, sqlc.CountUnknownChannelsParams{ChannelHash: hash, Iatas: iatas})
+	if err != nil {
+		return api.ChannelPage{}, err
 	}
 	hasMore := len(rows) > int(limit)
 	if hasMore {
@@ -138,10 +143,11 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 		last := items[len(items)-1].LastSeen
 		nextCursor = &last
 	}
-	return api.Page[api.ChannelSummary]{
-		Items:      items,
-		NextCursor: nextCursor,
-		HasMore:    hasMore,
+	return api.ChannelPage{
+		UnknownCount: unknownCount,
+		Items:        items,
+		NextCursor:   nextCursor,
+		HasMore:      hasMore,
 	}, nil
 }
 

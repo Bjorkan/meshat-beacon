@@ -12,7 +12,7 @@ import {
 } from '../features/observers/observer-updates';
 import type { NodeSummary } from '../features/nodes/types';
 import type { ObserverSummary } from '../features/observers/types';
-import type { ChannelMessage, ChannelSummary } from '../features/channels/types';
+import type { ChannelMessage, ChannelPage } from '../features/channels/types';
 import type { CursorPage } from '../types/api';
 import type {
   WsChannelMessage,
@@ -175,19 +175,28 @@ export function syncChannelMessage(
   currentRegionKey: string,
 ): void {
   let channelId: number | undefined;
-  for (const [queryKey, channels] of queryClient.getQueriesData<ChannelSummary[]>({
+  for (const [queryKey, channels] of queryClient.getQueriesData<InfiniteData<ChannelPage>>({
     queryKey: channelQueries.all(),
   })) {
     if (queryKey[0] !== 'channels' || queryKey[1] !== currentRegionKey || !channels) continue;
-    const index = channels.findIndex((channel) => channel.channelHash === data.channelHash);
-    if (index < 0) {
-      invalidateExact(queryClient, queryKey);
-      continue;
+    const channel = channels.pages
+      .flatMap((page) => page.items)
+      .find((item) => item.channelHash === data.channelHash && item.keyKnown);
+    if (channel) {
+      channelId = channel.id;
+      queryClient.setQueryData(queryKey, {
+        ...channels,
+        pages: channels.pages.map((page) => ({
+          ...page,
+          items: page.items.map((item) =>
+            item.id === channel.id ? { ...item, lastSeen: data.sentAt } : item,
+          ),
+        })),
+      });
     }
-    channelId = channels[index]!.id;
-    const next = [...channels];
-    next[index] = { ...next[index]!, lastSeen: data.sentAt };
-    queryClient.setQueryData(queryKey, next);
+    // Decryption may resolve an unknown placeholder, including hash collisions.
+    // Refresh aggregate metadata together with the channel rows.
+    invalidateExact(queryClient, queryKey);
   }
 
   if (channelId === undefined) return;

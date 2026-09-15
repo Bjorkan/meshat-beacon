@@ -43,6 +43,21 @@ func (m *MockQuerier) EXPECT() *MockQuerierMockRecorder {
 	return m.recorder
 }
 
+// CountUnknownChannels mocks base method.
+func (m *MockQuerier) CountUnknownChannels(ctx context.Context, arg db.CountUnknownChannelsParams) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountUnknownChannels", ctx, arg)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountUnknownChannels indicates an expected call of CountUnknownChannels.
+func (mr *MockQuerierMockRecorder) CountUnknownChannels(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountUnknownChannels", reflect.TypeOf((*MockQuerier)(nil).CountUnknownChannels), ctx, arg)
+}
+
 // DeleteOldChannelIATAs mocks base method.
 func (m *MockQuerier) DeleteOldChannelIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error {
 	m.ctrl.T.Helper()

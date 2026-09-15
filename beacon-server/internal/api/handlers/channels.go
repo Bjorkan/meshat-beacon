@@ -34,12 +34,13 @@ func ChannelsRouter(reader api.Reader) http.Handler {
 //	@Summary	List channels
 //	@Tags		Channels
 //	@Produce	json
+//	@Param		key	query	string	false	"Channel key filter (default known, or all for exact hash search)" Enums(known,unknown,all)
 //	@Param		hash	query		string	false	"Single-byte channel hash (hex)"
 //	@Param		iata	query		string	false	"Filter by IATA code"
 //	@Param		iatas	query		string	false	"Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ"
 //	@Param		cursor	query		int		false	"last_seen epoch ms of last item for pagination"
 //	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
-//	@Success	200		{object}	api.Page[api.ChannelSummary]
+//	@Success	200		{object}	api.ChannelPage
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/channels [get]
@@ -73,7 +74,18 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 			}
 			hashHex = h
 		}
-		channels, err := reader.ListChannels(r.Context(), int32(limit), hashHex, iatas, cursor)
+		keyFilter := r.URL.Query().Get("key")
+		if keyFilter == "" {
+			keyFilter = "known"
+			if len(hashHex) > 0 {
+				keyFilter = "all"
+			}
+		}
+		if keyFilter != "known" && keyFilter != "unknown" && keyFilter != "all" {
+			respondError(w, http.StatusBadRequest, "key must be known, unknown or all")
+			return
+		}
+		channels, err := reader.ListChannels(r.Context(), int32(limit), hashHex, iatas, cursor, keyFilter)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return

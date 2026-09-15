@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -116,8 +117,8 @@ func TestListChannelMessages_InvalidCursor(t *testing.T) {
 func TestListChannels_OK(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/channels", listChannels(stubReader{
-		listChannels: func(_ context.Context, _ int32, _ []byte, _ []string, _ int64) (api.Page[api.ChannelSummary], error) {
-			return api.Page[api.ChannelSummary]{Items: []api.ChannelSummary{{ID: 1, ChannelHash: "ab"}}}, nil
+		listChannels: func(_ context.Context, _ int32, _ []byte, _ []string, _ int64, _ string) (api.ChannelPage, error) {
+			return api.ChannelPage{Items: []api.ChannelSummary{{ID: 1, ChannelHash: "ab"}}}, nil
 		},
 	}))
 	req := httptest.NewRequest(http.MethodGet, "/channels", nil)
@@ -143,9 +144,9 @@ func TestListChannels_IATAParsing(t *testing.T) {
 			var got []string
 			r := chi.NewRouter()
 			r.Get("/channels", listChannels(stubReader{
-				listChannels: func(_ context.Context, _ int32, _ []byte, iatas []string, _ int64) (api.Page[api.ChannelSummary], error) {
+				listChannels: func(_ context.Context, _ int32, _ []byte, iatas []string, _ int64, _ string) (api.ChannelPage, error) {
 					got = iatas
-					return api.Page[api.ChannelSummary]{}, nil
+					return api.ChannelPage{}, nil
 				},
 			}))
 			req := httptest.NewRequest(http.MethodGet, "/channels"+tc.query, nil)
@@ -173,5 +174,41 @@ func TestGetChannel_OK(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
+	}
+}
+
+func TestChannelListDiagnosticsAndCount(t *testing.T) {
+	for _, tc := range []struct {
+		query, key string
+		status     int
+	}{
+		{"", "known", 200}, {"?hash=AB", "all", 200}, {"?key=unknown", "unknown", 200},
+		{"?hash=ab&key=known", "known", 200}, {"?key=invalid", "", 400},
+	} {
+		t.Run(tc.query, func(t *testing.T) {
+			reader := stubReader{listChannels: func(_ context.Context, _ int32, hash []byte, _ []string, _ int64, key string) (api.ChannelPage, error) {
+				if key != tc.key {
+					t.Fatalf("key=%s want=%s", key, tc.key)
+				}
+				if len(hash) > 0 && !reflect.DeepEqual(hash, []byte{0xab}) {
+					t.Fatalf("hash=%x", hash)
+				}
+				return api.ChannelPage{Items: []api.ChannelSummary{}, UnknownCount: 57}, nil
+			}}
+			w := httptest.NewRecorder()
+			listChannels(reader)(w, httptest.NewRequest(http.MethodGet, "/channels"+tc.query, nil))
+			if w.Code != tc.status {
+				t.Fatalf("status=%d", w.Code)
+			}
+			if w.Code == 200 {
+				var page api.ChannelPage
+				if err := json.Unmarshal(w.Body.Bytes(), &page); err != nil {
+					t.Fatal(err)
+				}
+				if page.UnknownCount != 57 {
+					t.Fatalf("count=%d", page.UnknownCount)
+				}
+			}
+		})
 	}
 }

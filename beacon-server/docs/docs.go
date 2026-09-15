@@ -55,6 +55,17 @@ const docTemplate = `{
                 "summary": "List channels",
                 "parameters": [
                     {
+                        "enum": [
+                            "known",
+                            "unknown",
+                            "all"
+                        ],
+                        "type": "string",
+                        "description": "Channel key filter (default known, or all for exact hash search)",
+                        "name": "key",
+                        "in": "query"
+                    },
+                    {
                         "type": "string",
                         "description": "Single-byte channel hash (hex)",
                         "name": "hash",
@@ -89,7 +100,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelSummary"
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage"
                         }
                     },
                     "400": {
@@ -2632,6 +2643,26 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage": {
+            "type": "object",
+            "properties": {
+                "hasMore": {
+                    "type": "boolean"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary"
+                    }
+                },
+                "nextCursor": {
+                    "type": "integer"
+                },
+                "unknownCount": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary": {
             "type": "object",
             "properties": {
@@ -3687,26 +3718,6 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelMessage"
-                    }
-                },
-                "nextCursor": {
-                    "type": "integer"
-                },
-                "nextPageToken": {
-                    "type": "string"
-                }
-            }
-        },
-        "github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelSummary": {
-            "type": "object",
-            "properties": {
-                "hasMore": {
-                    "type": "boolean"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary"
                     }
                 },
                 "nextCursor": {

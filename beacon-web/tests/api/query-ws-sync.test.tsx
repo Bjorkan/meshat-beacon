@@ -10,6 +10,7 @@ import type { ReactNode } from 'react';
 import {
   healLiveQueryCaches,
   syncNodeUpdate,
+  syncChannelMessage,
   syncObserverStatus,
   syncPacketObservation,
 } from '../../src/api/query-ws-sync';
@@ -240,4 +241,34 @@ describe('global WebSocket to Query cache policy', () => {
       ).toHaveLength(1);
     });
   });
+});
+
+it('refreshes channel aggregates and preserves paginated lists when messages arrive', () => {
+  const client = new QueryClient();
+  const key = channelQueries.list({ regionKey: 'YVR' }).queryKey;
+  const other = channelQueries.list({ regionKey: 'YYJ' }).queryKey;
+  const data = {
+    pages: [
+      {
+        items: [{ id: 7, channelHash: 'ab', keyKnown: true, lastSeen: 1 }],
+        unknownCount: 57,
+        hasMore: false,
+        nextCursor: null,
+      },
+    ],
+    pageParams: [undefined],
+  };
+  client.setQueryData(key, data);
+  client.setQueryData(other, data);
+  syncChannelMessage(
+    client,
+    { channelHash: 'ab', packetHash: 'aa', sentAt: 2, senderName: 'A', content: 'Hi' },
+    'YVR',
+  );
+  expect(client.getQueryData(key)).toEqual({
+    ...data,
+    pages: [{ ...data.pages[0], items: [{ ...data.pages[0]!.items[0], lastSeen: 2 }] }],
+  });
+  expect(client.getQueryState(key)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(other)?.isInvalidated).toBe(false);
 });

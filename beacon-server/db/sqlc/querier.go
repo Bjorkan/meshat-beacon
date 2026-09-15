@@ -12,6 +12,7 @@ import (
 )
 
 type Querier interface {
+	CountUnknownChannels(ctx context.Context, arg CountUnknownChannelsParams) (int64, error)
 	// Keeps the channel IATA filter in step with packet retention.
 	DeleteOldChannelIATAs(ctx context.Context, lastHeard pgtype.Timestamptz) error
 	// Deletes nodes not seen since the given cutoff. node_iatas and node_neighbors cascade-
@@ -134,9 +135,8 @@ type Querier interface {
 	// Pass empty string for iata or scope to skip those filters.
 	// Pass cursor=0 to start from the beginning.
 	ListChannelMessagesByHash(ctx context.Context, arg ListChannelMessagesByHashParams) ([]ListChannelMessagesByHashRow, error)
-	// Channels ordered by last seen, optionally filtered by hash and/or IATAs
-	// (membership via channel_iatas). NULL hash / empty array skip those filters.
-	// Pass cursor=0 to start from the beginning (cursor is last_seen epoch ms).
+	// Normal browsing only returns decryptable channels. Explicit diagnostics can request
+	// unknown or all channels; the aggregate below deliberately ignores page cursors.
 	ListChannels(ctx context.Context, arg ListChannelsParams) ([]Channel, error)
 	ListIATAs(ctx context.Context) ([]IataCode, error)
 	ListKnownRoutes(ctx context.Context, arg ListKnownRoutesParams) ([]ListKnownRoutesRow, error)

@@ -50,7 +50,7 @@ import {
   searchKnownRoutes,
 } from './client';
 import type { CursorPage, PacketSummary, TraceType } from '../types/api';
-import type { ChannelMessage } from '../features/channels/types';
+import type { ChannelMessage, ChannelPage } from '../features/channels/types';
 import type { ObserverSummary } from '../features/observers/types';
 import type { NodeSummary } from '../features/nodes/types';
 import type { KnownRoute } from '../types/api';
@@ -410,11 +410,26 @@ export const packetQueries = {
 
 export const channelQueries = {
   all: () => ['channels'] as const,
-  list: (args: { regionKey: string; iatas?: string[] }) =>
-    queryOptions({
-      queryKey: ['channels', args.regionKey] as const,
-      queryFn: () => getChannels({ iatas: args.iatas }),
+  list: (args: {
+    regionKey: string;
+    iatas?: string[];
+    hash?: string;
+    key?: 'known' | 'unknown' | 'all';
+  }) =>
+    infiniteQueryOptions<
+      ChannelPage,
+      Error,
+      InfiniteData<ChannelPage>,
+      QueryKey,
+      number | undefined
+    >({
+      queryKey: ['channels', args.regionKey, { hash: args.hash, key: args.key }] as const,
+      queryFn: ({ pageParam }) =>
+        getChannels({ iatas: args.iatas, hash: args.hash, key: args.key, cursor: pageParam }),
+      initialPageParam: undefined,
+      getNextPageParam: (page) => (page.hasMore ? (page.nextCursor ?? undefined) : undefined),
       staleTime: 60_000,
+      refetchInterval: 30_000,
     }),
   messages: (args: {
     channelId: number | undefined;

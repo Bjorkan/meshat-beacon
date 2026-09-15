@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { Timestamp } from '../../components/Timestamp';
 import { ChannelKindBadge } from './ChannelKindBadge';
 import { channelDisplayName } from './types';
@@ -5,11 +6,18 @@ import type { ChannelSummary } from './types';
 
 interface ChannelSidebarProps {
   channels: ChannelSummary[];
+  unknownCount?: number;
   selectedId: number | null;
   onSelect: (id: number) => void;
 }
 
-export function ChannelSidebar({ channels, selectedId, onSelect }: ChannelSidebarProps) {
+export function ChannelSidebar({
+  channels,
+  unknownCount = 0,
+  selectedId,
+  onSelect,
+}: ChannelSidebarProps) {
+  const { t } = useTranslation();
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="flex flex-col divide-y divide-border/40">
@@ -42,6 +50,11 @@ export function ChannelSidebar({ channels, selectedId, onSelect }: ChannelSideba
             </button>
           );
         })}
+        {unknownCount > 0 && (
+          <p className="px-3 py-3 text-xs text-text-muted" role="status">
+            {t('channels.unknownSummary', { count: unknownCount })}
+          </p>
+        )}
       </div>
     </div>
   );

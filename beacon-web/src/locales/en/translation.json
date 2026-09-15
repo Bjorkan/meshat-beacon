@@ -10,6 +10,7 @@
   "common": {
     "retry": "Retry",
     "loading": "Loading…",
+    "loadMore": "Load more",
     "failedToLoad": "Failed to load",
     "noMatches": "No matches",
     "noData": "No data",
@@ -198,6 +199,8 @@
     "public": "Public",
     "private": "Private",
     "unknownKeyWarning": "Key not known, messages may not be decrypted",
+    "unknownSummary_one": "{{count}} additional channel cannot be decrypted",
+    "unknownSummary_other": "{{count}} additional channels cannot be decrypted",
     "noMessages": "No messages"
   },
   "details": {

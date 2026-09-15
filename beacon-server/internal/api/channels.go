@@ -57,3 +57,12 @@ type Channel struct {
 	KeyFingerprint *string `json:"keyFingerprint,omitempty"` // first 8 bytes of SHA256(key), hex-encoded
 	MessageCount   int64   `json:"messageCount"`
 }
+
+// ChannelPage contains a page of channels and the total undecryptable population
+// matching the hash/IATA filters, independent of the page cursor and key filter.
+type ChannelPage struct {
+	Items        []ChannelSummary `json:"items"`
+	NextCursor   *int64           `json:"nextCursor"`
+	HasMore      bool             `json:"hasMore"`
+	UnknownCount int64            `json:"unknownCount"`
+}

@@ -417,6 +417,20 @@ Not yet implemented — see the Authentication section above.
 
 ---
 
+### Channel browsing and diagnostics
+
+`GET /channels` returns decryptable channels by default. Its `unknownCount` is the
+server-side total of undecryptable channels matching the hash/IATA filters, independent
+of the page limit and cursor. Use `key=unknown` for diagnostic rows, or `hash=ab` to
+inspect all channels matching an exact one-byte hash. An explicit `key=known` or
+`key=all` can override the default. IATA filters apply to both rows and the count.
+
+After successful backfill, a historical hash-only placeholder is omitted from the
+list and count when no undecrypted group-text packets remain for that hash. The stored
+row remains available by ID. If unresolved traffic shares a hash with a configured
+channel, it remains in the unknown population. The web list refreshes this metadata
+periodically and after decrypted messages arrive.
+
 ## Acknowledgements
 
 See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the people who have helped build

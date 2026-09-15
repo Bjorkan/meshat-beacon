@@ -10,6 +10,7 @@
   "common": {
     "retry": "Försök igen",
     "loading": "Laddar…",
+    "loadMore": "Visa fler",
     "failedToLoad": "Kunde inte läsa in",
     "noMatches": "Inga träffar",
     "noData": "Ingen data",
@@ -198,6 +199,8 @@
     "public": "Publik",
     "private": "Privat",
     "unknownKeyWarning": "Nyckeln är okänd, meddelanden kanske inte kan dekrypteras",
+    "unknownSummary_one": "{{count}} ytterligare kanal kan inte dekrypteras",
+    "unknownSummary_other": "{{count}} ytterligare kanaler kan inte dekrypteras",
     "noMessages": "Inga meddelanden"
   },
   "details": {

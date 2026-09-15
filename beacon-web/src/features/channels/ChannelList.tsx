@@ -1,5 +1,6 @@
+import { useTranslation } from 'react-i18next';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { channelQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -39,6 +40,7 @@ export function ChannelList({
   viewState,
   onViewStateChange,
 }: ChannelListProps) {
+  const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
   const isMobile = useIsMobile();
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -59,7 +61,15 @@ export function ChannelList({
     setHeardCounts({});
   }, []);
 
-  const { data: channels, isLoading } = useQuery(channelQueries.list({ regionKey, iatas }));
+  const hash =
+    searchField === 'hash' && /^[0-9a-f]{2}$/i.test(search.trim())
+      ? search.trim().toLowerCase()
+      : undefined;
+  const { data, isLoading, isError, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
+    useInfiniteQuery(channelQueries.list({ regionKey, iatas, hash, key: keyFilter || undefined }));
+  const channels = useMemo(() => data?.pages.flatMap((page) => page.items) ?? [], [data]);
+  const showUnknownSummary = !keyFilter && !search.trim() && !hashtagFilter;
+  const unknownCount = showUnknownSummary ? (data?.pages[0]?.unknownCount ?? 0) : 0;
 
   // Public pinned first, then named channels, then unnamed by most recent.
   const sortedChannels = useMemo(
@@ -124,9 +134,25 @@ export function ChannelList({
             ) : (
               <ChannelSidebar
                 channels={filteredChannels}
+                unknownCount={unknownCount}
                 selectedId={selectedId}
                 onSelect={handleSelect}
               />
+            )}
+            {isError && (
+              <button type="button" className="p-3 text-xs text-red" onClick={() => void refetch()}>
+                {t('common.failedToLoad')} · {t('common.tryAgain')}
+              </button>
+            )}
+            {hasNextPage && (
+              <button
+                type="button"
+                className="p-3 text-xs text-primary"
+                disabled={isFetchingNextPage}
+                onClick={() => void fetchNextPage()}
+              >
+                {t(isFetchingNextPage ? 'common.loading' : 'common.loadMore')}
+              </button>
             )}
           </div>
         )}

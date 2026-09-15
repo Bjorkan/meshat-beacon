@@ -42,3 +42,20 @@ describe('ChannelSidebar', () => {
     expect(onSelect).toHaveBeenCalledWith(7);
   });
 });
+
+it.each([0, 1, 57, 150])('renders one non-selectable summary for %i unknown channels', (count) => {
+  render(
+    <ChannelSidebar
+      channels={[channel(1, 'public')]}
+      unknownCount={count}
+      selectedId={null}
+      onSelect={() => {}}
+    />,
+  );
+  expect(screen.getAllByRole('button')).toHaveLength(1);
+  if (count === 0) expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  else
+    expect(screen.getByRole('status')).toHaveTextContent(
+      `${count} additional channel${count === 1 ? '' : 's'} cannot be decrypted`,
+    );
+});

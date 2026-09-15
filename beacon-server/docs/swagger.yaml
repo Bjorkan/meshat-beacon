@@ -101,6 +101,19 @@ definitions:
         description: epoch ms, from the sender's embedded timestamp
         type: integer
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage:
+    properties:
+      hasMore:
+        type: boolean
+      items:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary'
+        type: array
+      nextCursor:
+        type: integer
+      unknownCount:
+        type: integer
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary:
     properties:
       channelHash:
@@ -860,19 +873,6 @@ definitions:
       nextPageToken:
         type: string
     type: object
-  github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelSummary:
-    properties:
-      hasMore:
-        type: boolean
-      items:
-        items:
-          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelSummary'
-        type: array
-      nextCursor:
-        type: integer
-      nextPageToken:
-        type: string
-    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_KnownRoute:
     properties:
       hasMore:
@@ -1314,6 +1314,14 @@ paths:
   /channels:
     get:
       parameters:
+      - description: Channel key filter (default known, or all for exact hash search)
+        enum:
+        - known
+        - unknown
+        - all
+        in: query
+        name: key
+        type: string
       - description: Single-byte channel hash (hex)
         in: query
         name: hash
@@ -1340,7 +1348,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Page-github_com_MeshCore-Beacon_beacon-server_internal_api_ChannelSummary'
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ChannelPage'
         "400":
           description: Bad Request
           schema:

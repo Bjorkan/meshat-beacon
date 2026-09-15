@@ -13,7 +13,7 @@ import type {
   TraceType,
   TraceDetail,
 } from '../types/api';
-import type { ChannelSummary, ChannelMessage } from '../features/channels/types';
+import type { ChannelPage, ChannelSummary, ChannelMessage } from '../features/channels/types';
 import type { ObserverSummary, Observer, AdvertObservation } from '../features/observers/types';
 import type { NodeSummary, Node, NodeObservation, NodeNeighbor } from '../features/nodes/types';
 import type {
@@ -169,19 +169,28 @@ export function getRegion(regionId: number): Promise<Region> {
   return rawGetRegionsRegionId({ regionId }) as Promise<Region>;
 }
 
-// /channels only honors a singular `iata`, so a one-IATA region goes through it; multi-IATA regions
-// still send `iatas` (ignored server-side, effectively global) until the backend supports it.
 export async function getChannels(params?: {
   iatas?: string[];
   limit?: number;
-}): Promise<ChannelSummary[]> {
+  cursor?: number;
+  hash?: string;
+  key?: 'known' | 'unknown' | 'all';
+}): Promise<ChannelPage> {
   const iatas = params?.iatas ?? [];
   const page = await rawGetChannels({
     iata: iatas.length === 1 ? iatas[0] : undefined,
     iatas: iatas.length > 1 ? iatasParam(iatas) : undefined,
     limit: params?.limit,
+    cursor: params?.cursor,
+    hash: params?.hash,
+    key: params?.key,
   });
-  return requiredField(page.items, 'ChannelSummary page', 'items').map(toChannelSummary);
+  return {
+    items: requiredField(page.items, 'ChannelSummary page', 'items').map(toChannelSummary),
+    nextCursor: page.nextCursor ?? null,
+    hasMore: requiredField(page.hasMore, 'ChannelSummary page', 'hasMore'),
+    unknownCount: requiredField(page.unknownCount, 'ChannelSummary page', 'unknownCount'),
+  };
 }
 
 // Channel messages come back as { items } ordered id DESC, so the last row is the page's oldest
