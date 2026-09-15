@@ -116,6 +116,22 @@ func nullableUUID(id uuid.UUID) *uuid.UUID {
 	return &id
 }
 
+// uuidFromPgtype converts a nullable pgtype.UUID to a plain uuid.UUID.
+// Invalid/NULL values become uuid.Nil; used where a column became nullable
+// (packet_observations.observer_id after ON DELETE SET NULL) but the API
+// still carries a plain UUID.
+func uuidFromPgtype(u pgtype.UUID) uuid.UUID {
+	if !u.Valid {
+		return uuid.Nil
+	}
+	return uuid.UUID(u.Bytes)
+}
+
+// uuidToPgtype converts a plain uuid.UUID to a valid pgtype.UUID.
+func uuidToPgtype(id uuid.UUID) pgtype.UUID {
+	return pgtype.UUID{Bytes: id, Valid: true}
+}
+
 // tristate converts a *bool to a SQL-friendly string for the ListNodes filter:
 // nil → "any", true → "true", false → "false".
 func tristate(b *bool) string {

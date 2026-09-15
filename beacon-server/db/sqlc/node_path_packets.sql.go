@@ -77,7 +77,7 @@ type ListNodePathPacketsRow struct {
 	FirstHeardAt         pgtype.Timestamptz `json:"first_heard_at"`
 	LastHeardAt          pgtype.Timestamptz `json:"last_heard_at"`
 	ScopeName            *string            `json:"scope_name"`
-	ObserverID           uuid.UUID          `json:"observer_id"`
+	ObserverID           pgtype.UUID        `json:"observer_id"`
 	ObserverName         *string            `json:"observer_name"`
 	Iata                 string             `json:"iata"`
 	PathLengthByte       int16              `json:"path_length_byte"`

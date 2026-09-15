@@ -212,7 +212,7 @@ func TestGetObserver_OnlineStatus(t *testing.T) {
 		Return([]string{"default"}, nil)
 
 	mock.EXPECT().
-		GetObserverLastIATA(gomock.Any(), observerID).
+		GetObserverLastIATA(gomock.Any(), uuidToPgtype(observerID)).
 		Return("YVR", nil)
 
 	store := &Store{q: mock}
@@ -256,7 +256,7 @@ func TestGetObserver_OfflineStatus(t *testing.T) {
 		Return([]string{}, nil)
 
 	mock.EXPECT().
-		GetObserverLastIATA(gomock.Any(), observerID).
+		GetObserverLastIATA(gomock.Any(), uuidToPgtype(observerID)).
 		Return("YVR", nil)
 
 	store := &Store{q: mock}
@@ -302,7 +302,7 @@ func TestGetObserver_BrokerLastPacketAtNil(t *testing.T) {
 		Return([]string{}, nil)
 
 	mock.EXPECT().
-		GetObserverLastIATA(gomock.Any(), observerID).
+		GetObserverLastIATA(gomock.Any(), uuidToPgtype(observerID)).
 		Return("YVR", nil)
 
 	store := &Store{q: mock}

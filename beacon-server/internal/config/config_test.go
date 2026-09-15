@@ -107,6 +107,9 @@ func TestResolve_Defaults(t *testing.T) {
 	if r.NodeIATAMembershipTTL != 7*24*time.Hour {
 		t.Errorf("expected NodeIATAMembershipTTL 168h (7 days), got %v", r.NodeIATAMembershipTTL)
 	}
+	if r.ObserverDeleteAfter != 14*24*time.Hour {
+		t.Errorf("expected ObserverDeleteAfter 336h (14 days), got %v", r.ObserverDeleteAfter)
+	}
 }
 
 func TestResolve_ExplicitValues(t *testing.T) {
@@ -118,6 +121,7 @@ func TestResolve_ExplicitValues(t *testing.T) {
 	cfg.Background.ViewRefresh.Duration = 2 * time.Hour
 	cfg.Background.Reconfirm.Duration = 3 * time.Hour
 	cfg.Background.Cleanup.Duration = 4 * time.Hour
+	cfg.Observers.DeleteAfter.Duration = 21 * 24 * time.Hour
 
 	r := Resolve(cfg)
 	if r.TelemetryResolution != 30*time.Minute {
@@ -128,6 +132,9 @@ func TestResolve_ExplicitValues(t *testing.T) {
 	}
 	if r.ViewRefreshInterval != 2*time.Hour {
 		t.Errorf("expected 2h, got %v", r.ViewRefreshInterval)
+	}
+	if r.ObserverDeleteAfter != 21*24*time.Hour {
+		t.Errorf("expected ObserverDeleteAfter 504h (21 days), got %v", r.ObserverDeleteAfter)
 	}
 }
 
@@ -142,6 +149,9 @@ func TestResolvedConfig_String(t *testing.T) {
 	}
 	if !strings.Contains(s, "maxConnsPerIP=") {
 		t.Error("expected maxConnsPerIP in string")
+	}
+	if !strings.Contains(s, "observerDeleteAfter=") {
+		t.Error("expected observerDeleteAfter in string")
 	}
 }
 

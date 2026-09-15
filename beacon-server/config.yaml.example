@@ -118,6 +118,16 @@ websocket:
 #  clock_drift_threshold: 5m     # default: 5m
 #  iata_membership_ttl: 168h    # default: 7 days; IATA badges older than this stop counting
 
+# Observer retention. An observer that has not been heard from (packet, status,
+# or neighbors traffic) for this long is deleted by the cleanup job, along
+# with its brokers, scopes, telemetry, locations and owner mapping. Historical
+# packet observations keep a snapshot of the observer's identity and continue
+# to follow packets.retention, so deleting a stale observer never shortens
+# packet history. A public key that starts publishing again is recreated
+# cleanly by normal ingest.
+#observers:
+#  delete_after: 336h            # default: 14 days
+
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.
 # Defaults to allowing all origins with GET/HEAD/OPTIONS if omitted — appropriate

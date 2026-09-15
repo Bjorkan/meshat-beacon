@@ -61,7 +61,7 @@ func (s *Store) ListNodePathPackets(ctx context.Context, nodeID uuid.UUID, iatas
 			PacketHash: hex.EncodeToString(row.PacketHash), PayloadType: row.PayloadType, PayloadTypeName: api.PayloadTypeName(row.PayloadType),
 			RouteType: row.RouteType, RouteTypeName: api.RouteTypeName(row.RouteType), Scope: row.ScopeName,
 			FirstHeardAt: row.FirstHeardAt.Time.UnixMilli(), LastHeardAt: row.LastHeardAt.Time.UnixMilli(), ObservationCount: int32(row.MatchingObservations),
-			LatestObserver: &api.PacketLatestObserver{ID: row.ObserverID, DisplayName: row.ObserverName, IATA: row.Iata, PathLength: pathLength, PathBytes: pathBytes},
+			LatestObserver: &api.PacketLatestObserver{ID: uuidFromPgtype(row.ObserverID), DisplayName: row.ObserverName, IATA: row.Iata, PathLength: pathLength, PathBytes: pathBytes},
 		})
 	}
 	if err := s.resolvePacketSummaryPaths(ctx, page.Items); err != nil {

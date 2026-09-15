@@ -268,7 +268,7 @@ func (s *Store) GetObserverTelemetryBucketed(ctx context.Context, observerID uui
 
 func (s *Store) ListObserverAdverts(ctx context.Context, observerID uuid.UUID, cursor int64, limit int32) (api.Page[api.AdvertObservation], error) {
 	rows, err := s.q.ListObserverAdverts(ctx, sqlc.ListObserverAdvertsParams{
-		ObserverID: observerID,
+		ObserverID: uuidToPgtype(observerID),
 		Column2:    cursor,
 		Limit:      limit + 1, // fetch one extra to detect hasMore
 	})
@@ -316,7 +316,7 @@ func (s *Store) UpdateObserverStatus(ctx context.Context, p ingest.UpdateObserve
 }
 
 func (s *Store) GetObserverLastIATA(ctx context.Context, observerID uuid.UUID) (string, error) {
-	return s.q.GetObserverLastIATA(ctx, observerID)
+	return s.q.GetObserverLastIATA(ctx, uuidToPgtype(observerID))
 }
 
 func (s *Store) GetObserverRadio(ctx context.Context, observerID uuid.UUID) (ingest.RadioSettings, error) {
@@ -377,4 +377,13 @@ func (s *Store) IsObserverByPubkey(ctx context.Context, pubkey []byte) bool {
 
 func (s *Store) DeleteOldTelemetry(ctx context.Context, cutoff time.Time) error {
 	return s.q.DeleteOldTelemetry(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
+}
+
+// DeleteOldObservers deletes observers not heard from since the cutoff and
+// returns the deleted observer IDs so callers can invalidate cached observer
+// entries. Observer-owned metadata (brokers, locations, scopes, telemetry,
+// owners) cascades via FK; packet_observations.observer_id is ON DELETE SET
+// NULL so the separate packet-retention window is unaffected.
+func (s *Store) DeleteOldObservers(ctx context.Context, cutoff time.Time) ([]uuid.UUID, error) {
+	return s.q.DeleteOldObservers(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }

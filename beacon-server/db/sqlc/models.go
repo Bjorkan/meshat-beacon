@@ -114,7 +114,7 @@ type MvTopNodesByIatum struct {
 
 type MvTopObserversByIatum struct {
 	Iata             string             `json:"iata"`
-	ObserverID       uuid.UUID          `json:"observer_id"`
+	ObserverID       pgtype.UUID        `json:"observer_id"`
 	DisplayName      *string            `json:"display_name"`
 	ObserverType     *string            `json:"observer_type"`
 	Bucket           pgtype.Timestamptz `json:"bucket"`
@@ -277,24 +277,27 @@ type Packet struct {
 }
 
 type PacketObservation struct {
-	ID                int64              `json:"id"`
-	PacketHash        []byte             `json:"packet_hash"`
-	ObserverID        uuid.UUID          `json:"observer_id"`
-	Iata              string             `json:"iata"`
-	HeardAt           pgtype.Timestamptz `json:"heard_at"`
-	PathLengthByte    int16              `json:"path_length_byte"`
-	HashSize          int16              `json:"hash_size"`
-	HopCount          int16              `json:"hop_count"`
-	PathBytes         []byte             `json:"path_bytes"`
-	Rssi              *int16             `json:"rssi"`
-	Snr               *float32           `json:"snr"`
-	PropagationTimeMs *int32             `json:"propagation_time_ms"`
-	RadioFreqMhz      *float32           `json:"radio_freq_mhz"`
-	SpreadFactor      *int16             `json:"spread_factor"`
-	BandwidthKhz      *float32           `json:"bandwidth_khz"`
-	CodingRate        *int16             `json:"coding_rate"`
-	SourceBroker      *string            `json:"source_broker"`
-	PayloadType       *int16             `json:"payload_type"`
+	ID                  int64              `json:"id"`
+	PacketHash          []byte             `json:"packet_hash"`
+	ObserverID          pgtype.UUID        `json:"observer_id"`
+	Iata                string             `json:"iata"`
+	HeardAt             pgtype.Timestamptz `json:"heard_at"`
+	PathLengthByte      int16              `json:"path_length_byte"`
+	HashSize            int16              `json:"hash_size"`
+	HopCount            int16              `json:"hop_count"`
+	PathBytes           []byte             `json:"path_bytes"`
+	Rssi                *int16             `json:"rssi"`
+	Snr                 *float32           `json:"snr"`
+	PropagationTimeMs   *int32             `json:"propagation_time_ms"`
+	RadioFreqMhz        *float32           `json:"radio_freq_mhz"`
+	SpreadFactor        *int16             `json:"spread_factor"`
+	BandwidthKhz        *float32           `json:"bandwidth_khz"`
+	CodingRate          *int16             `json:"coding_rate"`
+	SourceBroker        *string            `json:"source_broker"`
+	PayloadType         *int16             `json:"payload_type"`
+	ObserverPublicKey   []byte             `json:"observer_public_key"`
+	ObserverDisplayName *string            `json:"observer_display_name"`
+	ObserverType        *string            `json:"observer_type"`
 }
 
 type Region struct {

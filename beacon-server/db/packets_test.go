@@ -109,7 +109,7 @@ func TestListPackets_LatestObserverNil(t *testing.T) {
 				PacketHash:       []byte{0xde, 0xad},
 				FirstHeardAt:     heardAt,
 				LastHeardAt:      heardAt,
-				LatestObserverID: uuid.UUID{}, // zero UUID
+				LatestObserverID: pgtype.UUID{}, // invalid UUID (observer deleted)
 			},
 		}, nil)
 
@@ -139,7 +139,7 @@ func TestListPackets_LatestObserverSet(t *testing.T) {
 				PacketHash:         []byte{0xde, 0xad},
 				FirstHeardAt:       heardAt,
 				LastHeardAt:        heardAt,
-				LatestObserverID:   observerID,
+				LatestObserverID:   uuidToPgtype(observerID),
 				LatestObserverName: &observerName,
 				LatestObserverIata: observerIATA,
 			},
@@ -176,7 +176,7 @@ func TestListPackets_LatestObserverPathFields(t *testing.T) {
 				PacketHash:                   []byte{0xde, 0xad},
 				FirstHeardAt:                 heardAt,
 				LastHeardAt:                  heardAt,
-				LatestObserverID:             observerID,
+				LatestObserverID:             uuidToPgtype(observerID),
 				LatestObserverPathLengthByte: pathLengthByte,
 				LatestObserverHashSize:       hashSize,
 				LatestObserverHopCount:       hopCount,
@@ -223,12 +223,12 @@ func TestListPackets_ResolvedPathOptInBatchesByHashWidth(t *testing.T) {
 	mock.EXPECT().ListPackets(gomock.Any(), gomock.Any()).Return([]sqlc.ListPacketsRow{
 		{
 			PacketHash: []byte{0xde, 0xad}, PayloadType: 2, FirstHeardAt: heardAt, LastHeardAt: heardAt,
-			LatestObserverID: observerID, LatestObserverPathLengthByte: 0x42,
+			LatestObserverID: uuidToPgtype(observerID), LatestObserverPathLengthByte: 0x42,
 			LatestObserverHashSize: 1, LatestObserverHopCount: 2, LatestObserverPathBytes: []byte{0xa1, 0xb2},
 		},
 		{
 			PacketHash: []byte{0xbe, 0xef}, PayloadType: 2, FirstHeardAt: heardAt, LastHeardAt: heardAt,
-			LatestObserverID: observerID, LatestObserverPathLengthByte: 0x41,
+			LatestObserverID: uuidToPgtype(observerID), LatestObserverPathLengthByte: 0x41,
 			LatestObserverHashSize: 1, LatestObserverHopCount: 1, LatestObserverPathBytes: []byte{0xa1},
 		},
 	}, nil)
@@ -511,7 +511,7 @@ func TestListPacketsAfterID_LatestObserverPathFields(t *testing.T) {
 				PacketHash:                   []byte{0xde, 0xad},
 				FirstHeardAt:                 heardAt,
 				LastHeardAt:                  heardAt,
-				LatestObserverID:             observerID,
+				LatestObserverID:             uuidToPgtype(observerID),
 				LatestObserverPathLengthByte: 0x42,
 				LatestObserverHashSize:       1,
 				LatestObserverHopCount:       2,
@@ -552,7 +552,7 @@ func TestListPacketsAfterID_ResolvedPathOptIn(t *testing.T) {
 			PayloadType:                  2,
 			FirstHeardAt:                 heardAt,
 			LastHeardAt:                  heardAt,
-			LatestObserverID:             observerID,
+			LatestObserverID:             uuidToPgtype(observerID),
 			LatestObserverPathLengthByte: 0x41,
 			LatestObserverHashSize:       1,
 			LatestObserverHopCount:       1,

@@ -70,6 +70,36 @@ func (q *Queries) DeleteOldNodes(ctx context.Context, lastSeen pgtype.Timestampt
 	return err
 }
 
+const deleteOldObservers = `-- name: DeleteOldObservers :many
+DELETE FROM observers WHERE last_seen < $1 RETURNING id
+`
+
+// Deletes observers not heard from since the given cutoff and returns the
+// deleted IDs so callers can invalidate cached observer entries.
+// observer_brokers, observer_locations, observer_scopes, observer_telemetry
+// and observer_owners cascade-delete via FK. packet_observations.observer_id
+// is ON DELETE SET NULL, so historical observations keep their own 30-day
+// packet-retention window untouched.
+func (q *Queries) DeleteOldObservers(ctx context.Context, lastSeen pgtype.Timestamptz) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, deleteOldObservers, lastSeen)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []uuid.UUID{}
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const deleteOldPackets = `-- name: DeleteOldPackets :exec
 DELETE FROM packets WHERE last_heard_at < $1
 `
@@ -647,7 +677,7 @@ ORDER BY heard_at DESC
 LIMIT 1
 `
 
-func (q *Queries) GetObserverLastIATA(ctx context.Context, observerID uuid.UUID) (string, error) {
+func (q *Queries) GetObserverLastIATA(ctx context.Context, observerID pgtype.UUID) (string, error) {
 	row := q.db.QueryRow(ctx, getObserverLastIATA, observerID)
 	var iata string
 	err := row.Scan(&iata)
@@ -1562,11 +1592,11 @@ type GetStatsTopObserversParams struct {
 }
 
 type GetStatsTopObserversRow struct {
-	ID               uuid.UUID `json:"id"`
-	DisplayName      *string   `json:"display_name"`
-	ObserverType     *string   `json:"observer_type"`
-	ObservationCount int64     `json:"observation_count"`
-	Iata             string    `json:"iata"`
+	ID               pgtype.UUID `json:"id"`
+	DisplayName      *string     `json:"display_name"`
+	ObserverType     *string     `json:"observer_type"`
+	ObservationCount int64       `json:"observation_count"`
+	Iata             string      `json:"iata"`
 }
 
 // Top N observers for the IATA within the window, summed from the precomputed
@@ -1760,6 +1790,9 @@ const insertObservation = `-- name: InsertObservation :one
 INSERT INTO packet_observations (
   packet_hash,
   observer_id,
+  observer_public_key,
+  observer_display_name,
+  observer_type,
   iata,
   heard_at,
   path_length_byte,
@@ -1776,15 +1809,19 @@ INSERT INTO packet_observations (
   source_broker,
   payload_type
 ) VALUES (
-  $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+  $1, $2,
+  (SELECT public_key FROM observers WHERE id = $2),
+  (SELECT display_name FROM observers WHERE id = $2),
+  (SELECT observer_type FROM observers WHERE id = $2),
+  $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
 )
 ON CONFLICT (packet_hash, observer_id) DO NOTHING
-RETURNING id, packet_hash, observer_id, iata, heard_at, path_length_byte, hash_size, hop_count, path_bytes, rssi, snr, propagation_time_ms, radio_freq_mhz, spread_factor, bandwidth_khz, coding_rate, source_broker, payload_type
+RETURNING id, packet_hash, observer_id, iata, heard_at, path_length_byte, hash_size, hop_count, path_bytes, rssi, snr, propagation_time_ms, radio_freq_mhz, spread_factor, bandwidth_khz, coding_rate, source_broker, payload_type, observer_public_key, observer_display_name, observer_type
 `
 
 type InsertObservationParams struct {
 	PacketHash        []byte             `json:"packet_hash"`
-	ObserverID        uuid.UUID          `json:"observer_id"`
+	ObserverID        pgtype.UUID        `json:"observer_id"`
 	Iata              string             `json:"iata"`
 	HeardAt           pgtype.Timestamptz `json:"heard_at"`
 	PathLengthByte    int16              `json:"path_length_byte"`
@@ -1805,6 +1842,9 @@ type InsertObservationParams struct {
 // ============================================================
 // PACKET OBSERVATIONS
 // ============================================================
+// The observer identity columns are snapshotted at insert time so historical
+// observations remain queryable after the active observer row is aged out by
+// observer retention (observer_id is ON DELETE SET NULL).
 func (q *Queries) InsertObservation(ctx context.Context, arg InsertObservationParams) (PacketObservation, error) {
 	row := q.db.QueryRow(ctx, insertObservation,
 		arg.PacketHash,
@@ -1845,6 +1885,9 @@ func (q *Queries) InsertObservation(ctx context.Context, arg InsertObservationPa
 		&i.CodingRate,
 		&i.SourceBroker,
 		&i.PayloadType,
+		&i.ObserverPublicKey,
+		&i.ObserverDisplayName,
+		&i.ObserverType,
 	)
 	return i, err
 }
@@ -2693,7 +2736,7 @@ func (q *Queries) ListNodes(ctx context.Context, arg ListNodesParams) ([]ListNod
 }
 
 const listObservationsForPacket = `-- name: ListObservationsForPacket :many
-SELECT po.id, po.packet_hash, po.observer_id, po.iata, po.heard_at, po.path_length_byte, po.hash_size, po.hop_count, po.path_bytes, po.rssi, po.snr, po.propagation_time_ms, po.radio_freq_mhz, po.spread_factor, po.bandwidth_khz, po.coding_rate, po.source_broker, po.payload_type, o.display_name AS observer_name
+SELECT po.id, po.packet_hash, po.observer_id, po.iata, po.heard_at, po.path_length_byte, po.hash_size, po.hop_count, po.path_bytes, po.rssi, po.snr, po.propagation_time_ms, po.radio_freq_mhz, po.spread_factor, po.bandwidth_khz, po.coding_rate, po.source_broker, po.payload_type, po.observer_public_key, po.observer_display_name, po.observer_type, COALESCE(o.display_name, po.observer_display_name) AS observer_name
 FROM packet_observations po
 LEFT JOIN observers o ON o.id = po.observer_id
 WHERE po.packet_hash = $1
@@ -2701,25 +2744,28 @@ ORDER BY po.heard_at ASC
 `
 
 type ListObservationsForPacketRow struct {
-	ID                int64              `json:"id"`
-	PacketHash        []byte             `json:"packet_hash"`
-	ObserverID        uuid.UUID          `json:"observer_id"`
-	Iata              string             `json:"iata"`
-	HeardAt           pgtype.Timestamptz `json:"heard_at"`
-	PathLengthByte    int16              `json:"path_length_byte"`
-	HashSize          int16              `json:"hash_size"`
-	HopCount          int16              `json:"hop_count"`
-	PathBytes         []byte             `json:"path_bytes"`
-	Rssi              *int16             `json:"rssi"`
-	Snr               *float32           `json:"snr"`
-	PropagationTimeMs *int32             `json:"propagation_time_ms"`
-	RadioFreqMhz      *float32           `json:"radio_freq_mhz"`
-	SpreadFactor      *int16             `json:"spread_factor"`
-	BandwidthKhz      *float32           `json:"bandwidth_khz"`
-	CodingRate        *int16             `json:"coding_rate"`
-	SourceBroker      *string            `json:"source_broker"`
-	PayloadType       *int16             `json:"payload_type"`
-	ObserverName      *string            `json:"observer_name"`
+	ID                  int64              `json:"id"`
+	PacketHash          []byte             `json:"packet_hash"`
+	ObserverID          pgtype.UUID        `json:"observer_id"`
+	Iata                string             `json:"iata"`
+	HeardAt             pgtype.Timestamptz `json:"heard_at"`
+	PathLengthByte      int16              `json:"path_length_byte"`
+	HashSize            int16              `json:"hash_size"`
+	HopCount            int16              `json:"hop_count"`
+	PathBytes           []byte             `json:"path_bytes"`
+	Rssi                *int16             `json:"rssi"`
+	Snr                 *float32           `json:"snr"`
+	PropagationTimeMs   *int32             `json:"propagation_time_ms"`
+	RadioFreqMhz        *float32           `json:"radio_freq_mhz"`
+	SpreadFactor        *int16             `json:"spread_factor"`
+	BandwidthKhz        *float32           `json:"bandwidth_khz"`
+	CodingRate          *int16             `json:"coding_rate"`
+	SourceBroker        *string            `json:"source_broker"`
+	PayloadType         *int16             `json:"payload_type"`
+	ObserverPublicKey   []byte             `json:"observer_public_key"`
+	ObserverDisplayName *string            `json:"observer_display_name"`
+	ObserverType        *string            `json:"observer_type"`
+	ObserverName        *string            `json:"observer_name"`
 }
 
 func (q *Queries) ListObservationsForPacket(ctx context.Context, packetHash []byte) ([]ListObservationsForPacketRow, error) {
@@ -2750,6 +2796,9 @@ func (q *Queries) ListObservationsForPacket(ctx context.Context, packetHash []by
 			&i.CodingRate,
 			&i.SourceBroker,
 			&i.PayloadType,
+			&i.ObserverPublicKey,
+			&i.ObserverDisplayName,
+			&i.ObserverType,
 			&i.ObserverName,
 		); err != nil {
 			return nil, err
@@ -2785,7 +2834,7 @@ LIMIT $3
 `
 
 type ListObserverAdvertsParams struct {
-	ObserverID uuid.UUID   `json:"observer_id"`
+	ObserverID pgtype.UUID `json:"observer_id"`
 	Column2    interface{} `json:"column_2"`
 	Limit      int32       `json:"limit"`
 }
@@ -3027,7 +3076,7 @@ SELECT
   ts.name AS scope_name,
   (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
   po.observer_id AS latest_observer_id,
-  o.display_name AS latest_observer_name,
+  COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
   po.iata AS latest_observer_iata,
   po.path_length_byte AS latest_observer_path_length_byte,
   po.hash_size AS latest_observer_hash_size,
@@ -3035,7 +3084,7 @@ SELECT
   po.path_bytes AS latest_observer_path_bytes
 FROM packets p
 LEFT JOIN LATERAL (
-  SELECT observer_id, iata, path_length_byte, hash_size, hop_count, path_bytes
+  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes
   FROM packet_observations
   WHERE packet_hash = p.packet_hash
   ORDER BY heard_at DESC
@@ -3094,7 +3143,7 @@ type ListPacketsRow struct {
 	ScopeID                      *int32             `json:"scope_id"`
 	ScopeName                    *string            `json:"scope_name"`
 	ObservationCount             int64              `json:"observation_count"`
-	LatestObserverID             uuid.UUID          `json:"latest_observer_id"`
+	LatestObserverID             pgtype.UUID        `json:"latest_observer_id"`
 	LatestObserverName           *string            `json:"latest_observer_name"`
 	LatestObserverIata           string             `json:"latest_observer_iata"`
 	LatestObserverPathLengthByte int16              `json:"latest_observer_path_length_byte"`
@@ -3162,7 +3211,7 @@ SELECT
   p.last_heard_at,
   (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
   po.observer_id AS latest_observer_id,
-  o.display_name AS latest_observer_name,
+  COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
   po.iata AS latest_observer_iata,
   po.path_length_byte AS latest_observer_path_length_byte,
   po.hash_size AS latest_observer_hash_size,
@@ -3198,7 +3247,7 @@ type ListPacketsAfterIDRow struct {
 	FirstHeardAt                 pgtype.Timestamptz `json:"first_heard_at"`
 	LastHeardAt                  pgtype.Timestamptz `json:"last_heard_at"`
 	ObservationCount             int64              `json:"observation_count"`
-	LatestObserverID             uuid.UUID          `json:"latest_observer_id"`
+	LatestObserverID             pgtype.UUID        `json:"latest_observer_id"`
 	LatestObserverName           *string            `json:"latest_observer_name"`
 	LatestObserverIata           string             `json:"latest_observer_iata"`
 	LatestObserverPathLengthByte int16              `json:"latest_observer_path_length_byte"`
@@ -3264,7 +3313,7 @@ SELECT
   sh.site_heard_at,
   (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
   po.observer_id AS latest_observer_id,
-  o.display_name AS latest_observer_name,
+  COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
   po.iata AS latest_observer_iata,
   po.path_length_byte AS latest_observer_path_length_byte,
   po.hash_size AS latest_observer_hash_size,
@@ -3316,7 +3365,7 @@ FROM (
 ) sh
 JOIN packets p ON p.packet_hash = sh.packet_hash
 LEFT JOIN LATERAL (
-  SELECT observer_id, iata, path_length_byte, hash_size, hop_count, path_bytes
+  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes
   FROM packet_observations
   WHERE packet_hash = p.packet_hash
   ORDER BY heard_at DESC
@@ -3352,7 +3401,7 @@ type ListPacketsByIATAsRow struct {
 	ScopeName                    *string            `json:"scope_name"`
 	SiteHeardAt                  pgtype.Timestamptz `json:"site_heard_at"`
 	ObservationCount             int64              `json:"observation_count"`
-	LatestObserverID             uuid.UUID          `json:"latest_observer_id"`
+	LatestObserverID             pgtype.UUID        `json:"latest_observer_id"`
 	LatestObserverName           *string            `json:"latest_observer_name"`
 	LatestObserverIata           string             `json:"latest_observer_iata"`
 	LatestObserverPathLengthByte int16              `json:"latest_observer_path_length_byte"`

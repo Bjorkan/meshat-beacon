@@ -209,9 +209,9 @@ func (s *Store) ListPackets(ctx context.Context, params api.PacketListParams) (a
 			LastHeardAt:      v.LastHeardAt.Time.UnixMilli(),
 			ObservationCount: int32(v.ObservationCount),
 		}
-		if v.LatestObserverID != (uuid.UUID{}) {
+		if v.LatestObserverID.Valid {
 			item.LatestObserver = &api.PacketLatestObserver{
-				ID:          v.LatestObserverID,
+				ID:          uuidFromPgtype(v.LatestObserverID),
 				DisplayName: v.LatestObserverName,
 				IATA:        v.LatestObserverIata,
 			}
@@ -288,9 +288,9 @@ func (s *Store) listPacketsByIATAs(ctx context.Context, params api.PacketListPar
 			LastHeardAt:      v.LastHeardAt.Time.UnixMilli(),
 			ObservationCount: int32(v.ObservationCount),
 		}
-		if v.LatestObserverID != (uuid.UUID{}) {
+		if v.LatestObserverID.Valid {
 			item.LatestObserver = &api.PacketLatestObserver{
-				ID:          v.LatestObserverID,
+				ID:          uuidFromPgtype(v.LatestObserverID),
 				DisplayName: v.LatestObserverName,
 				IATA:        v.LatestObserverIata,
 			}
@@ -343,14 +343,12 @@ func (s *Store) ListPacketsAfterID(ctx context.Context, afterObservationID int64
 			LastHeardAt:      v.LastHeardAt.Time.UnixMilli(),
 			ObservationCount: int32(v.ObservationCount),
 		}
-		if v.LatestObserverID != (uuid.UUID{}) {
+		if v.LatestObserverID.Valid {
 			item.LatestObserver = &api.PacketLatestObserver{
-				ID:          v.LatestObserverID,
+				ID:          uuidFromPgtype(v.LatestObserverID),
 				DisplayName: v.LatestObserverName,
 				IATA:        v.LatestObserverIata,
 			}
-			// Inner join here (unlike ListPackets/listPacketsByIATAs' LEFT JOIN LATERAL), so
-			// these are never nil when an observer was joined at all.
 			item.LatestObserver.PathLength, item.LatestObserver.PathBytes = buildLatestObserverPath(
 				&v.LatestObserverPathLengthByte, &v.LatestObserverHashSize, &v.LatestObserverHopCount, v.LatestObserverPathBytes,
 			)
@@ -517,7 +515,7 @@ func (s *Store) GetPacket(ctx context.Context, packetHash []byte) (*api.Packet, 
 	for _, v := range obsRows {
 		obs := api.PacketObservationDetail{
 			ID:           v.ID,
-			ObserverID:   v.ObserverID,
+			ObserverID:   uuidFromPgtype(v.ObserverID),
 			ObserverName: v.ObserverName,
 			IATA:         v.Iata,
 			HeardAt:      v.HeardAt.Time.UnixMilli(),
@@ -617,7 +615,7 @@ func (s *Store) UpsertIATA(ctx context.Context, iata string) error {
 func (s *Store) InsertObservation(ctx context.Context, o ingest.InsertObservationParams) (bool, error) {
 	params := sqlc.InsertObservationParams{
 		PacketHash:        o.PacketHash,
-		ObserverID:        o.ObserverID,
+		ObserverID:        uuidToPgtype(o.ObserverID),
 		Iata:              o.IATA,
 		HeardAt:           pgtype.Timestamptz{Time: o.HeardAt, Valid: true},
 		PathLengthByte:    int16(o.PathLengthByte),

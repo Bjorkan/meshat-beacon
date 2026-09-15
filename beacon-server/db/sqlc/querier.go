@@ -23,6 +23,13 @@ type Querier interface {
 	// dangling in old routes there, but ReconfirmTask already prunes stale/ambiguous routes
 	// periodically and will clean those up on its own schedule.
 	DeleteOldNodes(ctx context.Context, lastSeen pgtype.Timestamptz) error
+	// Deletes observers not heard from since the given cutoff and returns the
+	// deleted IDs so callers can invalidate cached observer entries.
+	// observer_brokers, observer_locations, observer_scopes, observer_telemetry
+	// and observer_owners cascade-delete via FK. packet_observations.observer_id
+	// is ON DELETE SET NULL, so historical observations keep their own 30-day
+	// packet-retention window untouched.
+	DeleteOldObservers(ctx context.Context, lastSeen pgtype.Timestamptz) ([]uuid.UUID, error)
 	// Deletes packets and their observations older than the given cutoff.
 	// packet_observations cascade-delete via FK.
 	DeleteOldPackets(ctx context.Context, lastHeardAt pgtype.Timestamptz) error
@@ -62,7 +69,7 @@ type Querier interface {
 	GetObserverBrokers(ctx context.Context, observerID uuid.UUID) ([]GetObserverBrokersRow, error)
 	GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error)
 	GetObserverByPubkey(ctx context.Context, publicKey []byte) (Observer, error)
-	GetObserverLastIATA(ctx context.Context, observerID uuid.UUID) (string, error)
+	GetObserverLastIATA(ctx context.Context, observerID pgtype.UUID) (string, error)
 	// The public projection contains only an existing node; unresolved claims stay private.
 	GetObserverOwnerNode(ctx context.Context, observerID uuid.UUID) (GetObserverOwnerNodeRow, error)
 	GetObserverRadio(ctx context.Context, id uuid.UUID) (GetObserverRadioRow, error)
@@ -115,6 +122,9 @@ type Querier interface {
 	// ============================================================
 	// PACKET OBSERVATIONS
 	// ============================================================
+	// The observer identity columns are snapshotted at insert time so historical
+	// observations remain queryable after the active observer row is aged out by
+	// observer retention (observer_id is ON DELETE SET NULL).
 	InsertObservation(ctx context.Context, arg InsertObservationParams) (PacketObservation, error)
 	// Inserts a telemetry snapshot for an observer. The reported_at timestamp should
 	// be truncated to the configured resolution before calling to ensure deduplication.

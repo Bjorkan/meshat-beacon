@@ -24,6 +24,7 @@ type Config struct {
 	Packets     PacketsConfig         `yaml:"packets"`
 	Routes      RoutesConfig          `yaml:"routes"`
 	Neighbors   NeighborsConfig       `yaml:"neighbors"`
+	Observers   ObserversConfig       `yaml:"observers"`
 	Ingest      IngestFilterConfig    `yaml:"ingest"`
 	Scopes      []ScopeConfig         `yaml:"scopes"`
 	Cache       CacheConfig           `yaml:"cache"`
@@ -62,6 +63,9 @@ type ResolvedConfig struct {
 	NodeDeleteAfter    time.Duration
 	// NodeIATAMembershipTTL bounds current node-to-IATA membership; see NodesConfig.
 	NodeIATAMembershipTTL time.Duration
+	// ObserverDeleteAfter is how long an observer can go unheard before the cleanup job
+	// deletes it; see ObserversConfig.
+	ObserverDeleteAfter time.Duration
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -213,6 +217,17 @@ type NeighborsConfig struct {
 	// containing even one such impossible pair is discarded whole.
 	// Defaults to 150 km if not set.
 	MaxDistanceKm float64 `yaml:"max_distance_km"`
+}
+
+// ObserversConfig controls observer row retention behaviour.
+type ObserversConfig struct {
+	// DeleteAfter is how long an observer can go without being heard (packet,
+	// status, or neighbors traffic, all of which refresh observers.last_seen)
+	// before the cleanup job deletes the observer row and its cascade-owned
+	// metadata. Historical packet observations are preserved: they keep a
+	// snapshot of the observer's identity and fall back to the packets'
+	// separate 30-day retention window. Defaults to 336h (14 days) if not set.
+	DeleteAfter duration `yaml:"delete_after"`
 }
 
 // NodesConfig controls node-derived signal thresholds.
@@ -388,6 +403,7 @@ func Resolve(cfg *Config) ResolvedConfig {
 		NodeStaleThreshold:    cfg.Nodes.StaleThreshold.Duration,
 		NodeDeleteAfter:       cfg.Nodes.DeleteAfter.Duration,
 		NodeIATAMembershipTTL: cfg.Nodes.IATAMembershipTTL.Duration,
+		ObserverDeleteAfter:   cfg.Observers.DeleteAfter.Duration,
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -445,17 +461,20 @@ func Resolve(cfg *Config) ResolvedConfig {
 	if r.NodeIATAMembershipTTL == 0 {
 		r.NodeIATAMembershipTTL = 7 * 24 * time.Hour
 	}
+	if r.ObserverDeleteAfter == 0 {
+		r.ObserverDeleteAfter = 14 * 24 * time.Hour
+	}
 	return r
 }
 
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
 		r.MaxConnsPerIP, r.ViewRefreshInterval, r.ReconfirmInterval, r.CleanupInterval,
 		r.PresenceFlushInterval, r.PresencePacketTTL, r.ClockDriftThreshold,
-		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL,
+		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter,
 	)
 }

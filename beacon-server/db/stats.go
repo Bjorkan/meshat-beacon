@@ -124,7 +124,7 @@ func (s *Store) GetStatsTopObservers(ctx context.Context, iatas []string, since 
 	items := make([]api.TopObserver, 0, len(rows))
 	for _, v := range rows {
 		items = append(items, api.TopObserver{
-			ObserverID:       v.ID,
+			ObserverID:       uuidFromPgtype(v.ID),
 			DisplayName:      v.DisplayName,
 			ObserverType:     v.ObserverType,
 			IATA:             v.Iata,

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/MeshCore-Beacon/beacon-server/db"
+	"github.com/google/uuid"
 )
 
 // ViewRefreshTask returns a Task that refreshes all materialized views.
@@ -46,8 +47,11 @@ func ViewRefreshTask(store *db.Store, interval time.Duration) Task {
 
 // CleanupTask returns a Task that prunes old telemetry, packet, and node rows,
 // plus neighbor edges that haven't been re-confirmed within the retention window,
-// plus stale node-to-IATA memberships past the nodes.iata_membership_ttl horizon.
-func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDeleteAfter, neighborRetention, nodeIATATTL, interval time.Duration) Task {
+// plus stale node-to-IATA memberships past the nodes.iata_membership_ttl horizon,
+// plus observers not heard from within the observer retention window.
+// invalidateObserver (optional) is called for every deleted observer so cached
+// observer detail/list entries do not outlive the row.
+func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDeleteAfter, neighborRetention, nodeIATATTL, observerDeleteAfter, interval time.Duration, invalidateObserver func(context.Context, uuid.UUID)) Task {
 	return Task{
 		Name:     "cleanup",
 		Interval: interval,
@@ -75,6 +79,15 @@ func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDelet
 			}
 			if err := store.DeleteOldNodes(ctx, time.Now().Add(-nodeDeleteAfter)); err != nil {
 				return err
+			}
+			deleted, err := store.DeleteOldObservers(ctx, time.Now().Add(-observerDeleteAfter))
+			if err != nil {
+				return err
+			}
+			for _, id := range deleted {
+				if invalidateObserver != nil {
+					invalidateObserver(ctx, id)
+				}
 			}
 			return nil
 		},

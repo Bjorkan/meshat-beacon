@@ -30,6 +30,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
@@ -264,6 +265,13 @@ func main() {
 		broker.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
 	}
 
+	// The cleanup task deletes stale observers and must invalidate their cached
+	// detail/list entries so a deleted observer cannot remain visible from cache.
+	var invalidateObserver func(context.Context, uuid.UUID)
+	if cr, ok := reader.(*cache.CachedReader); ok {
+		invalidateObserver = cr.InvalidateObserver
+	}
+
 	go broker.Start(ctx)
 	if cfg.Ingest.OwnerMetadata {
 		username, password := os.Getenv("MQTT_OWNER_USERNAME"), os.Getenv("MQTT_OWNER_PASSWORD")
@@ -283,7 +291,7 @@ func main() {
 
 	scheduler := background.New([]background.Task{
 		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),
-		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.NodeIATAMembershipTTL, resolved.CleanupInterval),
+		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.NodeIATAMembershipTTL, resolved.ObserverDeleteAfter, resolved.CleanupInterval, invalidateObserver),
 		background.ReconfirmTask(store, resolved.RouteRetention, resolved.RouteGrace, int64(resolved.RouteMinObservations), resolved.ReconfirmInterval),
 	})
 	go scheduler.Start(ctx)

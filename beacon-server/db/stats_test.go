@@ -90,7 +90,7 @@ func TestGetStatsTopObservers_IATATypeAssertion(t *testing.T) {
 		GetStatsTopObservers(gomock.Any(), gomock.Any()).
 		Return([]sqlc.GetStatsTopObserversRow{
 			{
-				ID:               observerID,
+				ID:               uuidToPgtype(observerID),
 				DisplayName:      &displayName,
 				ObserverType:     &obsType,
 				Iata:             "YVR",
