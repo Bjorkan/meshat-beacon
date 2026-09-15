@@ -53,7 +53,7 @@ func NodesRouter(reader api.Reader) http.Handler {
 //	@Param		supportsMultibytePaths	query		bool	false	"Filter by multibyte path support (true/false); omit for no filter"
 //	@Param		supportsMultibyteTraces	query		bool	false	"Filter by multibyte trace support (true/false); omit for no filter"
 //	@Param		neighbors				query		bool	false	"Include each node's known neighbor IDs (neighborIds field). Bare ?neighbors or ?neighbors=true enables it; omit/false for none"
-//	@Param		meshcoreRegion			query		string	false	"Filter by confirmed MeshCore OTA Region token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope"
+//	@Param		meshcoreRegion			query		string	false	"Filter by confirmed MeshCore region-scope token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope"
 //	@Param		sort					query		string	false	"Sort field: name, type, radio, neighbors, last_seen (default last_seen)"
 //	@Param		direction				query		string	false	"Sort direction: asc or desc (default desc)"
 //	@Param		pageToken				query		string	false	"Opaque keyset cursor returned as nextPageToken"
@@ -216,7 +216,7 @@ func validMeshCoreRegionToken(token string) bool {
 // listMeshCoreRegions godoc
 //
 //	@Summary	List MeshCore Regions
-//	@Description	Currently confirmed MeshCore OTA Region values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.
+//	@Description	Currently confirmed MeshCore region-scope values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.
 //	@Tags		Nodes
 //	@Produce	json
 //	@Success	200		{array}		api.MeshCoreRegion

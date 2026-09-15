@@ -1528,7 +1528,7 @@ GROUP BY ns.prefix_2
 HAVING COUNT(DISTINCT ns.node_id) > 1;
 
 -- name: ListMeshCoreRegions :many
--- Discovered MeshCore OTA Region values with confirmed-node counts, using the
+-- Discovered MeshCore region-scope values with confirmed-node counts, using the
 -- same trust rules as the node filter: observer self reports and neighbor
 -- entries answered with status == "responded", both fresh within the cutoff.
 -- Comma-separated stored values are split and normalized (lowercase, trimmed)

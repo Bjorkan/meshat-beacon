@@ -13,7 +13,7 @@ export interface ParsedMapView {
   neighborLines?: NeighborLinesMode;
   flow?: boolean;
   borders?: boolean;
-  meshcoreRegion?: string; // confirmed MeshCore OTA Region token, e.g. "se" ("" = All)
+  meshcoreRegion?: string; // confirmed MeshCore region-scope token, e.g. "se" ("" = All)
 }
 
 // The live map state a copy-link snapshot is built from (every field concrete).
@@ -96,7 +96,7 @@ function parseMapViewValues(get: (key: string) => string | null): ParsedMapView 
   const borders = parseBool(get('borders'));
   if (borders !== undefined) view.borders = borders;
 
-  // Single MeshCore OTA Region token; lenient like node_type — anything malformed
+  // Single MeshCore region-scope token; lenient like node_type — anything malformed
   // is dropped so a bad link degrades to the unfiltered view.
   const meshcoreRegion = get('meshcore_region')?.toLowerCase();
   if (meshcoreRegion && /^[a-z0-9*._-]{1,64}$/.test(meshcoreRegion)) {

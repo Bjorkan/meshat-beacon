@@ -346,7 +346,7 @@ func (s *Store) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-// ListMeshCoreRegions returns the currently confirmed MeshCore OTA Region
+// ListMeshCoreRegions returns the currently confirmed MeshCore region-scope
 // values with confirmed-node counts, normalized to lowercase trimmed tokens.
 func (s *Store) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
 	rows, err := s.q.ListMeshCoreRegions(ctx, s.meshcoreRegionCutoff())

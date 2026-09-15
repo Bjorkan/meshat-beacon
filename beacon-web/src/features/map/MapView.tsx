@@ -102,7 +102,7 @@ export function MapView({
     writePreference(MAP_NEIGHBOR_LINES_STORAGE_KEY, mode);
   }, []);
 
-  // MeshCore Region filter: a confirmed OTA region token ("" = All). Composes with the global
+  // MeshCore Region filter: a confirmed MeshCore region-scope token ("" = All). Composes with the global
   // IATA/region selector — the server intersects them. Changing it clears the node selection so a
   // filtered-out node never lingers as a ghost marker or edge.
   const [meshcoreRegionFilter, setMeshcoreRegionFilter] = useState(

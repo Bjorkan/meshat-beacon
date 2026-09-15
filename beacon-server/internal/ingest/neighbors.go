@@ -168,7 +168,7 @@ func (w *Worker) writeNeighbors(ctx context.Context, iata, pubkeyHex string, pub
 
 		snr := n.SNR
 
-		// OTA region scope queries are unreliable (per the firmware author, even
+		// Region-scope OTA queries are unreliable (per the firmware author, even
 		// the mobile app sees this) -- only "responded" is a trustworthy read.
 		// A "timeout" must not be taken as "the neighbor cleared its scope", so
 		// we pass nil and let UpsertNodeNeighbor's COALESCE preserve whatever

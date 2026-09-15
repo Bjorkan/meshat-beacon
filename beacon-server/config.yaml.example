@@ -107,7 +107,7 @@ routes:
 #  # whole (packets reach other regions via MQTT interconnects — those hops
 #  # are not radio hops).
 #  max_distance_km: 150   # default: 150
-#  # How long a MeshCore OTA region confirmation (observer self-report or a
+#  # How long a MeshCore region-scope confirmation (observer self-report or a
 #  # neighbor entry answered with status == "responded") counts as current for
 #  # the map's MeshCore Region filter. Timeouts preserve the old value and its
 #  # old timestamp. Defaults to 168h, matching neighbors.retention.

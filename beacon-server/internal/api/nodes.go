@@ -42,7 +42,7 @@ type NodeIATA struct {
 	LastHeard int64  `json:"lastHeard" binding:"required"` // epoch ms
 }
 
-// MeshCoreRegion is a discovered MeshCore OTA Region value with the number of
+// MeshCoreRegion is a discovered MeshCore region-scope value with the number of
 // nodes that currently confirm it. Distinct from Beacon's geographic regions
 // and transport scopes.
 type MeshCoreRegion struct {

@@ -589,7 +589,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "Filter by confirmed MeshCore OTA Region token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope",
+                        "description": "Filter by confirmed MeshCore region-scope token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope",
                         "name": "meshcoreRegion",
                         "in": "query"
                     },
@@ -677,7 +677,7 @@ const docTemplate = `{
         },
         "/nodes/meshcore-regions": {
             "get": {
-                "description": "Currently confirmed MeshCore OTA Region values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.",
+                "description": "Currently confirmed MeshCore region-scope values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.",
                 "produces": [
                     "application/json"
                 ],

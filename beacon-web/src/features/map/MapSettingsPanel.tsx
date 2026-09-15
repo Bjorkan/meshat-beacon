@@ -69,7 +69,7 @@ interface MapSettingsPanelProps {
   onNeighborLinesChange: (mode: NeighborLinesMode) => void;
   borders: boolean;
   onBordersChange: (on: boolean) => void;
-  // confirmed MeshCore OTA Region token ("" = All); options are discovered server-side
+  // confirmed MeshCore region-scope token ("" = All); options are discovered server-side
   meshcoreRegion: string;
   onMeshcoreRegionChange: (token: string) => void;
   // builds deep-link params for the current view, evaluated at copy time (reads the live camera)

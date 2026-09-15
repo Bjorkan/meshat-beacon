@@ -405,7 +405,7 @@ export function getNodesPage(
     supportsMultibyteTraces?: 'true' | 'false';
     scope?: string;
     neighbors?: boolean; // include each node's neighborIds (?neighbors=true)
-    meshcoreRegion?: string; // confirmed MeshCore OTA Region token (exact, server-normalized)
+    meshcoreRegion?: string; // confirmed MeshCore region-scope token (exact, server-normalized)
   },
 ): Promise<CursorPage<NodeSummary>> {
   return rawGetNodes({
@@ -436,7 +436,7 @@ export function getNodesPage(
   }).then((page) => toPage({ ...page, items: page.items.map(toNodeSummary) }));
 }
 
-// Confirmed MeshCore OTA Region values (with node counts) for the map's MeshCore Region selector.
+// Confirmed MeshCore region-scope values (with node counts) for the map's MeshCore Region selector.
 export function getMeshCoreRegions(): Promise<Models.MeshCoreRegion[]> {
   return rawGetNodesMeshcoreRegions();
 }

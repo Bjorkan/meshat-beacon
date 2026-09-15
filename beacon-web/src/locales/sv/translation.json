@@ -284,7 +284,7 @@
     "neighborLines": "Grannlinjer",
     "iataBorders": "IATA-gränser",
     "meshcoreRegion": "MeshCore-region",
-    "meshcoreRegionHint": "Endast noder vars MeshCore OTA-region nyligen bekräftats. Kombineras med den globala regionväljaren.",
+    "meshcoreRegionHint": "Endast noder vars MeshCore region scope nyligen bekräftats. Kombineras med den globala regionväljaren.",
     "on": "På",
     "off": "Av",
     "selected": "Vald",

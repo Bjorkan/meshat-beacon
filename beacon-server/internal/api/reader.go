@@ -226,7 +226,7 @@ type Reader interface {
 	// database, a high-confidence 2-byte hit is as trustworthy as a 3-byte one.
 	ListAmbiguousPrefix2(ctx context.Context) ([]string, error)
 
-	// ListMeshCoreRegions returns the MeshCore OTA Region values currently
+	// ListMeshCoreRegions returns the MeshCore region-scope values currently
 	// confirmed by fresh observer self-reports or neighbor OTA answers, with
 	// confirmed-node counts. Tokens are normalized (lowercase, trimmed); "*"
 	// is a literal token, not a wildcard.

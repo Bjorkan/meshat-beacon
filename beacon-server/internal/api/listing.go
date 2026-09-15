@@ -143,7 +143,7 @@ type NodeListParams struct {
 	PubkeyPrefix            string
 	Name                    string
 	Scope                   string
-	// MeshCoreRegion is an OTA "region scope" token (e.g. "se") that confirmed
+	// MeshCoreRegion is a MeshCore region-scope token (e.g. "se") that confirmed
 	// nodes must match. Unrelated to the geographic region/IATA and transport
 	// scope concepts: it filters by MeshCore's plaintext region configuration
 	// confirmed by a fresh observer self-report or neighbor OTA answer.

@@ -152,7 +152,7 @@ type Querier interface {
 	ListChannels(ctx context.Context, arg ListChannelsParams) ([]Channel, error)
 	ListIATAs(ctx context.Context) ([]IataCode, error)
 	ListKnownRoutes(ctx context.Context, arg ListKnownRoutesParams) ([]ListKnownRoutesRow, error)
-	// Discovered MeshCore OTA Region values with confirmed-node counts, using the
+	// Discovered MeshCore region-scope values with confirmed-node counts, using the
 	// same trust rules as the node filter: observer self reports and neighbor
 	// entries answered with status == "responded", both fresh within the cutoff.
 	// Comma-separated stored values are split and normalized (lowercase, trimmed)

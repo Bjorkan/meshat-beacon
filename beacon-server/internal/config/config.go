@@ -66,7 +66,7 @@ type ResolvedConfig struct {
 	// ObserverDeleteAfter is how long an observer can go unheard before the cleanup job
 	// deletes it; see ObserversConfig.
 	ObserverDeleteAfter time.Duration
-	// MeshCoreRegionFreshness is how long a MeshCore OTA region confirmation counts as
+	// MeshCoreRegionFreshness is how long a MeshCore region-scope confirmation counts as
 	// fresh; see NeighborsConfig.
 	MeshCoreRegionFreshness time.Duration
 }
@@ -220,7 +220,7 @@ type NeighborsConfig struct {
 	// containing even one such impossible pair is discarded whole.
 	// Defaults to 150 km if not set.
 	MaxDistanceKm float64 `yaml:"max_distance_km"`
-	// RegionScopeFreshness is how long a MeshCore OTA region confirmation
+	// RegionScopeFreshness is how long a MeshCore region-scope confirmation
 	// (observer self-report or a neighbor entry answered with
 	// status == "responded") keeps counting as current for the map's MeshCore
 	// Region filter and discovery. A timeout/failure preserves the old value
