@@ -73,6 +73,32 @@ describe('DataTable onEndReached', () => {
   });
 });
 
+// Pins the shared containment contract from issue #82: a desktop table wider than its container
+// scrolls inside the table's own region (both axes owned by one scroller) instead of leaking
+// horizontally to the page, and the sticky header stays inside that same scroll region.
+describe('DataTable horizontal containment', () => {
+  it('owns both overflow axes on one desktop scroll region with a sticky header inside it', () => {
+    const { container } = render(
+      <DataTable
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        selectedKey={null}
+        onSelect={() => {}}
+        emptyLabel="none"
+      />,
+    );
+
+    const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
+    expect(scroller).not.toBeNull();
+    expect(scroller).toHaveClass('overflow-y-auto');
+    expect(scroller.querySelector('table')).not.toBeNull();
+    const header = scroller.querySelector('thead');
+    expect(header).not.toBeNull();
+    expect(header!.closest('.overflow-x-auto')).toBe(scroller);
+  });
+});
+
 describe('DataTable card mode', () => {
   it('automatically renders labelled cards for a wide table on mobile', () => {
     setMobile(true);

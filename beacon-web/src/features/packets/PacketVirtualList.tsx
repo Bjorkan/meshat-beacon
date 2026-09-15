@@ -7,6 +7,7 @@ import { PacketRow } from './PacketRow';
 import { PacketExpansion } from './PacketExpansion';
 import { useFreshHashes } from './useFreshHashes';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { GRID_MIN_WIDTH } from './packet-grid';
 import {
   SCROLL_TOP_THRESHOLD_PX,
   SCROLL_BOTTOM_THRESHOLD_PX,
@@ -127,61 +128,67 @@ export function PacketVirtualList({
   return (
     <div
       ref={parentRef}
-      className={`flex-1 overflow-y-auto pb-10${isMobile ? ' px-4' : ''}`}
+      className={`flex-1 overflow-y-auto pb-10${isMobile ? ' px-4' : ' overflow-x-auto'}`}
       onScroll={handleScroll}
     >
-      <PacketTableHeader />
-      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        {virtualizer.getVirtualItems().map((virtualRow) => {
-          const packet = packets[virtualRow.index];
-          if (!packet) return null;
-          const expanded = expandedHash === packet.packetHash;
-          return (
-            <div
-              key={packet.packetHash}
-              data-index={virtualRow.index}
-              data-testid={`packet-item-${packet.packetHash}`}
-              ref={virtualizer.measureElement}
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                width: '100%',
-                transform: `translateY(${virtualRow.start}px)`,
-              }}
-            >
-              {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
-              <div className={isMobile ? 'pt-1.5' : ''}>
-                {isMobile ? (
-                  <PacketRow
-                    packet={packet}
-                    expanded={expanded}
-                    isFresh={freshHashes.has(packet.packetHash)}
-                    onToggle={() => onToggleExpand(packet.packetHash)}
-                  />
-                ) : (
-                  <PacketTableRow
-                    packet={packet}
-                    expanded={expanded}
-                    isFresh={freshHashes.has(packet.packetHash)}
-                    onToggle={() => onToggleExpand(packet.packetHash)}
-                  />
-                )}
-                {expanded && (
-                  <div ref={expansionRef}>
-                    <PacketExpansion
+      {/* Desktop grids own their horizontal overflow here: the wrapper holds the header and the
+          virtualized rows at the grid's real minimum width so a narrowed container scrolls this
+          region instead of clipping columns or widening the page. One wrapper (not separate
+          header/body scrollers) keeps the sticky header and rows aligned while scrolled. */}
+      <div style={isMobile ? undefined : { minWidth: GRID_MIN_WIDTH }}>
+        <PacketTableHeader />
+        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+          {virtualizer.getVirtualItems().map((virtualRow) => {
+            const packet = packets[virtualRow.index];
+            if (!packet) return null;
+            const expanded = expandedHash === packet.packetHash;
+            return (
+              <div
+                key={packet.packetHash}
+                data-index={virtualRow.index}
+                data-testid={`packet-item-${packet.packetHash}`}
+                ref={virtualizer.measureElement}
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  width: '100%',
+                  transform: `translateY(${virtualRow.start}px)`,
+                }}
+              >
+                {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
+                <div className={isMobile ? 'pt-1.5' : ''}>
+                  {isMobile ? (
+                    <PacketRow
                       packet={packet}
-                      onOpenAnalyzer={onOpenAnalyzer}
-                      onViewPath={onViewPath}
-                      selectedObservationId={selectedObservationId}
-                      onSelectObservation={onSelectObservation}
+                      expanded={expanded}
+                      isFresh={freshHashes.has(packet.packetHash)}
+                      onToggle={() => onToggleExpand(packet.packetHash)}
                     />
-                  </div>
-                )}
+                  ) : (
+                    <PacketTableRow
+                      packet={packet}
+                      expanded={expanded}
+                      isFresh={freshHashes.has(packet.packetHash)}
+                      onToggle={() => onToggleExpand(packet.packetHash)}
+                    />
+                  )}
+                  {expanded && (
+                    <div ref={expansionRef}>
+                      <PacketExpansion
+                        packet={packet}
+                        onOpenAnalyzer={onOpenAnalyzer}
+                        onViewPath={onViewPath}
+                        selectedObservationId={selectedObservationId}
+                        onSelectObservation={onSelectObservation}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </div>
   );

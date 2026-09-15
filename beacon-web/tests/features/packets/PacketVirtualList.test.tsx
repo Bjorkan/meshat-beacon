@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { PacketVirtualList } from '../../../src/features/packets/PacketVirtualList';
+import { GRID_MIN_WIDTH } from '../../../src/features/packets/packet-grid';
 import type { PacketSummary } from '../../../src/types/api';
 
 // PacketExpansion fetches through usePacketDetail; stub it so the list renders without a query client.
@@ -93,10 +94,12 @@ function makeHandlers() {
   };
 }
 
-// the scroll container is the component's root; the spacer under it carries the virtualizer's total size
+// the scroll container is the component's root; on desktop a min-width wrapper inside it keeps
+// the header and the virtualized rows on one shared horizontal overflow region
 const scroller = (container: HTMLElement) => container.firstElementChild as HTMLElement;
+const gridWrapper = (container: HTMLElement) => scroller(container).lastElementChild as HTMLElement;
 function totalSize(container: HTMLElement) {
-  const spacer = scroller(container).lastElementChild as HTMLElement;
+  const spacer = gridWrapper(container).lastElementChild as HTMLElement;
   const height = parseFloat(spacer.style.height);
   expect(Number.isFinite(height)).toBe(true);
   return height;
@@ -221,8 +224,58 @@ describe('PacketVirtualList header', () => {
     expect(headings).toHaveLength(1);
     const header = headings[0]!.parentElement as HTMLElement;
     expect(header.closest('[data-index]')).toBeNull();
-    expect(header.parentElement).toBe(scroller(container));
+    // the header and the virtualized rows share one wrapper so they cannot scroll apart
+    expect(header.parentElement).toBe(gridWrapper(container));
     expect(header.previousElementSibling).toBeNull();
+  });
+});
+
+// The desktop grid has a real minimum width (fixed tracks + gaps + padding). These tests pin the
+// containment contract from issue #82: overflow belongs to the list's own scroll region, the
+// header and rows stay on one shared wrapper, and mobile cards keep the page-level layout.
+describe('PacketVirtualList horizontal containment', () => {
+  it('lets the scroll region own horizontal overflow at desktop width', () => {
+    const { container } = renderWithClient(
+      <PacketVirtualList packets={many(30)} expandedHash={null} {...makeHandlers()} />,
+    );
+
+    const root = scroller(container);
+    expect(root).toHaveClass('overflow-x-auto');
+    expect(root).toHaveClass('overflow-y-auto');
+  });
+
+  it('gives the header and rows a wrapper matching the grid minimum width', () => {
+    const { container } = renderWithClient(
+      <PacketVirtualList packets={many(30)} expandedHash={null} {...makeHandlers()} />,
+    );
+
+    const wrapper = gridWrapper(container);
+    expect(wrapper.style.minWidth).toBe(GRID_MIN_WIDTH);
+    // both the sticky header and the virtualized spacer live inside the wrapper
+    const header = screen.getAllByText('Hash')[0]!.parentElement as HTMLElement;
+    const spacer = wrapper.lastElementChild as HTMLElement;
+    expect(header.parentElement).toBe(wrapper);
+    expect(spacer.parentElement).toBe(wrapper);
+    // every rendered row is positioned within the same spacer the header scrolls with
+    const row = screen.getByTestId('packet-item-AA0');
+    expect(row.parentElement).toBe(spacer);
+  });
+
+  it('keeps mobile cards free of the desktop grid wrapper', () => {
+    setMobile(true);
+    try {
+      const { container } = renderWithClient(
+        <PacketVirtualList packets={[pkt('AA11')]} expandedHash={null} {...makeHandlers()} />,
+      );
+
+      const root = scroller(container);
+      expect(root).toHaveClass('px-4');
+      expect(root).not.toHaveClass('overflow-x-auto');
+      const wrapper = gridWrapper(container);
+      expect(wrapper.style.minWidth).toBe('');
+    } finally {
+      setMobile(false);
+    }
   });
 });
 
