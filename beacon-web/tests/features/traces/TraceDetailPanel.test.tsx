@@ -5,6 +5,13 @@ import { TraceDetailPanel } from '../../../src/features/traces/TraceDetailPanel'
 import { traceQueries } from '../../../src/api/queries';
 import type { TracePacket } from '../../../src/types/api';
 
+// The WebGL map can't render in jsdom: stub the canvas, keep the packet list + selector logic.
+vi.mock('../../../src/features/traces/TracePathMapLazy', () => ({
+  TracePathMapLazy: ({ selectedKey }: { selectedKey: string | null }) => (
+    <div data-testid="trace-map">{selectedKey ?? 'all'}</div>
+  ),
+}));
+
 function packet(overrides: Partial<TracePacket> = {}): TracePacket {
   return {
     packetHash: 'old',
@@ -37,74 +44,95 @@ function renderDetail(packets: TracePacket[]) {
 }
 
 describe('TraceDetailPanel', () => {
-  it('renders one packet with named columns, no path and an explicit action', () => {
-    const { onAnalyze } = renderDetail([packet()]);
-    const table = screen.getByRole('table', { name: /1 packet/ });
-    expect(
-      within(table)
-        .getAllByRole('columnheader')
-        .map((el) => el.textContent),
-    ).toEqual(['Type / Scope', 'First heard', 'Last heard', 'Path', 'Analyze →']);
-    expect(within(table).getByText('No path')).toBeInTheDocument();
-    expect(within(table).getAllByRole('row')).toHaveLength(2);
-    const row = within(table).getAllByRole('row')[1];
-    expect(row).not.toHaveAttribute('tabindex');
-    fireEvent.click(within(row).getByText('FLOOD'));
-    expect(onAnalyze).not.toHaveBeenCalled();
-    fireEvent.click(within(row).getByRole('button', { name: /Analyze/ }));
+  it('renders the packet-path section with a hop list and an explicit analyze action', () => {
+    const { onAnalyze } = renderDetail([
+      packet({
+        rawPath: [{ hash: 'aa' }, { hash: 'bb', snr: -7.5 }],
+        resolvedRoute: [
+          { confidence: 'high', nodes: [{ id: 'gateway', name: 'Gateway', publicKey: 'aa' }] },
+          { confidence: 'none', nodes: [] },
+        ],
+      }),
+    ]);
+    expect(screen.getByText('Packet path')).toBeInTheDocument();
+    // nothing located: the map stays out of the way and explains why
+    expect(screen.queryByTestId('trace-map')).not.toBeInTheDocument();
+    expect(screen.getByText('No verified route to display')).toBeInTheDocument();
+    // the packet's compact hop list reads like the packet-path view: resolved hop first,
+    // then the link SNR entering it (SNR[1] = the AA→BB link)
+    expect(screen.getByText('Gateway')).toBeInTheDocument();
+    expect(screen.getByText('BB')).toBeInTheDocument();
+    expect(screen.getByText('-7.50 dB')).toBeInTheDocument();
+    const analyze = screen.getByRole('button', { name: /Analyze/ });
+    fireEvent.click(analyze);
     expect(onAnalyze).toHaveBeenCalledExactlyOnceWith('old');
   });
 
-  it('keeps newest-first ordering and optional scope per row', () => {
+  it('keeps newest-first ordering and optional scope per packet', () => {
     const { onAnalyze } = renderDetail([
       packet(),
       packet({ packetHash: 'new', lastHeardAt: 9, scope: 'EU' }),
       packet({ packetHash: 'middle', lastHeardAt: 5 }),
     ]);
-    const rows = screen.getAllByRole('row').slice(1);
-    expect(within(rows[0]).getByText('EU')).toBeInTheDocument();
-    expect(within(rows[1]).queryByText('EU')).not.toBeInTheDocument();
-    for (const row of rows) fireEvent.click(within(row).getByRole('button', { name: /Analyze/ }));
+    const packets = screen.getAllByRole('article');
+    expect(packets.map((p) => p.getAttribute('aria-label'))).toEqual(['NEW', 'MIDDLE', 'OLD']);
+    expect(within(packets[0]).getByText('EU')).toBeInTheDocument();
+    expect(within(packets[1]).queryByText('EU')).not.toBeInTheDocument();
+    for (const p of packets) fireEvent.click(within(p).getByRole('button', { name: /Analyze/ }));
     expect(onAnalyze.mock.calls).toEqual([['new'], ['middle'], ['old']]);
   });
 
-  it('preserves ordered mixed-confidence hops, measured SNR and separate node navigation', () => {
+  it('isolates a packet on the map when its hash is clicked and keeps node navigation separate', () => {
     const { onAnalyze, onViewNode } = renderDetail([
       packet({
-        rawPath: [{ hash: 'aa', snr: 0 }, { hash: 'bb' }, { hash: 'cc', snr: -7.5 }],
+        packetHash: 'pkt-one',
+        rawPath: [{ hash: 'aa' }, { hash: 'bb' }, { hash: 'cc', snr: -7.5 }],
         resolvedRoute: [
-          { confidence: 'high', nodes: [{ id: 'gateway', name: 'Gateway', publicKey: 'aa' }] },
           {
-            confidence: 'ambiguous',
-            nodes: [{ id: 'candidate', name: 'Candidate', publicKey: 'bb' }],
+            confidence: 'high',
+            nodes: [
+              { id: 'gateway', name: 'Gateway', publicKey: 'aa', longitude: 16.5, latitude: 59.6 },
+            ],
+          },
+          {
+            confidence: 'high',
+            nodes: [
+              { id: 'relay', name: 'Relay', publicKey: 'bb', longitude: 16.52, latitude: 59.61 },
+            ],
           },
           { confidence: 'none', nodes: [] },
         ],
       }),
+      packet({ packetHash: 'pkt-two' }),
     ]);
-    const path = screen.getByRole('region', { name: 'Path' });
-    expect(path.textContent).toBe('Gateway0.00 dB→BB→CC-7.50 dB');
-    expect(within(path).queryByText('Candidate')).not.toBeInTheDocument();
-    fireEvent.click(within(path).getByRole('button', { name: 'Gateway' }));
+    // the first packet resolved two located hops: the map draws with an All selector.
+    // Isolating it filters both the map and the packet list down to that packet.
+    expect(screen.getByTestId('trace-map')).toHaveTextContent('all');
+    expect(screen.getByRole('button', { name: 'All paths' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'PKT-ONE' }));
+    expect(screen.getByTestId('trace-map')).toHaveTextContent('pkt-one');
+    expect(screen.queryByText('PKT-TWO')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Gateway' }));
     expect(onViewNode).toHaveBeenCalledExactlyOnceWith('gateway');
     expect(onAnalyze).not.toHaveBeenCalled();
   });
 
-  it('retains all hops in long paths in a keyboard-scrollable region', () => {
+  it('shows every hop of a long path without truncation', () => {
     renderDetail([
       packet({
-        rawPath: Array.from({ length: 40 }, (_, i) => ({ hash: i.toString(16).padStart(2, '0') })),
+        rawPath: Array.from({ length: 40 }, (_, i) => ({
+          hash: `p${i.toString(16).padStart(2, '0')}`,
+        })),
       }),
     ]);
-    const path = screen.getByRole('region', { name: 'Path' });
-    expect(path).toHaveAttribute('tabindex', '0');
-    expect(within(path).getByText('00')).toBeInTheDocument();
-    expect(within(path).getByText('27')).toBeInTheDocument();
+    expect(screen.getByText('P00')).toBeInTheDocument();
+    expect(screen.getByText('P27')).toBeInTheDocument();
+    expect(screen.getByText('#40')).toBeInTheDocument();
   });
 
-  it('shows the empty state without an empty table', () => {
+  it('shows the empty state without packets', () => {
     renderDetail([]);
     expect(screen.getByText('No packets')).toBeInTheDocument();
-    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+    expect(screen.queryByRole('article')).not.toBeInTheDocument();
   });
 });

@@ -147,10 +147,8 @@ describe('TraceList', () => {
     renderTraces();
     fireEvent.click(await screen.findByText('3F2A11C0'));
 
-    expect(await screen.findByRole('columnheader', { name: 'First heard' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Last heard' })).toBeInTheDocument();
     // First/Last show a relative label (same here, 122ms apart); the exact ms is in the hover tooltip
-    const labels = screen.getAllByText(`${timeAgoMs(1717689045001)} ago`);
+    const labels = await screen.findAllByText(`${timeAgoMs(1717689045001)} ago`);
     expect(labels).toHaveLength(2);
     fireEvent.pointerMove(labels[0], { pointerType: 'mouse' });
     expect((await screen.findByRole('tooltip')).textContent).toMatch(/\.001$/); // First, ms preserved
@@ -185,7 +183,7 @@ describe('TraceList', () => {
           routeTypeName: 'ROUTE_REQUEST',
           firstHeardAt: 1,
           lastHeardAt: 2,
-          rawPath: [{ hash: 'a1', snr: -7.5 }, { hash: 'b2' }],
+          rawPath: [{ hash: 'a1' }, { hash: 'b2', snr: -7.5 }],
           resolvedRoute: [
             { confidence: 'high', nodes: [{ id: 'n1', name: 'GatewayX', publicKey: 'deadbeef' }] },
             { confidence: 'none', nodes: [] },
@@ -197,12 +195,11 @@ describe('TraceList', () => {
     renderTraces();
     fireEvent.click(await screen.findByText('3F2A11C0'));
 
-    // High-confidence identity is primary; unresolved hops remain raw.
+    // the packet's compact hop list reads like the packet-path view: step number,
+    // resolved hop, then the link SNR entering it (SNR[1] = the A1→B2 link)
     const hopA = await screen.findByText('GatewayX');
     expect(hopA).toBeInTheDocument();
     expect(screen.getByText('B2')).toBeInTheDocument();
-
-    // per-hop SNR sits on a sub-line below the hop, like the TRACE payload view
     expect(screen.getByText('-7.50 dB')).toBeInTheDocument();
 
     // raw hash remains available in the resolved hop popover for debugging.
@@ -219,10 +216,10 @@ describe('TraceList', () => {
 
     expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
     expect(screen.getByText('PING')).toBeInTheDocument();
-    // the path preview shows each hop's hash byte (uppercased) with its SNR on the sub-line
+    // the path preview shows each hop's hash byte (uppercased); SNR[1] labels the A1→B2 link
     expect(screen.getByText('A1')).toBeInTheDocument();
     expect(screen.getByText('B2')).toBeInTheDocument();
-    expect(screen.getByText('-7.50 dB')).toBeInTheDocument();
+    expect(screen.getByText('-9.00 dB')).toBeInTheDocument();
   });
 
   it('shows resolved node names in the list preview only for high confidence', async () => {
@@ -242,11 +239,14 @@ describe('TraceList', () => {
     renderTraces();
 
     expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
-    // high-confidence hop shows the node name with the raw prefix retained below
+    // high-confidence hop shows the node name with the raw prefix retained in the title
     expect(screen.getByText('GatewayX')).toBeInTheDocument();
     // ambiguous and unresolved hops fall back to the raw prefix
     expect(screen.getByText('B2')).toBeInTheDocument();
     expect(screen.getByText('C3')).toBeInTheDocument();
+    // SNR[i] labels link i-1 → i: SNR[1] (-9) renders after B2, SNR[2] (-8) after C3
+    expect(screen.getByText('-9.00 dB')).toBeInTheDocument();
+    expect(screen.getByText('-8.00 dB')).toBeInTheDocument();
   });
 
   it('refetches with the type param when the trace-type filter changes', async () => {
@@ -272,7 +272,7 @@ describe('TraceList', () => {
     renderTraces();
 
     expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
-    expect(screen.getByText('+3')).toBeInTheDocument();
+    expect(screen.getByText('+5')).toBeInTheDocument();
   });
 
   it('shows an empty state when there are no traces', async () => {

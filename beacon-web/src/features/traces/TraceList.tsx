@@ -28,63 +28,76 @@ interface TraceListProps {
   onTypeFilterChange: (value: '' | TraceType) => void;
 }
 
-// The desktop row carries the most complete observation's path, so scanners can read the hops
-// (and the SNR heard on each) without opening the detail panel. Uniquely resolved hops show
-// the node name; the raw prefix stays as secondary text for diagnostics. SNR renders inline
-// in the chip title when present — no placeholder sub-line, so paths without SNR stay compact.
+// The desktop row carries the most complete observation's path as single-line chips, like the
+// Packet tab's Sökväg column (InlinePacketPath): resolved node names where confidence is high,
+// otherwise the raw prefix, capped at 4 hops with a +N remainder. SNR[i] is hop i's reading of
+// the link from hop i-1, so SNR[0] is skipped and the rest color the chip-border of the hop
+// they enter — matching the backend's neighbor-edge semantics and the map's SNR scale.
+const TRACE_PREVIEW_CHIP_CLASSES = {
+  high: 'bg-green/8 text-green',
+  ambiguous: 'bg-warn/8 text-warn',
+  none: 'bg-text-muted/8 text-text-dim',
+} as const;
+
 function TracePathPreview({
   hashes,
   snrs,
   resolved,
   overflow = 0,
-  compact = false,
 }: {
   hashes: string[];
   snrs: number[];
   resolved?: { confidence: string; nodeName?: string }[];
   overflow?: number;
-  compact?: boolean;
 }) {
   return (
-    <div className={`${compact ? '' : 'mt-1.5 '}flex flex-wrap items-center gap-x-1 gap-y-1.5`}>
+    <span
+      className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap font-mono"
+      title={hashes.map((h) => h.toUpperCase()).join(' → ')}
+    >
       {hashes.map((hash, i) => {
-        const snr = snrs?.[i];
+        // SNR[i] is hop i's reading of the link from hop i-1: skip SNR[0] (no upstream link)
+        // and render the rest as compact colored text after the hop they enter.
+        const snr = i > 0 ? snrs?.[i] : undefined;
         const level = snr != null ? snrLevel(snr) : null;
         const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
         const hop = resolved?.[i];
-        const named = hop?.confidence === 'high' && hop.nodeName;
+        const confidence =
+          hop?.confidence === 'high' || hop?.confidence === 'ambiguous' ? hop.confidence : 'none';
+        const label = confidence === 'high' && hop?.nodeName ? hop.nodeName : hash.toUpperCase();
         const title =
-          snr != null ? `${hash.toUpperCase()} · ${formatSnr(snr)} dB` : hash.toUpperCase();
+          snr != null
+            ? `${label} · ${hash.toUpperCase()} · ${formatSnr(snr)} dB`
+            : label !== hash.toUpperCase()
+              ? `${label} · ${hash.toUpperCase()}`
+              : label;
         return (
-          <span key={i} className="inline-flex min-w-0 max-w-full shrink-0 items-center gap-1">
+          <span key={`${i}-${hash}`} className="contents">
             {i > 0 && (
-              <span className="text-text-dim" aria-hidden>
+              <span className="shrink-0 text-text-dim" aria-hidden>
                 →
               </span>
             )}
             <span
-              className="inline-flex min-w-0 max-w-full flex-col items-center gap-0.5"
-              title={named ? title : undefined}
+              className={`max-w-28 shrink truncate rounded-sm px-1 py-px font-semibold ${TRACE_PREVIEW_CHIP_CLASSES[confidence]}`}
+              title={title}
             >
-              <span className="max-w-full [overflow-wrap:anywhere] px-1.5 py-px rounded-sm bg-primary/6 text-primary font-mono text-[11px] font-semibold">
-                {named ? hop.nodeName : hash.toUpperCase()}
-              </span>
-              {named && (
-                <span className="font-mono text-[10px] text-text-dim">{hash.toUpperCase()}</span>
-              )}
-              {snr != null && (
-                <span className={`font-mono text-[10px] ${sigClass}`}>{formatSnr(snr)} dB</span>
-              )}
+              {label}
             </span>
+            {snr != null && (
+              <span className={`shrink-0 text-[10px] ${sigClass}`} title={title}>
+                {formatSnr(snr)} dB
+              </span>
+            )}
           </span>
         );
       })}
-      {overflow > 0 && <span className="font-mono text-[11px] text-text-dim">+{overflow}</span>}
-    </div>
+      {overflow > 0 && <span className="shrink-0 text-text-dim">+{overflow}</span>}
+    </span>
   );
 }
 
-const TRACE_PATH_PREVIEW_HOPS = 6;
+const TRACE_PATH_PREVIEW_HOPS = 4;
 
 function traceColumns(t: TFunction): Column<TraceTagSummary>[] {
   return [
@@ -229,7 +242,7 @@ export function TraceList({
   const mobileSortOptions = useMemo(() => traceMobileSortOptions(t), [t]);
 
   return (
-    <div className="flex flex-1 min-h-0">
+    <div className="relative flex flex-1 min-h-0">
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
           <span className="font-mono text-[11px] text-text-dim">

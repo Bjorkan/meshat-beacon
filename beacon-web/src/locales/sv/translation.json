@@ -335,8 +335,8 @@
     "collapseRoute": "Visa kompakt rutt"
   },
   "traces": {
-    "firstHeard": "Första hörd",
-    "lastHeard": "Senaste hörd",
+    "firstHeard": "Först hörd",
+    "lastHeard": "Senast hörd",
     "type": "Trace-typ",
     "path": "Sökväg",
     "firstSeen": "Först sedd",
@@ -350,6 +350,9 @@
     "packet_one": "{{count}} paket",
     "packet_other": "{{count}} paket",
     "noPackets": "Inga paket",
+    "mapSnrHint": "Länkfärg: SNR i samma skala som grannlänkarna. Blå länk saknar mätvärde; streckad länk är osäkert matchad.",
+    "legSnr": "Länk {{from}} → {{to}} · {{snr}} dB",
+    "noSnr": "SNR saknas",
     "summary": "{{packets}} pkt · {{iatas}} IATA"
   },
   "stats": {

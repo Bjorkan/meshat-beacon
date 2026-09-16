@@ -63,6 +63,10 @@ interface DetailPanelProps {
   collapsible?: boolean;
   // Rich tabular details need more room than the default entity sidebar.
   wide?: boolean;
+  // Overlay floats over the tab content at lg+ instead of squeezing the list beside it.
+  // Trace-detaljen behöver det: kartan + hopplistan kräver bredd som en statisk sidebar
+  // stjäl från listan (sidan växer då bredare än viewporten).
+  overlay?: boolean;
   isLoading?: boolean;
   loadError?: boolean;
   onRetry?: () => void;
@@ -80,6 +84,7 @@ export function DetailPanel({
   onClose,
   collapsible,
   wide,
+  overlay,
   isLoading,
   loadError,
   onRetry,
@@ -95,9 +100,14 @@ export function DetailPanel({
   // collapse only touches the compact overlay: shrink to a bottom bar and hide the body. The lg:*
   // classes below always win at desktop width, so a lingering collapsed state never hides the sidebar.
   const minimized = Boolean(collapsible && collapsed);
+  // Overlay-paneler flyter över tabbinnehållet från höger på lg+ istället för att
+  // krympa listan bredvid sig — annars växer sidan bredare än viewporten.
+  const desktopClass = overlay
+    ? 'lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-30 lg:w-3/4 lg:shadow-2xl'
+    : `lg:static lg:inset-auto lg:z-auto lg:shrink-0 ${wide ? 'lg:w-3/4' : 'lg:w-[400px]'}`;
   return (
     <div
-      className={`${minimized ? 'absolute inset-x-0 bottom-0' : 'absolute inset-0'} z-30 w-full lg:static lg:inset-auto lg:z-auto lg:shrink-0 ${wide ? 'lg:w-3/4' : 'lg:w-[400px]'} lg:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden`}
+      className={`${minimized ? 'absolute inset-x-0 bottom-0' : 'absolute inset-0'} z-30 w-full ${desktopClass} lg:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden`}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
         <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">

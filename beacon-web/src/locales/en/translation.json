@@ -350,6 +350,9 @@
     "packet_one": "{{count}} packet",
     "packet_other": "{{count}} packets",
     "noPackets": "No packets",
+    "mapSnrHint": "Link color: SNR on the same scale as neighbor links. Blue has no measurement; dashed is an uncertain match.",
+    "legSnr": "Link {{from}} → {{to}} · {{snr}} dB",
+    "noSnr": "No SNR value",
     "summary": "{{packets}} pkt · {{iatas}} IATA"
   },
   "stats": {
