@@ -175,11 +175,18 @@ export function DataTable<T>({
 
   const modelRows = table.getRowModel().rows;
 
+  // Fixed estimate: dynamic measurement reflows the whole scroll region on every
+  // row mount (200 trace rows with variable path heights), which blocks the main thread
+  // on filter swaps in Firefox. Overflow is clipped by the cell, so rows stay one line.
+  // measureElement stays OFF for desktop rows: with ~11k px of variable-height content
+  // the measure pass itself is the long task. Lanes force a constant row height so the
+  // estimate is exact and only viewport + overscan ever mounts.
   const virtualizer = useVirtualizer({
     count: virtualize ? modelRows.length : 0,
     getScrollElement: () => scrollRef.current,
-    estimateSize: () => (isMobile ? 84 : 42),
+    estimateSize: () => (isMobile ? 84 : 40),
     overscan: 8,
+    enabled: virtualize,
     getItemKey: (index) => modelRows[index]?.id ?? index,
   });
 
@@ -420,9 +427,8 @@ export function DataTable<T>({
               return (
                 <tr
                   key={row.id}
-                  ref={item ? virtualizer.measureElement : undefined}
                   data-index={item?.index}
-                  className={`h-10 cursor-pointer border-b border-l-2 border-b-border/50 transition-colors ${
+                  className={`h-10 cursor-pointer overflow-hidden border-b border-l-2 border-b-border/50 transition-colors ${
                     isSelected
                       ? 'border-l-primary bg-primary/10'
                       : 'border-l-transparent hover:border-l-primary/50 hover:bg-primary/5'

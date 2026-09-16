@@ -26,174 +26,174 @@ async function request<T>(route: string, query?: Record<string, QueryValue>, ini
   return await res.json() as T;
 }
 
-export async function rawGetBrokers(): Promise<Array<Models.BrokerStatus>> {
-  return request<Array<Models.BrokerStatus>>("/brokers", undefined);
+export async function rawGetBrokers(init?: RequestInit): Promise<Array<Models.BrokerStatus>> {
+  return request<Array<Models.BrokerStatus>>("/brokers", undefined, init);
 }
 
-export async function rawGetChannels(params: { key?: "known" | "unknown" | "all"; hash?: string; iata?: string; iatas?: string; cursor?: number; limit?: number; }): Promise<Models.ChannelPage> {
-  return request<Models.ChannelPage>("/channels", { "key": params.key, "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetChannels(params: { key?: "known" | "unknown" | "all"; hash?: string; iata?: string; iatas?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.ChannelPage> {
+  return request<Models.ChannelPage>("/channels", { "key": params.key, "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetChannelsChannelID(params: { channelID: number; }): Promise<Models.Channel> {
-  return request<Models.Channel>(`/channels/${encodeURIComponent(String(params.channelID))}`, undefined);
+export async function rawGetChannelsChannelID(params: { channelID: number; }, init?: RequestInit): Promise<Models.Channel> {
+  return request<Models.Channel>(`/channels/${encodeURIComponent(String(params.channelID))}`, undefined, init);
 }
 
-export async function rawGetChannelsChannelIDMessages(params: { channelID: number; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<Models.PageChannelMessage> {
-  return request<Models.PageChannelMessage>(`/channels/${encodeURIComponent(String(params.channelID))}/messages`, { "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetChannelsChannelIDMessages(params: { channelID: number; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageChannelMessage> {
+  return request<Models.PageChannelMessage>(`/channels/${encodeURIComponent(String(params.channelID))}/messages`, { "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetIatas(): Promise<Array<Models.IATA>> {
-  return request<Array<Models.IATA>>("/iatas", undefined);
+export async function rawGetIatas(init?: RequestInit): Promise<Array<Models.IATA>> {
+  return request<Array<Models.IATA>>("/iatas", undefined, init);
 }
 
-export async function rawGetIatasIata(params: { iata: string; }): Promise<Models.IATA> {
-  return request<Models.IATA>(`/iatas/${encodeURIComponent(String(params.iata))}`, undefined);
+export async function rawGetIatasIata(params: { iata: string; }, init?: RequestInit): Promise<Models.IATA> {
+  return request<Models.IATA>(`/iatas/${encodeURIComponent(String(params.iata))}`, undefined, init);
 }
 
-export async function rawGetIatasIataBorder(params: { iata: string; }): Promise<unknown> {
-  return request<unknown>(`/iatas/${encodeURIComponent(String(params.iata))}/border`, undefined);
+export async function rawGetIatasIataBorder(params: { iata: string; }, init?: RequestInit): Promise<unknown> {
+  return request<unknown>(`/iatas/${encodeURIComponent(String(params.iata))}/border`, undefined, init);
 }
 
-export async function rawGetMessages(params: { channelID?: number; channelHash?: string; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }): Promise<Models.PageChannelMessage> {
-  return request<Models.PageChannelMessage>("/messages", { "channelID": params.channelID, "channelHash": params.channelHash, "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetMessages(params: { channelID?: number; channelHash?: string; since?: number; iatas?: string; regionId?: number; region?: string; scope?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageChannelMessage> {
+  return request<Models.PageChannelMessage>("/messages", { "channelID": params.channelID, "channelHash": params.channelHash, "since": params.since, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "scope": params.scope, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetMessagesBackfill(params: { afterId: number; iatas?: string; region?: string; regionId?: number; scope?: string; limit?: number; }): Promise<Array<Models.ChannelMessage>> {
-  return request<Array<Models.ChannelMessage>>("/messages/backfill", { "afterId": params.afterId, "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "limit": params.limit });
+export async function rawGetMessagesBackfill(params: { afterId: number; iatas?: string; region?: string; regionId?: number; scope?: string; limit?: number; }, init?: RequestInit): Promise<Array<Models.ChannelMessage>> {
+  return request<Array<Models.ChannelMessage>>("/messages/backfill", { "afterId": params.afterId, "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "limit": params.limit }, init);
 }
 
-export async function rawGetNodes(params: { type?: number; typeName?: string; iata?: string; iatas?: string; regionId?: number; region?: string; name?: string; scope?: string; pubkey?: string; pubkeyPrefix?: string; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; neighbors?: boolean; meshcoreRegion?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }): Promise<Models.PageNodeSummary> {
-  return request<Models.PageNodeSummary>("/nodes", { "type": params.type, "typeName": params.typeName, "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "name": params.name, "scope": params.scope, "pubkey": params.pubkey, "pubkeyPrefix": params.pubkeyPrefix, "supportsMultibytePaths": params.supportsMultibytePaths, "supportsMultibyteTraces": params.supportsMultibyteTraces, "neighbors": params.neighbors, "meshcoreRegion": params.meshcoreRegion, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetNodes(params: { type?: number; typeName?: string; iata?: string; iatas?: string; regionId?: number; region?: string; name?: string; scope?: string; pubkey?: string; pubkeyPrefix?: string; supportsMultibytePaths?: boolean; supportsMultibyteTraces?: boolean; neighbors?: boolean; meshcoreRegion?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageNodeSummary> {
+  return request<Models.PageNodeSummary>("/nodes", { "type": params.type, "typeName": params.typeName, "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "name": params.name, "scope": params.scope, "pubkey": params.pubkey, "pubkeyPrefix": params.pubkeyPrefix, "supportsMultibytePaths": params.supportsMultibytePaths, "supportsMultibyteTraces": params.supportsMultibyteTraces, "neighbors": params.neighbors, "meshcoreRegion": params.meshcoreRegion, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetNodesAmbiguousPrefix2(): Promise<Array<string>> {
-  return request<Array<string>>("/nodes/ambiguous-prefix2", undefined);
+export async function rawGetNodesAmbiguousPrefix2(init?: RequestInit): Promise<Array<string>> {
+  return request<Array<string>>("/nodes/ambiguous-prefix2", undefined, init);
 }
 
-export async function rawGetNodesMeshcoreRegions(): Promise<Array<Models.MeshCoreRegion>> {
-  return request<Array<Models.MeshCoreRegion>>("/nodes/meshcore-regions", undefined);
+export async function rawGetNodesMeshcoreRegions(init?: RequestInit): Promise<Array<Models.MeshCoreRegion>> {
+  return request<Array<Models.MeshCoreRegion>>("/nodes/meshcore-regions", undefined, init);
 }
 
-export async function rawGetNodesNodeId(params: { nodeId: string; }): Promise<Models.Node> {
-  return request<Models.Node>(`/nodes/${encodeURIComponent(String(params.nodeId))}`, undefined);
+export async function rawGetNodesNodeId(params: { nodeId: string; }, init?: RequestInit): Promise<Models.Node> {
+  return request<Models.Node>(`/nodes/${encodeURIComponent(String(params.nodeId))}`, undefined, init);
 }
 
-export async function rawGetNodesNodeIdNeighbors(params: { nodeId: string; }): Promise<Array<Models.NodeNeighbor>> {
-  return request<Array<Models.NodeNeighbor>>(`/nodes/${encodeURIComponent(String(params.nodeId))}/neighbors`, undefined);
+export async function rawGetNodesNodeIdNeighbors(params: { nodeId: string; }, init?: RequestInit): Promise<Array<Models.NodeNeighbor>> {
+  return request<Array<Models.NodeNeighbor>>(`/nodes/${encodeURIComponent(String(params.nodeId))}/neighbors`, undefined, init);
 }
 
-export async function rawGetNodesNodeIdObservations(params: { nodeId: string; cursor?: number; limit?: number; }): Promise<Models.PagePacketObservationSummary> {
-  return request<Models.PagePacketObservationSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/observations`, { "cursor": params.cursor, "limit": params.limit });
+export async function rawGetNodesNodeIdObservations(params: { nodeId: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PagePacketObservationSummary> {
+  return request<Models.PagePacketObservationSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/observations`, { "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetNodesNodeIdPathPackets(params: { nodeId: string; iatas?: string; regionId?: number; region?: string; pageToken?: string; limit?: number; }): Promise<Models.PagePacketSummary> {
-  return request<Models.PagePacketSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/path-packets`, { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "pageToken": params.pageToken, "limit": params.limit });
+export async function rawGetNodesNodeIdPathPackets(params: { nodeId: string; iatas?: string; regionId?: number; region?: string; pageToken?: string; limit?: number; }, init?: RequestInit): Promise<Models.PagePacketSummary> {
+  return request<Models.PagePacketSummary>(`/nodes/${encodeURIComponent(String(params.nodeId))}/path-packets`, { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "pageToken": params.pageToken, "limit": params.limit }, init);
 }
 
-export async function rawGetObservers(params: { iata?: string; iatas?: string; regionId?: number; region?: string; type?: string; broker?: string; status?: string; name?: string; scope?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }): Promise<Models.PageObserverSummary> {
-  return request<Models.PageObserverSummary>("/observers", { "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "type": params.type, "broker": params.broker, "status": params.status, "name": params.name, "scope": params.scope, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetObservers(params: { iata?: string; iatas?: string; regionId?: number; region?: string; type?: string; broker?: string; status?: string; name?: string; scope?: string; sort?: string; direction?: string; pageToken?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageObserverSummary> {
+  return request<Models.PageObserverSummary>("/observers", { "iata": params.iata, "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "type": params.type, "broker": params.broker, "status": params.status, "name": params.name, "scope": params.scope, "sort": params.sort, "direction": params.direction, "pageToken": params.pageToken, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetObserversObserverId(params: { observerId: string; }): Promise<Models.Observer> {
-  return request<Models.Observer>(`/observers/${encodeURIComponent(String(params.observerId))}`, undefined);
+export async function rawGetObserversObserverId(params: { observerId: string; }, init?: RequestInit): Promise<Models.Observer> {
+  return request<Models.Observer>(`/observers/${encodeURIComponent(String(params.observerId))}`, undefined, init);
 }
 
-export async function rawGetObserversObserverIdAdverts(params: { observerId: string; cursor?: number; limit?: number; }): Promise<Models.PageAdvertObservation> {
-  return request<Models.PageAdvertObservation>(`/observers/${encodeURIComponent(String(params.observerId))}/adverts`, { "cursor": params.cursor, "limit": params.limit });
+export async function rawGetObserversObserverIdAdverts(params: { observerId: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageAdvertObservation> {
+  return request<Models.PageAdvertObservation>(`/observers/${encodeURIComponent(String(params.observerId))}/adverts`, { "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetObserversObserverIdTelemetry(params: { observerId: string; range?: string; afterId?: number; interval?: string; }): Promise<Models.ObserverTelemetry> {
-  return request<Models.ObserverTelemetry>(`/observers/${encodeURIComponent(String(params.observerId))}/telemetry`, { "range": params.range, "afterId": params.afterId, "interval": params.interval });
+export async function rawGetObserversObserverIdTelemetry(params: { observerId: string; range?: string; afterId?: number; interval?: string; }, init?: RequestInit): Promise<Models.ObserverTelemetry> {
+  return request<Models.ObserverTelemetry>(`/observers/${encodeURIComponent(String(params.observerId))}/telemetry`, { "range": params.range, "afterId": params.afterId, "interval": params.interval }, init);
 }
 
-export async function rawGetPackets(params: { payloadType?: number; payloadTypes?: string; payloadTypeName?: string; routeType?: number; routeTypes?: string; iata?: string; iatas?: string; scope?: string; scopes?: string; observer?: string; observers?: string; q?: string; searchField?: string; regionId?: number; region?: string; since?: number; until?: number; cursor?: number; limit?: number; include?: string; }): Promise<Models.PagePacketSummary> {
-  return request<Models.PagePacketSummary>("/packets", { "payloadType": params.payloadType, "payloadTypes": params.payloadTypes, "payloadTypeName": params.payloadTypeName, "routeType": params.routeType, "routeTypes": params.routeTypes, "iata": params.iata, "iatas": params.iatas, "scope": params.scope, "scopes": params.scopes, "observer": params.observer, "observers": params.observers, "q": params.q, "searchField": params.searchField, "regionId": params.regionId, "region": params.region, "since": params.since, "until": params.until, "cursor": params.cursor, "limit": params.limit, "include": params.include });
+export async function rawGetPackets(params: { payloadType?: number; payloadTypes?: string; payloadTypeName?: string; routeType?: number; routeTypes?: string; iata?: string; iatas?: string; scope?: string; scopes?: string; observer?: string; observers?: string; q?: string; searchField?: string; regionId?: number; region?: string; since?: number; until?: number; cursor?: number; limit?: number; include?: string; }, init?: RequestInit): Promise<Models.PagePacketSummary> {
+  return request<Models.PagePacketSummary>("/packets", { "payloadType": params.payloadType, "payloadTypes": params.payloadTypes, "payloadTypeName": params.payloadTypeName, "routeType": params.routeType, "routeTypes": params.routeTypes, "iata": params.iata, "iatas": params.iatas, "scope": params.scope, "scopes": params.scopes, "observer": params.observer, "observers": params.observers, "q": params.q, "searchField": params.searchField, "regionId": params.regionId, "region": params.region, "since": params.since, "until": params.until, "cursor": params.cursor, "limit": params.limit, "include": params.include }, init);
 }
 
-export async function rawGetPacketsBackfill(params: { afterObservationId: number; payloadType?: number; payloadTypeName?: string; routeType?: number; iatas?: string; region?: string; regionId?: number; scope?: string; limit?: number; include?: string; }): Promise<Array<Models.PacketSummary>> {
-  return request<Array<Models.PacketSummary>>("/packets/backfill", { "afterObservationId": params.afterObservationId, "payloadType": params.payloadType, "payloadTypeName": params.payloadTypeName, "routeType": params.routeType, "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "limit": params.limit, "include": params.include });
+export async function rawGetPacketsBackfill(params: { afterObservationId: number; payloadType?: number; payloadTypeName?: string; routeType?: number; iatas?: string; region?: string; regionId?: number; scope?: string; limit?: number; include?: string; }, init?: RequestInit): Promise<Array<Models.PacketSummary>> {
+  return request<Array<Models.PacketSummary>>("/packets/backfill", { "afterObservationId": params.afterObservationId, "payloadType": params.payloadType, "payloadTypeName": params.payloadTypeName, "routeType": params.routeType, "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "limit": params.limit, "include": params.include }, init);
 }
 
-export async function rawGetPacketsPacketHash(params: { packetHash: string; }): Promise<Models.Packet> {
-  return request<Models.Packet>(`/packets/${encodeURIComponent(String(params.packetHash))}`, undefined);
+export async function rawGetPacketsPacketHash(params: { packetHash: string; }, init?: RequestInit): Promise<Models.Packet> {
+  return request<Models.Packet>(`/packets/${encodeURIComponent(String(params.packetHash))}`, undefined, init);
 }
 
-export async function rawGetRegions(): Promise<Array<Models.RegionSummary>> {
-  return request<Array<Models.RegionSummary>>("/regions", undefined);
+export async function rawGetRegions(init?: RequestInit): Promise<Array<Models.RegionSummary>> {
+  return request<Array<Models.RegionSummary>>("/regions", undefined, init);
 }
 
-export async function rawGetRegionsRegionId(params: { regionId: number; }): Promise<Models.Region> {
-  return request<Models.Region>(`/regions/${encodeURIComponent(String(params.regionId))}`, undefined);
+export async function rawGetRegionsRegionId(params: { regionId: number; }, init?: RequestInit): Promise<Models.Region> {
+  return request<Models.Region>(`/regions/${encodeURIComponent(String(params.regionId))}`, undefined, init);
 }
 
-export async function rawGetRoutes(params: { iata?: string; iatas?: string; hopCount?: number; cursor?: number; pageToken?: string; sort?: string; direction?: string; limit?: number; }): Promise<Models.PageKnownRoute> {
-  return request<Models.PageKnownRoute>("/routes", { "iata": params.iata, "iatas": params.iatas, "hopCount": params.hopCount, "cursor": params.cursor, "pageToken": params.pageToken, "sort": params.sort, "direction": params.direction, "limit": params.limit });
+export async function rawGetRoutes(params: { iata?: string; iatas?: string; hopCount?: number; cursor?: number; pageToken?: string; sort?: string; direction?: string; limit?: number; }, init?: RequestInit): Promise<Models.PageKnownRoute> {
+  return request<Models.PageKnownRoute>("/routes", { "iata": params.iata, "iatas": params.iatas, "hopCount": params.hopCount, "cursor": params.cursor, "pageToken": params.pageToken, "sort": params.sort, "direction": params.direction, "limit": params.limit }, init);
 }
 
-export async function rawGetRoutesCross(params: { fromHash: string; fromIata: string; toHash: string; toIata: string; }): Promise<Array<Models.CrossIATARoute>> {
-  return request<Array<Models.CrossIATARoute>>("/routes/cross", { "fromHash": params.fromHash, "fromIata": params.fromIata, "toHash": params.toHash, "toIata": params.toIata });
+export async function rawGetRoutesCross(params: { fromHash: string; fromIata: string; toHash: string; toIata: string; }, init?: RequestInit): Promise<Array<Models.CrossIATARoute>> {
+  return request<Array<Models.CrossIATARoute>>("/routes/cross", { "fromHash": params.fromHash, "fromIata": params.fromIata, "toHash": params.toHash, "toIata": params.toIata }, init);
 }
 
-export async function rawGetRoutesSearch(params: { iata: string; from: string; to: string; }): Promise<Array<Models.KnownRoute>> {
-  return request<Array<Models.KnownRoute>>("/routes/search", { "iata": params.iata, "from": params.from, "to": params.to });
+export async function rawGetRoutesSearch(params: { iata: string; from: string; to: string; }, init?: RequestInit): Promise<Array<Models.KnownRoute>> {
+  return request<Array<Models.KnownRoute>>("/routes/search", { "iata": params.iata, "from": params.from, "to": params.to }, init);
 }
 
-export async function rawGetScopes(params: { iatas?: string; region?: string; regionId?: number; }): Promise<unknown> {
-  return request<unknown>("/scopes", { "iatas": params.iatas, "region": params.region, "regionId": params.regionId });
+export async function rawGetScopes(params: { iatas?: string; region?: string; regionId?: number; }, init?: RequestInit): Promise<unknown> {
+  return request<unknown>("/scopes", { "iatas": params.iatas, "region": params.region, "regionId": params.regionId }, init);
 }
 
-export async function rawGetScopesName(params: { name: string; }): Promise<Models.ScopeDetail> {
-  return request<Models.ScopeDetail>(`/scopes/${encodeURIComponent(String(params.name))}`, undefined);
+export async function rawGetScopesName(params: { name: string; }, init?: RequestInit): Promise<Models.ScopeDetail> {
+  return request<Models.ScopeDetail>(`/scopes/${encodeURIComponent(String(params.name))}`, undefined, init);
 }
 
-export async function rawGetStatsClockDrift(params: { iatas?: string; regionId?: number; region?: string; limit?: number; }): Promise<Array<Models.ClockDriftEntry>> {
-  return request<Array<Models.ClockDriftEntry>>("/stats/clock-drift", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "limit": params.limit });
+export async function rawGetStatsClockDrift(params: { iatas?: string; regionId?: number; region?: string; limit?: number; }, init?: RequestInit): Promise<Array<Models.ClockDriftEntry>> {
+  return request<Array<Models.ClockDriftEntry>>("/stats/clock-drift", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "limit": params.limit }, init);
 }
 
-export async function rawGetStatsNodeTypes(params: { iatas?: string; regionId?: number; region?: string; }): Promise<Array<Models.NodeTypeCount>> {
-  return request<Array<Models.NodeTypeCount>>("/stats/node-types", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region });
+export async function rawGetStatsNodeTypes(params: { iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Array<Models.NodeTypeCount>> {
+  return request<Array<Models.NodeTypeCount>>("/stats/node-types", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
-export async function rawGetStatsObservations(params: { iatas?: string; regionId?: number; region?: string; since?: number; }): Promise<Array<Models.ObservationPoint>> {
-  return request<Array<Models.ObservationPoint>>("/stats/observations", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since });
+export async function rawGetStatsObservations(params: { iatas?: string; regionId?: number; region?: string; since?: number; }, init?: RequestInit): Promise<Array<Models.ObservationPoint>> {
+  return request<Array<Models.ObservationPoint>>("/stats/observations", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since }, init);
 }
 
-export async function rawGetStatsOverview(params: { iatas?: string; regionId?: number; region?: string; }): Promise<Models.StatsOverview> {
-  return request<Models.StatsOverview>("/stats/overview", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region });
+export async function rawGetStatsOverview(params: { iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Models.StatsOverview> {
+  return request<Models.StatsOverview>("/stats/overview", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
-export async function rawGetStatsPayloadBreakdown(params: { iatas?: string; regionId?: number; region?: string; since?: number; }): Promise<Array<Models.PayloadBreakdownItem>> {
-  return request<Array<Models.PayloadBreakdownItem>>("/stats/payload-breakdown", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since });
+export async function rawGetStatsPayloadBreakdown(params: { iatas?: string; regionId?: number; region?: string; since?: number; }, init?: RequestInit): Promise<Array<Models.PayloadBreakdownItem>> {
+  return request<Array<Models.PayloadBreakdownItem>>("/stats/payload-breakdown", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since }, init);
 }
 
-export async function rawGetStatsRadioPresets(params: { preset?: string; iatas?: string; regionId?: number; region?: string; }): Promise<Array<Models.RadioPreset>> {
-  return request<Array<Models.RadioPreset>>("/stats/radio-presets", { "preset": params.preset, "iatas": params.iatas, "regionId": params.regionId, "region": params.region });
+export async function rawGetStatsRadioPresets(params: { preset?: string; iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Array<Models.RadioPreset>> {
+  return request<Array<Models.RadioPreset>>("/stats/radio-presets", { "preset": params.preset, "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
-export async function rawGetStatsScopes(): Promise<Array<Models.ScopeStats>> {
-  return request<Array<Models.ScopeStats>>("/stats/scopes", undefined);
+export async function rawGetStatsScopes(init?: RequestInit): Promise<Array<Models.ScopeStats>> {
+  return request<Array<Models.ScopeStats>>("/stats/scopes", undefined, init);
 }
 
-export async function rawGetStatsTopAdvertisers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }): Promise<Array<Models.TopAdvertiser>> {
-  return request<Array<Models.TopAdvertiser>>("/stats/top-advertisers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit });
+export async function rawGetStatsTopAdvertisers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }, init?: RequestInit): Promise<Array<Models.TopAdvertiser>> {
+  return request<Array<Models.TopAdvertiser>>("/stats/top-advertisers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit }, init);
 }
 
-export async function rawGetStatsTopNodes(params: { iatas?: string; regionId?: number; region?: string; limit?: number; }): Promise<Array<Models.TopNode>> {
-  return request<Array<Models.TopNode>>("/stats/top-nodes", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "limit": params.limit });
+export async function rawGetStatsTopNodes(params: { iatas?: string; regionId?: number; region?: string; limit?: number; }, init?: RequestInit): Promise<Array<Models.TopNode>> {
+  return request<Array<Models.TopNode>>("/stats/top-nodes", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "limit": params.limit }, init);
 }
 
-export async function rawGetStatsTopObservers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }): Promise<Array<Models.TopObserver>> {
-  return request<Array<Models.TopObserver>>("/stats/top-observers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit });
+export async function rawGetStatsTopObservers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }, init?: RequestInit): Promise<Array<Models.TopObserver>> {
+  return request<Array<Models.TopObserver>>("/stats/top-observers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit }, init);
 }
 
-export async function rawGetStatsTopTalkers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }): Promise<Array<Models.TopTalker>> {
-  return request<Array<Models.TopTalker>>("/stats/top-talkers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit });
+export async function rawGetStatsTopTalkers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }, init?: RequestInit): Promise<Array<Models.TopTalker>> {
+  return request<Array<Models.TopTalker>>("/stats/top-talkers", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since, "limit": params.limit }, init);
 }
 
-export async function rawGetTraces(params: { iatas?: string; region?: string; regionId?: number; scope?: string; type?: string; since?: number; until?: number; cursor?: number; limit?: number; }): Promise<Array<Models.TraceTagSummary>> {
-  return request<Array<Models.TraceTagSummary>>("/traces", { "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "type": params.type, "since": params.since, "until": params.until, "cursor": params.cursor, "limit": params.limit });
+export async function rawGetTraces(params: { iatas?: string; region?: string; regionId?: number; scope?: string; type?: string; since?: number; until?: number; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Array<Models.TraceTagSummary>> {
+  return request<Array<Models.TraceTagSummary>>("/traces", { "iatas": params.iatas, "region": params.region, "regionId": params.regionId, "scope": params.scope, "type": params.type, "since": params.since, "until": params.until, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
-export async function rawGetTracesTag(params: { tag: string; }): Promise<Models.TraceDetail> {
-  return request<Models.TraceDetail>(`/traces/${encodeURIComponent(String(params.tag))}`, undefined);
+export async function rawGetTracesTag(params: { tag: string; }, init?: RequestInit): Promise<Models.TraceDetail> {
+  return request<Models.TraceDetail>(`/traces/${encodeURIComponent(String(params.tag))}`, undefined, init);
 }

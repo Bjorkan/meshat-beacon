@@ -157,6 +157,51 @@ describe('TraceList', () => {
     await waitFor(() => expect(screen.getByRole('tooltip').textContent).toMatch(/\.123$/)); // Last, ms preserved
   });
 
+  it('aborts the superseded filter fetch so a stale 200-row response never commits', async () => {
+    let resolveFirst!: (value: TraceTagSummary[]) => void;
+    const first = new Promise<TraceTagSummary[]>((resolve) => {
+      resolveFirst = resolve;
+    });
+    mockGetTraces.mockImplementationOnce(() => first);
+    mockGetTraces.mockResolvedValue([tag('ping-tag', 1, { traceType: 'PING' })]);
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>
+        <RegionProvider defaultSelection={ALL_REGIONS}>{children}</RegionProvider>
+      </QueryClientProvider>
+    );
+    function TraceHarness() {
+      const [typeFilter, setTypeFilter] = useState<'' | 'TRACE' | 'PING'>('');
+      return (
+        <TraceList onAnalyze={vi.fn()} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} />
+      );
+    }
+    render(<TraceHarness />, { wrapper });
+
+    // switch All -> Ping while the All fetch is still in flight: TanStack must abort it
+    fireEvent.click(screen.getByRole('button', { name: 'Ping' }));
+    await screen.findByText('PING-TAG');
+    resolveFirst([tag('stale-tag', 1)]);
+    // let the stale promise settle — it must not clobber the Ping view
+    await waitFor(() => expect(screen.queryByText('STALE-TAG')).not.toBeInTheDocument());
+    expect(screen.getByText('PING-TAG')).toBeInTheDocument();
+  });
+
+  it('renders dense timestamp cells as static text without ticker or tooltip trees', async () => {
+    mockGetTraces.mockResolvedValue([
+      tag('3f2a11c0', 4, { traceType: 'PING', pathHashes: ['a1', 'b2'], snrValues: [-7.5, -9] }),
+    ]);
+
+    renderTraces();
+
+    await screen.findByText('3F2A11C0');
+    // static timestamps carry the absolute time as a native title, not a Radix tooltip
+    const cells = screen.getAllByTitle(/^\d{4}-\d{2}-\d{2} /);
+    expect(cells.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
   it('opens Analyze explicitly without making the entire packet row clickable', async () => {
     mockGetTraces.mockResolvedValue([tag('3f2a11c0', 2)]);
     mockGetTraceDetail.mockResolvedValue(detail);

@@ -560,11 +560,17 @@ export const traceQueries = {
   list: (args: { regionKey: string; iatas?: string[]; type?: string; limit?: number }) =>
     queryOptions({
       queryKey: ['traces', args.regionKey, args.type ?? ''] as const,
-      queryFn: () =>
-        getTraces(args.iatas, {
-          limit: args.limit,
-          type: (args.type || undefined) as TraceType | undefined,
-        }),
+      // TanStack cancels the in-flight fetch when the filter changes (signal aborted),
+      // so a superseded 200-row response never parses, caches, or commits a stale render.
+      queryFn: ({ signal }) =>
+        getTraces(
+          args.iatas,
+          {
+            limit: args.limit,
+            type: (args.type || undefined) as TraceType | undefined,
+          },
+          { signal },
+        ),
       staleTime: 30_000,
     }),
   detail: (tag: string) =>

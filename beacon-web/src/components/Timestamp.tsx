@@ -9,6 +9,10 @@ interface TimestampProps {
   ms?: boolean; // include .mmm in the absolute form (default false)
   className?: string;
   insideButton?: boolean;
+  // Dense tables (200 virtualized trace rows = ~400 instances) must stay cheap: plain text
+  // with the absolute time as a native title, no ticker subscription, no Radix tooltip tree.
+  // Default false preserves the live relative label + rich tooltip everywhere else.
+  static?: boolean;
 }
 
 // The single way to render a timestamp across the app. Defaults to a relative label ("2m ago") with
@@ -21,7 +25,51 @@ export function Timestamp({
   ms,
   className,
   insideButton,
+  static: staticText,
 }: TimestampProps) {
+  return staticText ? (
+    <StaticTimestamp value={value} mode={mode} ms={ms} className={className} />
+  ) : (
+    <LiveTimestamp
+      value={value}
+      mode={mode}
+      ms={ms}
+      className={className}
+      insideButton={insideButton}
+    />
+  );
+}
+
+// Static mode: no useTick subscription, no tooltip tree — safe inside 200-row tables.
+function StaticTimestamp({
+  value,
+  mode = 'relative',
+  ms,
+  className,
+}: Pick<TimestampProps, 'value' | 'mode' | 'ms' | 'className'>) {
+  const { t } = useTranslation();
+  const text =
+    mode === 'absolute'
+      ? formatAbsolute(value, { ms })
+      : t('common.ageAgo', { age: timeAgoMs(value) });
+  const hint =
+    mode === 'absolute'
+      ? t('common.ageAgo', { age: timeAgoMs(value) })
+      : formatAbsolute(value, { ms });
+  return (
+    <span className={`whitespace-nowrap ${className ?? ''}`} title={hint}>
+      {text}
+    </span>
+  );
+}
+
+function LiveTimestamp({
+  value,
+  mode = 'relative',
+  ms,
+  className,
+  insideButton,
+}: Omit<TimestampProps, 'static'>) {
   const { t } = useTranslation();
   useTick(); // keep the relative label fresh
 

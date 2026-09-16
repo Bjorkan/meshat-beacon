@@ -121,8 +121,8 @@ for (const { route, method, parameters, name, op } of operations) {
   const paramsType = fields.length ? `{ ${fields.join(' ')} }` : null;
   const resultType = responseSchema(op) ? tsType(responseSchema(op), 'Models.') : 'unknown';
   client += fields.length
-    ? `export async function ${name}(params: ${paramsType}): Promise<${resultType}> {\n`
-    : `export async function ${name}(): Promise<${resultType}> {\n`;
+    ? `export async function ${name}(params: ${paramsType}, init?: RequestInit): Promise<${resultType}> {\n`
+    : `export async function ${name}(init?: RequestInit): Promise<${resultType}> {\n`;
   let routeExpr = JSON.stringify(route);
   for (const p of pathParams)
     routeExpr = routeExpr.replace(
@@ -140,7 +140,7 @@ for (const { route, method, parameters, name, op } of operations) {
     initParts.push(`headers: { "Content-Type": "application/json" }`);
     initParts.push(`body: JSON.stringify(params.${bodyParam.name || 'body'})`);
   }
-  client += `  return request<${resultType}>(${routeExpr}, ${queryParams.length ? `{ ${queryEntries} }` : 'undefined'}${initParts.length ? `, { ${initParts.join(', ')} }` : ''});\n`;
+  client += `  return request<${resultType}>(${routeExpr}, ${queryParams.length ? `{ ${queryEntries} }` : 'undefined'}${initParts.length ? `, { ${initParts.join(', ')}, ...init }` : ', init'});\n`;
   client += `}\n\n`;
 }
 

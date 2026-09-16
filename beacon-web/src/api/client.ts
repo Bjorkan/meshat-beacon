@@ -357,16 +357,20 @@ export function getTraces(
     cursor?: number;
     limit?: number;
   },
+  init?: RequestInit,
 ): Promise<TraceTagSummary[]> {
-  return rawGetTraces({
-    iatas: iatasParam(iatas),
-    scope: params?.scope,
-    type: params?.type,
-    since: params?.since,
-    until: params?.until,
-    cursor: params?.cursor,
-    limit: params?.limit,
-  });
+  return rawGetTraces(
+    {
+      iatas: iatasParam(iatas),
+      scope: params?.scope,
+      type: params?.type,
+      since: params?.since,
+      until: params?.until,
+      cursor: params?.cursor,
+      limit: params?.limit,
+    },
+    init,
+  );
 }
 
 export function getTraceDetail(tag: string): Promise<TraceDetail> {

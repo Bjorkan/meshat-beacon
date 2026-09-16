@@ -52,7 +52,7 @@ function TracePathPreview({
 }) {
   return (
     <span
-      className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap font-mono"
+      className="flex h-5 min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap font-mono"
       title={hashes.map((h) => h.toUpperCase()).join(' → ')}
     >
       {hashes.map((hash, i) => {
@@ -138,14 +138,19 @@ function traceColumns(t: TFunction): Column<TraceTagSummary>[] {
     {
       header: 'Path',
       label: t('traces.path'),
+      // Fixed single-line lane: virtualization only bounds the commit when every row
+      // measures exactly estimateSize. Wrap + variable text = the measure pass becomes
+      // the Firefox long task, so the preview clips to one 40px lane instead.
       cell: (tag) =>
         tag.pathHashes?.length ? (
-          <TracePathPreview
-            hashes={tag.pathHashes.slice(0, TRACE_PATH_PREVIEW_HOPS)}
-            snrs={(tag.snrValues ?? []).slice(0, TRACE_PATH_PREVIEW_HOPS)}
-            resolved={tag.resolvedPath?.slice(0, TRACE_PATH_PREVIEW_HOPS)}
-            overflow={tag.pathHashes.length - TRACE_PATH_PREVIEW_HOPS}
-          />
+          <span className="block h-5 overflow-hidden">
+            <TracePathPreview
+              hashes={tag.pathHashes.slice(0, TRACE_PATH_PREVIEW_HOPS)}
+              snrs={(tag.snrValues ?? []).slice(0, TRACE_PATH_PREVIEW_HOPS)}
+              resolved={tag.resolvedPath?.slice(0, TRACE_PATH_PREVIEW_HOPS)}
+              overflow={tag.pathHashes.length - TRACE_PATH_PREVIEW_HOPS}
+            />
+          </span>
         ) : (
           <span className="text-text-dim">{t('traces.noPath')}</span>
         ),
@@ -155,14 +160,15 @@ function traceColumns(t: TFunction): Column<TraceTagSummary>[] {
       label: t('traces.firstSeen'),
       className: 'text-text-muted',
       sortValue: (tag) => tag.firstHeardAt,
-      cell: (tag) => <Timestamp value={tag.firstHeardAt} />,
+      // Static text: 200 rows × 2 timestamps must not mount 400 ticker subscribers + tooltip trees.
+      cell: (tag) => <Timestamp value={tag.firstHeardAt} static />,
     },
     {
       header: 'Last seen',
       label: t('traces.lastSeen'),
       className: 'text-text-muted',
       sortValue: (tag) => tag.lastHeardAt,
-      cell: (tag) => <Timestamp value={tag.lastHeardAt} />,
+      cell: (tag) => <Timestamp value={tag.lastHeardAt} static />,
     },
   ];
 }
@@ -193,7 +199,7 @@ function renderTraceCard(tag: TraceTagSummary, t: TFunction) {
         {tag.traceType && (
           <Badge variant={tag.traceType === 'PING' ? 'text' : 'trace'}>{tag.traceType}</Badge>
         )}
-        <Timestamp value={tag.lastHeardAt} className="ml-auto text-[11px] text-text-dim" />
+        <Timestamp value={tag.lastHeardAt} className="ml-auto text-[11px] text-text-dim" static />
       </div>
       {tag.pathHashes?.length ? (
         <TracePathPreview
@@ -255,6 +261,9 @@ export function TraceList({
             ariaLabel={t('traces.type')}
           />
         </div>
+        {/* The virtualizer keeps its measurements across filter swaps only when the
+            table stays mounted. A keyed remount would destroy all row measurements and force
+            a full 200-row commit — so reset scroll + selection imperatively on filter change. */}
         <DataTable
           key={`${regionKey}:${typeFilter}`}
           virtualize

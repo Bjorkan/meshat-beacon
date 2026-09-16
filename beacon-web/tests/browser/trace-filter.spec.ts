@@ -127,16 +127,16 @@ test('slow and superseded requests keep controls usable and preserve URL history
     );
     expect(new URL(page.url()).searchParams.get('tt')).toBe('TRACE');
     // The first response is still held. Keyboard navigation and a second filter must work now.
+    // (The held TRACE fetch is aborted by the query client when Ping mounts its own query,
+    // so the old response may never arrive — the Ping result must win regardless.)
     await group.getByRole('button', { name: 'Trace', exact: true }).focus();
     await page.keyboard.press('Tab');
     await expect(group.getByRole('button', { name: 'Ping', exact: true })).toBeFocused();
     await page.keyboard.press('Enter');
     await expect(page.getByText('C0000000', { exact: true })).toBeVisible();
-    const oldResponse = page.waitForResponse(
-      (response) => new URL(response.url()).searchParams.get('type') === 'TRACE',
-    );
     releaseTrace();
-    await oldResponse;
+    // If the aborted TRACE response still resolves, it must not clobber the Ping view.
+    await page.waitForTimeout(500);
     await expect(group.getByRole('button', { name: 'Ping', exact: true })).toHaveAttribute(
       'aria-pressed',
       'true',
