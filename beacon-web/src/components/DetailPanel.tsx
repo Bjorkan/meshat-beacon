@@ -102,8 +102,9 @@ export function DetailPanel({
   const minimized = Boolean(collapsible && collapsed);
   // Overlay-paneler flyter över tabbinnehållet från höger på lg+ istället för att
   // krympa listan bredvid sig — annars växer sidan bredare än viewporten.
+  // Samma storlek som Paketsökvägens modal (PacketPathMapModal): 860px / 92vw.
   const desktopClass = overlay
-    ? 'lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-30 lg:w-3/4 lg:shadow-2xl'
+    ? 'lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-30 lg:w-[860px] lg:max-w-[92vw] lg:shadow-2xl'
     : `lg:static lg:inset-auto lg:z-auto lg:shrink-0 ${wide ? 'lg:w-3/4' : 'lg:w-[400px]'}`;
   return (
     <div

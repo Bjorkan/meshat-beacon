@@ -111,7 +111,7 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
   const showMapSection = paths.length > 0 || (!isLoading && packets.length > 0 && blocked != null);
 
   return (
-    <DetailPanel title={tag.toUpperCase()} onClose={onClose} isLoading={isLoading} wide overlay>
+    <DetailPanel title={tag.toUpperCase()} onClose={onClose} isLoading={isLoading} overlay>
       {showMapSection && (
         <Section title={t('map.packetPath')} first>
           {paths.length > 0 ? (
