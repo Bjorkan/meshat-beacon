@@ -317,24 +317,30 @@
     "pathBlockedUnresolved": "No verifiable route: too few hops resolved to known nodes."
   },
   "routes": {
-    "route": "Route",
-    "detail": "Route detail",
-    "firstSeen": "First seen",
-    "lastSeen": "Last seen",
-    "findPath": "Find path",
-    "selectScope": "The selected scope is too broad for route search. Choose an IATA or a narrower region in the global selector.",
-    "fromHash": "From hash",
-    "toHash": "To hash",
-    "search": "Search",
-    "searching": "Searching…",
-    "noCrossIata": "No cross-IATA routes",
-    "noMatching": "No matching routes",
-    "none": "No routes",
-    "noun": "routes",
-    "summary": "{{hops}} hops · {{observations}} obs",
-    "omittedHops": "{{count}} intermediate hops; open the route to see all hops",
-    "expandRoute": "Show full route",
-    "collapseRoute": "Show compact route"
+    "from": "From",
+    "to": "To",
+    "swap": "Swap from and to",
+    "nodeSearchPlaceholder": "Search node name or pubkey…",
+    "noPositionHint": "No position — cannot be drawn on the map",
+    "sameNodeHint": "From and to cannot be the same node",
+    "noMatchHint": "No matching node",
+    "globalHint": "Searches the global graph — the region filter does not apply here.",
+    "plan": "Plan route",
+    "planning": "Planning…",
+    "best": "Best",
+    "alternative": "Alternative {{n}}",
+    "hops": "{{count}} hops",
+    "via": "via {{nodes}}",
+    "unmeasuredLeg": "Unmeasured",
+    "unmeasuredHint": "Legs without a fresh signal reading cost extra but are still used.",
+    "staleNode": "Stale",
+    "noRoute": "No route found between these nodes.",
+    "pickBoth": "Pick a from-node and a to-node to plan a route.",
+    "unknownNode": "Unknown node — it may have been deleted. Pick it again from search.",
+    "legNoSnr": "no measurement",
+    "openNode": "Open node {{name}}",
+    "neighborLeg": "Neighbor",
+    "neighborHint": "Both endpoints marked each other as neighbors — this hop is preferred when planning."
   },
   "traces": {
     "firstHeard": "First heard",
@@ -488,6 +494,7 @@
     "ephemeralKey": "Ephemeral key",
     "observerArea": "Observer / Area",
     "path": "Path",
-    "hopsHash": "Hops · Hash"
+    "hopsHash": "Hops · Hash",
+    "route": "Route"
   }
 }

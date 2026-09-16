@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"net/http"
 	"strconv"
 	"strings"
@@ -17,9 +18,11 @@ import (
 //
 // GET /routes          → listKnownRoutes
 // GET /routes/search   → searchKnownRoutes
+// GET /routes/best     → bestRoute
 func RoutesRouter(reader api.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", listKnownRoutes(reader))
+	r.Get("/best", bestRoute(reader))
 	r.Get("/cross", searchCrossIATARoutes(reader))
 	r.Get("/search", searchKnownRoutes(reader))
 	return r
@@ -85,18 +88,94 @@ func listKnownRoutes(reader api.Reader) http.HandlerFunc {
 	}
 }
 
-// searchKnownRoutes godoc
+// bestRoute godoc
 //
-//	@Summary	Search known routes by source and destination hash
+//	@Summary	Plan the best route between two nodes
+//	@Description	Computes best-first routes between two nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path has coordinates. An unroutable pair returns 200 with an empty paths array and a reason, never an error.
 //	@Tags		Routes
 //	@Produce	json
-//	@Param		iata	query		string	true	"IATA code to search within"
-//	@Param		from	query		string	true	"Source node hash prefix (hex)"
-//	@Param		to		query		string	true	"Destination node hash prefix (hex)"
-//	@Success	200		{object}	[]api.KnownRoute
-//	@Failure	400		{object}	handlers.APIError
-//	@Failure	500		{object}	handlers.APIError
-//	@Router		/routes/search [get]
+//	@Param		from			query		string	true	"Source node full public key (hex)"
+//	@Param		to				query		string	true	"Destination node full public key (hex)"
+//	@Param		alternatives	query		int		false	"Alternatives beyond the best path (0-2, default 2)"
+//	@Success	200				{object}	api.BestRouteResult
+//	@Failure	400				{object}	handlers.APIError
+//	@Failure	404				{object}	handlers.APIError
+//	@Failure	422				{object}	handlers.APIError
+//	@Failure	500				{object}	handlers.APIError
+//	@Router		/routes/best [get]
+func bestRoute(reader api.Reader) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		fromHex := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("from")))
+		toHex := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("to")))
+		if fromHex == "" || toHex == "" {
+			respondError(w, http.StatusBadRequest, "from and to are required (full node public keys, hex)")
+			return
+		}
+		fromBytes, err := hex.DecodeString(fromHex)
+		if err != nil || len(fromBytes) == 0 {
+			respondError(w, http.StatusBadRequest, "from must be a valid full public key hex string")
+			return
+		}
+		toBytes, err := hex.DecodeString(toHex)
+		if err != nil || len(toBytes) == 0 {
+			respondError(w, http.StatusBadRequest, "to must be a valid full public key hex string")
+			return
+		}
+		alternatives := 2
+		if v := r.URL.Query().Get("alternatives"); v != "" {
+			n, err := strconv.Atoi(v)
+			if err != nil || n < 0 || n > 2 {
+				respondError(w, http.StatusBadRequest, "alternatives must be an integer 0-2")
+				return
+			}
+			alternatives = n
+		}
+		// Pubkeys are globally unique: resolve both to node IDs first so the
+		// planner works on stable identities and can 404 unknown keys.
+		fromID, err := reader.GetNodeIDByPubkey(r.Context(), fromBytes)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if fromID == nil {
+			respondError(w, http.StatusNotFound, "unknown from node")
+			return
+		}
+		toID, err := reader.GetNodeIDByPubkey(r.Context(), toBytes)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if toID == nil {
+			respondError(w, http.StatusNotFound, "unknown to node")
+			return
+		}
+		result, err := reader.PlanBestRoute(r.Context(), *fromID, *toID, alternatives)
+		if err != nil {
+			respondError(w, http.StatusInternalServerError, "internal server error")
+			return
+		}
+		if result.Paths == nil {
+			result.Paths = []api.PlannedRoute{}
+		}
+		if len(result.Paths) == 0 && result.Reason == "endpoint-missing-position" {
+			respondError(w, http.StatusUnprocessableEntity, "one of the nodes has no known position and cannot be drawn on the map")
+			return
+		}
+		respond(w, http.StatusOK, result)
+	}
+}
+
+// @Summary	Search known routes by source and destination hash
+// @Tags		Routes
+// @Produce	json
+// @Param		iata	query		string	true	"IATA code to search within"
+// @Param		from	query		string	true	"Source node hash prefix (hex)"
+// @Param		to		query		string	true	"Destination node hash prefix (hex)"
+// @Success	200		{object}	[]api.KnownRoute
+// @Failure	400		{object}	handlers.APIError
+// @Failure	500		{object}	handlers.APIError
+// @Router		/routes/search [get]
 func searchKnownRoutes(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		iata := strings.ToUpper(r.URL.Query().Get("iata"))

@@ -1410,19 +1410,25 @@ ORDER BY hop_count ASC, last_seen DESC;
 -- common case). regionScope is optional too; pass NULL whenever the OTA
 -- scope query for this neighbor didn't succeed (status != "responded"),
 -- so a failed/timed-out query doesn't erase a previously known scope.
+-- direct marks an explicit neighbor claim (the reporter itself heard the
+-- neighbor over RF: /neighbors reports, zero-hop advert RX, DISCOVER_RESP RX
+-- -- pass TRUE) versus overheard third-party topology from packet paths (pass
+-- FALSE). Once TRUE it sticks: a later overheard observation must not demote
+-- an explicitly marked leg.
 -- On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 -- a stable map link quality while making recent RF conditions matter more than old samples.
 INSERT INTO node_neighbors (
-  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen, direct
 )
 VALUES (
   $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
   CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5,
-  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END
+  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END, $6
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
   observation_count = node_neighbors.observation_count + 1,
+  direct            = node_neighbors.direct OR EXCLUDED.direct,
   snr               = CASE
                         WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr
                         WHEN node_neighbors.snr IS NULL THEN EXCLUDED.snr
@@ -1671,3 +1677,37 @@ SELECT observer_id FROM observer_owners WHERE owner_node_id = @node_id;
 SELECT n.id, n.name, n.public_key FROM observer_owners o
 JOIN nodes n ON n.id = o.owner_node_id AND n.public_key = o.owner_pubkey
 WHERE o.observer_id = $1;
+
+-- name: GetRoutePlanGraph :many
+-- Full neighbor-graph dump for the /routes/best planner: every directed
+-- node_neighbors edge joined against both endpoints' identity, type and
+-- coordinates in ONE query, so the planner sees a point-in-time snapshot
+-- instead of a paginated crawl that can shift mid-read. One row per directed
+-- pair: SNR merges exactly like GetNodeNeighbors does (sample-weighted mean,
+-- summed counts, min/max timestamps) while the neighbor mark merges with OR
+-- (one explicit mark from either direction, any IATA, marks the leg).
+SELECT
+    nn.node_id AS from_id,
+    nf.public_key AS from_pubkey, nf.name AS from_name, nf.node_type AS from_type,
+    nf.latitude AS from_lat, nf.longitude AS from_lng,
+    nn.neighbor_id AS to_id,
+    nt.public_key AS to_pubkey, nt.name AS to_name, nt.node_type AS to_type,
+    nt.latitude AS to_lat, nt.longitude AS to_lng,
+  SUM(nn.observation_count)::bigint AS observation_count,
+  MIN(nn.first_seen)::timestamptz AS first_seen,
+  MAX(nn.last_seen)::timestamptz AS last_seen,
+  -- Sample-weighted mean like GetNodeNeighbors' Go merge (a plain AVG would
+  -- let a 1-sample row outweigh a 100-sample row). sqlc emits *float32 only
+  -- for a bare nullable column, so keep MAX(nn.snr) as the typed expression
+  -- and let Go do the weighting: rows are pre-aggregated per directed pair in
+  -- IATA order... no — simpler: emit both the weighted pieces and merge in Go.
+  SUM(COALESCE(nn.snr, 0) * nn.snr_sample_count)::real AS snr_weighted_sum,
+  SUM(nn.snr_sample_count)::bigint AS snr_sample_count,
+  MAX(nn.snr_last_seen)::timestamptz AS snr_last_seen,
+  BOOL_OR(nn.direct) AS direct
+FROM node_neighbors nn
+JOIN nodes nf ON nf.id = nn.node_id
+JOIN nodes nt ON nt.id = nn.neighbor_id
+GROUP BY nn.node_id, nn.neighbor_id,
+    nf.public_key, nf.name, nf.node_type, nf.latitude, nf.longitude,
+    nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude;

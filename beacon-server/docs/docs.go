@@ -1628,6 +1628,72 @@ const docTemplate = `{
                 }
             }
         },
+        "/routes/best": {
+            "get": {
+                "description": "Computes best-first routes between two nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path has coordinates. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Routes"
+                ],
+                "summary": "Plan the best route between two nodes",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Source node full public key (hex)",
+                        "name": "from",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Destination node full public key (hex)",
+                        "name": "to",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Alternatives beyond the best path (0-2, default 2)",
+                        "name": "alternatives",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.BestRouteResult"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    },
+                    "422": {
+                        "description": "Unprocessable Entity",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/internal_api_handlers.APIError"
+                        }
+                    }
+                }
+            }
+        },
         "/routes/cross": {
             "get": {
                 "produces": [
@@ -2584,6 +2650,24 @@ const docTemplate = `{
                 },
                 "snr": {
                     "type": "number"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.BestRouteResult": {
+            "type": "object",
+            "required": [
+                "paths"
+            ],
+            "properties": {
+                "paths": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRoute"
+                    }
+                },
+                "reason": {
+                    "description": "e.g. \"no-route\", \"endpoint-missing-position\"",
+                    "type": "string"
                 }
             }
         },
@@ -4173,6 +4257,124 @@ const docTemplate = `{
                 },
                 "payloadTypeName": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRoute": {
+            "type": "object",
+            "required": [
+                "containsStaleNodes",
+                "hasUnmeasuredLegs",
+                "hopCount",
+                "legs",
+                "nodes",
+                "totalCost"
+            ],
+            "properties": {
+                "containsStaleNodes": {
+                    "type": "boolean"
+                },
+                "hasUnmeasuredLegs": {
+                    "type": "boolean"
+                },
+                "hopCount": {
+                    "type": "integer"
+                },
+                "legs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteLeg"
+                    }
+                },
+                "nodes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteNode"
+                    }
+                },
+                "totalCost": {
+                    "type": "number"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteLeg": {
+            "type": "object",
+            "required": [
+                "from",
+                "neighbor",
+                "observationCount",
+                "snrLastSeen",
+                "snrSampleCount",
+                "to",
+                "unmeasured"
+            ],
+            "properties": {
+                "from": {
+                    "description": "full node public key, lowercase hex",
+                    "type": "string"
+                },
+                "neighbor": {
+                    "description": "true when the endpoints explicitly marked each other as neighbors",
+                    "type": "boolean"
+                },
+                "observationCount": {
+                    "type": "integer"
+                },
+                "snr": {
+                    "description": "merged sample-weighted SNR in dB, nil when unmeasured",
+                    "type": "number"
+                },
+                "snrLastSeen": {
+                    "description": "epoch ms, 0 when never measured",
+                    "type": "integer"
+                },
+                "snrSampleCount": {
+                    "type": "integer"
+                },
+                "to": {
+                    "description": "full node public key, lowercase hex",
+                    "type": "string"
+                },
+                "unmeasured": {
+                    "description": "true when no fresh SNR reading backs this leg",
+                    "type": "boolean"
+                }
+            }
+        },
+        "github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteNode": {
+            "type": "object",
+            "required": [
+                "id",
+                "nodeType",
+                "nodeTypeName",
+                "publicKey",
+                "stale"
+            ],
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "latitude": {
+                    "type": "number"
+                },
+                "longitude": {
+                    "type": "number"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "nodeType": {
+                    "type": "integer"
+                },
+                "nodeTypeName": {
+                    "type": "string"
+                },
+                "publicKey": {
+                    "description": "full key, lowercase hex",
+                    "type": "string"
+                },
+                "stale": {
+                    "type": "boolean"
                 }
             }
         },

@@ -23,6 +23,7 @@ type Config struct {
 	WebSocket   WebSocketConfig       `yaml:"websocket"`
 	Packets     PacketsConfig         `yaml:"packets"`
 	Routes      RoutesConfig          `yaml:"routes"`
+	RoutePlan   RoutePlanConfig       `yaml:"routeplan"`
 	Neighbors   NeighborsConfig       `yaml:"neighbors"`
 	Observers   ObserversConfig       `yaml:"observers"`
 	Ingest      IngestFilterConfig    `yaml:"ingest"`
@@ -69,6 +70,16 @@ type ResolvedConfig struct {
 	// MeshCoreRegionFreshness is how long a MeshCore region-scope confirmation counts as
 	// fresh; see NeighborsConfig.
 	MeshCoreRegionFreshness time.Duration
+	// RoutePlan* mirrors the routeplan: config block (see RoutePlanConfig);
+	// resolve to defaults when unset.
+	RoutePlanUnmeasuredPenalty float64
+	RoutePlanSNRGoodDB         float64
+	RoutePlanSNRBadDB          float64
+	RoutePlanSNRMaxPenalty     float64
+	RoutePlanNeighborBonus     float64
+	RoutePlanSNRFreshness      time.Duration
+	RoutePlanMaxHops           int
+	RoutePlanMaxAlternatives   int
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -229,6 +240,30 @@ type NeighborsConfig struct {
 	RegionScopeFreshness duration `yaml:"region_scope_freshness"`
 }
 
+// RoutePlanConfig tunes the /routes/best route planner's edge cost model.
+// Every leg costs a 1.0 base per hop plus a signal term: a fresh SNR reading
+// between SNRGoodDB (no extra cost) and SNRBadDB (full SNRMaxPenalty) is
+// linearly interpolated; unmeasured or stale-SNR legs pay UnmeasuredPenalty
+// instead. UnmeasuredPenalty must be >= SNRMaxPenalty so a measured leg always
+// beats an unmeasured one. SNRFreshness bounds how old an SNR reading may be
+// before it counts as unmeasured.
+//
+// NeighborBonus discounts legs whose endpoints explicitly marked each other as
+// neighbors (a DIRECT row in node_neighbors): the mesh's own statement that
+// the hop is real outranks an equally-measured overheard leg. It must stay
+// below (UnmeasuredPenalty - SNRMaxPenalty) so it can never promote an
+// unmeasured leg above a measured one.
+type RoutePlanConfig struct {
+	UnmeasuredPenalty float64  `yaml:"unmeasured_penalty"`
+	SNRGoodDB         float64  `yaml:"snr_good_db"`
+	SNRBadDB          float64  `yaml:"snr_bad_db"`
+	SNRMaxPenalty     float64  `yaml:"snr_max_penalty"`
+	NeighborBonus     float64  `yaml:"neighbor_bonus"`
+	SNRFreshness      duration `yaml:"snr_freshness"`
+	MaxHops           int      `yaml:"max_hops"`
+	MaxAlternatives   int      `yaml:"max_alternatives"`
+}
+
 // ObserversConfig controls observer row retention behaviour.
 type ObserversConfig struct {
 	// DeleteAfter is how long an observer can go without being heard (packet,
@@ -359,6 +394,53 @@ func (c *Config) Validate() error {
 	if roots > 1 {
 		return fmt.Errorf("config: at most one region may set root: true (found %d)", roots)
 	}
+	if err := c.RoutePlan.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Defaults for the route planner cost model; see RoutePlanConfig.
+const (
+	DefaultRoutePlanUnmeasuredPenalty = 2.5
+	DefaultRoutePlanSNRGoodDB         = 5.0
+	DefaultRoutePlanSNRBadDB          = -15.0
+	DefaultRoutePlanSNRMaxPenalty     = 2.0
+	// DefaultRoutePlanNeighborBonus discounts an explicitly marked neighbor
+	// leg. 0.4 sits strictly inside the measured band (worst measured pays
+	// 2.0): it outranks an equally-measured overheard leg but can never lift
+	// an unmeasured leg (2.5) above even the worst measured one (2.5-0.4=2.1 > 2.0).
+	DefaultRoutePlanNeighborBonus   = 0.4
+	DefaultRoutePlanMaxHops         = 12
+	DefaultRoutePlanMaxAlternatives = 2
+)
+
+// DefaultRoutePlanSNRFreshness is the default SNRFreshness (7 days, matching the
+// neighbor retention window an SNR confirmation ages with).
+var DefaultRoutePlanSNRFreshness = 7 * 24 * time.Hour
+
+// Validate rejects incoherent planner weights: good must beat bad (strictly,
+// otherwise the interpolation has no range), penalties must be non-negative,
+// an unmeasured leg must never beat the worst measured one, and the neighbor
+// bonus must fit strictly inside that gap so it reorders within the measured
+// band (or within unmeasured) but never promotes unmeasured above measured.
+func (c *RoutePlanConfig) Validate() error {
+	if c.SNRGoodDB <= c.SNRBadDB && (c.SNRGoodDB != 0 || c.SNRBadDB != 0) {
+		return fmt.Errorf("config: routeplan.snr_good_db (%v) must exceed snr_bad_db (%v)", c.SNRGoodDB, c.SNRBadDB)
+	}
+	if c.UnmeasuredPenalty < 0 || c.SNRMaxPenalty < 0 || c.NeighborBonus < 0 {
+		return fmt.Errorf("config: routeplan penalties and neighbor_bonus must be non-negative")
+	}
+	if c.UnmeasuredPenalty != 0 && c.SNRMaxPenalty != 0 && c.UnmeasuredPenalty < c.SNRMaxPenalty {
+		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must be >= snr_max_penalty (%v)", c.UnmeasuredPenalty, c.SNRMaxPenalty)
+	}
+	gap := c.UnmeasuredPenalty - c.SNRMaxPenalty
+	if c.NeighborBonus != 0 && gap != 0 && c.NeighborBonus >= gap {
+		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < unmeasured_penalty - snr_max_penalty (%v)", c.NeighborBonus, gap)
+	}
+	if c.MaxHops < 0 || c.MaxAlternatives < 0 {
+		return fmt.Errorf("config: routeplan max_hops and max_alternatives must be non-negative")
+	}
 	return nil
 }
 
@@ -415,6 +497,15 @@ func Resolve(cfg *Config) ResolvedConfig {
 		NodeIATAMembershipTTL:   cfg.Nodes.IATAMembershipTTL.Duration,
 		ObserverDeleteAfter:     cfg.Observers.DeleteAfter.Duration,
 		MeshCoreRegionFreshness: cfg.Neighbors.RegionScopeFreshness.Duration,
+
+		RoutePlanUnmeasuredPenalty: cfg.RoutePlan.UnmeasuredPenalty,
+		RoutePlanSNRGoodDB:         cfg.RoutePlan.SNRGoodDB,
+		RoutePlanSNRBadDB:          cfg.RoutePlan.SNRBadDB,
+		RoutePlanSNRMaxPenalty:     cfg.RoutePlan.SNRMaxPenalty,
+		RoutePlanNeighborBonus:     cfg.RoutePlan.NeighborBonus,
+		RoutePlanSNRFreshness:      cfg.RoutePlan.SNRFreshness.Duration,
+		RoutePlanMaxHops:           cfg.RoutePlan.MaxHops,
+		RoutePlanMaxAlternatives:   cfg.RoutePlan.MaxAlternatives,
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -480,17 +571,44 @@ func Resolve(cfg *Config) ResolvedConfig {
 		// the same starting point, so region confirmations age with the neighbor edges.
 		r.MeshCoreRegionFreshness = 7 * 24 * time.Hour
 	}
+	if r.RoutePlanUnmeasuredPenalty == 0 {
+		r.RoutePlanUnmeasuredPenalty = DefaultRoutePlanUnmeasuredPenalty
+	}
+	if r.RoutePlanSNRGoodDB == 0 {
+		r.RoutePlanSNRGoodDB = DefaultRoutePlanSNRGoodDB
+	}
+	if r.RoutePlanSNRBadDB == 0 {
+		r.RoutePlanSNRBadDB = DefaultRoutePlanSNRBadDB
+	}
+	if r.RoutePlanSNRMaxPenalty == 0 {
+		r.RoutePlanSNRMaxPenalty = DefaultRoutePlanSNRMaxPenalty
+	}
+	if r.RoutePlanNeighborBonus == 0 {
+		r.RoutePlanNeighborBonus = DefaultRoutePlanNeighborBonus
+	}
+	if r.RoutePlanSNRFreshness == 0 {
+		r.RoutePlanSNRFreshness = DefaultRoutePlanSNRFreshness
+	}
+	if r.RoutePlanMaxHops == 0 {
+		r.RoutePlanMaxHops = DefaultRoutePlanMaxHops
+	}
+	if r.RoutePlanMaxAlternatives == 0 {
+		r.RoutePlanMaxAlternatives = DefaultRoutePlanMaxAlternatives
+	}
 	return r
 }
 
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s routePlanUnmeasured=%.2f routePlanGood=%.1f routePlanBad=%.1f routePlanMaxPen=%.2f routePlanNeighborBonus=%.2f routePlanFresh=%s routePlanMaxHops=%d routePlanMaxAlt=%d",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
 		r.MaxConnsPerIP, r.ViewRefreshInterval, r.ReconfirmInterval, r.CleanupInterval,
 		r.PresenceFlushInterval, r.PresencePacketTTL, r.ClockDriftThreshold,
 		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter, r.MeshCoreRegionFreshness,
+		r.RoutePlanUnmeasuredPenalty, r.RoutePlanSNRGoodDB, r.RoutePlanSNRBadDB, r.RoutePlanSNRMaxPenalty,
+		r.RoutePlanNeighborBonus,
+		r.RoutePlanSNRFreshness, r.RoutePlanMaxHops, r.RoutePlanMaxAlternatives,
 	)
 }

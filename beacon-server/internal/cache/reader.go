@@ -470,6 +470,18 @@ func (cr *CachedReader) SearchCrossIATARoutes(ctx context.Context, fromHash, fro
 	return cr.inner.SearchCrossIATARoutes(ctx, fromHash, fromIATA, toHash, toIATA)
 }
 
+// PlanBestRoute implements [api.Reader]. Route planning is graph-global and
+// request-specific, so it bypasses the cache and always hits the store.
+func (cr *CachedReader) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
+	return cr.inner.PlanBestRoute(ctx, fromID, toID, maxAlternatives)
+}
+
+// GetNodeIDByPubkey implements [api.Reader]. Single-key lookups are cheap and
+// feed route planning; bypass the cache like the planner itself.
+func (cr *CachedReader) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error) {
+	return cr.inner.GetNodeIDByPubkey(ctx, pubkey)
+}
+
 // ListTraceTags implements [api.Reader].
 func (cr *CachedReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
 	return cr.inner.ListTraceTags(ctx, iatas, scope, traceType, since, until, cursor, limit)

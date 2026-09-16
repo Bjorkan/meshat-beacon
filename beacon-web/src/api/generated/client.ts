@@ -130,6 +130,10 @@ export async function rawGetRoutes(params: { iata?: string; iatas?: string; hopC
   return request<Models.PageKnownRoute>("/routes", { "iata": params.iata, "iatas": params.iatas, "hopCount": params.hopCount, "cursor": params.cursor, "pageToken": params.pageToken, "sort": params.sort, "direction": params.direction, "limit": params.limit }, init);
 }
 
+export async function rawGetRoutesBest(params: { from: string; to: string; alternatives?: number; }, init?: RequestInit): Promise<Models.BestRouteResult> {
+  return request<Models.BestRouteResult>("/routes/best", { "from": params.from, "to": params.to, "alternatives": params.alternatives }, init);
+}
+
 export async function rawGetRoutesCross(params: { fromHash: string; fromIata: string; toHash: string; toIata: string; }, init?: RequestInit): Promise<Array<Models.CrossIATARoute>> {
   return request<Array<Models.CrossIATARoute>>("/routes/cross", { "fromHash": params.fromHash, "fromIata": params.fromIata, "toHash": params.toHash, "toIata": params.toIata }, init);
 }

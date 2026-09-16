@@ -9,6 +9,7 @@ import type {
   BrokerStatus,
   KnownRoute,
   CrossIATARoute,
+  BestRouteResult,
   TraceTagSummary,
   TraceType,
   TraceDetail,
@@ -54,6 +55,7 @@ import {
   rawGetRegions,
   rawGetRegionsRegionId,
   rawGetRoutes,
+  rawGetRoutesBest,
   rawGetRoutesCross,
   rawGetRoutesSearch,
   rawGetScopes,
@@ -343,6 +345,24 @@ export function searchCrossIATARoutes(
   toIata: string,
 ): Promise<CrossIATARoute[]> {
   return rawGetRoutesCross({ fromHash, fromIata, toHash, toIata });
+}
+
+// Plan best routes between two nodes by full public key (lowercase hex).
+// Alternatives beyond the best path: 0-2 (server default 2).
+export function planBestRoute(
+  from: string,
+  to: string,
+  alternatives = 2,
+): Promise<BestRouteResult> {
+  return rawGetRoutesBest({ from: from.toLowerCase(), to: to.toLowerCase(), alternatives });
+}
+
+// Resolve one node by exact full public key. Null when unknown (no throw) so
+// the planner combobox can distinguish "no match" from transport errors.
+export async function getNodeByPubkey(publicKey: string): Promise<NodeSummary | null> {
+  const page = await rawGetNodes({ pubkey: publicKey.toLowerCase(), limit: 1 });
+  const item = page.items[0];
+  return item ? toNodeSummary(item) : null;
 }
 
 // Trace tags. /traces returns a bare array of per-tag summaries (ordered newest-heard first, cursor is

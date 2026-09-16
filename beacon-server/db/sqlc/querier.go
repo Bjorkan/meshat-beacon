@@ -84,6 +84,14 @@ type Querier interface {
 	GetRegion(ctx context.Context, id int32) (GetRegionRow, error)
 	GetRegionBySlug(ctx context.Context, slug string) (GetRegionBySlugRow, error)
 	GetRegionIATAs(ctx context.Context, regionID int32) ([]string, error)
+	// Full neighbor-graph dump for the /routes/best planner: every directed
+	// node_neighbors edge joined against both endpoints' identity, type and
+	// coordinates in ONE query, so the planner sees a point-in-time snapshot
+	// instead of a paginated crawl that can shift mid-read. One row per directed
+	// pair: SNR merges exactly like GetNodeNeighbors does (sample-weighted mean,
+	// summed counts, min/max timestamps) while the neighbor mark merges with OR
+	// (one explicit mark from either direction, any IATA, marks the leg).
+	GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow, error)
 	GetScopeByName(ctx context.Context, name string) (GetScopeByNameRow, error)
 	GetScopeNames(ctx context.Context) ([]string, error)
 	// Count each table on its own; the old cross-join blew up to millions of rows
@@ -305,6 +313,11 @@ type Querier interface {
 	// common case). regionScope is optional too; pass NULL whenever the OTA
 	// scope query for this neighbor didn't succeed (status != "responded"),
 	// so a failed/timed-out query doesn't erase a previously known scope.
+	// direct marks an explicit neighbor claim (the reporter itself heard the
+	// neighbor over RF: /neighbors reports, zero-hop advert RX, DISCOVER_RESP RX
+	// -- pass TRUE) versus overheard third-party topology from packet paths (pass
+	// FALSE). Once TRUE it sticks: a later overheard observation must not demote
+	// an explicitly marked leg.
 	// On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 	// a stable map link quality while making recent RF conditions matter more than old samples.
 	UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighborParams) error

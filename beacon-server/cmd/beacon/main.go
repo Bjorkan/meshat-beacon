@@ -18,6 +18,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/db"
 	_ "github.com/MeshCore-Beacon/beacon-server/docs"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api/router"
 	"github.com/MeshCore-Beacon/beacon-server/internal/background"
 	"github.com/MeshCore-Beacon/beacon-server/internal/cache"
@@ -113,6 +114,10 @@ func main() {
 	}
 
 	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL, resolved.MeshCoreRegionFreshness)
+	store.SetRoutePlanConfig(db.RoutePlanConfig{
+		Cost:           routeplan.FromResolved(resolved),
+		StaleThreshold: resolved.NodeStaleThreshold,
+	})
 
 	// ── MeshCore suggested radio settings (one fetch at startup, fail-open) ──────────────
 	presetCatalogue := radiopreset.Load(ctx, nil)

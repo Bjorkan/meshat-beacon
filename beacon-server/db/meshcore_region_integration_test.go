@@ -94,11 +94,11 @@ func TestMeshCoreRegionIntegration(t *testing.T) {
 	}
 
 	// alpha queried bravo's OTA scope successfully: "se" confirmed for bravo.
-	if err := store.UpsertNodeNeighbor(ctx, alpha, bravo, "YVR", nil, strPtr("se")); err != nil {
+	if err := store.UpsertNodeNeighbor(ctx, alpha, bravo, "YVR", nil, strPtr("se"), true); err != nil {
 		t.Fatal(err)
 	}
 	// A later timeout (NULL scope) must preserve bravo's value AND timestamp.
-	if err := store.UpsertNodeNeighbor(ctx, alpha, bravo, "YVR", nil, nil); err != nil {
+	if err := store.UpsertNodeNeighbor(ctx, alpha, bravo, "YVR", nil, nil, false); err != nil {
 		t.Fatal(err)
 	}
 

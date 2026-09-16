@@ -3,6 +3,8 @@
 
 export type AdvertObservation = { heardAt: number; hopCount?: number; iata: string; id: number; nodeName?: string; nodePublicKey?: string; packetHash: string; payloadType: number; payloadTypeName: string; rssi?: number; snr?: number; };
 
+export type BestRouteResult = { paths: Array<PlannedRoute>; reason?: string; };
+
 export type Channel = { channelHash: string; hashtag?: string; id: number; isHashtag: boolean; keyFingerprint?: string; keyKnown: boolean; kind: ChannelKind; lastSeen: number; messageCount: number; name?: string; };
 
 export type ChannelKind = "public" | "private" | "hashtag" | "unknown";
@@ -84,6 +86,12 @@ export type PagePacketObservationSummary = { hasMore: boolean; items: Array<Pack
 export type PagePacketSummary = { hasMore: boolean; items: Array<PacketSummary>; nextCursor?: number; nextPageToken?: string; };
 
 export type PayloadBreakdownItem = { count: number; payloadType: number; payloadTypeName: string; };
+
+export type PlannedRoute = { containsStaleNodes: boolean; hasUnmeasuredLegs: boolean; hopCount: number; legs: Array<PlannedRouteLeg>; nodes: Array<PlannedRouteNode>; totalCost: number; };
+
+export type PlannedRouteLeg = { from: string; neighbor: boolean; observationCount: number; snr?: number; snrLastSeen: number; snrSampleCount: number; to: string; unmeasured: boolean; };
+
+export type PlannedRouteNode = { id: string; latitude?: number; longitude?: number; name?: string; nodeType: number; nodeTypeName: string; publicKey: string; stale: boolean; };
 
 export type RadioPreset = { codingRate?: number; count: number; iata: string; preset: string; sourceType: string; suggestedTitle?: string; };
 

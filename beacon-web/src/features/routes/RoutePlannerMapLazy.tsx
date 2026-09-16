@@ -1,0 +1,31 @@
+import { lazy, Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
+import type { PlannedRoute } from '../../types/api';
+
+const RoutePlannerMap = lazy(() =>
+  import('./RoutePlannerMap').then((m) => ({ default: m.RoutePlannerMapInner })),
+);
+
+// Lazy planner map: MapLibre stays out of the startup bundle and loads only
+// once a route computation returned drawable paths.
+export function RoutePlannerMapLazy(props: {
+  paths: PlannedRoute[];
+  activeIndex: number;
+  styleId: string;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Suspense
+      fallback={
+        <div
+          role="status"
+          className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 font-mono text-xs text-text-muted"
+        >
+          <span>{t('map.loadingLocation')}</span>
+        </div>
+      }
+    >
+      <RoutePlannerMap {...props} />
+    </Suspense>
+  );
+}

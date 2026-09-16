@@ -197,6 +197,14 @@ func (s *stubReader) SearchCrossIATARoutes(_ context.Context, _, _, _, _ string)
 	return nil, nil
 }
 
+func (s *stubReader) PlanBestRoute(_ context.Context, _, _ uuid.UUID, _ int) (api.BestRouteResult, error) {
+	return api.BestRouteResult{Paths: []api.PlannedRoute{}}, nil
+}
+
+func (s *stubReader) GetNodeIDByPubkey(_ context.Context, _ []byte) (*uuid.UUID, error) {
+	return nil, nil
+}
+
 func (s *stubReader) ListTraceTags(_ context.Context, _ []string, _, _ string, _, _ time.Time, _ time.Time, _ int32) ([]api.TraceTagSummary, error) {
 	return nil, nil
 }

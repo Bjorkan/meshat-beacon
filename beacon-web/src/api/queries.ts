@@ -47,6 +47,8 @@ import {
   getTraceDetail,
   getTraces,
   getKnownRoutesPage,
+  getNodeByPubkey,
+  planBestRoute,
   searchCrossIATARoutes,
   searchKnownRoutes,
 } from './client';
@@ -550,6 +552,22 @@ export const routeQueries = {
       },
       enabled: args !== null,
       staleTime: 60_000,
+    }),
+  // Best-route planner: full pubkeys (lowercase hex), global graph, no region scope.
+  best: (args: { from: string; to: string } | null) =>
+    queryOptions({
+      queryKey: ['routes-best', args?.from.toLowerCase(), args?.to.toLowerCase()] as const,
+      queryFn: () => planBestRoute(args!.from, args!.to),
+      enabled: args !== null,
+      staleTime: 60_000,
+    }),
+  // Resolve one node by exact full pubkey for URL restoration + pasted keys.
+  byPubkey: (pubkey: string | null) =>
+    queryOptions({
+      queryKey: ['nodes-pubkey', pubkey?.toLowerCase()] as const,
+      queryFn: () => getNodeByPubkey(pubkey!),
+      enabled: pubkey !== null,
+      staleTime: 300_000,
     }),
 };
 

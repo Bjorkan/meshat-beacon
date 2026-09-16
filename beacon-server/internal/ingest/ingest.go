@@ -208,7 +208,10 @@ type DB interface {
 	// snr is optional (nil when no signal reading is available, the common case).
 	// regionScope is optional (nil when there's no fresh OTA-queried scope to
 	// record for this neighbor, e.g. a /neighbors report entry with a failed query).
-	UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string) error
+	// direct marks an explicit neighbor claim (the reporter itself heard the
+	// neighbor over RF); overheard third-party path topology passes false. Once
+	// true it sticks (OR-merged on conflict).
+	UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool) error
 
 	// UpdateObserverRegionScope records the observer's own OTA-reported region
 	// scope, from the "self" field of a /neighbors report.

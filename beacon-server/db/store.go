@@ -30,6 +30,8 @@ type Store struct {
 	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
 	meshcoreRegionFresh time.Duration // how long a MeshCore region-scope confirmation counts as fresh
 	presetCatalogue     *radiopreset.Catalogue
+	routePlan           RoutePlanConfig // /routes/best cost model; zero value falls back to defaults
+	routePlanSet        bool
 }
 
 // SetPresetCatalogue installs the startup-loaded MeshCore suggested-settings catalogue used to

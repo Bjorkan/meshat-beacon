@@ -171,6 +171,77 @@ func TestResolve_RouteDefaults(t *testing.T) {
 	}
 }
 
+func TestResolve_RoutePlanDefaults(t *testing.T) {
+	r := Resolve(&Config{})
+	if r.RoutePlanUnmeasuredPenalty != DefaultRoutePlanUnmeasuredPenalty {
+		t.Errorf("RoutePlanUnmeasuredPenalty = %v, want %v", r.RoutePlanUnmeasuredPenalty, DefaultRoutePlanUnmeasuredPenalty)
+	}
+	if r.RoutePlanSNRGoodDB != DefaultRoutePlanSNRGoodDB {
+		t.Errorf("RoutePlanSNRGoodDB = %v, want %v", r.RoutePlanSNRGoodDB, DefaultRoutePlanSNRGoodDB)
+	}
+	if r.RoutePlanSNRBadDB != DefaultRoutePlanSNRBadDB {
+		t.Errorf("RoutePlanSNRBadDB = %v, want %v", r.RoutePlanSNRBadDB, DefaultRoutePlanSNRBadDB)
+	}
+	if r.RoutePlanSNRMaxPenalty != DefaultRoutePlanSNRMaxPenalty {
+		t.Errorf("RoutePlanSNRMaxPenalty = %v, want %v", r.RoutePlanSNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty)
+	}
+	if r.RoutePlanNeighborBonus != DefaultRoutePlanNeighborBonus {
+		t.Errorf("RoutePlanNeighborBonus = %v, want %v", r.RoutePlanNeighborBonus, DefaultRoutePlanNeighborBonus)
+	}
+	if r.RoutePlanSNRFreshness != DefaultRoutePlanSNRFreshness {
+		t.Errorf("RoutePlanSNRFreshness = %v, want %v", r.RoutePlanSNRFreshness, DefaultRoutePlanSNRFreshness)
+	}
+	if r.RoutePlanMaxHops != DefaultRoutePlanMaxHops {
+		t.Errorf("RoutePlanMaxHops = %d, want %d", r.RoutePlanMaxHops, DefaultRoutePlanMaxHops)
+	}
+	if r.RoutePlanMaxAlternatives != DefaultRoutePlanMaxAlternatives {
+		t.Errorf("RoutePlanMaxAlternatives = %d, want %d", r.RoutePlanMaxAlternatives, DefaultRoutePlanMaxAlternatives)
+	}
+}
+
+func TestRoutePlanConfig_Validate(t *testing.T) {
+	good := RoutePlanConfig{
+		UnmeasuredPenalty: 2.5, SNRGoodDB: 5.0, SNRBadDB: -15.0, SNRMaxPenalty: 2.0,
+		NeighborBonus: 0.4,
+	}
+	if err := good.Validate(); err != nil {
+		t.Errorf("expected valid config, got %v", err)
+	}
+	if err := (&Config{}).Validate(); err != nil {
+		t.Errorf("expected zero routeplan block to validate, got %v", err)
+	}
+	inverted := good
+	inverted.SNRGoodDB, inverted.SNRBadDB = -15.0, 5.0
+	if err := inverted.Validate(); err == nil {
+		t.Error("expected error when snr_good_db <= snr_bad_db")
+	}
+	weak := good
+	weak.UnmeasuredPenalty = 1.0
+	if err := weak.Validate(); err == nil {
+		t.Error("expected error when unmeasured_penalty < snr_max_penalty")
+	}
+	negative := good
+	negative.SNRMaxPenalty = -1.0
+	if err := negative.Validate(); err == nil {
+		t.Error("expected error for negative penalty")
+	}
+	bigBonus := good
+	bigBonus.NeighborBonus = 0.5 // gap is 2.5-2.0 = 0.5: bonus must stay strictly below
+	if err := bigBonus.Validate(); err == nil {
+		t.Error("expected error when neighbor_bonus >= unmeasured_penalty - snr_max_penalty")
+	}
+	smallBonus := good
+	smallBonus.NeighborBonus = 0.4 // strictly inside the gap: valid
+	if err := smallBonus.Validate(); err != nil {
+		t.Errorf("expected bonus 0.4 inside the gap to validate, got %v", err)
+	}
+	negativeBonus := good
+	negativeBonus.NeighborBonus = -0.1
+	if err := negativeBonus.Validate(); err == nil {
+		t.Error("expected error for negative neighbor_bonus")
+	}
+}
+
 func TestChannelPublicFlagIsExplicit(t *testing.T) {
 	path := t.TempDir() + "/config.yaml"
 	err := os.WriteFile(path, []byte(`channel_keys:

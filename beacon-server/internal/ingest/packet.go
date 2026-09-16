@@ -577,7 +577,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 						currEntries := resolved[hashes[i]]
 						if len(prevEntries) == 1 && len(currEntries) == 1 {
 							snr := snrValues[i]
-							if err := w.db.UpsertNodeNeighbor(ctx, currEntries[0].NodeID, prevEntries[0].NodeID, iata, &snr, nil); err != nil {
+							if err := w.db.UpsertNodeNeighbor(ctx, currEntries[0].NodeID, prevEntries[0].NodeID, iata, &snr, nil, false); err != nil {
 								log.Printf("ingest[%s]: failed to upsert trace neighbor: %v", w.cfg.BrokerName, err)
 							}
 						}
@@ -657,7 +657,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 						// don't insert our own node as a neighbor
 						if oErr == nil && rErr == nil && observerNodeID != responderNodeID {
 							rxSNR := float32(parseNumber(envelope.SNR))
-							if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, responderNodeID, iata, &rxSNR, nil); err != nil {
+							if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, responderNodeID, iata, &rxSNR, nil, true); err != nil {
 								log.Printf("ingest[%s]: failed to upsert observer-discover neighbor: %v", w.cfg.BrokerName, err)
 							}
 						}
@@ -867,7 +867,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 			if from == to {
 				return
 			}
-			if err := w.db.UpsertNodeNeighbor(ctx, from, to, iata, nil, nil); err != nil {
+			if err := w.db.UpsertNodeNeighbor(ctx, from, to, iata, nil, nil, false); err != nil {
 				log.Printf("ingest[%s]: failed to upsert path neighbor: %v", w.cfg.BrokerName, err)
 			}
 		}
