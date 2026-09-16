@@ -2,7 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import type { TraceDetail, TracePacket } from '../../src/types/api';
 
 // Kartan kräver lokaliserade noder: samma fixtur som enheterna, runt Västmanland
-// så varje ben ligger väl inom 150 km LoRa-gränsen.
+// så varje ben ligger väl inom 150 km LoRa-gränsen. 2-byte-hashar (samma bar som
+// Paketsökvägen: 1 byte kan aldrig verifieras) + tom kollisionsmängd via den
+// mockade /nodes/ambiguous-prefix2-routen nedan.
 const packet: TracePacket = {
   packetHash: 'newest-packet-hash',
   routeType: 1,
@@ -10,7 +12,7 @@ const packet: TracePacket = {
   scope: 'EU',
   firstHeardAt: Date.now() - 120_000,
   lastHeardAt: Date.now() - 60_000,
-  rawPath: [{ hash: 'aa', snr: 3.75 }, { hash: 'bb', snr: 13.25 }, { hash: 'cc' }],
+  rawPath: [{ hash: 'aabb', snr: 3.75 }, { hash: 'ccdd', snr: 13.25 }, { hash: 'eeff' }],
   resolvedRoute: [
     {
       confidence: 'high',
@@ -20,7 +22,10 @@ const packet: TracePacket = {
       confidence: 'high',
       nodes: [{ id: 'relay', name: 'Relay', publicKey: 'bb', longitude: 16.52, latitude: 59.61 }],
     },
-    { confidence: 'none', nodes: [] },
+    {
+      confidence: 'high',
+      nodes: [{ id: 'third', name: 'Third', publicKey: 'cc', longitude: 16.54, latitude: 59.62 }],
+    },
   ],
 };
 const packets: TracePacket[] = [
@@ -67,7 +72,11 @@ async function openTrace(page: Page, rows = packets) {
       ];
     else if (path === '/api/v1/traces/abcd')
       data = { traceTag: 'abcd', packets: rows } satisfies TraceDetail;
-    else if (/\/packets\/|\/nodes\//.test(path)) {
+    else if (path === '/api/v1/nodes/ambiguous-prefix2') {
+      // Tom kollisionsmängd = 2-byte-fixturer ritas (fail-closed-gaten öppnar).
+      await route.fulfill({ json: [] });
+      return;
+    } else if (/\/packets\/|\/nodes\//.test(path)) {
       await route.fulfill({ status: 404, json: { error: 'not found' } });
       return;
     }
@@ -191,7 +200,7 @@ test.describe('touch', () => {
     await expectContained(page);
     await page.getByText('Gateway', { exact: true }).tap();
     const popover = page.getByRole('tooltip');
-    await expect(popover).toContainText('Hash AA');
+    await expect(popover).toContainText('Hash AABB');
     await popover.getByRole('button', { name: 'Gateway' }).tap();
     await expect(page.getByRole('dialog')).toBeVisible();
     expect(page.url()).not.toContain('newest-packet-hash');

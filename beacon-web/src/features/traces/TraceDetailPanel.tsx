@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { traceQueries } from '../../api/queries';
+import { traceQueries, nodeQueries } from '../../api/queries';
 import { DetailPanel, Section } from '../../components/DetailPanel';
 import { Timestamp } from '../../components/Timestamp';
 import { Badge } from '../../components/Badge';
@@ -91,19 +91,38 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
     () => (detail ? [...detail.packets].sort((a, b) => b.lastHeardAt - a.lastHeardAt) : []),
     [detail],
   );
-  const { paths, blocked } = useMemo(() => buildTracePaths(packets), [packets]);
+  // Global 2-byte-kollisionsmängd (samma spärr som Paketsökvägen): utan den kan vi inte
+  // bevisa att en 2-byte-rutt är säker — fail-closed tills fetchen löst sig.
+  const { data: ambiguousPrefix2 } = useQuery(nodeQueries.ambiguousPrefix2());
+  const { paths, blocked } = useMemo(
+    () => buildTracePaths(packets, { ambiguousPrefix2 }),
+    [packets, ambiguousPrefix2],
+  );
   const { themeId } = useTheme();
   const styleId = useMemo(() => mapStyleForTheme(themeId), [themeId]);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const activeKey =
     selectedKey && packets.some((p) => p.packetHash === selectedKey) ? selectedKey : null;
   const visiblePackets = activeKey ? packets.filter((p) => p.packetHash === activeKey) : packets;
-  const blockedMessage =
+  // Samma blockeringsmeddelanden som Paketsökvägen — short-hash/ambiguous först.
+  const blockedKey =
     blocked == null
       ? null
-      : blocked.reason === 'out-of-range'
-        ? t('map.pathBlockedOutOfRange')
-        : t('map.pathBlockedUnresolved');
+      : blocked.reason === 'short-hash'
+        ? 'map.pathBlockedShortHash'
+        : blocked.reason === 'ambiguous-hop'
+          ? 'map.pathBlockedAmbiguousHop'
+          : blocked.reason === 'out-of-range'
+            ? 'map.pathBlockedOutOfRange'
+            : 'map.pathBlockedUnresolved';
+  const blockedMessage =
+    blocked == null || blockedKey == null
+      ? null
+      : t(blockedKey, {
+          size: blocked.observedHashSize,
+          required: 2,
+          count: blocked.count,
+        });
 
   // The map section is informative, never load-bearing: it renders when at least one packet
   // resolved to drawable legs, explains why when everything was withheld, and stays out of

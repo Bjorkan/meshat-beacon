@@ -151,13 +151,6 @@ function TraceCanvas({
           'line-color': ['get', 'snrColor'],
           'line-width': 2.5,
           'line-opacity': 0.9,
-          // tvetydigt upplösta ben markeras streckade, säkra heldragna
-          'line-dasharray': [
-            'case',
-            ['==', ['get', 'ambiguous'], true],
-            ['literal', [2, 1.5]],
-            ['literal', [1, 0]],
-          ],
         },
       } as LineLayerSpecification);
     }
@@ -241,8 +234,9 @@ function TraceCanvas({
 
 // Egen MapLibre-karta som ritar en trace-taggs paket som verifierbara ben.
 // Varje ben bär sin egen snrColor: samma SNR-skala som grannlinjerna på Kart-fliken
-// (danger/warn/green + blå fallback utan mätvärde). Tvetydigt upplösta ben ritas
-// streckade. Äger sin egen instans och rör aldrig Kart-flikens karta. Laddas via
+// (danger/warn/green + blå fallback utan mätvärde). Bara fail-closed verifierade ben
+// når hit — tvetydiga hopp undanhåller hela paketet (samma spärr som Paketsökvägen).
+// Äger sin egen instans och rör aldrig Kart-flikens karta. Laddas via
 // TracePathMapLazy så startpaketet aldrig betalar MapLibre-kostnaden, och visar
 // ladd/fel-tillstånd som Nod-detaljens platskarta medan tiles hämtas.
 export function TracePathMapInner({

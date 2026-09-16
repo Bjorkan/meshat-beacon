@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { TraceDetailPanel } from '../../../src/features/traces/TraceDetailPanel';
-import { traceQueries } from '../../../src/api/queries';
+import { nodeQueries, traceQueries } from '../../../src/api/queries';
 import type { TracePacket } from '../../../src/types/api';
 
 // The WebGL map can't render in jsdom: stub the canvas, keep the packet list + selector logic.
@@ -28,6 +28,8 @@ function packet(overrides: Partial<TracePacket> = {}): TracePacket {
 function renderDetail(packets: TracePacket[]) {
   const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity } } });
   client.setQueryData(traceQueries.detail('abcd').queryKey, { traceTag: 'abcd', packets });
+  // Kollisionsmängden tom = 2-byte-fixturer ritas (samma mock som PacketPathMapModal-testet).
+  client.setQueryData(nodeQueries.ambiguousPrefix2().queryKey, []);
   const onAnalyze = vi.fn();
   const onViewNode = vi.fn();
   render(
@@ -86,7 +88,7 @@ describe('TraceDetailPanel', () => {
     const { onAnalyze, onViewNode } = renderDetail([
       packet({
         packetHash: 'pkt-one',
-        rawPath: [{ hash: 'aa' }, { hash: 'bb' }, { hash: 'cc', snr: -7.5 }],
+        rawPath: [{ hash: 'aabb' }, { hash: 'ccdd' }, { hash: 'eeff', snr: -7.5 }],
         resolvedRoute: [
           {
             confidence: 'high',
@@ -100,12 +102,17 @@ describe('TraceDetailPanel', () => {
               { id: 'relay', name: 'Relay', publicKey: 'bb', longitude: 16.52, latitude: 59.61 },
             ],
           },
-          { confidence: 'none', nodes: [] },
+          {
+            confidence: 'high',
+            nodes: [
+              { id: 'third', name: 'Third', publicKey: 'cc', longitude: 16.54, latitude: 59.62 },
+            ],
+          },
         ],
       }),
       packet({ packetHash: 'pkt-two' }),
     ]);
-    // the first packet resolved two located hops: the map draws with an All selector.
+    // the first packet resolved three located hops: the map draws with an All selector.
     // Isolating it filters both the map and the packet list down to that packet.
     expect(screen.getByTestId('trace-map')).toHaveTextContent('all');
     expect(screen.getByRole('button', { name: 'All paths' })).toBeInTheDocument();

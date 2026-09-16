@@ -352,7 +352,7 @@
     "packet_one": "{{count}} paket",
     "packet_other": "{{count}} paket",
     "noPackets": "Inga paket",
-    "mapSnrHint": "Länkfärg: SNR i samma skala som grannlänkarna. Blå länk saknar mätvärde; streckad länk är osäkert matchad.",
+    "mapSnrHint": "Länkfärg: SNR i samma skala som grannlänkarna. Blå länk saknar mätvärde.",
     "legSnr": "Länk {{from}} → {{to}} · {{snr}} dB",
     "noSnr": "SNR saknas",
     "summary": "{{packets}} pkt · {{iatas}} IATA"
