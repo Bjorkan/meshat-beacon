@@ -276,6 +276,8 @@
     "failedLocation": "Bakgrundskartan kunde inte laddas. Positionen visas som koordinater nedan.",
     "noDrawablePaths": "Ingen verifierad rutt att visa",
     "noDrawablePathsHint": "Paketets observationer innehåller ingen rutt med tillräckliga positionsuppgifter.",
+    "directHop": "Direkt",
+    "unverifiedPathHashes": "Sökvägshashar",
     "settings": "Kartinställningar",
     "nodeType": "Nodtyp",
     "clustering": "Klustring",

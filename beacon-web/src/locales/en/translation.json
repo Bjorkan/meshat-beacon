@@ -276,6 +276,8 @@
     "failedLocation": "The basemap could not load. The location is shown as coordinates below.",
     "noDrawablePaths": "No verified route to display",
     "noDrawablePathsHint": "This packet has no route with sufficient location information.",
+    "directHop": "Direct",
+    "unverifiedPathHashes": "Path hashes",
     "settings": "Map settings",
     "nodeType": "Node type",
     "clustering": "Clustering",

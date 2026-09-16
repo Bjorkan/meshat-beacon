@@ -115,7 +115,7 @@ describe('PacketPathMapModal', () => {
     expect(screen.getByRole('button', { name: 'Copy path link' })).toBeInTheDocument();
   });
 
-  it('explains a withheld 1-byte route instead of drawing it', () => {
+  it('shows the blurred map with the explanation and raw observer rows for a withheld 1-byte route', () => {
     const shortHash = {
       ...detail,
       observations: detail.observations.map((o) => ({
@@ -124,13 +124,12 @@ describe('PacketPathMapModal', () => {
       })),
     } as unknown as PacketDetail;
     render(<PacketPathMapModal detail={shortHash} onClose={() => {}} />);
-    // no observer rows: every candidate was withheld
-    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mini-map')).toBeNull();
+    // same chrome: map renders (empty), explanation floats over it, observers list raw rows
+    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
+    expect(screen.getByText('All paths')).toBeInTheDocument();
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Bravo')).toBeInTheDocument();
     expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*2B hashes/);
-    expect(screen.queryByTestId('mini-map')).toBeNull();
-    expect(screen.queryByText('All paths')).toBeNull();
-    expect(screen.getByText('AABBCCDD')).toBeInTheDocument();
   });
 
   it('draws a 2-byte route when the DB reports no collisions', () => {
@@ -149,7 +148,7 @@ describe('PacketPathMapModal', () => {
     expect(screen.queryByRole('note')).not.toBeInTheDocument();
   });
 
-  it('explains a 2-byte route with an ambiguous hop', () => {
+  it('shows the blurred map with the explanation for a 2-byte route with an ambiguous hop', () => {
     const ambiguous = {
       ...detail,
       observations: [
@@ -186,12 +185,14 @@ describe('PacketPathMapModal', () => {
       ],
     } as unknown as PacketDetail;
     render(<PacketPathMapModal detail={ambiguous} onClose={() => {}} />);
-    expect(screen.queryByText('Alpha')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('mini-map')).toBeNull();
+    // map renders empty with the explanation over it; observers stay listed with raw hops
+    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
+    expect(screen.getByText('Alpha')).toBeInTheDocument();
+    expect(screen.getByText('Bravo')).toBeInTheDocument();
     expect(screen.getByRole('note')).toHaveTextContent(/more than one node/);
   });
 
-  it('explains an MQTT-stitched route with an impossible leg', () => {
+  it('shows the blurred map with the explanation for an MQTT-stitched route with an impossible leg', () => {
     const stitched = {
       ...detail,
       observations: [
@@ -206,8 +207,43 @@ describe('PacketPathMapModal', () => {
       ],
     } as unknown as PacketDetail;
     render(<PacketPathMapModal detail={stitched} onClose={() => {}} />);
-    expect(screen.queryByTestId('mini-map')).toBeNull();
+    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
     expect(screen.getByRole('note')).toHaveTextContent(/too far apart/);
+  });
+
+  it('renders one Direct row per zero-hop observation without path bytes', () => {
+    const direct = {
+      ...detail,
+      observations: detail.observations.map((o) => ({
+        ...o,
+        pathLength: { raw: '00', hashSize: 1, hopCount: 0 },
+        pathBytes: undefined,
+        resolvedPath: [],
+      })),
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={direct} onClose={() => {}} />);
+    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
+    expect(screen.getAllByText('Direct')).toHaveLength(2);
+  });
+
+  it('lists unverified observation hops as raw hash blocks', () => {
+    const unverified = {
+      ...detail,
+      observations: [
+        {
+          ...detail.observations[0],
+          pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
+          pathBytes: 'ceb3',
+          resolvedPath: [
+            { confidence: 'none', nodes: [] },
+            { confidence: 'none', nodes: [] },
+          ],
+        },
+      ],
+    } as unknown as PacketDetail;
+    render(<PacketPathMapModal detail={unverified} onClose={() => {}} />);
+    expect(screen.getByText('CE')).toBeInTheDocument();
+    expect(screen.getByText('B3')).toBeInTheDocument();
   });
 
   describe('copy path link', () => {

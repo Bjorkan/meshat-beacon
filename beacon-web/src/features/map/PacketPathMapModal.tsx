@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import type { PacketDetail } from '../../types/api';
+import type { Observation, PacketDetail } from '../../types/api';
 import { nodeQueries } from '../../api/queries';
 import { ModalOverlay } from '../../components/ModalOverlay';
 import { CloseButton } from '../../components/CloseButton';
@@ -11,6 +11,7 @@ import { useTheme } from '../../hooks/useTheme';
 import { buildPacketPathResult } from './packet-path';
 import { PacketPathMap } from './PacketPathMap';
 import { mapStyleForTheme } from './types';
+import { PathData } from '../packets/PathData';
 
 // Closable mini-map of a packet's resolved path(s). "All paths" overlays every observation's route;
 // clicking an observer isolates its path. Lives over the analyzer (no tab switch), so closing it
@@ -44,6 +45,63 @@ function Row({
       />
       <span className="truncate">{label}</span>
       {meta != null && <span className="ml-auto text-text-dim">{meta}</span>}
+    </button>
+  );
+}
+
+// Unverifiable observation row: the observer that heard the packet plus its raw path
+// hashes as hop blocks (gray — no verification claim). Zero-hop sightings (DIRECT,
+// hopCount 0) render a single Direkt row instead of an empty list.
+function ObserverPathRow({
+  observation,
+  active,
+  onClick,
+}: {
+  observation: Observation;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  const hashSize = observation.pathLength.hashSize;
+  const chars = hashSize * 2;
+  const hops =
+    observation.pathBytes && chars > 0
+      ? (observation.pathBytes.match(new RegExp(`.{1,${chars}}`, 'g')) ?? [])
+      : [];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`w-full flex flex-col gap-1.5 px-3 py-2 text-left font-mono border-l-2 transition-colors ${
+        active
+          ? 'border-l-secondary bg-secondary/5 text-text-bright'
+          : 'border-l-transparent text-text-normal hover:bg-text-normal/3'
+      }`}
+    >
+      <span className="flex w-full items-center gap-2 text-[13px]">
+        <span className="truncate">
+          {observation.observerName ?? observation.observerId.slice(0, 8)}
+        </span>
+        <span className="ml-auto shrink-0 text-text-dim">
+          {formatPropagation(observation.propagationTimeMs)}
+        </span>
+      </span>
+      {hops.length > 0 ? (
+        <span
+          className="flex flex-wrap items-center gap-1 text-[11px]"
+          aria-label={t('map.unverifiedPathHashes')}
+        >
+          <PathData
+            pathBytes={observation.pathBytes!}
+            hashSize={hashSize}
+            resolvedPath={observation.resolvedPath}
+            size="sm"
+          />
+        </span>
+      ) : (
+        <span className="text-[11px] text-text-dim">{t('map.directHop')}</span>
+      )}
     </button>
   );
 }
@@ -94,11 +152,14 @@ export function PacketPathMapModal({
   const { themeId } = useTheme();
   const styleId = useMemo(() => mapStyleForTheme(themeId), [themeId]);
 
+  // Lacking a verified route the map still renders — same chrome (map + observer list),
+  // but with no lines/points, the basemap blurred, and the explanation floating over it.
+  // The observer list then shows each observation's raw path hashes instead of path rows.
+  const hasDrawableRoute = paths.length > 0;
+
   return (
     <ModalOverlay label={t('map.packetPathLabel')} onClose={onClose}>
-      <div
-        className={`${paths.length > 0 ? 'h-full lg:w-[860px]' : 'max-h-[85vh] lg:w-[540px]'} w-full lg:max-w-[92vw] bg-bg-surface flex flex-col overflow-y-auto`}
-      >
+      <div className="h-full lg:w-[860px] w-full lg:max-w-[92vw] bg-bg-surface flex flex-col overflow-y-auto">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
           <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
             {t('map.packetPath')}
@@ -117,7 +178,7 @@ export function PacketPathMapModal({
           </div>
         </div>
 
-        {paths.length > 0 && blockedMessage != null && (
+        {hasDrawableRoute && blockedMessage != null && (
           <div
             role="note"
             className="shrink-0 px-3 py-2 border-b border-warn/20 bg-warn/5 text-[12px] font-mono text-text-normal"
@@ -126,49 +187,55 @@ export function PacketPathMapModal({
           </div>
         )}
 
-        {paths.length === 0 ? (
-          <div className="space-y-4 p-5 font-mono text-sm">
-            <h2 className="font-semibold text-text-bright">{t('map.noDrawablePaths')}</h2>
-            <p role="note" className="text-text-normal">
-              {blockedMessage ?? t('map.noDrawablePathsHint')}
-            </p>
-            <dl className="space-y-2 text-xs text-text-muted">
-              <div>
-                <dt>{t('fields.hash')}</dt>
-                <dd className="break-all text-text-normal">{detail.packetHash.toUpperCase()}</dd>
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
+          <div className="relative h-[55vh] max-lg:shrink-0 lg:h-auto lg:flex-1 min-h-0 bg-bg-base">
+            <PacketPathMap paths={paths} selectedKey={selectedKey} styleId={styleId} />
+            {!hasDrawableRoute && (
+              <div
+                className="absolute inset-0 z-10 flex items-center justify-center bg-bg-base/40 p-6 backdrop-blur-[3px]"
+                role="note"
+                aria-label={t('map.noDrawablePaths')}
+              >
+                <div className="max-w-md space-y-2 text-center font-mono text-sm">
+                  <h2 className="font-semibold text-text-bright">{t('map.noDrawablePaths')}</h2>
+                  <p className="text-text-normal">
+                    {blockedMessage ?? t('map.noDrawablePathsHint')}
+                  </p>
+                </div>
               </div>
-              <div>
-                <dt>{t('details.observations')}</dt>
-                <dd>{detail.observations.length}</dd>
-              </div>
-            </dl>
+            )}
           </div>
-        ) : (
-          <div className="flex-1 min-h-0 flex flex-col lg:flex-row">
-            <div className="h-[55vh] max-lg:shrink-0 lg:h-auto lg:flex-1 min-h-0 bg-bg-base">
-              <PacketPathMap paths={paths} selectedKey={selectedKey} styleId={styleId} />
+          <div className="lg:w-[220px] lg:border-l border-t lg:border-t-0 border-border flex flex-col min-h-0 overflow-y-auto">
+            <div className="sticky top-0 bg-bg-surface z-10 border-b border-border-subtle">
+              <Row
+                active={selectedKey === null}
+                label={t('map.allPaths')}
+                onClick={() => setSelectedKey(null)}
+              />
             </div>
-            <div className="lg:w-[220px] lg:border-l border-t lg:border-t-0 border-border flex flex-col min-h-0 overflow-y-auto">
-              <div className="sticky top-0 bg-bg-surface z-10 border-b border-border-subtle">
-                <Row
-                  active={selectedKey === null}
-                  label={t('map.allPaths')}
-                  onClick={() => setSelectedKey(null)}
-                />
-              </div>
-              {paths.map((p) => (
-                <Row
-                  key={p.key}
-                  active={selectedKey === p.key}
-                  color={p.color}
-                  label={p.key === 'trace' ? t('map.traceRoute') : p.label}
-                  meta={formatPropagation(p.propagationMs)}
-                  onClick={() => setSelectedKey(p.key)}
-                />
-              ))}
-            </div>
+            {hasDrawableRoute
+              ? paths.map((p) => (
+                  <Row
+                    key={p.key}
+                    active={selectedKey === p.key}
+                    color={p.color}
+                    label={p.key === 'trace' ? t('map.traceRoute') : p.label}
+                    meta={formatPropagation(p.propagationMs)}
+                    onClick={() => setSelectedKey(p.key)}
+                  />
+                ))
+              : detail.observations.map((obs) => (
+                  <ObserverPathRow
+                    key={obs.observerId}
+                    observation={obs}
+                    active={selectedKey === obs.observerId}
+                    onClick={() =>
+                      setSelectedKey((cur) => (cur === obs.observerId ? null : obs.observerId))
+                    }
+                  />
+                ))}
           </div>
-        )}
+        </div>
       </div>
     </ModalOverlay>
   );
