@@ -1197,7 +1197,9 @@ SELECT
   MAX(nt.last_seen)::timestamptz AS to_last_seen,
   BOOL_OR(nn.direct) AS direct,
   MAX(nn.direct_last_seen)::timestamptz AS direct_last_seen,
-  MAX(nn.hash_width)::smallint AS hash_width
+  -- COALESCE to 0 (legacy/unknown, never discountable): MAX over all-NULL
+  -- rows returns NULL, which pgx cannot scan into the non-nullable int16.
+  COALESCE(MAX(nn.hash_width), 0)::smallint AS hash_width
 FROM node_neighbors nn
 JOIN nodes nf ON nf.id = nn.node_id
 JOIN nodes nt ON nt.id = nn.neighbor_id
