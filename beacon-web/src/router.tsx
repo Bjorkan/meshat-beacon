@@ -55,6 +55,7 @@ import {
   validateMapSearch,
   validateNodesSearch,
   validateObserversSearch,
+  validateRoutesSearch,
   validateTracesSearch,
 } from './routes/search-contracts';
 import type { PacketDetail } from './types/api';
@@ -720,6 +721,7 @@ const observerDetailRoute = createRoute({
 const routesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: 'routes',
+  validateSearch: validateRoutesSearch,
   component: lazyRouteComponent(() => import('./routes/routes-route'), 'RoutesRoute'),
 });
 

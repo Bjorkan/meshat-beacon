@@ -17,6 +17,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -74,7 +75,7 @@ func (s *Store) UpsertNodeShortID(ctx context.Context, nodeID uuid.UUID, iata st
 	})
 }
 
-func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string) error {
+func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool) error {
 	// A neighbor edge claims the two nodes hear each other over RF, which is
 	// impossible beyond a bounded range. When both endpoints report
 	// coordinates, refuse links longer than the cap — packets and /neighbors
@@ -98,6 +99,7 @@ func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.
 		Iata:        iata,
 		Snr:         snr,
 		RegionScope: regionScope,
+		Direct:      direct,
 	})
 }
 
@@ -328,6 +330,33 @@ func (s *Store) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UU
 
 func (s *Store) GetNodeByPubkey(ctx context.Context, pubkey []byte) (uuid.UUID, error) {
 	return s.q.GetNodeByPubkey(ctx, pubkey)
+}
+
+// GetNodeIDByPubkey implements api.Reader: full public key to node UUID,
+// nil without error when the key is unknown.
+func (s *Store) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error) {
+	id, err := s.q.GetNodeByPubkey(ctx, pubkey)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &id, nil
+}
+
+// GetNodeTypeByPubkey implements api.Reader: full public key to node type,
+// nil without error when the key is unknown. The repeater-only route planner
+// uses this to reject non-repeater endpoints before planning.
+func (s *Store) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
+	t, err := s.q.GetNodeTypeByPubkey(ctx, pubkey)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
 }
 
 // ListAmbiguousPrefix2 returns every 2-byte prefix claimed by more than one infra

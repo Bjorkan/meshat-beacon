@@ -24,6 +24,58 @@ type KnownRoute struct {
 	ObservationCount int64      `json:"observationCount" binding:"required"`
 }
 
+// PlannedRouteLeg is one directed hop of a computed best route.
+type PlannedRouteLeg struct {
+	From             string   `json:"from" binding:"required"` // full node public key, lowercase hex
+	To               string   `json:"to" binding:"required"`   // full node public key, lowercase hex
+	SNR              *float32 `json:"snr,omitempty"`           // merged sample-weighted SNR in dB: last-known reading, nil when never measured
+	SNRSampleCount   int64    `json:"snrSampleCount" binding:"required"`
+	SNRLastSeen      int64    `json:"snrLastSeen" binding:"required"` // epoch ms, 0 when never measured
+	ObservationCount int64    `json:"observationCount" binding:"required"`
+	Unmeasured       bool     `json:"unmeasured" binding:"required"` // true when no fresh SNR reading backs this leg; SNR then is a stale last-known value, not current quality
+	Neighbor         bool     `json:"neighbor" binding:"required"`   // true when the reporter explicitly marked the peer as a neighbor (directional, freshly confirmed)
+}
+
+// PlannedRouteNode is a waypoint of a computed best route. ID feeds the
+// existing node overlay (/nodes/$nodeId); PublicKey is the stable full-hex
+// identity used in from/to URLs.
+type PlannedRouteNode struct {
+	ID           uuid.UUID `json:"id" binding:"required"`
+	PublicKey    string    `json:"publicKey" binding:"required"` // full key, lowercase hex
+	Name         *string   `json:"name,omitempty"`
+	Latitude     *float64  `json:"latitude,omitempty"`
+	Longitude    *float64  `json:"longitude,omitempty"`
+	NodeType     int16     `json:"nodeType" binding:"required"`
+	NodeTypeName string    `json:"nodeTypeName" binding:"required"`
+	Stale        bool      `json:"stale" binding:"required"`
+	// SupportsMultibytePaths reports confirmed 3-byte path-hash forwarding
+	// (firmware 1.14+). False means "not confirmed yet", NOT "known
+	// incompatible": the flag starts false on a cold deployment until enough
+	// advert/path traffic has been observed. The MeshCore exporter warns
+	// (without blocking the copy) when any repeater in the route is
+	// unconfirmed. Tri-state (confirmed/unknown/unsupported) is future work;
+	// today only confirmed-true is actionable.
+	SupportsMultibytePaths bool `json:"supportsMultibytePaths" binding:"required"`
+}
+
+// PlannedRoute is one computed path between two nodes, best first.
+type PlannedRoute struct {
+	Nodes              []PlannedRouteNode `json:"nodes" binding:"required"`
+	Legs               []PlannedRouteLeg  `json:"legs" binding:"required"`
+	TotalCost          float64            `json:"totalCost" binding:"required"`
+	HopCount           int                `json:"hopCount" binding:"required"`
+	HasUnmeasuredLegs  bool               `json:"hasUnmeasuredLegs" binding:"required"`
+	ContainsStaleNodes bool               `json:"containsStaleNodes" binding:"required"`
+}
+
+// BestRouteResult is the GET /routes/best response. Paths is empty (with
+// Reason set) when no route exists -- never an error, so the planner UI can
+// render "no route" instead of failing.
+type BestRouteResult struct {
+	Paths  []PlannedRoute `json:"paths" binding:"required"`
+	Reason string         `json:"reason,omitempty"` // e.g. "no-route", "endpoint-missing-position"
+}
+
 // CrossIATAHop represents the boundary hop between two IATAs in a cross-IATA route.
 type CrossIATAHop struct {
 	FromNode ResolvedNode `json:"fromNode" binding:"required"` // last node in source IATA

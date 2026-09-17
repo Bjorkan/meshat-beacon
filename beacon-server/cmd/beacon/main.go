@@ -18,6 +18,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/db"
 	_ "github.com/MeshCore-Beacon/beacon-server/docs"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api/router"
 	"github.com/MeshCore-Beacon/beacon-server/internal/background"
 	"github.com/MeshCore-Beacon/beacon-server/internal/cache"
@@ -113,6 +114,33 @@ func main() {
 	}
 
 	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL, resolved.MeshCoreRegionFreshness)
+	store.SetRoutePlanConfig(db.RoutePlanConfig{
+		Cost:           routeplan.FromResolved(resolved),
+		StaleThreshold: resolved.NodeStaleThreshold,
+	})
+	// Routing snapshot: PostgreSQL stays the source of truth; steady-state
+	// /routes/best requests plan against the Holder's immutable in-memory
+	// copy built once at startup and refreshed periodically (30s bound).
+	// RefreshRouteSnapshot logs age/node/edge/rebuild/build/failure counters
+	// on every attempt. A failed refresh keeps the previous snapshot serving;
+	// startup itself fails closed since no known-good snapshot exists yet.
+	if err := store.RefreshRouteSnapshot(ctx); err != nil {
+		log.Fatalf("initial route snapshot failed: %v", err)
+	}
+	routeRefresh := time.NewTicker(routeplan.DefaultSnapshotRefreshInterval)
+	defer routeRefresh.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-routeRefresh.C:
+				if err := store.RefreshRouteSnapshot(ctx); err != nil {
+					log.Printf("routeplan: snapshot refresh failed, serving previous snapshot: %v", err)
+				}
+			}
+		}
+	}()
 
 	// ── MeshCore suggested radio settings (one fetch at startup, fail-open) ──────────────
 	presetCatalogue := radiopreset.Load(ctx, nil)

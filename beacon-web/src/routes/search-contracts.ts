@@ -82,6 +82,33 @@ export function validateTracesSearch(search: Record<string, unknown>): TracesSea
   return { tt: oneOf(search.tt, ['TRACE', 'PING'] as const) };
 }
 
+export interface RoutesSearch {
+  from?: string;
+  to?: string;
+  alt?: number;
+}
+
+function hexKey(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const hex = value.replace(/\s+/g, '').toLowerCase();
+  // Full node public keys only: 32 bytes / 64 hex chars, matching the
+  // /routes/best contract (short prefixes 404/400 elsewhere, never route).
+  return /^[0-9a-f]{64}$/.test(hex) ? hex : undefined;
+}
+
+function altIndex(value: unknown): number | undefined {
+  const n = typeof value === 'string' ? Number(value) : typeof value === 'number' ? value : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= 2 ? n : undefined;
+}
+
+export function validateRoutesSearch(search: Record<string, unknown>): RoutesSearch {
+  return {
+    from: hexKey(search.from),
+    to: hexKey(search.to),
+    alt: altIndex(search.alt),
+  };
+}
+
 export interface MapSearch {
   node?: string;
   lat?: number;

@@ -171,6 +171,179 @@ func TestResolve_RouteDefaults(t *testing.T) {
 	}
 }
 
+func TestResolve_RoutePlanDefaults(t *testing.T) {
+	r := Resolve(&Config{})
+	if r.RoutePlanUnmeasuredPenalty != DefaultRoutePlanUnmeasuredPenalty {
+		t.Errorf("RoutePlanUnmeasuredPenalty = %v, want %v", r.RoutePlanUnmeasuredPenalty, DefaultRoutePlanUnmeasuredPenalty)
+	}
+	if r.RoutePlanSNRGoodDB != DefaultRoutePlanSNRGoodDB {
+		t.Errorf("RoutePlanSNRGoodDB = %v, want %v", r.RoutePlanSNRGoodDB, DefaultRoutePlanSNRGoodDB)
+	}
+	if r.RoutePlanSNRBadDB != DefaultRoutePlanSNRBadDB {
+		t.Errorf("RoutePlanSNRBadDB = %v, want %v", r.RoutePlanSNRBadDB, DefaultRoutePlanSNRBadDB)
+	}
+	if r.RoutePlanSNRMaxPenalty != DefaultRoutePlanSNRMaxPenalty {
+		t.Errorf("RoutePlanSNRMaxPenalty = %v, want %v", r.RoutePlanSNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty)
+	}
+	if r.RoutePlanNeighborBonus != DefaultRoutePlanNeighborBonus {
+		t.Errorf("RoutePlanNeighborBonus = %v, want %v", r.RoutePlanNeighborBonus, DefaultRoutePlanNeighborBonus)
+	}
+	if r.RoutePlanSNRFreshness != DefaultRoutePlanSNRFreshness {
+		t.Errorf("RoutePlanSNRFreshness = %v, want %v", r.RoutePlanSNRFreshness, DefaultRoutePlanSNRFreshness)
+	}
+	if r.RoutePlanMaxHops != DefaultRoutePlanMaxHops {
+		t.Errorf("RoutePlanMaxHops = %d, want %d", r.RoutePlanMaxHops, DefaultRoutePlanMaxHops)
+	}
+	if r.RoutePlanMaxAlternatives != DefaultRoutePlanMaxAlternatives {
+		t.Errorf("RoutePlanMaxAlternatives = %d, want %d", r.RoutePlanMaxAlternatives, DefaultRoutePlanMaxAlternatives)
+	}
+}
+
+func fptr(v float64) *float64 { return &v }
+func iptr(v int) *int         { return &v }
+
+func dptr(d time.Duration) *duration { return &duration{Duration: d} }
+
+func TestRoutePlanConfig_Validate(t *testing.T) {
+	good := RoutePlanConfig{
+		UnmeasuredPenalty: fptr(2.5), SNRGoodDB: fptr(5.0), SNRBadDB: fptr(-15.0), SNRMaxPenalty: fptr(2.0),
+		NeighborBonus: fptr(0.4),
+	}
+	if err := good.Validate(); err != nil {
+		t.Errorf("expected valid config, got %v", err)
+	}
+	if err := (&Config{}).Validate(); err != nil {
+		t.Errorf("expected zero routeplan block to validate, got %v", err)
+	}
+	inverted := good
+	inverted.SNRGoodDB, inverted.SNRBadDB = fptr(-15.0), fptr(5.0)
+	if err := inverted.Validate(); err == nil {
+		t.Error("expected error when snr_good_db <= snr_bad_db")
+	}
+	negative := good
+	negative.SNRMaxPenalty = fptr(-1.0)
+	if err := negative.Validate(); err == nil {
+		t.Error("expected error for negative penalty")
+	}
+	negativeBonus := good
+	negativeBonus.NeighborBonus = fptr(-0.1)
+	if err := negativeBonus.Validate(); err == nil {
+		t.Error("expected error for negative neighbor_bonus")
+	}
+	// Raw validation only checks shape: partial configs pass here and are
+	// rejected by ValidateResolved after defaults are applied (see below).
+	partial := RoutePlanConfig{NeighborBonus: fptr(10)}
+	if err := partial.Validate(); err != nil {
+		t.Errorf("expected partial raw config to pass shape validation, got %v", err)
+	}
+}
+
+func TestValidateResolved_PartialBonusRejected(t *testing.T) {
+	// neighbor_bonus: 10 alone passes raw validation but resolves against
+	// default penalties (unmeasured 2.5, max 2.0) into negative edge costs.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(10)
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected resolved rejection for lone neighbor_bonus: 10")
+	}
+}
+
+func TestValidateResolved_PartialUnmeasuredRejected(t *testing.T) {
+	// unmeasured_penalty: 1 alone resolves against the default max penalty
+	// 2.0, violating unmeasured >= max.
+	cfg := &Config{}
+	cfg.RoutePlan.UnmeasuredPenalty = fptr(1)
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected resolved rejection for lone unmeasured_penalty: 1")
+	}
+}
+
+func TestLoad_RoutePlanPartialRejected(t *testing.T) {
+	for _, body := range []string{
+		"routeplan:\n  neighbor_bonus: 10\n",
+		"routeplan:\n  unmeasured_penalty: 1\n",
+	} {
+		path := t.TempDir() + "/config.yaml"
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Errorf("expected Load to reject %q", body)
+		}
+	}
+}
+
+func TestResolve_RoutePlanExplicitZero(t *testing.T) {
+	// Explicit 0 is distinct from unset: it disables the feature instead of
+	// resolving back to the default.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(0)
+	cfg.RoutePlan.MaxAlternatives = iptr(0)
+	r := Resolve(cfg)
+	if r.RoutePlanNeighborBonus != 0 {
+		t.Errorf("explicit neighbor_bonus 0 resolved to %v", r.RoutePlanNeighborBonus)
+	}
+	if r.RoutePlanMaxAlternatives != 0 {
+		t.Errorf("explicit max_alternatives 0 resolved to %v", r.RoutePlanMaxAlternatives)
+	}
+	if err := ValidateResolved(r); err != nil {
+		t.Errorf("explicit-zero resolve should validate, got %v", err)
+	}
+}
+
+func TestValidateResolved_PositiveCosts(t *testing.T) {
+	if err := ValidateResolved(Resolve(&Config{})); err != nil {
+		t.Fatalf("default resolve should validate, got %v", err)
+	}
+	// Bonus at the gap boundary must be rejected: it would zero out costs.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(0.5) // gap is 2.5-2.0 = 0.5
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected rejection when neighbor_bonus >= unmeasured - max gap")
+	}
+}
+
+func TestResolve_RoutePlanDirectFreshnessDefault(t *testing.T) {
+	r := Resolve(&Config{})
+	if r.RoutePlanDirectFreshness != r.RoutePlanSNRFreshness {
+		t.Errorf("direct freshness should default to SNR freshness, got %v vs %v",
+			r.RoutePlanDirectFreshness, r.RoutePlanSNRFreshness)
+	}
+}
+
+func TestResolve_RoutePlanDirectFreshnessExplicitZero(t *testing.T) {
+	// Explicit 0 is distinct from unset: it disables the fresh-direct
+	// bonus/badge instead of falling back to SNR freshness. Resolve keeps
+	// the 0; the no-fallback copy in routeplan.FromResolved is covered by
+	// TestIsFreshNeighbor_DisabledFreshness on the planner side (config
+	// cannot import routeplan: import cycle).
+	cfg := &Config{}
+	cfg.RoutePlan.DirectFreshness = dptr(0)
+	r := Resolve(cfg)
+	if r.RoutePlanDirectFreshness != 0 {
+		t.Fatalf("explicit direct_freshness 0 resolved to %v", r.RoutePlanDirectFreshness)
+	}
+	if err := ValidateResolved(r); err != nil {
+		t.Fatalf("explicit-zero direct freshness should validate, got %v", err)
+	}
+}
+
+func TestLoad_RoutePlanDirectFreshnessZero(t *testing.T) {
+	// End-to-end through YAML: direct_freshness: 0s disables the bonus.
+	path := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(path, []byte("routeplan:\n  direct_freshness: 0s\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Resolve(cfg)
+	if r.RoutePlanDirectFreshness != 0 {
+		t.Fatalf("YAML direct_freshness: 0s resolved to %v", r.RoutePlanDirectFreshness)
+	}
+}
+
 func TestChannelPublicFlagIsExplicit(t *testing.T) {
 	path := t.TempDir() + "/config.yaml"
 	err := os.WriteFile(path, []byte(`channel_keys:

@@ -65,6 +65,9 @@ type Querier interface {
 	// Copyright 2026 Beacon Contributors
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	GetNodePathPublicKey(ctx context.Context, id uuid.UUID) ([]byte, error)
+	// Route-planner endpoint validation: the planner is repeater-only, so the
+	// handler must know the endpoint type. NULL (no row) means unknown key.
+	GetNodeTypeByPubkey(ctx context.Context, publicKey []byte) (int16, error)
 	GetNodesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]GetNodesByIDsRow, error)
 	GetObserverBrokers(ctx context.Context, observerID uuid.UUID) ([]GetObserverBrokersRow, error)
 	GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error)
@@ -84,6 +87,16 @@ type Querier interface {
 	GetRegion(ctx context.Context, id int32) (GetRegionRow, error)
 	GetRegionBySlug(ctx context.Context, slug string) (GetRegionBySlugRow, error)
 	GetRegionIATAs(ctx context.Context, regionID int32) ([]string, error)
+	// Full neighbor-graph dump for the /routes/best planner: every directed
+	// node_neighbors edge joined against both endpoints' identity, type and
+	// coordinates in ONE query, so the planner sees a point-in-time snapshot
+	// instead of a paginated crawl that can shift mid-read. One row per directed
+	// pair: SNR merges exactly like GetNodeNeighbors does (sample-weighted mean,
+	// summed counts, min/max timestamps) while the direct mark merges per directed
+	// pair with OR across IATAs (the planner's Neighbor semantic is directional:
+	// only the reporter hearing the peer counts, reverse evidence does not mark
+	// this direction) plus MAX(direct_last_seen) for bonus freshness.
+	GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow, error)
 	GetScopeByName(ctx context.Context, name string) (GetScopeByNameRow, error)
 	GetScopeNames(ctx context.Context) ([]string, error)
 	// Count each table on its own; the old cross-join blew up to millions of rows
@@ -305,6 +318,12 @@ type Querier interface {
 	// common case). regionScope is optional too; pass NULL whenever the OTA
 	// scope query for this neighbor didn't succeed (status != "responded"),
 	// so a failed/timed-out query doesn't erase a previously known scope.
+	// direct marks an explicit neighbor claim (the reporter itself heard the
+	// neighbor over RF: /neighbors reports, zero-hop advert RX, DISCOVER_RESP RX
+	// -- pass TRUE) versus overheard third-party topology from packet paths (pass
+	// FALSE). direct_last_seen advances only on explicit direct confirmations, so
+	// the planner can age the bonus out: overheard traffic refreshes last_seen
+	// (keeping the row alive under retention) but never refreshes direct_last_seen.
 	// On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 	// a stable map link quality while making recent RF conditions matter more than old samples.
 	UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighborParams) error

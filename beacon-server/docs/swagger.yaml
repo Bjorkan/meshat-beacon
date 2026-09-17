@@ -36,6 +36,18 @@ definitions:
     - payloadType
     - payloadTypeName
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.BestRouteResult:
+    properties:
+      paths:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRoute'
+        type: array
+      reason:
+        description: e.g. "no-route", "endpoint-missing-position"
+        type: string
+    required:
+    - paths
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.Channel:
     properties:
       channelHash:
@@ -1194,6 +1206,105 @@ definitions:
     - count
     - payloadType
     - payloadTypeName
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRoute:
+    properties:
+      containsStaleNodes:
+        type: boolean
+      hasUnmeasuredLegs:
+        type: boolean
+      hopCount:
+        type: integer
+      legs:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteLeg'
+        type: array
+      nodes:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteNode'
+        type: array
+      totalCost:
+        type: number
+    required:
+    - containsStaleNodes
+    - hasUnmeasuredLegs
+    - hopCount
+    - legs
+    - nodes
+    - totalCost
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteLeg:
+    properties:
+      from:
+        description: full node public key, lowercase hex
+        type: string
+      neighbor:
+        description: true when the reporter explicitly marked the peer as a neighbor
+          (directional, freshly confirmed)
+        type: boolean
+      observationCount:
+        type: integer
+      snr:
+        description: 'merged sample-weighted SNR in dB: last-known reading, nil when
+          never measured'
+        type: number
+      snrLastSeen:
+        description: epoch ms, 0 when never measured
+        type: integer
+      snrSampleCount:
+        type: integer
+      to:
+        description: full node public key, lowercase hex
+        type: string
+      unmeasured:
+        description: true when no fresh SNR reading backs this leg; SNR then is a
+          stale last-known value, not current quality
+        type: boolean
+    required:
+    - from
+    - neighbor
+    - observationCount
+    - snrLastSeen
+    - snrSampleCount
+    - to
+    - unmeasured
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PlannedRouteNode:
+    properties:
+      id:
+        type: string
+      latitude:
+        type: number
+      longitude:
+        type: number
+      name:
+        type: string
+      nodeType:
+        type: integer
+      nodeTypeName:
+        type: string
+      publicKey:
+        description: full key, lowercase hex
+        type: string
+      stale:
+        type: boolean
+      supportsMultibytePaths:
+        description: |-
+          SupportsMultibytePaths reports confirmed 3-byte path-hash forwarding
+          (firmware 1.14+). False means "not confirmed yet", NOT "known
+          incompatible": the flag starts false on a cold deployment until enough
+          advert/path traffic has been observed. The MeshCore exporter warns
+          (without blocking the copy) when any repeater in the route is
+          unconfirmed. Tri-state (confirmed/unknown/unsupported) is future work;
+          today only confirmed-true is actionable.
+        type: boolean
+    required:
+    - id
+    - nodeType
+    - nodeTypeName
+    - publicKey
+    - stale
+    - supportsMultibytePaths
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.RadioPreset:
     properties:
@@ -2710,6 +2821,55 @@ paths:
           schema:
             $ref: '#/definitions/internal_api_handlers.APIError'
       summary: List known routes
+      tags:
+      - Routes
+  /routes/best:
+    get:
+      description: Computes best-first repeater routes between two repeater nodes
+        over the observed neighbor graph, preferring legs with known signal strength.
+        Unmeasured legs pay a configured penalty but are still used, so the graph
+        never fragments. Every node in a returned path is a repeater with coordinates.
+        Non-repeater endpoints are rejected with 400. An unroutable pair returns 200
+        with an empty paths array and a reason, never an error.
+      parameters:
+      - description: Source repeater full public key (hex)
+        in: query
+        name: from
+        required: true
+        type: string
+      - description: Destination repeater full public key (hex)
+        in: query
+        name: to
+        required: true
+        type: string
+      - description: Alternatives beyond the best path (0-2, default 2)
+        in: query
+        name: alternatives
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.BestRouteResult'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: Plan the best route between two nodes
       tags:
       - Routes
   /routes/cross:

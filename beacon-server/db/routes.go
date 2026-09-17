@@ -12,9 +12,41 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
+	"github.com/MeshCore-Beacon/beacon-server/internal/config"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+// RoutePlanConfig carries the planner cost model and staleness window into the
+// store. Wired from config.ResolvedConfig in main; tests construct it directly.
+type RoutePlanConfig struct {
+	Cost           routeplan.Config
+	StaleThreshold time.Duration
+}
+
+// DefaultRoutePlanConfig mirrors the server defaults for tests and callers
+// without a resolved config.
+func DefaultRoutePlanConfig() RoutePlanConfig {
+	return RoutePlanConfig{
+		Cost:           routeplan.FromResolved(config.Resolve(&config.Config{})),
+		StaleThreshold: 24 * time.Hour,
+	}
+}
+
+// SetRoutePlanConfig installs the planner cost model. Must be called before
+// PlanBestRoute; the zero value falls back to server defaults.
+func (s *Store) SetRoutePlanConfig(c RoutePlanConfig) {
+	s.routePlan = c
+	s.routePlanSet = true
+}
+
+func (s *Store) routePlanOrDefault() RoutePlanConfig {
+	if s.routePlanSet {
+		return s.routePlan
+	}
+	return DefaultRoutePlanConfig()
+}
 
 // routePathKey is the route's identity digest: md5 over the comma-joined
 // node UUIDs, matching Postgres's decode(md5(array_to_string(node_ids, ',')), 'hex').
@@ -347,6 +379,180 @@ func extractFromNode(hops []api.RouteHop, nodeID uuid.UUID) []api.RouteHop {
 		}
 	}
 	return hops
+}
+
+// PlanBestRoute serves planning requests from the Holder's in-memory routing
+// snapshot when one is installed (see RefreshRouteSnapshot); otherwise it
+// falls back to a single PostgreSQL dump (startup/tests). Endpoints are resolved by UUID (the
+// handler maps full pubkeys to IDs). Endpoint metadata is resolved
+// independently of the neighbor graph, so a known + located but isolated
+// endpoint yields "no-route" (200, empty paths) while a known endpoint
+// without coordinates yields "endpoint-missing-position" (the handler maps
+// that to 422). A pair with no connecting path also yields "no-route".
+func (s *Store) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
+	cfg := s.routePlanOrDefault()
+	if maxAlternatives < 0 {
+		maxAlternatives = 0
+	}
+	if maxAlternatives > cfg.Cost.MaxAlternatives {
+		maxAlternatives = cfg.Cost.MaxAlternatives
+	}
+	k := 1 + maxAlternatives
+	now := time.Now()
+
+	if snap := s.routeSnapshotOrNil(); snap != nil {
+		return planOnSnapshot(ctx, s, snap, cfg, fromID, toID, k, now)
+	}
+
+	rows, err := s.q.GetRoutePlanGraph(ctx)
+	if err != nil {
+		return api.BestRouteResult{}, err
+	}
+	g := routeplan.BuildGraph(rows, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg), now)
+
+	// Classify endpoints from node metadata, not from graph membership: a
+	// located node with zero neighbor rows never enters g.Nodes but must not
+	// be reported as missing its position.
+	fromLoc, toLoc, err := s.routeEndpointLocations(ctx, fromID, toID, g)
+	if err != nil {
+		return api.BestRouteResult{}, err
+	}
+	if !fromLoc || !toLoc {
+		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "endpoint-missing-position"}, nil
+	}
+
+	paths := routeplan.ShortestPaths(g, cfg.Cost, fromID, toID, k, now)
+	if len(paths) == 0 {
+		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
+	}
+	out := make([]api.PlannedRoute, 0, len(paths))
+	for _, p := range paths {
+		route, ok := toPlannedRoute(g, p, now, cfg)
+		if !ok {
+			continue
+		}
+		out = append(out, route)
+	}
+	if len(out) == 0 {
+		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
+	}
+	return api.BestRouteResult{Paths: out}, nil
+}
+
+// routeEndpointLocations reports whether each endpoint is located, resolving
+// metadata independently of the neighbor graph. A node present in the graph
+// is located by construction (BuildGraph drops unlocated rows). A node absent
+// from the graph falls back to a GetNodesByIDs lookup: known + located but
+// isolated still routes to "no-route", while unknown or unlocated yields
+// "endpoint-missing-position".
+func (s *Store) routeEndpointLocations(ctx context.Context, fromID, toID uuid.UUID, g routeplan.Graph) (bool, bool, error) {
+	_, fromInGraph := g.Nodes[fromID]
+	_, toInGraph := g.Nodes[toID]
+	if fromInGraph && toInGraph {
+		return true, true, nil
+	}
+	missing := make([]uuid.UUID, 0, 2)
+	if !fromInGraph {
+		missing = append(missing, fromID)
+	}
+	if !toInGraph && toID != fromID {
+		missing = append(missing, toID)
+	}
+	nodes, err := s.GetNodesByIDs(ctx, missing)
+	if err != nil {
+		return false, false, err
+	}
+	located := func(id uuid.UUID, inGraph bool) bool {
+		if inGraph {
+			return true
+		}
+		n := nodes[id]
+		return n != nil && n.Latitude != nil && n.Longitude != nil
+	}
+	return located(fromID, fromInGraph), located(toID, toInGraph), nil
+}
+
+func (s *Store) staleThresholdOrDefault() time.Duration {
+	if s.staleThreshold != 0 {
+		return s.staleThreshold
+	}
+	return 24 * time.Hour
+}
+
+func (s *Store) neighborMaxKmOrDefault(cfg RoutePlanConfig) float64 {
+	if cfg.Cost.MaxDistanceKm != 0 {
+		return cfg.Cost.MaxDistanceKm
+	}
+	if s.neighborMaxKm != 0 {
+		return s.neighborMaxKm
+	}
+	return 150
+}
+
+// toPlannedRoute projects one node path onto the API shape. Edges are looked
+// up from the graph (same merged values the cost used); ok=false when a leg
+// vanished, which cannot happen for paths the search just produced. The
+// neighbor badge uses the same freshness definition as the cost model
+// (IsFreshNeighbor): a stale confirmation earns neither bonus nor badge.
+func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg RoutePlanConfig) (api.PlannedRoute, bool) {
+	nodes := make([]api.PlannedRouteNode, 0, len(p.Nodes))
+	legs := make([]api.PlannedRouteLeg, 0, len(p.Nodes)-1)
+	hasUnmeasured := false
+	hasStale := false
+	for i, id := range p.Nodes {
+		n, ok := g.Nodes[id]
+		if !ok {
+			return api.PlannedRoute{}, false
+		}
+		lat, lng := n.Lat, n.Lng
+		nodes = append(nodes, api.PlannedRouteNode{
+			ID: n.ID, PublicKey: n.Pubkey, Name: n.Name,
+			Latitude: &lat, Longitude: &lng,
+			NodeType: n.Type, NodeTypeName: api.NodeTypeName(n.Type), Stale: n.Stale,
+			SupportsMultibytePaths: n.SupportsMultibytePaths,
+		})
+		if n.Stale {
+			hasStale = true
+		}
+		if i+1 < len(p.Nodes) {
+			var found *routeplan.Edge
+			for _, e := range g.Edges[id] {
+				if e.To == p.Nodes[i+1] {
+					e := e
+					found = &e
+					break
+				}
+			}
+			if found == nil {
+				return api.PlannedRoute{}, false
+			}
+			var snr *float32
+			var snrCount int64
+			var snrSeen int64
+			if found.SNR != nil {
+				v := *found.SNR
+				snr = &v
+				snrCount = found.SNRSampleCount
+			}
+			if !found.SNRLastSeen.IsZero() {
+				snrSeen = found.SNRLastSeen.UnixMilli()
+			}
+			unmeasured := i < len(p.Unmeasured) && p.Unmeasured[i]
+			if unmeasured {
+				hasUnmeasured = true
+			}
+			legs = append(legs, api.PlannedRouteLeg{
+				From: n.Pubkey, To: g.Nodes[p.Nodes[i+1]].Pubkey,
+				SNR: snr, SNRSampleCount: snrCount, SNRLastSeen: snrSeen,
+				ObservationCount: found.Observations, Unmeasured: unmeasured,
+				Neighbor: cfg.Cost.IsFreshNeighbor(*found, now),
+			})
+		}
+	}
+	return api.PlannedRoute{
+		Nodes: nodes, Legs: legs, TotalCost: p.Cost, HopCount: len(legs),
+		HasUnmeasuredLegs: hasUnmeasured, ContainsStaleNodes: hasStale,
+	}, true
 }
 
 // knownRouteRow normalizes the per-query sqlc row structs (identical

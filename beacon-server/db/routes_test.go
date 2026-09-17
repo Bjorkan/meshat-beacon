@@ -69,6 +69,245 @@ func TestDeleteOldRoutes_PassesCutoffs(t *testing.T) {
 	}
 }
 
+func TestPlanBestRoute_IsolatedLocatedIsNoRoute(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.7, 16.6
+
+	// Empty graph: neither endpoint participates in any neighbor row.
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{}, nil)
+	// Fallback metadata lookup: both known and located -> no-route, not 422.
+	mock.EXPECT().GetNodesByIDs(gomock.Any(), gomock.Any()).Return([]sqlc.GetNodesByIDsRow{
+		{ID: from, Latitude: &lat, Longitude: &lng},
+		{ID: to, Latitude: &lat2, Longitude: &lng2},
+	}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 0 || res.Reason != "no-route" {
+		t.Errorf("isolated located pair must be no-route, got %+v", res)
+	}
+}
+
+func TestPlanBestRoute_UnlocatedEndpointIsMissingPosition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	lat, lng := 59.6, 16.5
+
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{}, nil)
+	// from located, to known but without coordinates -> missing position.
+	mock.EXPECT().GetNodesByIDs(gomock.Any(), gomock.Any()).Return([]sqlc.GetNodesByIDsRow{
+		{ID: from, Latitude: &lat, Longitude: &lng},
+		{ID: to},
+	}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Reason != "endpoint-missing-position" {
+		t.Errorf("unlocated endpoint must be endpoint-missing-position, got %+v", res)
+	}
+}
+
+func TestPlanBestRoute_StaleDirectGrantsNoBonusOrBadge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	// Neighbor=true but DirectLastSeen 30d old (freshness window is 7d):
+	// the shared IsFreshNeighbor definition must deny both bonus and badge.
+	stale := now.Add(-30 * 24 * time.Hour)
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{{
+		FromID: from, FromPubkey: from[:], FromType: 2, FromLat: &lat, FromLng: &lng,
+		ToID: to, ToPubkey: to[:], ToType: 2, ToLat: &lat2, ToLng: &lng2,
+		ObservationCount: 5,
+		FirstSeen:        pgtype.Timestamptz{Time: stale, Valid: true},
+		LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+		EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+		SnrWeightedSum:   40, SnrSampleCount: 5,
+		SnrLastSeen:    pgtype.Timestamptz{Time: now, Valid: true},
+		Direct:         true,
+		DirectLastSeen: pgtype.Timestamptz{Time: stale, Valid: true},
+	}}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %+v", res)
+	}
+	leg := res.Paths[0].Legs[0]
+	if leg.Neighbor {
+		t.Error("stale direct confirmation must not set leg.neighbor=true")
+	}
+	// Strong measured SNR (8dB mean) with no bonus costs exactly base 1.0.
+	if res.Paths[0].TotalCost != 1.0 {
+		t.Errorf("stale direct must grant no bonus (cost 1.0), got %v", res.Paths[0].TotalCost)
+	}
+}
+
+func TestPlanBestRoute_ZeroBonusKeepsBadge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	cfg := DefaultRoutePlanConfig()
+	cfg.Cost.NeighborBonus = 0 // discount disabled, topology fact intact
+	store.SetRoutePlanConfig(cfg)
+
+	from, to := uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{{
+		FromID: from, FromPubkey: from[:], FromType: 2, FromLat: &lat, FromLng: &lng,
+		ToID: to, ToPubkey: to[:], ToType: 2, ToLat: &lat2, ToLng: &lng2,
+		ObservationCount: 5,
+		FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+		LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+		EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+		SnrWeightedSum:   40, SnrSampleCount: 5,
+		SnrLastSeen:    pgtype.Timestamptz{Time: now, Valid: true},
+		Direct:         true,
+		DirectLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+	}}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %+v", res)
+	}
+	leg := res.Paths[0].Legs[0]
+	if !leg.Neighbor {
+		t.Error("fresh direct must set leg.neighbor=true even with NeighborBonus=0")
+	}
+	// Strong measured SNR with zero bonus costs exactly base 1.0.
+	if res.Paths[0].TotalCost != 1.0 {
+		t.Errorf("zero bonus must grant no discount (cost 1.0), got %v", res.Paths[0].TotalCost)
+	}
+}
+
+func TestPlanBestRoute_ConnectedUnchanged(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, mid, to := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	lat3, lng3 := 59.62, 16.54
+	row := func(f, tt uuid.UUID, flat, flng, tlat, tlng float64) sqlc.GetRoutePlanGraphRow {
+		return sqlc.GetRoutePlanGraphRow{
+			FromID: f, FromPubkey: f[:], FromType: 2, FromLat: &flat, FromLng: &flng,
+			ToID: tt, ToPubkey: tt[:], ToType: 2, ToLat: &tlat, ToLng: &tlng,
+			ObservationCount: 3,
+			FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+			LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+			EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+			SnrWeightedSum:   24, SnrSampleCount: 3,
+			SnrLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	}
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{
+		row(from, mid, lat, lng, lat2, lng2),
+		row(mid, to, lat2, lng2, lat3, lng3),
+	}, nil)
+	// Both endpoints are in the graph: no metadata fallback lookup.
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 || res.Reason != "" {
+		t.Errorf("connected pair must return one path with no reason, got %+v", res)
+	}
+	if len(res.Paths[0].Nodes) != 3 {
+		t.Errorf("expected 3-node path, got %+v", res.Paths[0])
+	}
+}
+
+func TestPlanBestRoute_SnapshotServesWithoutPerRequestAggregate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, mid, to := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	lat3, lng3 := 59.62, 16.54
+	row := func(f, tt uuid.UUID, flat, flng, tlat, tlng float64) sqlc.GetRoutePlanGraphRow {
+		return sqlc.GetRoutePlanGraphRow{
+			FromID: f, FromPubkey: f[:], FromType: 2, FromLat: &flat, FromLng: &flng,
+			ToID: tt, ToPubkey: tt[:], ToType: 2, ToLat: &tlat, ToLng: &tlng,
+			ObservationCount: 3,
+			FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+			LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+			EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+			SnrWeightedSum:   24, SnrSampleCount: 3,
+			SnrLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	}
+	// Exactly ONE aggregate: the production refresh. The two PlanBestRoute
+	// calls below must not trigger another.
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Times(1).Return([]sqlc.GetRoutePlanGraphRow{
+		row(from, mid, lat, lng, lat2, lng2),
+		row(mid, to, lat2, lng2, lat3, lng3),
+	}, nil)
+
+	if err := store.RefreshRouteSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	st, ok := store.RouteSnapshotStats(time.Now())
+	if !ok || st.Nodes != 3 || st.Edges != 2 || st.Builds != 1 {
+		t.Fatalf("expected healthy snapshot stats, got %+v ok=%v", st, ok)
+	}
+	for i := 0; i < 2; i++ {
+		res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Paths) != 1 {
+			t.Fatalf("request %d: expected 1 path, got %+v", i, res)
+		}
+	}
+}
+
 func TestExtractFromNode_Found(t *testing.T) {
 	a, b, c := uuid.New(), uuid.New(), uuid.New()
 	hops := []api.RouteHop{

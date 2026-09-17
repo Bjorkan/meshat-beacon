@@ -122,6 +122,15 @@ type Reader interface {
 	// GetNodesByIDs returns a map of node ID to resolved node details for the given IDs.
 	GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*ResolvedNode, error)
 
+	// GetNodeIDByPubkey resolves a full node public key to its UUID.
+	// Returns nil, nil when no node carries that key.
+	GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
+
+	// GetNodeTypeByPubkey resolves a full node public key to its node type.
+	// Returns nil, nil when no node carries that key. Used by the repeater-only
+	// route planner to reject non-repeater endpoints with 4xx.
+	GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error)
+
 	// ListNodeObservations returns a paginated list of packet observations originating from a node.
 	// Pass cursor=0 to start from the beginning.
 	ListNodeObservations(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (Page[PacketObservationSummary], error)
@@ -243,4 +252,11 @@ type Reader interface {
 	// SearchCrossIATARoutes finds routes that cross IATA boundaries between
 	// a source node/IATA and a destination node/IATA.
 	SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, toHash, toIATA string) ([]CrossIATARoute, error)
+
+	// PlanBestRoute computes best routes between two nodes (by UUID) over the
+	// observed neighbor graph, preferring legs with known signal strength.
+	// Returns an empty Paths slice (with Reason set) when no route exists --
+	// never an error for a merely unroutable pair. maxAlternatives caps the
+	// number of alternative paths beyond the best one.
+	PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (BestRouteResult, error)
 }

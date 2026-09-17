@@ -14,8 +14,11 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
 	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/google/uuid"
+
+	"sync"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -30,6 +33,14 @@ type Store struct {
 	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
 	meshcoreRegionFresh time.Duration // how long a MeshCore region-scope confirmation counts as fresh
 	presetCatalogue     *radiopreset.Catalogue
+	routePlan           RoutePlanConfig // /routes/best cost model; zero value falls back to defaults
+	routePlanSet        bool
+	// routeHolder is the single routing-snapshot manager (see
+	// routes_snapshot.go). PostgreSQL stays the source of truth; steady-state
+	// planning reads the Holder's immutable snapshot instead of rebuilding
+	// the global graph per request.
+	routeSnapMu sync.RWMutex
+	routeHolder *routeplan.Holder
 }
 
 // SetPresetCatalogue installs the startup-loaded MeshCore suggested-settings catalogue used to

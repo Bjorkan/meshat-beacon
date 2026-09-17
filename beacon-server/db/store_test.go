@@ -194,7 +194,7 @@ func TestUpsertNodeNeighbor_DistanceCap_RefusesImpossibleLink(t *testing.T) {
 	// no EXPECT for UpsertNodeNeighbor — it must never be reached
 
 	store := &Store{q: mock, neighborMaxKm: 150}
-	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil); err != nil {
+	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -223,7 +223,7 @@ func TestUpsertNodeNeighbor_DistanceCap_AllowsNearbyLink(t *testing.T) {
 		Return(nil)
 
 	store := &Store{q: mock, neighborMaxKm: 150}
-	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil); err != nil {
+	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil, false); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }

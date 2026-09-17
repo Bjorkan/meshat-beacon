@@ -85,7 +85,7 @@ function ObserverList({
       <div className="flex flex-col gap-0.5">
         {loading && (
           <div className="py-6 text-center font-mono text-[11px] text-text-dim">
-            {t(searching ? 'routes.searching' : 'common.loading')}
+            {t('common.loading')}
           </div>
         )}
         {searching && search.isError && (

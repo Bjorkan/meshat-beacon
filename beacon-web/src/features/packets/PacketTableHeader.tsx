@@ -15,7 +15,7 @@ export function PacketTableHeader() {
       <span aria-hidden />
       <span>Hash</span>
       <span>{t('entities.type')}</span>
-      <span>{t('routes.route')}</span>
+      <span>{t('packets.route')}</span>
       <span>{t('packets.observerArea')}</span>
       <span>{t('packets.path')}</span>
       <span>Obs</span>

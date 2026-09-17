@@ -113,6 +113,37 @@ routes:
 #  # old timestamp. Defaults to 168h, matching neighbors.retention.
 #  region_scope_freshness: 168h
 
+# Route planner (/routes/best) edge cost model. Every leg costs a 1.0 base per
+# hop plus a signal term: a fresh SNR reading between snr_good_db (no extra
+# cost) and snr_bad_db (full snr_max_penalty) is linearly interpolated;
+# unmeasured or stale legs pay unmeasured_penalty instead, which must stay >=
+# snr_max_penalty so a measured leg always beats an unmeasured one. The
+# reporter marking its peer as a neighbor (directional, freshly confirmed
+# within direct_freshness) discounts the leg by neighbor_bonus and marks the
+# leg neighbor=true in the API, which must stay below
+# (unmeasured_penalty - snr_max_penalty) and below 1.0 so every edge cost
+# stays strictly positive for Dijkstra. neighbor_bonus: 0 disables ONLY the
+# routing discount -- a freshly confirmed edge still reports neighbor=true.
+# direct_freshness: 0 disables BOTH bonus and badge (no confirmation is ever
+# fresh).
+#
+# All fields are optional and unset means "use the default". An explicit value
+# -- including 0 -- is honored: max_alternatives: 0 disables alternatives.
+# Partial blocks are validated AFTER defaults are applied, so e.g.
+# neighbor_bonus: 10 alone is rejected (it would zero out costs against the
+# default penalties).
+#routeplan:
+#  unmeasured_penalty: 2.5  # default: 2.5
+#  snr_good_db: 5.0         # default: 5.0
+#  snr_bad_db: -15.0        # default: -15.0
+#  snr_max_penalty: 2.0     # default: 2.0
+#  neighbor_bonus: 0.4      # default: 0.4
+#  snr_freshness: 168h      # default: 168h (7 days, the neighbor retention window)
+#  direct_freshness: 168h   # default: same as snr_freshness; how long a direct
+#                           # confirmation keeps earning the neighbor bonus
+#  max_hops: 12             # default: 12
+#  max_alternatives: 2      # default: 2; the /routes/best API caps alternatives at 0-2
+
 websocket:
   max_connections_per_ip: 5 # default: 5
 
