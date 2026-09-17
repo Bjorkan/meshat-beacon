@@ -16,6 +16,8 @@ import { snrBars } from '../../lib/signal';
 import { RoutePlannerMapLazy } from './RoutePlannerMapLazy';
 import { NodeCombobox, type NodePick } from './NodeCombobox';
 import { NodeLabel } from './NodeLabel';
+import { CopyButton } from '../../components/CopyButton';
+import { plannedRouteToMeshcore } from './route-features';
 import type { PlannedRoute, PlannedRouteLeg, PlannedRouteNode } from '../../types/api';
 
 function LegRow({ leg, index }: { leg: PlannedRouteLeg; index: number }) {
@@ -67,6 +69,10 @@ function RouteCard({
 }) {
   const { t } = useTranslation();
   const via = route.nodes.slice(1, -1);
+  // MeshCore export for this card's route (best or alternative): canonical
+  // ordered repeater list from the legs, or null when a hop lacks a valid
+  // full public key — then no copy button is rendered at all.
+  const meshcoreRoute = plannedRouteToMeshcore(route);
   return (
     <div
       className={`w-full rounded border px-3 py-2 text-left transition-colors ${
@@ -135,6 +141,23 @@ function RouteCard({
           <LegRow key={`${leg.from}-${leg.to}-${i}`} leg={leg} index={i} />
         ))}
       </div>
+      {meshcoreRoute != null && (
+        <div className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5">
+          <span
+            className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-dim"
+            title={meshcoreRoute}
+          >
+            {meshcoreRoute}
+          </span>
+          <CopyButton
+            value={meshcoreRoute}
+            label={t('routes.copyMeshcoreRoute')}
+            copiedLabel={t('routes.meshcoreRouteCopied')}
+            ariaLabel={t('routes.copyMeshcoreRoute')}
+            className="shrink-0"
+          />
+        </div>
+      )}
     </div>
   );
 }

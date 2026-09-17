@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createMemoryHistory,
@@ -81,7 +81,7 @@ function bestResult(): BestRouteResult {
           },
           {
             id: 'id-m',
-            publicKey: 'mid'.padEnd(64, '0'),
+            publicKey: 'cd'.padEnd(64, '0'),
             name: 'Mid',
             latitude: 59.605,
             longitude: 16.51,
@@ -103,7 +103,7 @@ function bestResult(): BestRouteResult {
         legs: [
           {
             from: FROM,
-            to: 'mid'.padEnd(64, '0'),
+            to: 'cd'.padEnd(64, '0'),
             observationCount: 2,
             snrSampleCount: 0,
             snrLastSeen: 0,
@@ -111,7 +111,7 @@ function bestResult(): BestRouteResult {
             neighbor: false,
           },
           {
-            from: 'mid'.padEnd(64, '0'),
+            from: 'cd'.padEnd(64, '0'),
             to: TO,
             observationCount: 2,
             snrSampleCount: 0,
@@ -274,5 +274,29 @@ describe('RoutePlanner', () => {
     fireEvent.keyDown(openButtons[0], { key: 'Enter' });
     fireEvent.click(openButtons[0]);
     expect(opened.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('copies the MeshCore route for best and alternative with feedback', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+    await renderReady(`/routes?from=${FROM}&to=${TO}`);
+    await screen.findByText('Best');
+    // One copy button per card (best + alternative), each exporting its own
+    // canonical ordered repeater list as 3-byte ids.
+    const copyButtons = screen.getAllByRole('button', { name: 'Copy MeshCore route' });
+    expect(copyButtons.length).toBe(2);
+    await act(async () => {
+      fireEvent.click(copyButtons[0]);
+    });
+    expect(writeText).toHaveBeenCalledWith('aabbcc,112233');
+    expect(await screen.findAllByText('MeshCore route copied')).toHaveLength(1);
+    await act(async () => {
+      fireEvent.click(copyButtons[1]);
+    });
+    expect(writeText).toHaveBeenCalledWith(`aabbcc,${'cd'.padEnd(6, '0')},112233`);
   });
 });

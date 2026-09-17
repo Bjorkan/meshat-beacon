@@ -339,6 +339,8 @@
     "unknownNode": "Unknown node — it may have been deleted. Pick it again from search.",
     "legNoSnr": "no measurement",
     "openNode": "Open node {{name}}",
+    "copyMeshcoreRoute": "Copy MeshCore route",
+    "meshcoreRouteCopied": "MeshCore route copied",
     "neighborLeg": "Neighbor",
     "neighborHint": "Both endpoints marked each other as neighbors — this hop is preferred when planning."
   },

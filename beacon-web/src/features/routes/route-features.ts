@@ -24,6 +24,33 @@ function nodeLabel(n: { name?: string; publicKey: string }): string {
   return n.name ?? n.publicKey.slice(0, 6).toUpperCase();
 }
 
+// MeshCore route export: the planned route as comma-separated 3-byte route
+// hashes (first 3 bytes / 6 hex chars of each repeater's full public key),
+// e.g. "030680,ab6b92,73f8a9". Lowercase hex, no spaces.
+//
+// The canonical ordered repeater list is built leg-by-leg: the first leg's
+// `from` (the chosen start repeater — never prepend anything before it),
+// then every leg's `to` in order. Legs are the source of truth, not
+// path.nodes, so a duplicated start/target across nodes+legs can never
+// produce a doubled first/last entry. Returns null when any hop lacks a
+// valid full public key (64 hex chars) — never copy a broken/partial route.
+export function plannedRouteToMeshcore(route: PlannedRoute): string | null {
+  if (route.legs.length === 0) return null;
+  const first = route.legs[0];
+  if (first == null) return null;
+  // Canonical ordered repeater list: first leg's `from` is the chosen start
+  // repeater (never prepend anything before it), then every leg's `to`.
+  const orderedKeys: string[] = [first.from];
+  for (const leg of route.legs) orderedKeys.push(leg.to);
+  const ids: string[] = [];
+  for (const key of orderedKeys) {
+    const hex = key.replace(/\s+/g, '').toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+    ids.push(hex.slice(0, 6));
+  }
+  return ids.join(',');
+}
+
 export function routesToFeatures(
   paths: PlannedRoute[],
   activeIndex: number,

@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { routesToFeatures } from '../../../src/features/routes/route-features';
+import {
+  plannedRouteToMeshcore,
+  routesToFeatures,
+} from '../../../src/features/routes/route-features';
 import { TRACE_SNR_FALLBACK, traceLegColor } from '../../../src/features/traces/trace-path';
-import type { PlannedRoute } from '../../../src/types/api';
+import type { PlannedRoute, PlannedRouteLeg } from '../../../src/types/api';
 
 const palette = TRACE_SNR_FALLBACK;
 
@@ -73,5 +76,81 @@ describe('routesToFeatures active ordering', () => {
     const { lines } = routesToFeatures([r0, r1], 0, palette);
     expect(lines.features.map((f) => f.properties.routeIndex)).toEqual([1, 0]);
     expect(lines.features[lines.features.length - 1].properties.active).toBe(true);
+  });
+});
+
+const FULL_A = 'aa'.repeat(32);
+const FULL_B = 'bb'.repeat(32);
+const FULL_C = 'cc'.repeat(32);
+const FULL_D = 'dd'.repeat(32);
+
+function meshcoreLeg(from: string, to: string): PlannedRouteLeg {
+  return {
+    from,
+    to,
+    snrSampleCount: 0,
+    snrLastSeen: 0,
+    observationCount: 1,
+    unmeasured: true,
+    neighbor: false,
+  };
+}
+
+function meshcoreRoute(keys: string[]): PlannedRoute {
+  const legs = keys.slice(1).map((to, i) => meshcoreLeg(keys[i] as string, to));
+  return {
+    // nodes intentionally mirror the leg endpoints so the test proves legs
+    // (not nodes) drive the export — no doubled start/target.
+    nodes: keys.map((publicKey, i) => ({
+      id: `n${i}`,
+      publicKey,
+      nodeType: 2,
+      nodeTypeName: 'repeater',
+      stale: false,
+    })),
+    legs,
+    totalCost: legs.length,
+    hopCount: legs.length,
+    hasUnmeasuredLegs: true,
+    containsStaleNodes: false,
+  };
+}
+
+describe('plannedRouteToMeshcore', () => {
+  it('exports A -> B as two 3-byte ids', () => {
+    expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, FULL_B]))).toBe('aaaaaa,bbbbbb');
+  });
+
+  it('exports A -> B -> C -> D as four ordered 3-byte ids', () => {
+    expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, FULL_B, FULL_C, FULL_D]))).toBe(
+      'aaaaaa,bbbbbb,cccccc,dddddd',
+    );
+  });
+
+  it('exports the documented example shape (start, middles, target)', () => {
+    const start = '030680' + '00'.repeat(29);
+    const m1 = 'ab6b92' + '11'.repeat(29);
+    const m2 = '73f8a9' + '22'.repeat(29);
+    const m3 = '65c1d1' + '33'.repeat(29);
+    const target = 'b322cf' + '44'.repeat(29);
+    expect(plannedRouteToMeshcore(meshcoreRoute([start, m1, m2, m3, target]))).toBe(
+      '030680,ab6b92,73f8a9,65c1d1,b322cf',
+    );
+  });
+
+  it('normalizes uppercase hex to lowercase without spaces', () => {
+    expect(
+      plannedRouteToMeshcore(meshcoreRoute([FULL_A.toUpperCase(), FULL_B.toUpperCase()])),
+    ).toBe('aaaaaa,bbbbbb');
+  });
+
+  it('returns null for an empty route', () => {
+    expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A]))).toBeNull();
+  });
+
+  it('returns null instead of a partial route when a hop lacks a full public key', () => {
+    expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, 'bbbbbb']))).toBeNull();
+    expect(plannedRouteToMeshcore(meshcoreRoute(['aaaaaa', FULL_B]))).toBeNull();
+    expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, FULL_B, 'zz']))).toBeNull();
   });
 });

@@ -339,6 +339,8 @@
     "unknownNode": "Okänd nod — den kan ha raderats. Välj den igen från sök.",
     "legNoSnr": "ingen mätning",
     "openNode": "Öppna nod {{name}}",
+    "copyMeshcoreRoute": "Kopiera MeshCore-rutt",
+    "meshcoreRouteCopied": "MeshCore-rutt kopierad",
     "neighborLeg": "Granne",
     "neighborHint": "Båda ändpunkterna har markerat varandra som grannar — detta hopp föredras vid planering."
   },
