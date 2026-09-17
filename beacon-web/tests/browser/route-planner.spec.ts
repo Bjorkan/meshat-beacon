@@ -111,7 +111,31 @@ const best: BestRouteResult = {
   ],
 };
 
-async function mockApi(page: Page) {
+const longRoutes: BestRouteResult = {
+  paths: Array.from({ length: 3 }, (_, routeIndex) => {
+    const nodes = [
+      best.paths[0].nodes[0],
+      ...Array.from({ length: 10 }, (_, index) => ({
+        ...best.paths[1].nodes[1],
+        id: `long-${routeIndex}-${index}`,
+        publicKey: (0x100000 + routeIndex * 100 + index).toString(16).padEnd(64, '0'),
+        name: `Repeater ${routeIndex + 1}-${index + 1}`,
+        latitude: 59.601 + index * 0.0008,
+        longitude: 16.501 + index * 0.0016,
+      })),
+      best.paths[0].nodes[1],
+    ];
+    return {
+      ...best.paths[0],
+      nodes,
+      legs: nodes.slice(1).map((node, index) => leg(nodes[index].publicKey, node.publicKey)),
+      hopCount: nodes.length - 1,
+      hasUnmeasuredLegs: true,
+    };
+  }),
+};
+
+async function mockApi(page: Page, result: BestRouteResult = best) {
   await page.addInitScript(() => localStorage.setItem('beacon-language', 'en'));
   // console/pageerror capture: a map-init exception must be visible in CI
   // logs rather than inferred from a disappearing element.
@@ -123,7 +147,7 @@ async function mockApi(page: Page) {
     const url = new URL(route.request().url());
     const path = url.pathname;
     if (path === '/api/v1/routes/best') {
-      await route.fulfill({ json: best });
+      await route.fulfill({ json: result });
       return;
     }
     if (path === '/api/v1/nodes') {
@@ -303,6 +327,130 @@ for (const viewport of [
       const copy = alternative.getByRole('button', { name: 'Copy MeshCore route', exact: true });
       await copy.scrollIntoViewIfNeeded();
       await expect(copy).toBeInViewport();
+    });
+
+    test('expanded long routes scroll inside the panel without moving the map or page', async ({
+      page,
+      browserName,
+    }, testInfo) => {
+      test.setTimeout(60_000);
+      await mockApi(page, longRoutes);
+      await page.addInitScript(() => {
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: async () => {} },
+        });
+      });
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      const cards = page.getByRole('article');
+      await expect(cards).toHaveCount(3);
+      await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
+      const panel = cards.first().locator('../..');
+      const map = page.getByTestId('route-map');
+      const footer = viewport.hasTouch ? page.getByRole('tablist') : page.getByRole('contentinfo');
+      const mapBounds = await map.boundingBox();
+      const footerBounds = await footer.boundingBox();
+      const assertContained = async () => {
+        expect(await map.boundingBox()).toEqual(mapBounds);
+        expect(await footer.boundingBox()).toEqual(footerBounds);
+        expect(
+          await page.evaluate(() => ({
+            x: window.scrollX,
+            y: window.scrollY,
+            overflowX: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+            overflowY:
+              document.documentElement.scrollHeight - document.documentElement.clientHeight,
+          })),
+        ).toEqual({ x: 0, y: 0, overflowX: 0, overflowY: 0 });
+      };
+      for (const card of await cards.all()) {
+        await card.getByRole('button', { name: 'Show details', exact: true }).click();
+        await expect(card.locator('[data-route-details]')).toBeVisible();
+      }
+      await panel.evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      await assertContained();
+      const bounds = (await panel.boundingBox())!;
+      const session =
+        viewport.hasTouch && browserName === 'chromium'
+          ? await page.context().newCDPSession(page)
+          : null;
+      const scroll = async (direction: number, padding = false) => {
+        const x = bounds.x + (padding ? 4 : bounds.width / 2);
+        const y = bounds.y + bounds.height * 0.7;
+        if (session) {
+          await session.send('Input.dispatchTouchEvent', {
+            type: 'touchStart',
+            touchPoints: [{ x, y }],
+          });
+          for (let step = 1; step <= 8; step++) {
+            await session.send('Input.dispatchTouchEvent', {
+              type: 'touchMove',
+              touchPoints: [{ x, y: y - direction * step * 25 }],
+            });
+          }
+          await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        } else {
+          await page.mouse.move(x, y);
+          await page.mouse.wheel(0, direction * 500);
+        }
+      };
+      await scroll(1, true);
+      await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+      await assertContained();
+      await scroll(1);
+      await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(200);
+      await assertContained();
+      for (const card of await cards.all()) {
+        for (const node of await card.getByRole('button', { name: /^Open node / }).all()) {
+          await node.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+          await expect(node).toBeInViewport({ ratio: 1 });
+        }
+        const code = card.locator('[data-route-details] code');
+        await code.scrollIntoViewIfNeeded();
+        await expect(code).toBeInViewport({ ratio: 1 });
+        const copy = card.getByRole('button', { name: 'Copy MeshCore route', exact: true });
+        if (viewport.hasTouch) await copy.tap();
+        else await copy.click();
+        await expect(copy).toHaveText('MeshCore route copied');
+        await expect(copy).toBeInViewport({ ratio: 1 });
+        await assertContained();
+      }
+      await panel.evaluate((el) => {
+        el.scrollTop = el.scrollHeight;
+      });
+      await scroll(1);
+      await expect
+        .poll(() =>
+          panel.evaluate((el) => Math.abs(el.scrollHeight - el.clientHeight - el.scrollTop)),
+        )
+        .toBeLessThanOrEqual(1);
+      await assertContained();
+      await page.screenshot({ path: testInfo.outputPath(`${viewport.name}-long-routes.png`) });
+      await panel.evaluate((el) => {
+        el.scrollTop = 0;
+      });
+      await scroll(-1);
+      await assertContained();
+      await page.mouse.move(viewport.width - 2, bounds.y + 20);
+      await page.mouse.wheel(0, 500);
+      await assertContained();
+      await session?.detach();
+    });
+
+    test('search suggestions remain clickable above route results', async ({ page }) => {
+      await mockApi(page, longRoutes);
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      const to = page.getByRole('combobox', { name: 'To', exact: true });
+      await expect(to).toHaveValue('Beta');
+      await to.fill('bet');
+      const suggestion = page.getByRole('option', { name: /Beta/ });
+      await expect(suggestion).toBeInViewport({ ratio: 1 });
+      if (viewport.hasTouch) await suggestion.tap();
+      else await suggestion.click();
+      await expect(suggestion).toBeHidden();
+      await expect(page).toHaveURL(new RegExp(`to=${TO}`));
     });
 
     test('route planner keyboard disclosures and selection stay independent', async ({ page }) => {
