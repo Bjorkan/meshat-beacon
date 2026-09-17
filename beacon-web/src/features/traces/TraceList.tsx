@@ -31,8 +31,10 @@ interface TraceListProps {
 // The desktop row carries the most complete observation's path as single-line chips, like the
 // Packet tab's Sökväg column (InlinePacketPath): resolved node names where confidence is high,
 // otherwise the raw prefix, capped at 4 hops with a +N remainder. SNR[i] is hop i's reading of
-// the link from hop i-1, so SNR[0] is skipped and the rest color the chip-border of the hop
-// they enter — matching the backend's neighbor-edge semantics and the map's SNR scale.
+// the link from hop i-1, so SNR[0] is skipped and the rest render on the inbound edge before
+// the hop they enter (Node → SNR → Node) — matching the backend's neighbor-edge semantics
+// and the map's SNR scale. The SNR must never trail the hop: a trailing value reads as the
+// outgoing link to the next hop, which is the opposite of the TRACE semantics.
 const TRACE_PREVIEW_CHIP_CLASSES = {
   high: 'bg-green/8 text-green',
   ambiguous: 'bg-warn/8 text-warn',
@@ -56,8 +58,10 @@ function TracePathPreview({
       title={hashes.map((h) => h.toUpperCase()).join(' → ')}
     >
       {hashes.map((hash, i) => {
-        // SNR[i] is hop i's reading of the link from hop i-1: skip SNR[0] (no upstream link)
-        // and render the rest as compact colored text after the hop they enter.
+        // SNR[i] is hop i's reading of the link from hop i-1: skip SNR[0] (no upstream link).
+        // The SNR renders on the inbound edge BEFORE the hop it enters
+        // (Node(i-1) → SNR[i] → Node(i)) so it cannot be misread as the outgoing link.
+        // Use != null so a real 0 dB reading still renders; only missing data is hidden.
         const snr = i > 0 ? snrs?.[i] : undefined;
         const level = snr != null ? snrLevel(snr) : null;
         const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
@@ -65,30 +69,65 @@ function TracePathPreview({
         const confidence =
           hop?.confidence === 'high' || hop?.confidence === 'ambiguous' ? hop.confidence : 'none';
         const label = confidence === 'high' && hop?.nodeName ? hop.nodeName : hash.toUpperCase();
+        const inboundTitle = snr != null ? `${formatSnr(snr)} dB inbound to ${label}` : null;
         const title =
           snr != null
             ? `${label} · ${hash.toUpperCase()} · ${formatSnr(snr)} dB`
             : label !== hash.toUpperCase()
               ? `${label} · ${hash.toUpperCase()}`
               : label;
-        return (
-          <span key={`${i}-${hash}`} className="contents">
-            {i > 0 && (
+        if (i === 0) {
+          return (
+            <span key={`${i}-${hash}`} className="contents">
+              <span
+                className={`max-w-28 shrink truncate rounded-sm px-1 py-px font-semibold ${TRACE_PREVIEW_CHIP_CLASSES[confidence]}`}
+                title={title}
+              >
+                {label}
+              </span>
+            </span>
+          );
+        }
+        // Inbound edge: Node(i-1) → SNR[i] → Node(i). Without a reading the edge
+        // collapses to a single arrow so no dangling "→ →" is rendered.
+        if (snr == null) {
+          return (
+            <span key={`${i}-${hash}`} className="contents">
               <span className="shrink-0 text-text-dim" aria-hidden>
                 →
               </span>
-            )}
+              <span
+                className={`max-w-28 shrink truncate rounded-sm px-1 py-px font-semibold ${TRACE_PREVIEW_CHIP_CLASSES[confidence]}`}
+                title={title}
+              >
+                {label}
+              </span>
+            </span>
+          );
+        }
+        return (
+          <span key={`${i}-${hash}`} className="contents">
+            <span
+              className="inline-flex shrink-0 items-center gap-1"
+              role="group"
+              aria-label={inboundTitle ?? undefined}
+            >
+              <span className="shrink-0 text-text-dim" aria-hidden>
+                →
+              </span>
+              <span className={`shrink-0 text-[10px] ${sigClass}`} title={title}>
+                {formatSnr(snr)} dB
+              </span>
+              <span className="shrink-0 text-text-dim" aria-hidden>
+                →
+              </span>
+            </span>
             <span
               className={`max-w-28 shrink truncate rounded-sm px-1 py-px font-semibold ${TRACE_PREVIEW_CHIP_CLASSES[confidence]}`}
               title={title}
             >
               {label}
             </span>
-            {snr != null && (
-              <span className={`shrink-0 text-[10px] ${sigClass}`} title={title}>
-                {formatSnr(snr)} dB
-              </span>
-            )}
           </span>
         );
       })}

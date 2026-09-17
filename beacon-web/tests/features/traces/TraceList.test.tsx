@@ -91,8 +91,8 @@ function renderTraces(onAnalyze = vi.fn()) {
       <TraceList onAnalyze={onAnalyze} typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} />
     );
   }
-  render(<TraceHarness />, { wrapper });
-  return { onAnalyze };
+  const result = render(<TraceHarness />, { wrapper });
+  return { onAnalyze, ...result };
 }
 
 beforeEach(() => {
@@ -289,9 +289,59 @@ describe('TraceList', () => {
     // ambiguous and unresolved hops fall back to the raw prefix
     expect(screen.getByText('B2')).toBeInTheDocument();
     expect(screen.getByText('C3')).toBeInTheDocument();
-    // SNR[i] labels link i-1 → i: SNR[1] (-9) renders after B2, SNR[2] (-8) after C3
+    // SNR[i] labels link i-1 → i: SNR[1] (-9) renders before B2, SNR[2] (-8) before C3
     expect(screen.getByText('-9.00 dB')).toBeInTheDocument();
     expect(screen.getByText('-8.00 dB')).toBeInTheDocument();
+  });
+
+  it('places preview SNR on the inbound edge: A → SNR → B → SNR → C (issue #96)', async () => {
+    // hashes = [A, B, C], snr = [ignored, 8.5, 6.25]: the first hop must show no SNR
+    // and every later SNR must precede its receiving hop in DOM order.
+    mockGetTraces.mockResolvedValue([
+      tag('3f2a11c0', 4, {
+        traceType: 'TRACE',
+        pathHashes: ['aa', 'bb', 'cc'],
+        snrValues: [99, 8.5, 6.25],
+      }),
+    ]);
+
+    const { container } = renderTraces();
+
+    expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
+    // SNR[0] (99) has no upstream link and must never render — not even for the origin hop.
+    expect(screen.queryByText('99.00 dB')).not.toBeInTheDocument();
+    expect(screen.getByText('8.50 dB')).toBeInTheDocument();
+    expect(screen.getByText('6.25 dB')).toBeInTheDocument();
+    const text = container.textContent ?? '';
+    const idxA = text.indexOf('AA');
+    const idxSnr1 = text.indexOf('8.50 dB');
+    const idxB = text.indexOf('BB');
+    const idxSnr2 = text.indexOf('6.25 dB');
+    const idxC = text.indexOf('CC');
+    expect([idxA, idxSnr1, idxB, idxSnr2, idxC].every((i) => i >= 0)).toBe(true);
+    expect(idxA).toBeLessThan(idxSnr1);
+    expect(idxSnr1).toBeLessThan(idxB);
+    expect(idxB).toBeLessThan(idxSnr2);
+    expect(idxSnr2).toBeLessThan(idxC);
+    // The inbound edges expose accessible labels tying each SNR to its receiving hop.
+    expect(screen.getByRole('group', { name: '8.50 dB inbound to BB' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: '6.25 dB inbound to CC' })).toBeInTheDocument();
+  });
+
+  it('renders a real 0 dB preview reading instead of dropping it as missing', async () => {
+    mockGetTraces.mockResolvedValue([
+      tag('3f2a11c0', 4, {
+        traceType: 'TRACE',
+        pathHashes: ['aa', 'bb'],
+        snrValues: [99, 0],
+      }),
+    ]);
+
+    renderTraces();
+
+    expect(await screen.findByText('3F2A11C0')).toBeInTheDocument();
+    expect(screen.getByText('0.00 dB')).toBeInTheDocument();
+    expect(screen.queryByText('99.00 dB')).not.toBeInTheDocument();
   });
 
   it('refetches with the type param when the trace-type filter changes', async () => {

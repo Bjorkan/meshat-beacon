@@ -360,41 +360,61 @@ function TracePayload({
           </div>
           <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-[13px]">
             {pathHashes.map((hash, i) => {
-              const snr = snrValues?.[i];
+              // SNR[i] is hop i's reading of the inbound link from hop i-1: SNR[0] has
+              // no upstream link and is never shown. Render the reading on the edge
+              // BEFORE the hop it enters (Node(i-1) → SNR[i] → Node(i)) so it cannot
+              // be misread as the outgoing link. != null keeps a real 0 dB reading
+              // distinct from missing data.
+              const snr = i > 0 ? snrValues?.[i] : undefined;
               const level = snr != null ? snrLevel(snr) : null;
               const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
               // When the packet detail resolved this trace's route, overlay it onto each hash block:
               // tint by match confidence and reveal the resolved node(s) on hover. Falls back to the
               // plain hash badge when there's no resolution (e.g. live/WS view).
               const resolved = resolvedRoute?.[i];
-              return (
-                <span key={i} className="contents">
-                  {i > 0 && (
+              const hopBadge = resolvedRoute ? (
+                <ResolvedHopBlock
+                  hop={resolved}
+                  label={hash.toUpperCase()}
+                  onViewNode={onViewNode}
+                  showSnr={false}
+                />
+              ) : (
+                <HexBadge value={hash} />
+              );
+              if (i === 0)
+                return (
+                  <span key={i} className="contents">
+                    {hopBadge}
+                  </span>
+                );
+              // Missing readings collapse to a single arrow (no "→ →" pair); present
+              // readings sit between the arrows on the inbound edge.
+              if (snr == null)
+                return (
+                  <span key={i} className="contents">
                     <span className="text-text-dim" aria-hidden>
                       →
                     </span>
-                  )}
-                  <span className="inline-flex flex-col items-center gap-0.5">
-                    {resolvedRoute ? (
-                      <ResolvedHopBlock
-                        hop={resolved}
-                        label={hash.toUpperCase()}
-                        onViewNode={onViewNode}
-                        showSnr={false}
-                      />
-                    ) : (
-                      <HexBadge value={hash} />
-                    )}
-                    {/* keep a sub-line on every hop (SNR, or a "-" placeholder when there's no reading)
-                        so the hash badges across the row stay aligned */}
-                    {snr != null ? (
-                      <span className={`text-[11px] ${sigClass}`}>{formatSnr(snr)} dB</span>
-                    ) : (
-                      <span className="text-[11px] text-text-dim" aria-hidden>
-                        -
-                      </span>
-                    )}
+                    {hopBadge}
                   </span>
+                );
+              return (
+                <span key={i} className="contents">
+                  <span
+                    className="inline-flex items-center gap-1.5"
+                    role="group"
+                    aria-label={`${formatSnr(snr)} dB inbound to ${hash.toUpperCase()}`}
+                  >
+                    <span className="text-text-dim" aria-hidden>
+                      →
+                    </span>
+                    <span className={`text-[11px] ${sigClass}`}>{formatSnr(snr)} dB</span>
+                    <span className="text-text-dim" aria-hidden>
+                      →
+                    </span>
+                  </span>
+                  {hopBadge}
                 </span>
               );
             })}

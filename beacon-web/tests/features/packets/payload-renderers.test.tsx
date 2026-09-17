@@ -50,16 +50,48 @@ describe('PayloadBreakdown — trace resolvedRoute overlay', () => {
     expect(screen.queryByRole('button', { name: 'CD' })).not.toBeInTheDocument();
   });
 
-  it("renders a '-' placeholder under a hop that has no SNR, so badges stay aligned", () => {
-    // 3 hashes but only 2 SNR readings → the third hop's sub-line is a placeholder
+  it('places each SNR on the inbound edge before the hop it enters, never after it', () => {
+    // SNR[i] is hop i's reading of the link from hop i-1: the origin hop (AB) must
+    // carry no SNR edge, and the CD→EF edge must read "→ -8.00 dB → EF" in DOM order.
     const payload = {
       type: 'TRACE',
       flags: 0,
       pathHashes: ['ab', 'cd', 'ef'],
-      snrValues: [-5, -8],
+      snrValues: [-5, -8, -9],
     };
-    render(<PayloadBreakdown payload={payload} resolvedRoute={resolvedRoute} />);
-    expect(screen.getByText('-')).toBeInTheDocument();
+    // No resolvedRoute here so hops render as their raw AB/CD/EF badges.
+    const { container } = render(<PayloadBreakdown payload={payload} />);
+    const text = container.textContent ?? '';
+    // SNR[0] (-5) belongs to no edge and is never rendered...
+    expect(screen.queryByText('-5.00 dB')).not.toBeInTheDocument();
+    // ...while SNR[1] and SNR[2] render once each, on their inbound edges.
+    expect(screen.getByText('-8.00 dB')).toBeInTheDocument();
+    expect(screen.getByText('-9.00 dB')).toBeInTheDocument();
+    // DOM order pins the edge semantics: A → SNR → B → SNR → C (issue #96).
+    const idxAB = text.indexOf('AB');
+    const idxSnr1 = text.indexOf('-8.00 dB');
+    const idxCD = text.indexOf('CD');
+    const idxSnr2 = text.indexOf('-9.00 dB');
+    const idxEF = text.indexOf('EF');
+    expect([idxAB, idxSnr1, idxCD, idxSnr2, idxEF].every((i) => i >= 0)).toBe(true);
+    expect(idxAB).toBeLessThan(idxSnr1);
+    expect(idxSnr1).toBeLessThan(idxCD);
+    expect(idxCD).toBeLessThan(idxSnr2);
+    expect(idxSnr2).toBeLessThan(idxEF);
+    // The edge exposes an accessible inbound label for the receiving hop.
+    expect(screen.getByRole('group', { name: '-8.00 dB inbound to CD' })).toBeInTheDocument();
+  });
+
+  it('renders a real 0 dB reading (not a missing-value placeholder)', () => {
+    const payload = {
+      type: 'TRACE',
+      flags: 0,
+      pathHashes: ['ab', 'cd'],
+      snrValues: [99, 0],
+    };
+    render(<PayloadBreakdown payload={payload} />);
+    expect(screen.getByText('0.00 dB')).toBeInTheDocument();
+    expect(screen.queryByText('99.00 dB')).not.toBeInTheDocument();
   });
 });
 
