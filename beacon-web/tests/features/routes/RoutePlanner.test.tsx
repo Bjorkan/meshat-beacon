@@ -222,10 +222,11 @@ async function renderReady(url = '/routes') {
 describe('RoutePlanner', () => {
   it('shows the planner prompt before both endpoints are picked', async () => {
     await renderReady();
-    // prompt appears twice (list pane + empty map pane): both must agree
+    // floating panel shows the prompt; the map behind always mounts now
+    // (Google-Maps-style background layer), so the stub is present too.
     const prompts = await screen.findAllByText('Pick a from-node and a to-node to plan a route.');
-    expect(prompts.length).toBe(2);
-    expect(screen.queryByTestId('route-map-stub')).toBeNull();
+    expect(prompts.length).toBe(1);
+    expect(screen.getByTestId('route-map-stub')).toBeInTheDocument();
   });
 
   it('restores from/to from the URL and renders best + alternative', async () => {

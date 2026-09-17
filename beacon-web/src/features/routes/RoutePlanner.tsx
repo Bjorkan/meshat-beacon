@@ -294,103 +294,121 @@ export function RoutePlanner() {
   const showResults = pair !== null && !sameNode && !urlEndpointInvalid;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex flex-col gap-2 border-b border-border-subtle bg-bg-base px-4 py-2 shrink-0 lg:flex-row lg:items-end">
-        <NodeCombobox
-          label={t('routes.from')}
-          value={resolvedFrom}
-          onPick={(p) => setPair(p, resolvedTo)}
-          onClear={() => setPair(null, resolvedTo)}
-          excludePublicKey={resolvedTo?.publicKey}
-          autoFocus
-        />
-        <button
-          type="button"
-          aria-label={t('routes.swap')}
-          title={t('routes.swap')}
-          onClick={swap}
-          disabled={!resolvedFrom && !resolvedTo}
-          className="shrink-0 self-center rounded border border-border bg-bg-surface px-2 py-1 font-mono text-text-muted hover:border-text-dim hover:text-text-normal disabled:opacity-40 lg:mb-0.5"
-        >
-          ⇅
-        </button>
-        <NodeCombobox
-          label={t('routes.to')}
-          value={resolvedTo}
-          onPick={(p) => setPair(resolvedFrom, p)}
-          onClear={() => setPair(resolvedFrom, null)}
-          excludePublicKey={resolvedFrom?.publicKey}
-        />
-      </div>
-      <div className="px-4 pt-1.5 font-mono text-[11px] text-text-dim shrink-0">
-        {t('routes.globalHint')}
-      </div>
-
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-        <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-3 lg:max-w-md">
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      {/* Floating Google-Maps-style search panel: from/to inputs + results
+          overlay the map on the left; the map is always mounted behind. */}
+      <div className="pointer-events-none absolute inset-y-0 left-0 z-10 flex w-full max-w-md flex-col gap-2 overflow-y-auto p-3 lg:p-4">
+        <div className="pointer-events-auto rounded-lg border border-border bg-bg-base p-3 shadow-lg">
+          <div className="flex flex-col gap-2">
+            <NodeCombobox
+              label={t('routes.from')}
+              value={resolvedFrom}
+              onPick={(p) => setPair(p, resolvedTo)}
+              onClear={() => setPair(null, resolvedTo)}
+              excludePublicKey={resolvedTo?.publicKey}
+              autoFocus
+            />
+            <div className="flex items-center gap-2">
+              <div className="px-1 font-mono text-[11px] text-text-dim">
+                {t('routes.globalHint')}
+              </div>
+              <span className="flex-1" />
+              <button
+                type="button"
+                aria-label={t('routes.swap')}
+                title={t('routes.swap')}
+                onClick={swap}
+                disabled={!resolvedFrom && !resolvedTo}
+                className="shrink-0 rounded border border-border bg-bg-surface px-2 py-1 font-mono text-text-muted hover:border-text-dim hover:text-text-normal disabled:opacity-40"
+              >
+                ⇅
+              </button>
+            </div>
+            <NodeCombobox
+              label={t('routes.to')}
+              value={resolvedTo}
+              onPick={(p) => setPair(resolvedFrom, p)}
+              onClear={() => setPair(resolvedFrom, null)}
+              excludePublicKey={resolvedFrom?.publicKey}
+            />
+          </div>
+        </div>
+        <div className="pointer-events-auto flex min-h-0 flex-col gap-2">
           {sameNode && (
-            <div role="alert" className="font-mono text-[13px] text-warn">
+            <div
+              role="alert"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
+            >
               {t('routes.sameNodeHint')}
             </div>
           )}
           {urlEndpointInvalid && !sameNode && (
-            <div role="alert" className="font-mono text-[13px] text-warn">
+            <div
+              role="alert"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
+            >
               {t('routes.nonRepeaterEndpoint')}
             </div>
           )}
           {!showResults && !sameNode && !urlEndpointInvalid && (
-            <div className="font-mono text-[13px] text-text-dim">{t('routes.pickBoth')}</div>
+            <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
+              {t('routes.pickBoth')}
+            </div>
           )}
           {showResults && isLoading && (
-            <div role="status" className="font-mono text-[13px] text-text-dim">
+            <div
+              role="status"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg"
+            >
               {t('routes.planning')}
             </div>
           )}
           {showResults && isError && (
-            <div role="alert" className="font-mono text-[13px] text-danger">
+            <div
+              role="alert"
+              className="rounded-lg border border-danger/40 bg-bg-base px-3 py-2 font-mono text-[13px] text-danger shadow-lg"
+            >
               {(error as Error)?.message || 'Error'}
             </div>
           )}
           {showResults && !isLoading && !isError && paths.length === 0 && (
-            <div role="status" className="font-mono text-[13px] text-text-dim">
+            <div
+              role="status"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg"
+            >
               {data?.reason === 'no-route' ? t('routes.noRoute') : t('routes.unknownNode')}
             </div>
           )}
           {paths.map((route: PlannedRoute, i: number) => (
-            <RouteCard
-              key={i}
-              route={route}
-              index={i}
-              active={i === active}
-              onSelect={() => selectAlt(i)}
-              onOpenNode={setOverlayNodeId}
-            />
+            <div key={i} className="rounded-lg border border-border bg-bg-base shadow-lg">
+              <RouteCard
+                route={route}
+                index={i}
+                active={i === active}
+                onSelect={() => selectAlt(i)}
+                onOpenNode={setOverlayNodeId}
+              />
+            </div>
           ))}
         </div>
-        <div className="relative min-h-[320px] flex-1 lg:min-h-0">
-          {paths.length > 0 ? (
-            <div data-testid="route-map" className="absolute inset-0">
-              {/* Local boundary: a MapLibre/chunk/WebGL failure must never
-                  unmount the route cards above — map errors stay in this pane. */}
-              <ErrorBoundary
-                fallback={
-                  <div
-                    role="status"
-                    className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-3 text-center font-mono text-xs text-text-muted"
-                  >
-                    <span>{t('routes.mapFailed')}</span>
-                  </div>
-                }
-              >
-                <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
-              </ErrorBoundary>
+      </div>
+      {/* Map is always mounted (Google-Maps-style background layer), also
+          before any route is picked — previously it only mounted with results. */}
+      <div className="absolute inset-0" data-testid="route-map">
+        {/* Local boundary: a MapLibre/chunk/WebGL failure must never
+            unmount the route cards above — map errors stay in this pane. */}
+        <ErrorBoundary
+          fallback={
+            <div
+              role="status"
+              className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-3 text-center font-mono text-xs text-text-muted"
+            >
+              <span>{t('routes.mapFailed')}</span>
             </div>
-          ) : (
-            <div className="flex h-full min-h-[320px] items-center justify-center px-3 text-center font-mono text-xs text-text-muted">
-              {showResults ? t('routes.planning') : t('routes.pickBoth')}
-            </div>
-          )}
-        </div>
+          }
+        >
+          <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+        </ErrorBoundary>
       </div>
     </div>
   );
