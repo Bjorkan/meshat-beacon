@@ -53,10 +53,10 @@ export function routesToFeatures(
         to.longitude == null
       )
         return;
-      const snrColor = traceLegColor(leg.snr ?? null, palette);
+      const snrColor = traceLegColor(leg.unmeasured ? null : (leg.snr ?? null), palette);
       const label =
         `${nodeLabel(from)} → ${nodeLabel(to)}` +
-        (leg.snr != null ? ` · ${leg.snr.toFixed(2)} dB` : '');
+        (leg.snr != null && !leg.unmeasured ? ` · ${leg.snr.toFixed(2)} dB` : '');
       lines.push({
         type: 'Feature',
         properties: { routeIndex, active, snrColor, label },
@@ -93,8 +93,9 @@ export function routesToFeatures(
     });
   });
   // alternatives under the best path: draw dimmed routes first so the active
-  // route paints on top.
-  lines.sort((a, b) => Number(b.properties.active) - Number(a.properties.active));
+  // route paints on top. Active features sort last (source order = paint
+  // order for the single line layer).
+  lines.sort((a, b) => Number(a.properties.active) - Number(b.properties.active));
   return {
     lines: { type: 'FeatureCollection', features: lines },
     points: { type: 'FeatureCollection', features: points },

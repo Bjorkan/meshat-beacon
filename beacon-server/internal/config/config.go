@@ -71,13 +71,16 @@ type ResolvedConfig struct {
 	// fresh; see NeighborsConfig.
 	MeshCoreRegionFreshness time.Duration
 	// RoutePlan* mirrors the routeplan: config block (see RoutePlanConfig);
-	// resolve to defaults when unset.
+	// resolve to defaults when unset. A nil pointer means "not configured" and
+	// resolves to the default; an explicit value (including 0) is honored, so
+	// operators can disable the neighbor bonus or alternatives with 0.
 	RoutePlanUnmeasuredPenalty float64
 	RoutePlanSNRGoodDB         float64
 	RoutePlanSNRBadDB          float64
 	RoutePlanSNRMaxPenalty     float64
 	RoutePlanNeighborBonus     float64
 	RoutePlanSNRFreshness      time.Duration
+	RoutePlanDirectFreshness   time.Duration
 	RoutePlanMaxHops           int
 	RoutePlanMaxAlternatives   int
 }
@@ -248,20 +251,31 @@ type NeighborsConfig struct {
 // beats an unmeasured one. SNRFreshness bounds how old an SNR reading may be
 // before it counts as unmeasured.
 //
-// NeighborBonus discounts legs whose endpoints explicitly marked each other as
-// neighbors (a DIRECT row in node_neighbors): the mesh's own statement that
-// the hop is real outranks an equally-measured overheard leg. It must stay
-// below (UnmeasuredPenalty - SNRMaxPenalty) so it can never promote an
-// unmeasured leg above a measured one.
+// NeighborBonus discounts legs whose reporter explicitly marked the peer as a
+// neighbor (a DIRECT row in node_neighbors for that directed pair): the
+// reporter's own statement that the hop is real outranks an equally-measured
+// overheard leg. It must stay below (UnmeasuredPenalty - SNRMaxPenalty) so it
+// can never promote an unmeasured leg above a measured one. DirectFreshness
+// bounds how old the direct confirmation may be before the bonus stops
+// applying; it defaults to SNRFreshness (the neighbor retention window) when
+// unset.
+//
+// All fields are pointers so "unset" (nil, resolve to default) is distinct
+// from an explicit value: operators can disable the neighbor bonus or the
+// alternatives with an explicit 0. Relation invariants are validated against
+// the resolved values (see ValidateResolved), never against the raw partial
+// config, so a partial block cannot pass validation and become invalid only
+// after defaults are filled in.
 type RoutePlanConfig struct {
-	UnmeasuredPenalty float64  `yaml:"unmeasured_penalty"`
-	SNRGoodDB         float64  `yaml:"snr_good_db"`
-	SNRBadDB          float64  `yaml:"snr_bad_db"`
-	SNRMaxPenalty     float64  `yaml:"snr_max_penalty"`
-	NeighborBonus     float64  `yaml:"neighbor_bonus"`
-	SNRFreshness      duration `yaml:"snr_freshness"`
-	MaxHops           int      `yaml:"max_hops"`
-	MaxAlternatives   int      `yaml:"max_alternatives"`
+	UnmeasuredPenalty *float64  `yaml:"unmeasured_penalty"`
+	SNRGoodDB         *float64  `yaml:"snr_good_db"`
+	SNRBadDB          *float64  `yaml:"snr_bad_db"`
+	SNRMaxPenalty     *float64  `yaml:"snr_max_penalty"`
+	NeighborBonus     *float64  `yaml:"neighbor_bonus"`
+	SNRFreshness      *duration `yaml:"snr_freshness"`
+	DirectFreshness   *duration `yaml:"direct_freshness"`
+	MaxHops           *int      `yaml:"max_hops"`
+	MaxAlternatives   *int      `yaml:"max_alternatives"`
 }
 
 // ObserversConfig controls observer row retention behaviour.
@@ -419,34 +433,80 @@ const (
 // neighbor retention window an SNR confirmation ages with).
 var DefaultRoutePlanSNRFreshness = 7 * 24 * time.Hour
 
-// Validate rejects incoherent planner weights: good must beat bad (strictly,
-// otherwise the interpolation has no range), penalties must be non-negative,
-// an unmeasured leg must never beat the worst measured one, and the neighbor
-// bonus must fit strictly inside that gap so it reorders within the measured
-// band (or within unmeasured) but never promotes unmeasured above measured.
+// Validate checks the raw routeplan block for shape errors only (negative
+// values, inverted good/bad). A nil field means "not configured" and is
+// skipped here; relational invariants are enforced on the resolved values by
+// ValidateResolved so partial configs cannot pass raw validation and become
+// invalid only after defaults are applied. Load calls ValidateResolved on the
+// resolved result, so callers get the full check.
 func (c *RoutePlanConfig) Validate() error {
-	if c.SNRGoodDB <= c.SNRBadDB && (c.SNRGoodDB != 0 || c.SNRBadDB != 0) {
-		return fmt.Errorf("config: routeplan.snr_good_db (%v) must exceed snr_bad_db (%v)", c.SNRGoodDB, c.SNRBadDB)
+	if c.UnmeasuredPenalty != nil && *c.UnmeasuredPenalty < 0 {
+		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must be non-negative", *c.UnmeasuredPenalty)
 	}
-	if c.UnmeasuredPenalty < 0 || c.SNRMaxPenalty < 0 || c.NeighborBonus < 0 {
+	if c.SNRMaxPenalty != nil && *c.SNRMaxPenalty < 0 {
+		return fmt.Errorf("config: routeplan.snr_max_penalty (%v) must be non-negative", *c.SNRMaxPenalty)
+	}
+	if c.NeighborBonus != nil && *c.NeighborBonus < 0 {
+		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be non-negative", *c.NeighborBonus)
+	}
+	if c.MaxHops != nil && *c.MaxHops < 0 {
+		return fmt.Errorf("config: routeplan max_hops must be non-negative")
+	}
+	if c.MaxAlternatives != nil && *c.MaxAlternatives < 0 {
+		return fmt.Errorf("config: routeplan max_alternatives must be non-negative")
+	}
+	if c.SNRGoodDB != nil && c.SNRBadDB != nil && *c.SNRGoodDB <= *c.SNRBadDB {
+		return fmt.Errorf("config: routeplan.snr_good_db (%v) must exceed snr_bad_db (%v)", *c.SNRGoodDB, *c.SNRBadDB)
+	}
+	if c.SNRFreshness != nil && c.SNRFreshness.Duration < 0 {
+		return fmt.Errorf("config: routeplan.snr_freshness must be non-negative")
+	}
+	if c.DirectFreshness != nil && c.DirectFreshness.Duration < 0 {
+		return fmt.Errorf("config: routeplan.direct_freshness must be non-negative")
+	}
+	return nil
+}
+
+// ValidateResolved enforces every planner invariant against fully resolved
+// values (defaults applied): good strictly beats bad, penalties and bonus are
+// non-negative, unmeasured never beats the worst measured leg, the neighbor
+// bonus fits strictly inside that gap, and every possible resulting edge cost
+// is strictly positive for Dijkstra (measured strong/interpolated/bad plus
+// unmeasured, each with and without the bonus). Limits must be consistent with
+// the API behavior (non-negative; alternatives honor the handler cap).
+func ValidateResolved(r ResolvedConfig) error {
+	if r.RoutePlanSNRGoodDB <= r.RoutePlanSNRBadDB {
+		return fmt.Errorf("config: routeplan.snr_good_db (%v) must exceed snr_bad_db (%v)", r.RoutePlanSNRGoodDB, r.RoutePlanSNRBadDB)
+	}
+	if r.RoutePlanUnmeasuredPenalty < 0 || r.RoutePlanSNRMaxPenalty < 0 || r.RoutePlanNeighborBonus < 0 {
 		return fmt.Errorf("config: routeplan penalties and neighbor_bonus must be non-negative")
 	}
-	if c.UnmeasuredPenalty != 0 && c.SNRMaxPenalty != 0 && c.UnmeasuredPenalty < c.SNRMaxPenalty {
-		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must be >= snr_max_penalty (%v)", c.UnmeasuredPenalty, c.SNRMaxPenalty)
+	if r.RoutePlanUnmeasuredPenalty < r.RoutePlanSNRMaxPenalty {
+		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must be >= snr_max_penalty (%v)", r.RoutePlanUnmeasuredPenalty, r.RoutePlanSNRMaxPenalty)
 	}
-	gap := c.UnmeasuredPenalty - c.SNRMaxPenalty
-	if c.NeighborBonus != 0 && gap != 0 && c.NeighborBonus >= gap {
-		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < unmeasured_penalty - snr_max_penalty (%v)", c.NeighborBonus, gap)
+	gap := r.RoutePlanUnmeasuredPenalty - r.RoutePlanSNRMaxPenalty
+	if r.RoutePlanNeighborBonus >= gap {
+		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < unmeasured_penalty - snr_max_penalty (%v)", r.RoutePlanNeighborBonus, gap)
 	}
-	if c.MaxHops < 0 || c.MaxAlternatives < 0 {
+	// Every resulting edge cost must be strictly positive: base 1.0 minus the
+	// bonus is the cheapest possible leg (strong measured neighbor leg).
+	if 1.0-r.RoutePlanNeighborBonus <= 0 {
+		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < 1.0 so every edge cost stays positive", r.RoutePlanNeighborBonus)
+	}
+	if r.RoutePlanMaxHops < 0 || r.RoutePlanMaxAlternatives < 0 {
 		return fmt.Errorf("config: routeplan max_hops and max_alternatives must be non-negative")
+	}
+	if r.RoutePlanSNRFreshness < 0 || r.RoutePlanDirectFreshness < 0 {
+		return fmt.Errorf("config: routeplan freshness windows must be non-negative")
 	}
 	return nil
 }
 
 // Load reads and parses the config file at path.
 // Returns an empty Config (not an error) if the file does not exist,
-// so Beacon starts cleanly without a config file.
+// so Beacon starts cleanly without a config file. Validation runs against
+// the resolved config (see ValidateResolved) so partial blocks that only
+// become invalid once defaults are applied are still rejected.
 func Load(path string) (*Config, error) {
 	cfg := &Config{}
 	data, err := os.ReadFile(path)
@@ -462,6 +522,9 @@ func Load(path string) (*Config, error) {
 	if err := cfg.Validate(); err != nil {
 		return nil, err
 	}
+	if err := ValidateResolved(Resolve(cfg)); err != nil {
+		return nil, err
+	}
 	configDir := filepath.Dir(path)
 	for iata, details := range cfg.IATAs {
 		if details.BorderFile != "" && !filepath.IsAbs(details.BorderFile) {
@@ -472,7 +535,11 @@ func Load(path string) (*Config, error) {
 	return cfg, nil
 }
 
-// Resolve returns a ResolvedConfig with defaults applied for any zero values.
+// Resolve returns a ResolvedConfig with defaults applied for any unset
+// (nil) routeplan value. An explicit value -- including 0 -- is always
+// honored, so operators can disable the neighbor bonus or the alternatives
+// with 0. Callers that need the invariant check should run ValidateResolved
+// on the result (Load already does).
 func Resolve(cfg *Config) ResolvedConfig {
 	r := ResolvedConfig{
 		TelemetryResolution:  cfg.Telemetry.Resolution.Duration,
@@ -498,14 +565,15 @@ func Resolve(cfg *Config) ResolvedConfig {
 		ObserverDeleteAfter:     cfg.Observers.DeleteAfter.Duration,
 		MeshCoreRegionFreshness: cfg.Neighbors.RegionScopeFreshness.Duration,
 
-		RoutePlanUnmeasuredPenalty: cfg.RoutePlan.UnmeasuredPenalty,
-		RoutePlanSNRGoodDB:         cfg.RoutePlan.SNRGoodDB,
-		RoutePlanSNRBadDB:          cfg.RoutePlan.SNRBadDB,
-		RoutePlanSNRMaxPenalty:     cfg.RoutePlan.SNRMaxPenalty,
-		RoutePlanNeighborBonus:     cfg.RoutePlan.NeighborBonus,
-		RoutePlanSNRFreshness:      cfg.RoutePlan.SNRFreshness.Duration,
-		RoutePlanMaxHops:           cfg.RoutePlan.MaxHops,
-		RoutePlanMaxAlternatives:   cfg.RoutePlan.MaxAlternatives,
+		RoutePlanUnmeasuredPenalty: derefFloat(cfg.RoutePlan.UnmeasuredPenalty, DefaultRoutePlanUnmeasuredPenalty),
+		RoutePlanSNRGoodDB:         derefFloat(cfg.RoutePlan.SNRGoodDB, DefaultRoutePlanSNRGoodDB),
+		RoutePlanSNRBadDB:          derefFloat(cfg.RoutePlan.SNRBadDB, DefaultRoutePlanSNRBadDB),
+		RoutePlanSNRMaxPenalty:     derefFloat(cfg.RoutePlan.SNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty),
+		RoutePlanNeighborBonus:     derefFloat(cfg.RoutePlan.NeighborBonus, DefaultRoutePlanNeighborBonus),
+		RoutePlanSNRFreshness:      derefDuration(cfg.RoutePlan.SNRFreshness, DefaultRoutePlanSNRFreshness),
+		RoutePlanDirectFreshness:   derefDuration(cfg.RoutePlan.DirectFreshness, 0),
+		RoutePlanMaxHops:           derefInt(cfg.RoutePlan.MaxHops, DefaultRoutePlanMaxHops),
+		RoutePlanMaxAlternatives:   derefInt(cfg.RoutePlan.MaxAlternatives, DefaultRoutePlanMaxAlternatives),
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -571,36 +639,46 @@ func Resolve(cfg *Config) ResolvedConfig {
 		// the same starting point, so region confirmations age with the neighbor edges.
 		r.MeshCoreRegionFreshness = 7 * 24 * time.Hour
 	}
-	if r.RoutePlanUnmeasuredPenalty == 0 {
-		r.RoutePlanUnmeasuredPenalty = DefaultRoutePlanUnmeasuredPenalty
-	}
-	if r.RoutePlanSNRGoodDB == 0 {
-		r.RoutePlanSNRGoodDB = DefaultRoutePlanSNRGoodDB
-	}
-	if r.RoutePlanSNRBadDB == 0 {
-		r.RoutePlanSNRBadDB = DefaultRoutePlanSNRBadDB
-	}
-	if r.RoutePlanSNRMaxPenalty == 0 {
-		r.RoutePlanSNRMaxPenalty = DefaultRoutePlanSNRMaxPenalty
-	}
-	if r.RoutePlanNeighborBonus == 0 {
-		r.RoutePlanNeighborBonus = DefaultRoutePlanNeighborBonus
-	}
-	if r.RoutePlanSNRFreshness == 0 {
-		r.RoutePlanSNRFreshness = DefaultRoutePlanSNRFreshness
-	}
-	if r.RoutePlanMaxHops == 0 {
-		r.RoutePlanMaxHops = DefaultRoutePlanMaxHops
-	}
-	if r.RoutePlanMaxAlternatives == 0 {
-		r.RoutePlanMaxAlternatives = DefaultRoutePlanMaxAlternatives
+	// RoutePlanDirectFreshness defaults to the SNR freshness (the neighbor
+	// retention window) when unset; an explicit value -- including 0, which
+	// disables the bonus -- is honored. graph.FromResolved applies the same
+	// fallback for configs built programmatically.
+	if cfg.RoutePlan.DirectFreshness == nil {
+		r.RoutePlanDirectFreshness = r.RoutePlanSNRFreshness
 	}
 	return r
 }
 
+// derefFloat returns the pointed-to value, or def when the pointer is nil
+// (unset). An explicit zero is honored.
+func derefFloat(p *float64, def float64) float64 {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+// derefInt returns the pointed-to value, or def when the pointer is nil
+// (unset). An explicit zero is honored.
+func derefInt(p *int, def int) int {
+	if p == nil {
+		return def
+	}
+	return *p
+}
+
+// derefDuration returns the pointed-to duration, or def when the pointer is
+// nil (unset). An explicit zero is honored.
+func derefDuration(p *duration, def time.Duration) time.Duration {
+	if p == nil {
+		return def
+	}
+	return p.Duration
+}
+
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s routePlanUnmeasured=%.2f routePlanGood=%.1f routePlanBad=%.1f routePlanMaxPen=%.2f routePlanNeighborBonus=%.2f routePlanFresh=%s routePlanMaxHops=%d routePlanMaxAlt=%d",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s routePlanUnmeasured=%.2f routePlanGood=%.1f routePlanBad=%.1f routePlanMaxPen=%.2f routePlanNeighborBonus=%.2f routePlanFresh=%s routePlanDirectFresh=%s routePlanMaxHops=%d routePlanMaxAlt=%d",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
@@ -609,6 +687,6 @@ func (r ResolvedConfig) String() string {
 		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter, r.MeshCoreRegionFreshness,
 		r.RoutePlanUnmeasuredPenalty, r.RoutePlanSNRGoodDB, r.RoutePlanSNRBadDB, r.RoutePlanSNRMaxPenalty,
 		r.RoutePlanNeighborBonus,
-		r.RoutePlanSNRFreshness, r.RoutePlanMaxHops, r.RoutePlanMaxAlternatives,
+		r.RoutePlanSNRFreshness, r.RoutePlanDirectFreshness, r.RoutePlanMaxHops, r.RoutePlanMaxAlternatives,
 	)
 }

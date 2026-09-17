@@ -214,9 +214,65 @@ describe('RoutePlanner', () => {
   it('selecting the alternative switches the active route', async () => {
     await renderReady(`/routes?from=${FROM}&to=${TO}`);
     await screen.findByText('Alternative 1');
-    fireEvent.click(screen.getByText('Alternative 1'));
+    // Route selection is a dedicated button (sibling of the node buttons),
+    // not the whole card: keyboard and pointer activation must not open nodes.
+    const selectButtons = screen.getAllByRole('button', { name: /^(Best|Alternative 1)$/ });
+    expect(selectButtons.length).toBe(2);
+    fireEvent.click(selectButtons[1]);
     await waitFor(() =>
       expect(screen.getByTestId('route-map-stub').textContent).toContain('active:1'),
     );
+  });
+
+  it('opens nodes via dedicated buttons without changing route selection', async () => {
+    const opened: string[] = [];
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+    });
+    client.setQueryData(
+      routeQueries.byPubkey(FROM).queryKey,
+      nodeSummary({ publicKey: FROM, name: 'Alpha', lat: 59.6, lng: 16.5 }),
+    );
+    client.setQueryData(
+      routeQueries.byPubkey(TO).queryKey,
+      nodeSummary({ publicKey: TO, name: null, lat: 59.61, lng: 16.52 }),
+    );
+    client.setQueryData(routeQueries.best({ from: FROM, to: TO }).queryKey, bestResult());
+    const rootRoute = createRootRoute();
+    const routesRoute = createRoute({
+      getParentRoute: () => rootRoute,
+      path: '/routes',
+      component: () => (
+        <OverlaysContext.Provider
+          value={{ setOverlayNodeId: (id: string) => opened.push(id) } as never}
+        >
+          <RoutePlanner />
+        </OverlaysContext.Provider>
+      ),
+      validateSearch: (search: Record<string, unknown>) => search,
+    });
+    const router = createRouter({
+      routeTree: rootRoute.addChildren([routesRoute]),
+      history: createMemoryHistory({ initialEntries: [`/routes?from=${FROM}&to=${TO}`] }),
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
+    await router.load();
+    await screen.findByText('Best');
+    // open-node buttons are real buttons with accessible names, siblings of
+    // the route-selection buttons (no nested interactive controls).
+    const openButtons = screen.getAllByRole('button', { name: /^Open node / });
+    expect(openButtons.length).toBeGreaterThan(0);
+    fireEvent.click(openButtons[0]);
+    expect(opened).toEqual(['id-a']);
+    // selection unchanged: still showing the best route as active.
+    expect(screen.getByTestId('route-map-stub').textContent).toContain('active:0');
+    // keyboard activation works too.
+    fireEvent.keyDown(openButtons[0], { key: 'Enter' });
+    fireEvent.click(openButtons[0]);
+    expect(opened.length).toBeGreaterThanOrEqual(2);
   });
 });

@@ -1413,22 +1413,28 @@ ORDER BY hop_count ASC, last_seen DESC;
 -- direct marks an explicit neighbor claim (the reporter itself heard the
 -- neighbor over RF: /neighbors reports, zero-hop advert RX, DISCOVER_RESP RX
 -- -- pass TRUE) versus overheard third-party topology from packet paths (pass
--- FALSE). Once TRUE it sticks: a later overheard observation must not demote
--- an explicitly marked leg.
+-- FALSE). direct_last_seen advances only on explicit direct confirmations, so
+-- the planner can age the bonus out: overheard traffic refreshes last_seen
+-- (keeping the row alive under retention) but never refreshes direct_last_seen.
 -- On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 -- a stable map link quality while making recent RF conditions matter more than old samples.
 INSERT INTO node_neighbors (
-  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen, direct
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen, direct, direct_last_seen
 )
 VALUES (
   $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
   CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5,
-  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END, $6
+  CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END, $6,
+  CASE WHEN $6::boolean THEN NOW() ELSE NULL END
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
   observation_count = node_neighbors.observation_count + 1,
   direct            = node_neighbors.direct OR EXCLUDED.direct,
+  direct_last_seen  = CASE
+                        WHEN EXCLUDED.direct THEN COALESCE(EXCLUDED.direct_last_seen, NOW())
+                        ELSE node_neighbors.direct_last_seen
+                      END,
   snr               = CASE
                         WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr
                         WHEN node_neighbors.snr IS NULL THEN EXCLUDED.snr
@@ -1684,8 +1690,10 @@ WHERE o.observer_id = $1;
 -- coordinates in ONE query, so the planner sees a point-in-time snapshot
 -- instead of a paginated crawl that can shift mid-read. One row per directed
 -- pair: SNR merges exactly like GetNodeNeighbors does (sample-weighted mean,
--- summed counts, min/max timestamps) while the neighbor mark merges with OR
--- (one explicit mark from either direction, any IATA, marks the leg).
+-- summed counts, min/max timestamps) while the direct mark merges per directed
+-- pair with OR across IATAs (the planner's Neighbor semantic is directional:
+-- only the reporter hearing the peer counts, reverse evidence does not mark
+-- this direction) plus MAX(direct_last_seen) for bonus freshness.
 SELECT
     nn.node_id AS from_id,
     nf.public_key AS from_pubkey, nf.name AS from_name, nf.node_type AS from_type,
@@ -1704,7 +1712,11 @@ SELECT
   SUM(COALESCE(nn.snr, 0) * nn.snr_sample_count)::real AS snr_weighted_sum,
   SUM(nn.snr_sample_count)::bigint AS snr_sample_count,
   MAX(nn.snr_last_seen)::timestamptz AS snr_last_seen,
-  BOOL_OR(nn.direct) AS direct
+  MAX(nn.last_seen)::timestamptz AS edge_last_seen,
+  MAX(nf.last_seen)::timestamptz AS from_last_seen,
+  MAX(nt.last_seen)::timestamptz AS to_last_seen,
+  BOOL_OR(nn.direct) AS direct,
+  MAX(nn.direct_last_seen)::timestamptz AS direct_last_seen
 FROM node_neighbors nn
 JOIN nodes nf ON nf.id = nn.node_id
 JOIN nodes nt ON nt.id = nn.neighbor_id

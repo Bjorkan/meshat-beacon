@@ -85,7 +85,8 @@ func TestLegCost_NeighborBonusBeatsOverheard(t *testing.T) {
 	cfg := testCfg()
 	now := time.Now()
 	// Same strong reading: the explicitly marked neighbor leg must win...
-	marked := Edge{Neighbor: true, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	// (a fresh direct confirmation is required for the bonus).
+	marked := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
 	overheard := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
 	mc, mu := cfg.LegCost(marked, now)
 	oc, ou := cfg.LegCost(overheard, now)
@@ -97,7 +98,7 @@ func TestLegCost_NeighborBonusBeatsOverheard(t *testing.T) {
 	}
 	// ...but the bonus must never promote an unmeasured leg above a measured one.
 	unmarkedWorst := Edge{SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now}
-	markedUnmeasured := Edge{Neighbor: true}
+	markedUnmeasured := Edge{Neighbor: true, DirectLastSeen: now}
 	wc, _ := cfg.LegCost(unmarkedWorst, now)
 	uc, uu := cfg.LegCost(markedUnmeasured, now)
 	if !uu {
@@ -105,6 +106,158 @@ func TestLegCost_NeighborBonusBeatsOverheard(t *testing.T) {
 	}
 	if uc <= wc {
 		t.Errorf("marked unmeasured (%v) must stay costlier than worst measured (%v)", uc, wc)
+	}
+}
+
+func TestLegCost_StaleDirectLosesBonus(t *testing.T) {
+	cfg := testCfg()
+	now := time.Now()
+	// One old direct observation plus fresh overheard traffic: the row stays
+	// alive (last_seen fresh) but the direct confirmation is stale, so the
+	// bonus must stop applying.
+	staleDirect := Edge{
+		Neighbor: true, DirectLastSeen: now.Add(-30 * 24 * time.Hour),
+		SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now,
+	}
+	overheard := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	sc, _ := cfg.LegCost(staleDirect, now)
+	oc, _ := cfg.LegCost(overheard, now)
+	if sc != oc {
+		t.Errorf("stale direct (%v) must cost the same as overheard (%v)", sc, oc)
+	}
+	// A new direct confirmation restores the bonus.
+	fresh := staleDirect
+	fresh.DirectLastSeen = now
+	fc, _ := cfg.LegCost(fresh, now)
+	if fc != 1.0-cfg.NeighborBonus {
+		t.Errorf("fresh direct should cost %v, got %v", 1.0-cfg.NeighborBonus, fc)
+	}
+}
+
+func TestLegCost_AllBranchesPositive(t *testing.T) {
+	cfg := testCfg()
+	now := time.Now()
+	cases := map[string]Edge{
+		"strong":           {SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now},
+		"strong+bonus":     {Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now},
+		"mid":              {SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now},
+		"mid+bonus":        {Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now},
+		"bad":              {SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now},
+		"bad+bonus":        {Neighbor: true, DirectLastSeen: now, SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now},
+		"unmeasured":       {},
+		"unmeasured+bonus": {Neighbor: true, DirectLastSeen: now},
+		"stale":            {SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-30 * 24 * time.Hour)},
+	}
+	for name, e := range cases {
+		c, _ := cfg.LegCost(e, now)
+		if c <= 0 {
+			t.Errorf("%s: cost must be strictly positive for Dijkstra, got %v", name, c)
+		}
+	}
+}
+
+func TestShortestPaths_HopBoundKeepsLowHopArrival(t *testing.T) {
+	// A cheaper arrival at X with no hop budget left must not dominate a
+	// slightly more expensive arrival that can still reach the destination.
+	// With MaxHops=2 the only valid route is A -> X -> D.
+	cfg := testCfg()
+	cfg.MaxHops = 2
+	cfg.NeighborBonus = 0 // keep review's exact leg costs
+	cfg.UnmeasuredPenalty = 1.5
+	now := time.Now()
+	a, b, x, d := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	strong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), x: loc(x), d: loc(d)},
+		Edges: map[uuid.UUID][]Edge{
+			// A->B 1.0, B->X 1.0 (2 hops, budget exhausted at X),
+			// A->X unmeasured 1+1.5=2.5, X->D 1.0: valid A->X->D costs 3.5.
+			a: {strong(a, b), {From: a, To: x}},
+			b: {strong(b, x)},
+			x: {strong(x, d)},
+		},
+	}
+	paths := ShortestPaths(g, cfg, a, d, 1, now)
+	if len(paths) != 1 {
+		t.Fatalf("expected 1 path A->X->D within 2 hops, got %d (%v)", len(paths), paths)
+	}
+	got := paths[0].Nodes
+	if len(got) != 3 || got[0] != a || got[1] != x || got[2] != d {
+		t.Errorf("expected A->X->D, got %v", got)
+	}
+	if len(paths[0].Nodes)-1 > cfg.MaxHops {
+		t.Errorf("returned path exceeds MaxHops: %d > %d", len(paths[0].Nodes)-1, cfg.MaxHops)
+	}
+}
+
+func TestShortestPaths_YenRejectsOverBudgetCombined(t *testing.T) {
+	// Best A->B->D (2 hops). A Yen spur B->C->D is individually within a
+	// 2-hop budget from B, but combined A->B->C->D is 3 hops and must not be
+	// returned when MaxHops=2.
+	cfg := testCfg()
+	cfg.MaxHops = 2
+	cfg.NeighborBonus = 0
+	now := time.Now()
+	a, b, c, d := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	strong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {strong(a, b)},
+			b: {strong(b, d), strong(b, c)},
+			c: {strong(c, d)},
+		},
+	}
+	paths := ShortestPaths(g, cfg, a, d, 3, now)
+	if len(paths) == 0 {
+		t.Fatal("expected at least the best path")
+	}
+	for _, p := range paths {
+		if len(p.Nodes)-1 > cfg.MaxHops {
+			t.Errorf("path %v exceeds MaxHops=2", p.Nodes)
+		}
+	}
+	// The only 2-hop route here is A->B->D; anything else would be 3 hops.
+	if len(paths) != 1 {
+		t.Errorf("expected only A->B->D within budget, got %d paths", len(paths))
+	}
+}
+
+func TestShortestPaths_AllPathsRespectMaxHops(t *testing.T) {
+	cfg := testCfg()
+	cfg.MaxHops = 3
+	now := time.Now()
+	a, b, c, d, e := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	strong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d), e: loc(e)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {strong(a, b), strong(a, c)},
+			b: {strong(b, c), strong(b, d)},
+			c: {strong(c, d), strong(c, e)},
+			d: {strong(d, e)},
+			e: {strong(e, d)},
+		},
+	}
+	for _, p := range ShortestPaths(g, cfg, a, e, 5, now) {
+		if len(p.Nodes)-1 > cfg.MaxHops {
+			t.Errorf("path exceeds MaxHops: %d hops", len(p.Nodes)-1)
+		}
 	}
 }
 
@@ -122,10 +275,10 @@ func TestShortestPaths_PrefersMarkedNeighbor(t *testing.T) {
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d)},
 		Edges: map[uuid.UUID][]Edge{
 			a: {
-				{From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: true},
+				{From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: true, DirectLastSeen: now},
 				{From: a, To: d, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now},
 			},
-			b: {{From: b, To: c, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: true}},
+			b: {{From: b, To: c, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: true, DirectLastSeen: now}},
 			d: {{From: d, To: c, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}},
 		},
 	}
@@ -243,7 +396,7 @@ func TestBuildGraph_MergesDirectedSNR(t *testing.T) {
 		ToLat: f64(59.61), ToLng: f64(16.52),
 		ObservationCount: 4, FirstSeen: ts(now), LastSeen: ts(now),
 		SnrWeightedSum: 20, SnrSampleCount: 4, SnrLastSeen: ts(now),
-		Direct: true,
+		Direct: true, DirectLastSeen: ts(now),
 	}
 	g := BuildGraph([]db.GetRoutePlanGraphRow{row}, 24*time.Hour, 0, now)
 	if len(g.Edges[a]) != 1 {
@@ -276,5 +429,76 @@ func TestBuildGraph_UnmeasuredWhenNoSamples(t *testing.T) {
 	e := g.Edges[a][0]
 	if e.SNR != nil {
 		t.Errorf("zero samples must stay nil SNR (never fabricated 0 dB), got %v", *e.SNR)
+	}
+}
+
+func TestBuildGraph_NodeStaleFromNodeLastSeen(t *testing.T) {
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	// A fresh located node pair connected by an unmeasured edge (no SNR at
+	// all): staleness must come from node last_seen, so neither node is stale
+	// merely because SNR is absent.
+	fresh := db.GetRoutePlanGraphRow{
+		FromID: a, FromPubkey: a[:], FromType: 2,
+		FromLat: f64(59.6), FromLng: f64(16.5),
+		ToID: b, ToPubkey: b[:], ToType: 2,
+		ToLat: f64(59.61), ToLng: f64(16.52),
+		ObservationCount: 2, FirstSeen: ts(now), LastSeen: ts(now),
+		SnrWeightedSum: 0, SnrSampleCount: 0,
+		FromLastSeen: ts(now), ToLastSeen: ts(now),
+		EdgeLastSeen: ts(now),
+	}
+	g := BuildGraph([]db.GetRoutePlanGraphRow{fresh}, 24*time.Hour, 0, now)
+	if g.Nodes[a].Stale || g.Nodes[b].Stale {
+		t.Error("fresh nodes on an unmeasured edge must not be stale for lack of SNR")
+	}
+	// A genuinely stale node (last_seen past the threshold) is marked stale,
+	// matching the normal node API semantics.
+	old := now.Add(-72 * time.Hour)
+	staleRow := fresh
+	staleRow.FromLastSeen = ts(old)
+	staleRow.ToLastSeen = ts(old)
+	staleRow.EdgeLastSeen = ts(old)
+	staleRow.SnrLastSeen = ts(old)
+	g2 := BuildGraph([]db.GetRoutePlanGraphRow{staleRow}, 24*time.Hour, 0, now)
+	if !g2.Nodes[a].Stale || !g2.Nodes[b].Stale {
+		t.Error("nodes past the stale threshold must be marked stale")
+	}
+}
+
+func TestBuildGraph_DirectionalDirect(t *testing.T) {
+	// Direct evidence is directional: a reverse (B,A) mark must not set
+	// Neighbor on the (A,B) edge.
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	mkrow := func(from, to uuid.UUID, direct bool) db.GetRoutePlanGraphRow {
+		var dls pgtype.Timestamptz
+		if direct {
+			dls = ts(now)
+		}
+		return db.GetRoutePlanGraphRow{
+			FromID: from, FromPubkey: from[:], FromType: 2,
+			FromLat: f64(59.6), FromLng: f64(16.5),
+			ToID: to, ToPubkey: to[:], ToType: 2,
+			ToLat: f64(59.61), ToLng: f64(16.52),
+			ObservationCount: 2, FirstSeen: ts(now), LastSeen: ts(now),
+			SnrWeightedSum: 16, SnrSampleCount: 2, SnrLastSeen: ts(now),
+			FromLastSeen: ts(now), ToLastSeen: ts(now),
+			EdgeLastSeen: ts(now),
+			Direct:       direct, DirectLastSeen: dls,
+		}
+	}
+	g := BuildGraph([]db.GetRoutePlanGraphRow{
+		mkrow(a, b, false),
+		mkrow(b, a, true),
+	}, 24*time.Hour, 0, now)
+	if len(g.Edges[a]) != 1 || len(g.Edges[b]) != 1 {
+		t.Fatalf("expected one edge per direction, got %+v", g.Edges)
+	}
+	if g.Edges[a][0].Neighbor {
+		t.Error("(A,B) must not gain Neighbor from reverse (B,A) evidence")
+	}
+	if !g.Edges[b][0].Neighbor {
+		t.Error("(B,A) explicit mark must survive")
 	}
 }

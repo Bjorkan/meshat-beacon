@@ -99,10 +99,11 @@ export function NodeCombobox({
     onPick(pick);
   };
 
-  // full pubkey pasted (or typed): resolve exactly on Enter
+  // full pubkey pasted (or typed): resolve exactly on Enter. Only a full
+  // 64-hex key can become a route endpoint (matching /routes/best).
   const commitExactKey = async (raw: string) => {
     const hex = raw.replace(/\s+/g, '').toLowerCase();
-    if (!/^[0-9a-f]{4,}$/.test(hex)) return false;
+    if (!/^[0-9a-f]{64}$/.test(hex)) return false;
     const page = await getNodesPage(undefined, { pubkeyPrefix: hex, limit: 10 });
     const exact = page.items.find((n) => n.publicKey.toLowerCase() === hex);
     if (exact) {

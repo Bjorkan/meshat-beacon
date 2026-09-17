@@ -11,13 +11,19 @@
 // must exceed maxPenalty so a measured leg always beats an unmeasured one and
 // the graph never fragments for lack of measurements.
 //
-// A leg whose endpoints have marked each other as neighbors (a DIRECT
-// neighbor edge in node_neighbors, as opposed to a purely overheard
-// third-party observation) earns neighborBonus off its cost: an explicitly
-// marked neighbor relation is the mesh's own statement that the hop is real,
-// so it outranks an equally-measured overheard leg. The bonus must stay below
+// A leg whose reporter explicitly marked the peer as a neighbor (a DIRECT
+// neighbor edge in node_neighbors for that directed pair, as opposed to a
+// purely overheard third-party observation) earns neighborBonus off its cost:
+// an explicit mark is the reporter's own statement that the hop is real, so it
+// outranks an equally-measured overheard leg. The bonus must stay below
 // the unmeasured/measured gap (see Validate) so it can never promote an
-// unmeasured leg above a measured one.
+// unmeasured leg above a measured one. Reverse evidence does not mark this
+// direction: the semantic is directional, OR-merged only across IATA rows of
+// the same (reporter, peer) pair.
+//
+// The bonus additionally requires a fresh direct confirmation
+// (direct_last_seen within DirectFreshness): overheard traffic keeps the row
+// alive under retention but never refreshes the direct confirmation.
 //
 // The graph is directed (each stored node_neighbors row is one directed edge)
 // and merged across IATAs exactly like GetNodeNeighbors: SNR is the
@@ -51,13 +57,21 @@ type Config struct {
 	SNRMaxPenalty     float64
 	NeighborBonus     float64 // discount for explicitly marked neighbor legs (see package doc)
 	SNRFreshness      time.Duration
-	MaxHops           int
-	MaxAlternatives   int
-	MaxDistanceKm     float64 // legs longer than this are not radio hops; 0 = unlimited
+	// DirectFreshness bounds how old a direct confirmation (direct_last_seen)
+	// may be before the neighbor bonus stops applying. Defaults to
+	// SNRFreshness/the neighbor retention window when zero.
+	DirectFreshness time.Duration
+	MaxHops         int
+	MaxAlternatives int
+	MaxDistanceKm   float64 // legs longer than this are not radio hops; 0 = unlimited
 }
 
 // FromResolved maps the resolved server config onto the planner cost model.
 func FromResolved(r config.ResolvedConfig) Config {
+	directFresh := r.RoutePlanDirectFreshness
+	if directFresh == 0 {
+		directFresh = r.RoutePlanSNRFreshness
+	}
 	return Config{
 		UnmeasuredPenalty: r.RoutePlanUnmeasuredPenalty,
 		SNRGoodDB:         r.RoutePlanSNRGoodDB,
@@ -65,6 +79,7 @@ func FromResolved(r config.ResolvedConfig) Config {
 		SNRMaxPenalty:     r.RoutePlanSNRMaxPenalty,
 		NeighborBonus:     r.RoutePlanNeighborBonus,
 		SNRFreshness:      r.RoutePlanSNRFreshness,
+		DirectFreshness:   directFresh,
 		MaxHops:           r.RoutePlanMaxHops,
 		MaxAlternatives:   r.RoutePlanMaxAlternatives,
 		MaxDistanceKm:     r.NeighborMaxKm,
@@ -88,10 +103,17 @@ type Edge struct {
 	SNRSampleCount int64
 	SNRLastSeen    time.Time // zero when never measured
 	Observations   int64
-	// Neighbor is true when either endpoint explicitly marked the other as a
-	// neighbor (a DIRECT row in node_neighbors). Overheard third-party legs
-	// leave it false. Merged with OR across IATA rows.
+	// Neighbor is true when the reporter explicitly marked the peer as a
+	// neighbor (a DIRECT row in node_neighbors for this directed pair).
+	// Overheard third-party legs leave it false. Directional: reverse evidence
+	// does not mark this direction. Merged with OR across IATA rows of the
+	// same directed pair. Only fresh confirmations count -- see DirectLastSeen.
 	Neighbor bool
+	// DirectLastSeen is the freshest explicit direct confirmation for this
+	// directed pair; zero when never directly confirmed. Overheard traffic
+	// never advances it. The planner grants the neighbor bonus only while it
+	// is within Config.DirectFreshness.
+	DirectLastSeen time.Time
 }
 
 // Graph is the directed planning graph: located nodes plus directed edges.
@@ -101,14 +123,22 @@ type Graph struct {
 }
 
 // LegCost returns the cost of traversing e plus whether the leg counts as
-// unmeasured (no fresh SNR reading backs it). Neighbor legs earn the
-// configured bonus (floored at a small epsilon above zero so costs stay
-// positive for Dijkstra). now anchors the freshness check so tests can pin time.
+// unmeasured (no fresh SNR reading backs it). A leg earns the configured
+// neighbor bonus only when explicitly marked AND freshly confirmed
+// (DirectLastSeen within DirectFreshness, falling back to SNRFreshness when
+// unset); the cost is floored at a small epsilon above zero so costs stay
+// positive for Dijkstra. now anchors the freshness checks so tests can pin time.
 func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	const base = 1.0
 	bonus := 0.0
 	if e.Neighbor && c.NeighborBonus > 0 {
-		bonus = c.NeighborBonus
+		fresh := c.DirectFreshness
+		if fresh == 0 {
+			fresh = c.SNRFreshness
+		}
+		if !e.DirectLastSeen.IsZero() && now.Sub(e.DirectLastSeen) <= fresh {
+			bonus = c.NeighborBonus
+		}
 	}
 	if e.SNR == nil || e.SNRSampleCount == 0 || now.Sub(e.SNRLastSeen) > c.SNRFreshness {
 		return base + c.UnmeasuredPenalty - bonus, true
@@ -145,9 +175,9 @@ func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 // touching an unlocated endpoint are dropped (they cannot be drawn); legs
 // longer than maxKm between two located endpoints are dropped (not radio
 // hops -- same sanity rule as ingest). Opposite directed rows stay separate
-// edges; their SNR is merged per direction across IATA rows, while the
-// neighbor mark merges with OR: one explicit mark from either direction (any
-// IATA) is the mesh's own statement that the hop is real.
+// edges; their SNR is merged per direction across IATA rows, while the direct
+// mark is directional too: only this (reporter, peer) pair's own explicit
+// marks set Neighbor, reverse evidence never does.
 func BuildGraph(rows []db.GetRoutePlanGraphRow, staleThreshold time.Duration, maxKm float64, now time.Time) Graph {
 	type dirKey struct {
 		from, to uuid.UUID
@@ -186,19 +216,35 @@ func BuildGraph(rows []db.GetRoutePlanGraphRow, staleThreshold time.Duration, ma
 		if r.Direct {
 			e.Neighbor = true
 		}
+		if r.DirectLastSeen.Valid && r.DirectLastSeen.Time.After(e.DirectLastSeen) {
+			e.DirectLastSeen = r.DirectLastSeen.Time
+		}
 		mergeEdgeSNR(e, r.SnrWeightedSum, r.SnrSampleCount, r.SnrLastSeen)
 	}
 
-	// Staleness is a node property but the dump carries no node last_seen; use
-	// the freshest touching edge as the node's freshness signal (a node heard
-	// recently has recently confirmed edges).Flagged in the response, never excluded.
+	// Staleness is a node property: prefer the nodes' own last_seen (the dump
+	// carries from/to last_seen), falling back to the freshest touching edge's
+	// last_seen only when node timestamps are absent. Stale legs are flagged
+	// in the response, never excluded.
 	freshest := make(map[uuid.UUID]time.Time)
-	for _, key := range order {
-		e := merged[key]
-		t := e.SNRLastSeen
-		for _, id := range [2]uuid.UUID{key.from, key.to} {
-			if t.After(freshest[id]) {
-				freshest[id] = t
+	for _, r := range rows {
+		if r.FromLastSeen.Valid {
+			if r.FromLastSeen.Time.After(freshest[r.FromID]) {
+				freshest[r.FromID] = r.FromLastSeen.Time
+			}
+		}
+		if r.ToLastSeen.Valid {
+			if r.ToLastSeen.Time.After(freshest[r.ToID]) {
+				freshest[r.ToID] = r.ToLastSeen.Time
+			}
+		}
+		if r.EdgeLastSeen.Valid {
+			for _, id := range [2]uuid.UUID{r.FromID, r.ToID} {
+				if _, hasNode := freshest[id]; !hasNode {
+					if r.EdgeLastSeen.Time.After(freshest[id]) {
+						freshest[id] = r.EdgeLastSeen.Time
+					}
+				}
 			}
 		}
 	}

@@ -68,10 +68,7 @@ function RouteCard({
   const { t } = useTranslation();
   const via = route.nodes.slice(1, -1);
   return (
-    <button
-      type="button"
-      onClick={onSelect}
-      aria-pressed={active}
+    <div
       className={`w-full rounded border px-3 py-2 text-left transition-colors ${
         active
           ? 'border-primary-dim bg-primary/5'
@@ -79,13 +76,6 @@ function RouteCard({
       }`}
     >
       <div className="flex items-center gap-2">
-        <span
-          className={`font-mono text-[11px] font-semibold uppercase tracking-wider ${
-            active ? 'text-primary' : 'text-text-dim'
-          }`}
-        >
-          {index === 0 ? t('routes.best') : t('routes.alternative', { n: index })}
-        </span>
         <span className="font-mono text-[11px] text-text-dim">
           {t('routes.hops', { count: route.hopCount })}
         </span>
@@ -102,6 +92,15 @@ function RouteCard({
             {t('routes.staleNode')}
           </span>
         )}
+        <span className="flex-1" />
+        <button
+          type="button"
+          onClick={onSelect}
+          aria-pressed={active}
+          className="shrink-0 rounded border border-border px-2 py-0.5 font-mono text-[11px] text-text-muted hover:border-text-dim hover:text-text-normal"
+        >
+          {index === 0 ? t('routes.best') : t('routes.alternative', { n: index })}
+        </button>
       </div>
       {via.length > 0 && (
         <div className="mt-1 truncate font-mono text-[11px] text-text-muted">
@@ -118,27 +117,16 @@ function RouteCard({
             <span className="min-w-0 flex-1">
               <NodeLabel name={n.name} publicKey={n.publicKey} />
             </span>
-            <span
-              role="button"
-              tabIndex={0}
+            <button
+              type="button"
               aria-label={t('routes.openNode', {
                 name: n.name ?? n.publicKey.slice(0, 6).toUpperCase(),
               })}
               className="shrink-0 cursor-pointer font-mono text-[11px] text-primary hover:underline"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenNode(n.id);
-              }}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  onOpenNode(n.id);
-                }
-              }}
+              onClick={() => onOpenNode(n.id)}
             >
               ↗
-            </span>
+            </button>
           </span>
         ))}
       </div>
@@ -147,7 +135,7 @@ function RouteCard({
           <LegRow key={`${leg.from}-${leg.to}-${i}`} leg={leg} index={i} />
         ))}
       </div>
-    </button>
+    </div>
   );
 }
 

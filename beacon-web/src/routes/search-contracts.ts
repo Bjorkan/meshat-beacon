@@ -91,7 +91,9 @@ export interface RoutesSearch {
 function hexKey(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const hex = value.replace(/\s+/g, '').toLowerCase();
-  return /^[0-9a-f]+$/.test(hex) && hex.length >= 2 ? hex : undefined;
+  // Full node public keys only: 32 bytes / 64 hex chars, matching the
+  // /routes/best contract (short prefixes 404/400 elsewhere, never route).
+  return /^[0-9a-f]{64}$/.test(hex) ? hex : undefined;
 }
 
 function altIndex(value: unknown): number | undefined {

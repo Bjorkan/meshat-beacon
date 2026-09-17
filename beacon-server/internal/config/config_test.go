@@ -199,10 +199,13 @@ func TestResolve_RoutePlanDefaults(t *testing.T) {
 	}
 }
 
+func fptr(v float64) *float64 { return &v }
+func iptr(v int) *int         { return &v }
+
 func TestRoutePlanConfig_Validate(t *testing.T) {
 	good := RoutePlanConfig{
-		UnmeasuredPenalty: 2.5, SNRGoodDB: 5.0, SNRBadDB: -15.0, SNRMaxPenalty: 2.0,
-		NeighborBonus: 0.4,
+		UnmeasuredPenalty: fptr(2.5), SNRGoodDB: fptr(5.0), SNRBadDB: fptr(-15.0), SNRMaxPenalty: fptr(2.0),
+		NeighborBonus: fptr(0.4),
 	}
 	if err := good.Validate(); err != nil {
 		t.Errorf("expected valid config, got %v", err)
@@ -211,34 +214,98 @@ func TestRoutePlanConfig_Validate(t *testing.T) {
 		t.Errorf("expected zero routeplan block to validate, got %v", err)
 	}
 	inverted := good
-	inverted.SNRGoodDB, inverted.SNRBadDB = -15.0, 5.0
+	inverted.SNRGoodDB, inverted.SNRBadDB = fptr(-15.0), fptr(5.0)
 	if err := inverted.Validate(); err == nil {
 		t.Error("expected error when snr_good_db <= snr_bad_db")
 	}
-	weak := good
-	weak.UnmeasuredPenalty = 1.0
-	if err := weak.Validate(); err == nil {
-		t.Error("expected error when unmeasured_penalty < snr_max_penalty")
-	}
 	negative := good
-	negative.SNRMaxPenalty = -1.0
+	negative.SNRMaxPenalty = fptr(-1.0)
 	if err := negative.Validate(); err == nil {
 		t.Error("expected error for negative penalty")
 	}
-	bigBonus := good
-	bigBonus.NeighborBonus = 0.5 // gap is 2.5-2.0 = 0.5: bonus must stay strictly below
-	if err := bigBonus.Validate(); err == nil {
-		t.Error("expected error when neighbor_bonus >= unmeasured_penalty - snr_max_penalty")
-	}
-	smallBonus := good
-	smallBonus.NeighborBonus = 0.4 // strictly inside the gap: valid
-	if err := smallBonus.Validate(); err != nil {
-		t.Errorf("expected bonus 0.4 inside the gap to validate, got %v", err)
-	}
 	negativeBonus := good
-	negativeBonus.NeighborBonus = -0.1
+	negativeBonus.NeighborBonus = fptr(-0.1)
 	if err := negativeBonus.Validate(); err == nil {
 		t.Error("expected error for negative neighbor_bonus")
+	}
+	// Raw validation only checks shape: partial configs pass here and are
+	// rejected by ValidateResolved after defaults are applied (see below).
+	partial := RoutePlanConfig{NeighborBonus: fptr(10)}
+	if err := partial.Validate(); err != nil {
+		t.Errorf("expected partial raw config to pass shape validation, got %v", err)
+	}
+}
+
+func TestValidateResolved_PartialBonusRejected(t *testing.T) {
+	// neighbor_bonus: 10 alone passes raw validation but resolves against
+	// default penalties (unmeasured 2.5, max 2.0) into negative edge costs.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(10)
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected resolved rejection for lone neighbor_bonus: 10")
+	}
+}
+
+func TestValidateResolved_PartialUnmeasuredRejected(t *testing.T) {
+	// unmeasured_penalty: 1 alone resolves against the default max penalty
+	// 2.0, violating unmeasured >= max.
+	cfg := &Config{}
+	cfg.RoutePlan.UnmeasuredPenalty = fptr(1)
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected resolved rejection for lone unmeasured_penalty: 1")
+	}
+}
+
+func TestLoad_RoutePlanPartialRejected(t *testing.T) {
+	for _, body := range []string{
+		"routeplan:\n  neighbor_bonus: 10\n",
+		"routeplan:\n  unmeasured_penalty: 1\n",
+	} {
+		path := t.TempDir() + "/config.yaml"
+		if err := os.WriteFile(path, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := Load(path); err == nil {
+			t.Errorf("expected Load to reject %q", body)
+		}
+	}
+}
+
+func TestResolve_RoutePlanExplicitZero(t *testing.T) {
+	// Explicit 0 is distinct from unset: it disables the feature instead of
+	// resolving back to the default.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(0)
+	cfg.RoutePlan.MaxAlternatives = iptr(0)
+	r := Resolve(cfg)
+	if r.RoutePlanNeighborBonus != 0 {
+		t.Errorf("explicit neighbor_bonus 0 resolved to %v", r.RoutePlanNeighborBonus)
+	}
+	if r.RoutePlanMaxAlternatives != 0 {
+		t.Errorf("explicit max_alternatives 0 resolved to %v", r.RoutePlanMaxAlternatives)
+	}
+	if err := ValidateResolved(r); err != nil {
+		t.Errorf("explicit-zero resolve should validate, got %v", err)
+	}
+}
+
+func TestValidateResolved_PositiveCosts(t *testing.T) {
+	if err := ValidateResolved(Resolve(&Config{})); err != nil {
+		t.Fatalf("default resolve should validate, got %v", err)
+	}
+	// Bonus at the gap boundary must be rejected: it would zero out costs.
+	cfg := &Config{}
+	cfg.RoutePlan.NeighborBonus = fptr(0.5) // gap is 2.5-2.0 = 0.5
+	if err := ValidateResolved(Resolve(cfg)); err == nil {
+		t.Error("expected rejection when neighbor_bonus >= unmeasured - max gap")
+	}
+}
+
+func TestResolve_RoutePlanDirectFreshnessDefault(t *testing.T) {
+	r := Resolve(&Config{})
+	if r.RoutePlanDirectFreshness != r.RoutePlanSNRFreshness {
+		t.Errorf("direct freshness should default to SNR freshness, got %v vs %v",
+			r.RoutePlanDirectFreshness, r.RoutePlanSNRFreshness)
 	}
 }
 

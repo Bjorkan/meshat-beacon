@@ -4314,14 +4314,14 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "neighbor": {
-                    "description": "true when the endpoints explicitly marked each other as neighbors",
+                    "description": "true when the reporter explicitly marked the peer as a neighbor (directional, freshly confirmed)",
                     "type": "boolean"
                 },
                 "observationCount": {
                     "type": "integer"
                 },
                 "snr": {
-                    "description": "merged sample-weighted SNR in dB, nil when unmeasured",
+                    "description": "merged sample-weighted SNR in dB: last-known reading, nil when never measured",
                     "type": "number"
                 },
                 "snrLastSeen": {
@@ -4336,7 +4336,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "unmeasured": {
-                    "description": "true when no fresh SNR reading backs this leg",
+                    "description": "true when no fresh SNR reading backs this leg; SNR then is a stale last-known value, not current quality",
                     "type": "boolean"
                 }
             }

@@ -27,15 +27,17 @@ further comment.
 
 ## Branches
 
-- `main` — stable releases only, protected. Never target this directly.
-- `dev` — active development. All PRs target `dev`.
+- `main` — stable releases only, protected. Feature branches (`feat/*`,
+  `fix/*`) branch from `main` and target `main` via pull request.
+  (There is no `dev` branch in this monorepo; earlier revisions of this file
+  referenced one. Do not create it solely on the basis of stale docs.)
 
 ## Workflow
 
-1. Fork or create a branch from `dev`
+1. Fork or create a branch from `main`
 2. Make your changes
 3. Run the checklist below
-4. Open a pull request against `dev` with a clear description of what changed
+4. Open a pull request against `main` with a clear description of what changed
    and why, referencing any related issues
 
 ---

@@ -22,6 +22,7 @@ type Path struct {
 
 type dijkstraItem struct {
 	node  uuid.UUID
+	hops  int // hops used to reach node; part of the search state
 	cost  float64
 	index int
 }
@@ -76,6 +77,11 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 		for i := 0; i < len(prev.Nodes)-1; i++ {
 			spur := prev.Nodes[i]
 			root := append([]uuid.UUID(nil), prev.Nodes[:i+1]...)
+			rootHops := len(root) - 1
+			remaining := cfg.MaxHops - rootHops
+			if cfg.MaxHops > 0 && remaining < 0 {
+				continue
+			}
 			b := &bans{edges: map[[2]uuid.UUID]bool{}, nodes: map[uuid.UUID]bool{}}
 			for _, p := range paths {
 				if len(p.Nodes) > i && equalPrefix(p.Nodes, root) {
@@ -91,6 +97,12 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 			}
 			combined := append(append([]uuid.UUID(nil), root[:len(root)-1]...), spurPath.Nodes...)
 			if hasLoop(combined) {
+				continue
+			}
+			// Defensive combined-length guard: the spur search already
+			// honors the remaining budget, but never return a path that
+			// exceeds the total hop bound.
+			if cfg.MaxHops > 0 && len(combined)-1 > cfg.MaxHops {
 				continue
 			}
 			key := pathKey(combined)
@@ -122,37 +134,47 @@ func (h pathHeap) Swap(i, j int)      { h[i], h[j] = h[j], h[i]; h[i].index = i;
 func (h *pathHeap) Push(x any)        { item := x.(*pathItem); item.index = len(*h); *h = append(*h, item) }
 func (h *pathHeap) Pop() any          { old := *h; n := len(old); item := old[n-1]; *h = old[:n-1]; return item }
 
-// dijkstra finds the cheapest src->dst path honoring bans and the mid-node
-// type gate. Returns nil when unreachable.
+// dijkstra finds the cheapest src->dst path honoring bans, the mid-node
+// type gate, and the hop bound. The search state is (node, hopsUsed): a
+// cheaper arrival with no hop budget left must not dominate a slightly more
+// expensive arrival that can still reach the destination. Returns nil when
+// unreachable within the bound.
 func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time) *Path {
 	maxHops := cfg.MaxHops
 	if maxHops <= 0 {
 		maxHops = DefaultMaxHopsFallback
 	}
-	dist := map[uuid.UUID]float64{src: 0}
-	prev := map[uuid.UUID]uuid.UUID{}
-	prevUnmeasured := map[uuid.UUID]bool{}
-	hops := map[uuid.UUID]int{src: 0}
-	pq := &dijkstraPQ{&dijkstraItem{node: src, cost: 0}}
+	type state struct {
+		node uuid.UUID
+		hops int
+	}
+	dist := map[state]float64{{node: src, hops: 0}: 0}
+	prev := map[state]state{}
+	prevUnmeasured := map[state]bool{}
+	pq := &dijkstraPQ{&dijkstraItem{node: src, hops: 0, cost: 0}}
 	heap.Init(pq)
-	visited := map[uuid.UUID]bool{}
+	visited := map[state]bool{}
+	var best *state
+	var bestCost float64
 	for pq.Len() > 0 {
 		item := heap.Pop(pq).(*dijkstraItem)
-		u := item.node
-		if visited[u] {
+		s := state{node: item.node, hops: item.hops}
+		if visited[s] {
 			continue
 		}
-		visited[u] = true
-		if u == dst {
+		visited[s] = true
+		if s.node == dst {
+			best = &state{node: s.node, hops: s.hops}
+			bestCost = item.cost
 			break
 		}
-		if hops[u] >= maxHops {
+		if s.hops >= maxHops {
 			continue
 		}
-		for _, e := range g.Edges[u] {
+		for _, e := range g.Edges[s.node] {
 			v := e.To
 			if b != nil {
-				if b.edges[[2]uuid.UUID{u, v}] || b.nodes[v] {
+				if b.edges[[2]uuid.UUID{s.node, v}] || b.nodes[v] {
 					continue
 				}
 			}
@@ -163,34 +185,33 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time) *
 				}
 			}
 			cost, unmeasured := cfg.LegCost(e, now)
-			nc := dist[u] + cost
-			if d, ok := dist[v]; ok && nc >= d {
+			ns := state{node: v, hops: s.hops + 1}
+			nc := dist[s] + cost
+			if d, ok := dist[ns]; ok && nc >= d {
 				continue
 			}
-			dist[v] = nc
-			prev[v] = u
-			prevUnmeasured[v] = unmeasured
-			hops[v] = hops[u] + 1
-			heap.Push(pq, &dijkstraItem{node: v, cost: nc})
+			dist[ns] = nc
+			prev[ns] = s
+			prevUnmeasured[ns] = unmeasured
+			heap.Push(pq, &dijkstraItem{node: v, hops: ns.hops, cost: nc})
 		}
 	}
-	d, ok := dist[dst]
-	if !ok {
+	if best == nil {
 		return nil
 	}
-	// walk back
+	// walk back through (node, hops) states
 	nodes := []uuid.UUID{dst}
 	flags := []bool{}
-	for cur := dst; cur != src; {
+	for cur := *best; !(cur.node == src && cur.hops == 0); {
 		p, ok := prev[cur]
 		if !ok {
 			return nil
 		}
 		flags = append([]bool{prevUnmeasured[cur]}, flags...)
-		nodes = append([]uuid.UUID{p}, nodes...)
+		nodes = append([]uuid.UUID{p.node}, nodes...)
 		cur = p
 	}
-	return &Path{Nodes: nodes, Cost: d, Unmeasured: flags}
+	return &Path{Nodes: nodes, Cost: bestCost, Unmeasured: flags}
 }
 
 // DefaultMaxHopsFallback guards a zero Config (tests that only set weights).

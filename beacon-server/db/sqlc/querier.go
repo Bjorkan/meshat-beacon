@@ -89,8 +89,10 @@ type Querier interface {
 	// coordinates in ONE query, so the planner sees a point-in-time snapshot
 	// instead of a paginated crawl that can shift mid-read. One row per directed
 	// pair: SNR merges exactly like GetNodeNeighbors does (sample-weighted mean,
-	// summed counts, min/max timestamps) while the neighbor mark merges with OR
-	// (one explicit mark from either direction, any IATA, marks the leg).
+	// summed counts, min/max timestamps) while the direct mark merges per directed
+	// pair with OR across IATAs (the planner's Neighbor semantic is directional:
+	// only the reporter hearing the peer counts, reverse evidence does not mark
+	// this direction) plus MAX(direct_last_seen) for bonus freshness.
 	GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow, error)
 	GetScopeByName(ctx context.Context, name string) (GetScopeByNameRow, error)
 	GetScopeNames(ctx context.Context) ([]string, error)
@@ -316,8 +318,9 @@ type Querier interface {
 	// direct marks an explicit neighbor claim (the reporter itself heard the
 	// neighbor over RF: /neighbors reports, zero-hop advert RX, DISCOVER_RESP RX
 	// -- pass TRUE) versus overheard third-party topology from packet paths (pass
-	// FALSE). Once TRUE it sticks: a later overheard observation must not demote
-	// an explicitly marked leg.
+	// FALSE). direct_last_seen advances only on explicit direct confirmations, so
+	// the planner can age the bonus out: overheard traffic refreshes last_seen
+	// (keeping the row alive under retention) but never refreshes direct_last_seen.
 	// On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 	// a stable map link quality while making recent RF conditions matter more than old samples.
 	UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighborParams) error

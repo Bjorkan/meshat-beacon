@@ -69,6 +69,103 @@ func TestDeleteOldRoutes_PassesCutoffs(t *testing.T) {
 	}
 }
 
+func TestPlanBestRoute_IsolatedLocatedIsNoRoute(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.7, 16.6
+
+	// Empty graph: neither endpoint participates in any neighbor row.
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{}, nil)
+	// Fallback metadata lookup: both known and located -> no-route, not 422.
+	mock.EXPECT().GetNodesByIDs(gomock.Any(), gomock.Any()).Return([]sqlc.GetNodesByIDsRow{
+		{ID: from, Latitude: &lat, Longitude: &lng},
+		{ID: to, Latitude: &lat2, Longitude: &lng2},
+	}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 0 || res.Reason != "no-route" {
+		t.Errorf("isolated located pair must be no-route, got %+v", res)
+	}
+}
+
+func TestPlanBestRoute_UnlocatedEndpointIsMissingPosition(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	lat, lng := 59.6, 16.5
+
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{}, nil)
+	// from located, to known but without coordinates -> missing position.
+	mock.EXPECT().GetNodesByIDs(gomock.Any(), gomock.Any()).Return([]sqlc.GetNodesByIDsRow{
+		{ID: from, Latitude: &lat, Longitude: &lng},
+		{ID: to},
+	}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if res.Reason != "endpoint-missing-position" {
+		t.Errorf("unlocated endpoint must be endpoint-missing-position, got %+v", res)
+	}
+}
+
+func TestPlanBestRoute_ConnectedUnchanged(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, mid, to := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	lat3, lng3 := 59.62, 16.54
+	row := func(f, tt uuid.UUID, flat, flng, tlat, tlng float64) sqlc.GetRoutePlanGraphRow {
+		return sqlc.GetRoutePlanGraphRow{
+			FromID: f, FromPubkey: f[:], FromType: 2, FromLat: &flat, FromLng: &flng,
+			ToID: tt, ToPubkey: tt[:], ToType: 2, ToLat: &tlat, ToLng: &tlng,
+			ObservationCount: 3,
+			FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+			LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+			EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+			SnrWeightedSum:   24, SnrSampleCount: 3,
+			SnrLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	}
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{
+		row(from, mid, lat, lng, lat2, lng2),
+		row(mid, to, lat2, lng2, lat3, lng3),
+	}, nil)
+	// Both endpoints are in the graph: no metadata fallback lookup.
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 || res.Reason != "" {
+		t.Errorf("connected pair must return one path with no reason, got %+v", res)
+	}
+	if len(res.Paths[0].Nodes) != 3 {
+		t.Errorf("expected 3-node path, got %+v", res.Paths[0])
+	}
+}
+
 func TestExtractFromNode_Found(t *testing.T) {
 	a, b, c := uuid.New(), uuid.New(), uuid.New()
 	hops := []api.RouteHop{

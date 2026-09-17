@@ -32,13 +32,16 @@ func decodeBest(t *testing.T, w *httptest.ResponseRecorder) api.BestRouteResult 
 
 func TestBestRoute_Validation(t *testing.T) {
 	r := bestRouter(stubReader{})
+	short := "aabb" // valid hex but not a full 32-byte public key
 	cases := map[string]int{
-		"/routes/best":                                   http.StatusBadRequest, // missing from/to
-		"/routes/best?from=zz&to=aabb":                   http.StatusBadRequest, // non-hex from
-		"/routes/best?from=aabb&to=zz":                   http.StatusBadRequest, // non-hex to
-		"/routes/best?from=aabb&to=ccdd&alternatives=5":  http.StatusBadRequest, // out of range
-		"/routes/best?from=aabb&to=ccdd&alternatives=no": http.StatusBadRequest,
-		"/routes/best?from=aabb&to=ccdd&alternatives=-1": http.StatusBadRequest,
+		"/routes/best": http.StatusBadRequest, // missing from/to
+		"/routes/best?from=zz&to=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa":                                                                               http.StatusBadRequest, // non-hex from
+		"/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=zz":                                                                               http.StatusBadRequest, // non-hex to
+		"/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc&alternatives=5":  http.StatusBadRequest, // out of range
+		"/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc&alternatives=no": http.StatusBadRequest,
+		"/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc&alternatives=-1": http.StatusBadRequest,
+		"/routes/best?from=" + short + "&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc":                                                                    http.StatusBadRequest, // short from
+		"/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=" + short:                                                                         http.StatusBadRequest, // short to
 	}
 	for target, want := range cases {
 		req := httptest.NewRequest(http.MethodGet, target, nil)
@@ -56,7 +59,7 @@ func TestBestRoute_UnknownFrom404(t *testing.T) {
 			return nil, nil
 		},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aabb&to=ccdd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
@@ -68,13 +71,13 @@ func TestBestRoute_UnknownTo404(t *testing.T) {
 	from := uuid.New()
 	r := bestRouter(stubReader{
 		getNodeIDByPubkey: func(_ context.Context, pubkey []byte) (*uuid.UUID, error) {
-			if len(pubkey) == 2 && pubkey[0] == 0xaa {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
 				return &from, nil
 			}
 			return nil, nil
 		},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aabb&to=ccdd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusNotFound {
@@ -86,7 +89,7 @@ func TestBestRoute_NoRoute200Empty(t *testing.T) {
 	from, to := uuid.New(), uuid.New()
 	r := bestRouter(stubReader{
 		getNodeIDByPubkey: func(_ context.Context, pubkey []byte) (*uuid.UUID, error) {
-			if len(pubkey) == 2 && pubkey[0] == 0xaa {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
 				return &from, nil
 			}
 			return &to, nil
@@ -95,7 +98,7 @@ func TestBestRoute_NoRoute200Empty(t *testing.T) {
 			return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
 		},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aabb&to=ccdd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
@@ -111,7 +114,7 @@ func TestBestRoute_MissingPosition422(t *testing.T) {
 	from, to := uuid.New(), uuid.New()
 	r := bestRouter(stubReader{
 		getNodeIDByPubkey: func(_ context.Context, pubkey []byte) (*uuid.UUID, error) {
-			if len(pubkey) == 2 && pubkey[0] == 0xaa {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
 				return &from, nil
 			}
 			return &to, nil
@@ -120,7 +123,7 @@ func TestBestRoute_MissingPosition422(t *testing.T) {
 			return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "endpoint-missing-position"}, nil
 		},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aabb&to=ccdd", nil)
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusUnprocessableEntity {
@@ -133,7 +136,7 @@ func TestBestRoute_AlternativesCapped(t *testing.T) {
 	var gotAlt int
 	r := bestRouter(stubReader{
 		getNodeIDByPubkey: func(_ context.Context, pubkey []byte) (*uuid.UUID, error) {
-			if len(pubkey) == 2 && pubkey[0] == 0xaa {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
 				return &from, nil
 			}
 			return &to, nil
@@ -143,7 +146,7 @@ func TestBestRoute_AlternativesCapped(t *testing.T) {
 			return api.BestRouteResult{Paths: []api.PlannedRoute{}}, nil
 		},
 	})
-	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aabb&to=ccdd&alternatives=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc&alternatives=0", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {

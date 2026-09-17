@@ -381,12 +381,14 @@ func extractFromNode(hops []api.RouteHop, nodeID uuid.UUID) []api.RouteHop {
 	return hops
 }
 
-// PlanBestRoute dumps the neighbor graph in one query, builds the planning
-// graph, and returns up to 1+maxAlternatives loopless paths, best first.
-// Endpoints are resolved by UUID (the handler maps full pubkeys to IDs); an
-// unlocated endpoint yields Reason "endpoint-missing-position", a pair with no
-// connecting path yields "no-route". Both are 200s with empty Paths, never
-// errors -- the planner UI renders them as states, not failures.
+// PlanBestRoute serves planning requests from the in-memory routing snapshot
+// when one is installed (see SetRouteSnapshot); otherwise it falls back to a
+// single PostgreSQL dump (startup/tests). Endpoints are resolved by UUID (the
+// handler maps full pubkeys to IDs). Endpoint metadata is resolved
+// independently of the neighbor graph, so a known + located but isolated
+// endpoint yields "no-route" (200, empty paths) while a known endpoint
+// without coordinates yields "endpoint-missing-position" (the handler maps
+// that to 422). A pair with no connecting path also yields "no-route".
 func (s *Store) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
 	cfg := s.routePlanOrDefault()
 	if maxAlternatives < 0 {
@@ -398,26 +400,26 @@ func (s *Store) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAl
 	k := 1 + maxAlternatives
 	now := time.Now()
 
+	if snap := s.routeSnapshotOrNil(); snap != nil {
+		return planOnSnapshot(ctx, s, snap, cfg, fromID, toID, k, now)
+	}
+
 	rows, err := s.q.GetRoutePlanGraph(ctx)
 	if err != nil {
 		return api.BestRouteResult{}, err
 	}
 	g := routeplan.BuildGraph(rows, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg), now)
 
-	from, ok := g.Nodes[fromID]
-	if !ok {
+	// Classify endpoints from node metadata, not from graph membership: a
+	// located node with zero neighbor rows never enters g.Nodes but must not
+	// be reported as missing its position.
+	fromLoc, toLoc, err := s.routeEndpointLocations(ctx, fromID, toID, g)
+	if err != nil {
+		return api.BestRouteResult{}, err
+	}
+	if !fromLoc || !toLoc {
 		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "endpoint-missing-position"}, nil
 	}
-	to, ok := g.Nodes[toID]
-	if !ok {
-		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "endpoint-missing-position"}, nil
-	}
-	// An endpoint isolated in the dump isn't necessarily unknown: it may exist
-	// but have no located neighbors at all. The reason stays the same shape for
-	// the UI ("no route"), only the missing-position case is distinguished above
-	// because it is actionable (the node can never be drawn).
-	_ = from
-	_ = to
 
 	paths := routeplan.ShortestPaths(g, cfg.Cost, fromID, toID, k, now)
 	if len(paths) == 0 {
@@ -435,6 +437,39 @@ func (s *Store) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAl
 		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
 	}
 	return api.BestRouteResult{Paths: out}, nil
+}
+
+// routeEndpointLocations reports whether each endpoint is located, resolving
+// metadata independently of the neighbor graph. A node present in the graph
+// is located by construction (BuildGraph drops unlocated rows). A node absent
+// from the graph falls back to a GetNodesByIDs lookup: known + located but
+// isolated still routes to "no-route", while unknown or unlocated yields
+// "endpoint-missing-position".
+func (s *Store) routeEndpointLocations(ctx context.Context, fromID, toID uuid.UUID, g routeplan.Graph) (bool, bool, error) {
+	_, fromInGraph := g.Nodes[fromID]
+	_, toInGraph := g.Nodes[toID]
+	if fromInGraph && toInGraph {
+		return true, true, nil
+	}
+	missing := make([]uuid.UUID, 0, 2)
+	if !fromInGraph {
+		missing = append(missing, fromID)
+	}
+	if !toInGraph && toID != fromID {
+		missing = append(missing, toID)
+	}
+	nodes, err := s.GetNodesByIDs(ctx, missing)
+	if err != nil {
+		return false, false, err
+	}
+	located := func(id uuid.UUID, inGraph bool) bool {
+		if inGraph {
+			return true
+		}
+		n := nodes[id]
+		return n != nil && n.Latitude != nil && n.Longitude != nil
+	}
+	return located(fromID, fromInGraph), located(toID, toInGraph), nil
 }
 
 func (s *Store) staleThresholdOrDefault() time.Duration {

@@ -112,13 +112,13 @@ func bestRoute(reader api.Reader) http.HandlerFunc {
 			return
 		}
 		fromBytes, err := hex.DecodeString(fromHex)
-		if err != nil || len(fromBytes) == 0 {
-			respondError(w, http.StatusBadRequest, "from must be a valid full public key hex string")
+		if err != nil || len(fromBytes) != 32 {
+			respondError(w, http.StatusBadRequest, "from must be a full node public key (64 hex characters)")
 			return
 		}
 		toBytes, err := hex.DecodeString(toHex)
-		if err != nil || len(toBytes) == 0 {
-			respondError(w, http.StatusBadRequest, "to must be a valid full public key hex string")
+		if err != nil || len(toBytes) != 32 {
+			respondError(w, http.StatusBadRequest, "to must be a full node public key (64 hex characters)")
 			return
 		}
 		alternatives := 2

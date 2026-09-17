@@ -28,12 +28,12 @@ type KnownRoute struct {
 type PlannedRouteLeg struct {
 	From             string   `json:"from" binding:"required"` // full node public key, lowercase hex
 	To               string   `json:"to" binding:"required"`   // full node public key, lowercase hex
-	SNR              *float32 `json:"snr,omitempty"`           // merged sample-weighted SNR in dB, nil when unmeasured
+	SNR              *float32 `json:"snr,omitempty"`           // merged sample-weighted SNR in dB: last-known reading, nil when never measured
 	SNRSampleCount   int64    `json:"snrSampleCount" binding:"required"`
 	SNRLastSeen      int64    `json:"snrLastSeen" binding:"required"` // epoch ms, 0 when never measured
 	ObservationCount int64    `json:"observationCount" binding:"required"`
-	Unmeasured       bool     `json:"unmeasured" binding:"required"` // true when no fresh SNR reading backs this leg
-	Neighbor         bool     `json:"neighbor" binding:"required"`   // true when the endpoints explicitly marked each other as neighbors
+	Unmeasured       bool     `json:"unmeasured" binding:"required"` // true when no fresh SNR reading backs this leg; SNR then is a stale last-known value, not current quality
+	Neighbor         bool     `json:"neighbor" binding:"required"`   // true when the reporter explicitly marked the peer as a neighbor (directional, freshly confirmed)
 }
 
 // PlannedRouteNode is a waypoint of a computed best route. ID feeds the

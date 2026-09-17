@@ -118,6 +118,28 @@ func main() {
 		Cost:           routeplan.FromResolved(resolved),
 		StaleThreshold: resolved.NodeStaleThreshold,
 	})
+	// Routing snapshot: PostgreSQL stays the source of truth; steady-state
+	// /routes/best requests plan against this immutable in-memory copy built
+	// once at startup and refreshed periodically (30s bound). A failed
+	// refresh keeps the previous snapshot serving; startup itself fails
+	// closed since no known-good snapshot exists yet.
+	if err := store.RefreshRouteSnapshot(ctx); err != nil {
+		log.Fatalf("initial route snapshot failed: %v", err)
+	}
+	routeRefresh := time.NewTicker(routeplan.DefaultSnapshotRefreshInterval)
+	defer routeRefresh.Stop()
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-routeRefresh.C:
+				if err := store.RefreshRouteSnapshot(ctx); err != nil {
+					log.Printf("routeplan: snapshot refresh failed, serving previous snapshot: %v", err)
+				}
+			}
+		}
+	}()
 
 	// ── MeshCore suggested radio settings (one fetch at startup, fail-open) ──────────────
 	presetCatalogue := radiopreset.Load(ctx, nil)
