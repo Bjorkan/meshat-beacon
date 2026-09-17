@@ -491,7 +491,9 @@ func (s *Store) neighborMaxKmOrDefault(cfg RoutePlanConfig) float64 {
 
 // toPlannedRoute projects one node path onto the API shape. Edges are looked
 // up from the graph (same merged values the cost used); ok=false when a leg
-// vanished, which cannot happen for paths the search just produced.
+// vanished, which cannot happen for paths the search just produced. The
+// neighbor badge uses the same freshness definition as the cost model
+// (IsFreshNeighbor): a stale confirmation earns neither bonus nor badge.
 func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg RoutePlanConfig) (api.PlannedRoute, bool) {
 	nodes := make([]api.PlannedRouteNode, 0, len(p.Nodes))
 	legs := make([]api.PlannedRouteLeg, 0, len(p.Nodes)-1)
@@ -541,12 +543,11 @@ func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg Rout
 			legs = append(legs, api.PlannedRouteLeg{
 				From: n.Pubkey, To: g.Nodes[p.Nodes[i+1]].Pubkey,
 				SNR: snr, SNRSampleCount: snrCount, SNRLastSeen: snrSeen,
-				ObservationCount: found.Observations, Unmeasured: unmeasured, Neighbor: found.Neighbor,
+				ObservationCount: found.Observations, Unmeasured: unmeasured,
+				Neighbor: cfg.Cost.IsFreshNeighbor(*found, now),
 			})
 		}
 	}
-	_ = now
-	_ = cfg
 	return api.PlannedRoute{
 		Nodes: nodes, Legs: legs, TotalCost: p.Cost, HopCount: len(legs),
 		HasUnmeasuredLegs: hasUnmeasured, ContainsStaleNodes: hasStale,

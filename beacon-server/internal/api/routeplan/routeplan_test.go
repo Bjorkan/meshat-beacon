@@ -8,6 +8,7 @@ import (
 	"time"
 
 	db "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
+	"github.com/MeshCore-Beacon/beacon-server/internal/config"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -20,6 +21,7 @@ func testCfg() Config {
 		SNRMaxPenalty:     2.0,
 		NeighborBonus:     0.4,
 		SNRFreshness:      7 * 24 * time.Hour,
+		DirectFreshness:   7 * 24 * time.Hour,
 		MaxHops:           12,
 		MaxAlternatives:   2,
 		MaxDistanceKm:     150,
@@ -114,7 +116,7 @@ func TestLegCost_StaleDirectLosesBonus(t *testing.T) {
 	now := time.Now()
 	// One old direct observation plus fresh overheard traffic: the row stays
 	// alive (last_seen fresh) but the direct confirmation is stale, so the
-	// bonus must stop applying.
+	// bonus must stop applying -- and the shared helper agrees.
 	staleDirect := Edge{
 		Neighbor: true, DirectLastSeen: now.Add(-30 * 24 * time.Hour),
 		SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now,
@@ -125,12 +127,62 @@ func TestLegCost_StaleDirectLosesBonus(t *testing.T) {
 	if sc != oc {
 		t.Errorf("stale direct (%v) must cost the same as overheard (%v)", sc, oc)
 	}
+	if cfg.IsFreshNeighbor(staleDirect, now) {
+		t.Error("stale confirmation must not count as a fresh neighbor")
+	}
 	// A new direct confirmation restores the bonus.
 	fresh := staleDirect
 	fresh.DirectLastSeen = now
 	fc, _ := cfg.LegCost(fresh, now)
 	if fc != 1.0-cfg.NeighborBonus {
 		t.Errorf("fresh direct should cost %v, got %v", 1.0-cfg.NeighborBonus, fc)
+	}
+	if !cfg.IsFreshNeighbor(fresh, now) {
+		t.Error("fresh confirmation must count as a fresh neighbor")
+	}
+}
+
+func TestIsFreshNeighbor_DisabledFreshness(t *testing.T) {
+	// DirectFreshness <= 0 disables the bonus/badge entirely, even with a
+	// brand-new confirmation -- this is what explicit direct_freshness: 0
+	// resolves to end-to-end.
+	cfg := testCfg()
+	cfg.DirectFreshness = 0
+	now := time.Now()
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	if cfg.IsFreshNeighbor(e, now) {
+		t.Error("zero DirectFreshness must never report a fresh neighbor")
+	}
+	c, _ := cfg.LegCost(e, now)
+	if c != 1.0 {
+		t.Errorf("zero DirectFreshness must grant no bonus, got cost %v", c)
+	}
+}
+
+func TestFromResolved_NoDirectFreshnessFallback(t *testing.T) {
+	// routeplan.FromResolved must copy verbatim: an explicit 0 (disabled)
+	// reaches the planner as 0. config.Resolve already maps unset -> SNR
+	// freshness upstream (covered in the config package); here we pin the
+	// planner side with a plain ResolvedConfig literal.
+	r := config.ResolvedConfig{
+		RoutePlanUnmeasuredPenalty: 2.5,
+		RoutePlanSNRGoodDB:         5.0,
+		RoutePlanSNRBadDB:          -15.0,
+		RoutePlanSNRMaxPenalty:     2.0,
+		RoutePlanNeighborBonus:     0.4,
+		RoutePlanSNRFreshness:      7 * 24 * time.Hour,
+		RoutePlanDirectFreshness:   0, // explicit disable
+		RoutePlanMaxHops:           12,
+		RoutePlanMaxAlternatives:   2,
+	}
+	pc := FromResolved(r)
+	if pc.DirectFreshness != 0 {
+		t.Errorf("explicit 0 must reach routeplan.Config as 0, got %v", pc.DirectFreshness)
+	}
+	now := time.Now()
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	if pc.IsFreshNeighbor(e, now) {
+		t.Error("explicit 0 must never grant the neighbor bonus/badge")
 	}
 }
 
@@ -312,6 +364,39 @@ func TestShortestPaths_AllPathsRespectMaxHops(t *testing.T) {
 	for _, p := range ShortestPaths(g, cfg, a, e, 5, now) {
 		if len(p.Nodes)-1 > cfg.MaxHops {
 			t.Errorf("path exceeds MaxHops: %d hops", len(p.Nodes)-1)
+		}
+	}
+}
+
+func TestShortestPaths_ZeroMaxHopsUsesDefaultEverywhere(t *testing.T) {
+	// A programmatic zero Config must behave as the default bound (12) in
+	// ALL three places: first search, spur remaining budget, combined guard.
+	// Previously the first search used 12 while the guard compared against
+	// raw 0, rejecting every non-zero-hop Yen alternative.
+	cfg := testCfg()
+	cfg.MaxHops = 0
+	now := time.Now()
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	strong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {strong(a, b), strong(a, c)},
+			b: {strong(b, c)},
+		},
+	}
+	paths := ShortestPaths(g, cfg, a, c, 2, now)
+	if len(paths) != 2 {
+		t.Fatalf("zero MaxHops must act as default bound with k=2, got %d paths", len(paths))
+	}
+	for _, p := range paths {
+		if len(p.Nodes)-1 > DefaultMaxHopsFallback {
+			t.Errorf("path exceeds default bound: %v", p.Nodes)
 		}
 	}
 }

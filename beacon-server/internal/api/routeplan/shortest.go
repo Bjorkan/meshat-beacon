@@ -53,8 +53,10 @@ type bans struct {
 
 // ShortestPaths returns up to k loopless shortest paths from src to dst
 // (Yen's algorithm over Dijkstra), best first. Mid-nodes must be
-// repeaters/room servers; endpoints may be any type. Paths longer than
-// cfg.MaxHops edges are discarded. now anchors the SNR freshness check.
+// repeaters/room servers; endpoints may be any type. The effective hop bound
+// is computed once from cfg and used for the first search, every spur
+// search's remaining budget, and the combined-length guard, so all three
+// always agree. now anchors the SNR freshness check.
 func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time) []Path {
 	if k <= 0 {
 		return nil
@@ -65,7 +67,8 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 	if _, ok := g.Nodes[dst]; !ok {
 		return nil
 	}
-	first := dijkstra(g, cfg, src, dst, nil, now, maxHopsOrUnbounded(cfg.MaxHops))
+	maxHops := maxHopsOrDefault(cfg.MaxHops)
+	first := dijkstra(g, cfg, src, dst, nil, now, maxHops)
 	if first == nil {
 		return nil
 	}
@@ -78,7 +81,7 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 			spur := prev.Nodes[i]
 			root := append([]uuid.UUID(nil), prev.Nodes[:i+1]...)
 			rootHops := len(root) - 1
-			remaining := maxHopsOrUnbounded(cfg.MaxHops) - rootHops
+			remaining := maxHops - rootHops
 			if remaining < 0 {
 				continue
 			}
@@ -103,8 +106,8 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 			if hasLoop(combined) {
 				continue
 			}
-			// Defensive combined-length guard (bounded configs only).
-			if isBounded(cfg.MaxHops) && len(combined)-1 > cfg.MaxHops {
+			// Defensive combined-length guard against the same bound.
+			if len(combined)-1 > maxHops {
 				continue
 			}
 			key := pathKey(combined)
@@ -218,20 +221,17 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time, m
 // DefaultMaxHopsFallback guards a zero Config (tests that only set weights).
 const DefaultMaxHopsFallback = 12
 
-// maxHopsOrUnbounded maps Config.MaxHops onto dijkstra's explicit limit:
-// positive values bound, zero (unset) falls back to the default, and there
-// is no unbounded config value -- the planner always bounds.
-func maxHopsOrUnbounded(configured int) int {
+// maxHopsOrDefault maps Config.MaxHops onto the single effective bound used
+// for the first search, every spur search's remaining budget, and the
+// combined-length guard: positive values bound, zero (unset) falls back to
+// the default. Negative is treated as the default too (config validation
+// rejects negatives; this keeps programmatic misuse bounded rather than
+// silently unbounded -- the planner always bounds).
+func maxHopsOrDefault(configured int) int {
 	if configured <= 0 {
 		return DefaultMaxHopsFallback
 	}
 	return configured
-}
-
-// isBounded reports whether the configured MaxHops enforces a limit (always
-// true: zero means the default bound, never unbounded).
-func isBounded(configured int) bool {
-	return configured >= 0
 }
 
 func pathCost(g Graph, cfg Config, nodes []uuid.UUID, now time.Time) (float64, []bool) {

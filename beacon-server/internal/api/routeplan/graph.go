@@ -58,8 +58,9 @@ type Config struct {
 	NeighborBonus     float64 // discount for explicitly marked neighbor legs (see package doc)
 	SNRFreshness      time.Duration
 	// DirectFreshness bounds how old a direct confirmation (direct_last_seen)
-	// may be before the neighbor bonus stops applying. Defaults to
-	// SNRFreshness/the neighbor retention window when zero.
+	// may be before the neighbor bonus/badge stops applying. Resolve defaults
+	// unset to SNRFreshness; an explicit 0 disables the bonus (see
+	// IsFreshNeighbor: DirectFreshness <= 0 is never fresh).
 	DirectFreshness time.Duration
 	MaxHops         int
 	MaxAlternatives int
@@ -67,11 +68,11 @@ type Config struct {
 }
 
 // FromResolved maps the resolved server config onto the planner cost model.
+// RoutePlanDirectFreshness is copied verbatim WITHOUT a zero fallback: nil
+// (unset) already resolved to SNRFreshness in config.Resolve, while an
+// explicit 0 means disabled and must reach the planner as 0 (see
+// IsFreshNeighbor: DirectFreshness <= 0 grants no bonus).
 func FromResolved(r config.ResolvedConfig) Config {
-	directFresh := r.RoutePlanDirectFreshness
-	if directFresh == 0 {
-		directFresh = r.RoutePlanSNRFreshness
-	}
 	return Config{
 		UnmeasuredPenalty: r.RoutePlanUnmeasuredPenalty,
 		SNRGoodDB:         r.RoutePlanSNRGoodDB,
@@ -79,7 +80,7 @@ func FromResolved(r config.ResolvedConfig) Config {
 		SNRMaxPenalty:     r.RoutePlanSNRMaxPenalty,
 		NeighborBonus:     r.RoutePlanNeighborBonus,
 		SNRFreshness:      r.RoutePlanSNRFreshness,
-		DirectFreshness:   directFresh,
+		DirectFreshness:   r.RoutePlanDirectFreshness,
 		MaxHops:           r.RoutePlanMaxHops,
 		MaxAlternatives:   r.RoutePlanMaxAlternatives,
 		MaxDistanceKm:     r.NeighborMaxKm,
@@ -122,23 +123,31 @@ type Graph struct {
 	Edges map[uuid.UUID][]Edge // adjacency by source node
 }
 
+// IsFreshNeighbor is the single shared definition of "fresh direct neighbor"
+// used by both route cost (LegCost) and API projection (toPlannedRoute): the
+// edge must be explicitly marked AND its confirmation must be within
+// DirectFreshness. DirectFreshness <= 0 means no confirmation is ever fresh,
+// i.e. the bonus/badge is disabled. now anchors the check so tests pin time.
+func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
+	if !e.Neighbor || c.NeighborBonus <= 0 || e.DirectLastSeen.IsZero() {
+		return false
+	}
+	if c.DirectFreshness <= 0 {
+		return false
+	}
+	return now.Sub(e.DirectLastSeen) <= c.DirectFreshness
+}
+
 // LegCost returns the cost of traversing e plus whether the leg counts as
-// unmeasured (no fresh SNR reading backs it). A leg earns the configured
-// neighbor bonus only when explicitly marked AND freshly confirmed
-// (DirectLastSeen within DirectFreshness, falling back to SNRFreshness when
-// unset); the cost is floored at a small epsilon above zero so costs stay
-// positive for Dijkstra. now anchors the freshness checks so tests can pin time.
+// unmeasured (no fresh SNR reading backs it). A freshly-confirmed neighbor
+// leg (see IsFreshNeighbor) earns the configured bonus; the cost is floored
+// at a small epsilon above zero so costs stay positive for Dijkstra. now
+// anchors the freshness checks so tests can pin time.
 func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	const base = 1.0
 	bonus := 0.0
-	if e.Neighbor && c.NeighborBonus > 0 {
-		fresh := c.DirectFreshness
-		if fresh == 0 {
-			fresh = c.SNRFreshness
-		}
-		if !e.DirectLastSeen.IsZero() && now.Sub(e.DirectLastSeen) <= fresh {
-			bonus = c.NeighborBonus
-		}
+	if c.IsFreshNeighbor(e, now) {
+		bonus = c.NeighborBonus
 	}
 	if e.SNR == nil || e.SNRSampleCount == 0 || now.Sub(e.SNRLastSeen) > c.SNRFreshness {
 		return base + c.UnmeasuredPenalty - bonus, true

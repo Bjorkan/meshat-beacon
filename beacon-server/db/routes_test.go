@@ -123,6 +123,52 @@ func TestPlanBestRoute_UnlocatedEndpointIsMissingPosition(t *testing.T) {
 	}
 }
 
+func TestPlanBestRoute_StaleDirectGrantsNoBonusOrBadge(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	// Neighbor=true but DirectLastSeen 30d old (freshness window is 7d):
+	// the shared IsFreshNeighbor definition must deny both bonus and badge.
+	stale := now.Add(-30 * 24 * time.Hour)
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{{
+		FromID: from, FromPubkey: from[:], FromType: 2, FromLat: &lat, FromLng: &lng,
+		ToID: to, ToPubkey: to[:], ToType: 2, ToLat: &lat2, ToLng: &lng2,
+		ObservationCount: 5,
+		FirstSeen:        pgtype.Timestamptz{Time: stale, Valid: true},
+		LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+		EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+		SnrWeightedSum:   40, SnrSampleCount: 5,
+		SnrLastSeen:    pgtype.Timestamptz{Time: now, Valid: true},
+		Direct:         true,
+		DirectLastSeen: pgtype.Timestamptz{Time: stale, Valid: true},
+	}}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 {
+		t.Fatalf("expected 1 path, got %+v", res)
+	}
+	leg := res.Paths[0].Legs[0]
+	if leg.Neighbor {
+		t.Error("stale direct confirmation must not set leg.neighbor=true")
+	}
+	// Strong measured SNR (8dB mean) with no bonus costs exactly base 1.0.
+	if res.Paths[0].TotalCost != 1.0 {
+		t.Errorf("stale direct must grant no bonus (cost 1.0), got %v", res.Paths[0].TotalCost)
+	}
+}
+
 func TestPlanBestRoute_ConnectedUnchanged(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

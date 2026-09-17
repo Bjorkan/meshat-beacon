@@ -641,8 +641,11 @@ func Resolve(cfg *Config) ResolvedConfig {
 	}
 	// RoutePlanDirectFreshness defaults to the SNR freshness (the neighbor
 	// retention window) when unset; an explicit value -- including 0, which
-	// disables the bonus -- is honored. graph.FromResolved applies the same
-	// fallback for configs built programmatically.
+	// disables the bonus -- is honored. Note this defaulting happens here in
+	// Resolve (nil -> copy SNR freshness), so FromResolved must copy the
+	// resolved value WITHOUT a fallback: an explicit 0 reaches the planner
+	// as 0 and LegCost/IsFreshNeighbor treat DirectFreshness <= 0 as
+	// "no confirmation is ever fresh".
 	if cfg.RoutePlan.DirectFreshness == nil {
 		r.RoutePlanDirectFreshness = r.RoutePlanSNRFreshness
 	}

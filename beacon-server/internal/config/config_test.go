@@ -202,6 +202,8 @@ func TestResolve_RoutePlanDefaults(t *testing.T) {
 func fptr(v float64) *float64 { return &v }
 func iptr(v int) *int         { return &v }
 
+func dptr(d time.Duration) *duration { return &duration{Duration: d} }
+
 func TestRoutePlanConfig_Validate(t *testing.T) {
 	good := RoutePlanConfig{
 		UnmeasuredPenalty: fptr(2.5), SNRGoodDB: fptr(5.0), SNRBadDB: fptr(-15.0), SNRMaxPenalty: fptr(2.0),
@@ -306,6 +308,39 @@ func TestResolve_RoutePlanDirectFreshnessDefault(t *testing.T) {
 	if r.RoutePlanDirectFreshness != r.RoutePlanSNRFreshness {
 		t.Errorf("direct freshness should default to SNR freshness, got %v vs %v",
 			r.RoutePlanDirectFreshness, r.RoutePlanSNRFreshness)
+	}
+}
+
+func TestResolve_RoutePlanDirectFreshnessExplicitZero(t *testing.T) {
+	// Explicit 0 is distinct from unset: it disables the fresh-direct
+	// bonus/badge instead of falling back to SNR freshness. Resolve keeps
+	// the 0; the no-fallback copy in routeplan.FromResolved is covered by
+	// TestIsFreshNeighbor_DisabledFreshness on the planner side (config
+	// cannot import routeplan: import cycle).
+	cfg := &Config{}
+	cfg.RoutePlan.DirectFreshness = dptr(0)
+	r := Resolve(cfg)
+	if r.RoutePlanDirectFreshness != 0 {
+		t.Fatalf("explicit direct_freshness 0 resolved to %v", r.RoutePlanDirectFreshness)
+	}
+	if err := ValidateResolved(r); err != nil {
+		t.Fatalf("explicit-zero direct freshness should validate, got %v", err)
+	}
+}
+
+func TestLoad_RoutePlanDirectFreshnessZero(t *testing.T) {
+	// End-to-end through YAML: direct_freshness: 0s disables the bonus.
+	path := t.TempDir() + "/config.yaml"
+	if err := os.WriteFile(path, []byte("routeplan:\n  direct_freshness: 0s\n"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	r := Resolve(cfg)
+	if r.RoutePlanDirectFreshness != 0 {
+		t.Fatalf("YAML direct_freshness: 0s resolved to %v", r.RoutePlanDirectFreshness)
 	}
 }
 
