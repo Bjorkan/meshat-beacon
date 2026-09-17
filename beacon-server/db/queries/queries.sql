@@ -1340,7 +1340,17 @@ SELECT
     (SELECT p3.parsed_payload
      FROM packets p3
      WHERE p3.trace_tag = t.trace_tag
-     ORDER BY jsonb_array_length(p3.parsed_payload->'pathHashes') DESC
+     ORDER BY COALESCE(jsonb_array_length(p3.parsed_payload->'pathHashes'), 0) DESC,
+         (SELECT COUNT(*)
+          FROM jsonb_array_elements(
+              CASE WHEN jsonb_typeof(p3.parsed_payload->'snrValues') = 'array'
+                   THEN p3.parsed_payload->'snrValues' ELSE '[]'::jsonb END
+          ) WITH ORDINALITY AS snr(value, position)
+          WHERE snr.position > 1
+            AND snr.position <= jsonb_array_length(p3.parsed_payload->'pathHashes')
+            AND jsonb_typeof(snr.value) = 'number') DESC,
+         p3.last_heard_at DESC,
+         p3.packet_hash ASC
      LIMIT 1) AS best_payload
 FROM tags t
 ORDER BY t.last_heard_at DESC;
