@@ -87,9 +87,9 @@ export type PagePacketSummary = { hasMore: boolean; items: Array<PacketSummary>;
 
 export type PayloadBreakdownItem = { count: number; payloadType: number; payloadTypeName: string; };
 
-export type PlannedRoute = { containsStaleNodes: boolean; hasUnmeasuredLegs: boolean; hopCount: number; legs: Array<PlannedRouteLeg>; nodes: Array<PlannedRouteNode>; totalCost: number; };
+export type PlannedRoute = { containsStaleNodes: boolean; hasUnmeasuredLegs: boolean; hasUnseenLegs: boolean; hopCount: number; legs: Array<PlannedRouteLeg>; nodes: Array<PlannedRouteNode>; totalCost: number; };
 
-export type PlannedRouteLeg = { from: string; neighbor: boolean; observationCount: number; snr?: number; snrLastSeen: number; snrSampleCount: number; to: string; unmeasured: boolean; };
+export type PlannedRouteLeg = { from: string; neighbor: boolean; observationCount: number; snr?: number; snrLastSeen: number; snrSampleCount: number; to: string; unmeasured: boolean; unseen: boolean; };
 
 export type PlannedRouteNode = { id: string; latitude?: number; longitude?: number; name?: string; nodeType: number; nodeTypeName: string; publicKey: string; stale: boolean; supportsMultibytePaths: boolean; };
 

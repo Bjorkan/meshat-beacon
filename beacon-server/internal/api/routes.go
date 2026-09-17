@@ -34,6 +34,11 @@ type PlannedRouteLeg struct {
 	ObservationCount int64    `json:"observationCount" binding:"required"`
 	Unmeasured       bool     `json:"unmeasured" binding:"required"` // true when no fresh SNR reading backs this leg; SNR then is a stale last-known value, not current quality
 	Neighbor         bool     `json:"neighbor" binding:"required"`   // true when the reporter explicitly marked the peer as a neighbor (directional, freshly confirmed)
+	// Unseen is true when no packet was ever observed crossing this hop in
+	// this direction: topologically possible but unproven ("unconfirmed
+	// possible" in the UI). The leg pays a large extra penalty, so any
+	// route avoiding it wins unless no alternative exists.
+	Unseen bool `json:"unseen" binding:"required"`
 }
 
 // PlannedRouteNode is a waypoint of a computed best route. ID feeds the
@@ -65,6 +70,7 @@ type PlannedRoute struct {
 	TotalCost          float64            `json:"totalCost" binding:"required"`
 	HopCount           int                `json:"hopCount" binding:"required"`
 	HasUnmeasuredLegs  bool               `json:"hasUnmeasuredLegs" binding:"required"`
+	HasUnseenLegs      bool               `json:"hasUnseenLegs" binding:"required"` // true when any leg was never observed carrying traffic in its direction
 	ContainsStaleNodes bool               `json:"containsStaleNodes" binding:"required"`
 }
 

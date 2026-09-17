@@ -260,6 +260,57 @@ func TestPlanBestRoute_ConnectedUnchanged(t *testing.T) {
 	}
 }
 
+func TestPlanBestRoute_FlagsUnseenLeg(t *testing.T) {
+	// A directed edge with observation_count == 0 is topologically possible
+	// but never proven: the leg pays the unseen penalty and both the leg
+	// and the route carry the flag for the UI ("unconfirmed possible").
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, to := uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Return([]sqlc.GetRoutePlanGraphRow{{
+		FromID: from, FromPubkey: from[:], FromType: 2, FromLat: &lat, FromLng: &lng,
+		ToID: to, ToPubkey: to[:], ToType: 2, ToLat: &lat2, ToLng: &lng2,
+		ObservationCount: 0,
+		FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+		LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+		EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+		ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+		SnrWeightedSum:   40, SnrSampleCount: 5,
+		SnrLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+	}}, nil)
+
+	res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(res.Paths) != 1 {
+		t.Fatalf("expected 1 path (unseen hop still usable), got %+v", res)
+	}
+	leg := res.Paths[0].Legs[0]
+	if !leg.Unseen {
+		t.Error("zero-observation leg must set leg.unseen=true")
+	}
+	if leg.ObservationCount != 0 {
+		t.Errorf("leg must carry observationCount 0, got %d", leg.ObservationCount)
+	}
+	if !res.Paths[0].HasUnseenLegs {
+		t.Error("route with an unseen leg must set hasUnseenLegs=true")
+	}
+	cfg := DefaultRoutePlanConfig()
+	want := cfg.Cost.SNRStrongCap + cfg.Cost.UnseenPenalty
+	if res.Paths[0].TotalCost != want {
+		t.Errorf("unseen strong leg should cost cap+penalty=%v, got %v", want, res.Paths[0].TotalCost)
+	}
+}
+
 func TestPlanBestRoute_SnapshotServesWithoutPerRequestAggregate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()

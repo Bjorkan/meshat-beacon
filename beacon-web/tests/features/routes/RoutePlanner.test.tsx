@@ -79,12 +79,14 @@ function bestResult(): BestRouteResult {
             snrLastSeen: 1,
             observationCount: 5,
             unmeasured: false,
+            unseen: false,
             neighbor: true,
           },
         ],
         totalCost: 1,
         hopCount: 1,
         hasUnmeasuredLegs: false,
+        hasUnseenLegs: false,
         containsStaleNodes: false,
       },
       {
@@ -128,21 +130,24 @@ function bestResult(): BestRouteResult {
             snrSampleCount: 0,
             snrLastSeen: 0,
             unmeasured: true,
+            unseen: false,
             neighbor: false,
           },
           {
             from: 'cd'.padEnd(64, '0'),
             to: TO,
-            observationCount: 2,
+            observationCount: 0,
             snrSampleCount: 0,
             snrLastSeen: 0,
             unmeasured: true,
+            unseen: true,
             neighbor: false,
           },
         ],
         totalCost: 7,
         hopCount: 2,
         hasUnmeasuredLegs: true,
+        hasUnseenLegs: true,
         containsStaleNodes: false,
       },
     ],
@@ -263,6 +268,8 @@ describe('RoutePlanner', () => {
     // unmeasured legs carry the badge; the marked neighbor leg carries its own
     expect(screen.getAllByText('Unmeasured').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Neighbor').length).toBeGreaterThan(0);
+    // the zero-observation leg is flagged unseen at leg level and route level
+    expect(screen.getAllByText('Unconfirmed possible').length).toBeGreaterThan(0);
     expect(screen.getByTestId('route-map-stub').textContent).toContain('active:0');
   });
 

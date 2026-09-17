@@ -200,6 +200,9 @@ func TestResolve_RoutePlanDefaults(t *testing.T) {
 	if r.RoutePlanUnmeasuredFloor != DefaultRoutePlanUnmeasuredFloor {
 		t.Errorf("RoutePlanUnmeasuredFloor = %v, want %v", r.RoutePlanUnmeasuredFloor, DefaultRoutePlanUnmeasuredFloor)
 	}
+	if r.RoutePlanUnseenPenalty != DefaultRoutePlanUnseenPenalty {
+		t.Errorf("RoutePlanUnseenPenalty = %v, want %v", r.RoutePlanUnseenPenalty, DefaultRoutePlanUnseenPenalty)
+	}
 	if r.RoutePlanNeighborBonus != DefaultRoutePlanNeighborBonus {
 		t.Errorf("RoutePlanNeighborBonus = %v, want %v", r.RoutePlanNeighborBonus, DefaultRoutePlanNeighborBonus)
 	}
@@ -251,6 +254,7 @@ func TestRoutePlanConfig_Validate(t *testing.T) {
 		"degenerate full":    func(c *RoutePlanConfig) { c.TrafficFullCount = fptr(0.5) },
 		"share out of range": func(c *RoutePlanConfig) { c.TrafficMeasuredShare = fptr(1.5) },
 		"negative floor":     func(c *RoutePlanConfig) { c.UnmeasuredFloor = fptr(-0.1) },
+		"negative unseen":    func(c *RoutePlanConfig) { c.UnseenPenalty = fptr(-1) },
 	} {
 		bad := good
 		mutate(&bad)

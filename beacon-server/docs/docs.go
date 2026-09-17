@@ -1630,7 +1630,7 @@ const docTemplate = `{
         },
         "/routes/best": {
             "get": {
-                "description": "Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with strong signal and unambiguously proven traffic history (exact identity or 2+ byte hashes resolving to one node; 1-byte evidence never discounts). Unmeasured legs pay a configured penalty discounted by passed-packet evidence but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
+                "description": "Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with strong signal and unambiguously proven traffic history (exact identity or 2+ byte hashes resolving to one node; 1-byte evidence never discounts). A hop no packet ever crossed in its direction pays a large extra penalty and is flagged unseen (\"unconfirmed possible\"). Unmeasured legs pay a configured penalty discounted by passed-packet evidence but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
                 "produces": [
                     "application/json"
                 ],
@@ -4265,6 +4265,7 @@ const docTemplate = `{
             "required": [
                 "containsStaleNodes",
                 "hasUnmeasuredLegs",
+                "hasUnseenLegs",
                 "hopCount",
                 "legs",
                 "nodes",
@@ -4275,6 +4276,10 @@ const docTemplate = `{
                     "type": "boolean"
                 },
                 "hasUnmeasuredLegs": {
+                    "type": "boolean"
+                },
+                "hasUnseenLegs": {
+                    "description": "true when any leg was never observed carrying traffic in its direction",
                     "type": "boolean"
                 },
                 "hopCount": {
@@ -4306,7 +4311,8 @@ const docTemplate = `{
                 "snrLastSeen",
                 "snrSampleCount",
                 "to",
-                "unmeasured"
+                "unmeasured",
+                "unseen"
             ],
             "properties": {
                 "from": {
@@ -4337,6 +4343,10 @@ const docTemplate = `{
                 },
                 "unmeasured": {
                     "description": "true when no fresh SNR reading backs this leg; SNR then is a stale last-known value, not current quality",
+                    "type": "boolean"
+                },
+                "unseen": {
+                    "description": "Unseen is true when no packet was ever observed crossing this hop in\nthis direction: topologically possible but unproven (\"unconfirmed\npossible\" in the UI). The leg pays a large extra penalty, so any\nroute avoiding it wins unless no alternative exists.",
                     "type": "boolean"
                 }
             }

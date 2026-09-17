@@ -494,10 +494,13 @@ func (s *Store) neighborMaxKmOrDefault(cfg RoutePlanConfig) float64 {
 // vanished, which cannot happen for paths the search just produced. The
 // neighbor badge uses the same freshness definition as the cost model
 // (IsFreshNeighbor): a stale confirmation earns neither bonus nor badge.
+// The unseen flag comes from the same merged edge the cost used
+// (Edge.Unseen): a leg no packet ever crossed in its direction.
 func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg RoutePlanConfig) (api.PlannedRoute, bool) {
 	nodes := make([]api.PlannedRouteNode, 0, len(p.Nodes))
 	legs := make([]api.PlannedRouteLeg, 0, len(p.Nodes)-1)
 	hasUnmeasured := false
+	hasUnseen := false
 	hasStale := false
 	for i, id := range p.Nodes {
 		n, ok := g.Nodes[id]
@@ -541,17 +544,22 @@ func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg Rout
 			if unmeasured {
 				hasUnmeasured = true
 			}
+			unseen := i < len(p.Unseen) && p.Unseen[i]
+			if unseen {
+				hasUnseen = true
+			}
 			legs = append(legs, api.PlannedRouteLeg{
 				From: n.Pubkey, To: g.Nodes[p.Nodes[i+1]].Pubkey,
 				SNR: snr, SNRSampleCount: snrCount, SNRLastSeen: snrSeen,
 				ObservationCount: found.Observations, Unmeasured: unmeasured,
 				Neighbor: cfg.Cost.IsFreshNeighbor(*found, now),
+				Unseen:   unseen,
 			})
 		}
 	}
 	return api.PlannedRoute{
 		Nodes: nodes, Legs: legs, TotalCost: p.Cost, HopCount: len(legs),
-		HasUnmeasuredLegs: hasUnmeasured, ContainsStaleNodes: hasStale,
+		HasUnmeasuredLegs: hasUnmeasured, HasUnseenLegs: hasUnseen, ContainsStaleNodes: hasStale,
 	}, true
 }
 

@@ -18,6 +18,11 @@ type Path struct {
 	// fresh SNR reading. Carried alongside so callers never recompute cost
 	// semantics from raw edges.
 	Unmeasured []bool
+	// Unseen[i] reports whether leg i (Nodes[i] -> Nodes[i+1]) was never
+	// observed carrying a packet in that direction (see Edge.Unseen):
+	// topologically possible but unproven ("unconfirmed possible" in the
+	// UI). Carried alongside for the same reason as Unmeasured.
+	Unseen []bool
 }
 
 type dijkstraItem struct {
@@ -117,8 +122,8 @@ func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time
 				continue
 			}
 			seen[key] = true
-			cost, unmeasured := pathCost(g, cfg, combined, now)
-			heap.Push(candidates, &pathItem{path: Path{Nodes: combined, Cost: cost, Unmeasured: unmeasured}})
+			cost, unmeasured, unseen := pathCost(g, cfg, combined, now)
+			heap.Push(candidates, &pathItem{path: Path{Nodes: combined, Cost: cost, Unmeasured: unmeasured, Unseen: unseen}})
 		}
 		if candidates.Len() == 0 {
 			break
@@ -157,6 +162,7 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time, m
 	dist := map[state]float64{{node: src, hops: 0}: 0}
 	prev := map[state]state{}
 	prevUnmeasured := map[state]bool{}
+	prevUnseen := map[state]bool{}
 	pq := &dijkstraPQ{&dijkstraItem{node: src, hops: 0, cost: 0}}
 	heap.Init(pq)
 	visited := map[state]bool{}
@@ -203,6 +209,7 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time, m
 			dist[ns] = nc
 			prev[ns] = s
 			prevUnmeasured[ns] = unmeasured
+			prevUnseen[ns] = e.Unseen()
 			heap.Push(pq, &dijkstraItem{node: v, hops: ns.hops, cost: nc})
 		}
 	}
@@ -212,16 +219,18 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time, m
 	// walk back through (node, hops) states
 	nodes := []uuid.UUID{dst}
 	flags := []bool{}
+	unseen := []bool{}
 	for cur := *best; !(cur.node == src && cur.hops == 0); {
 		p, ok := prev[cur]
 		if !ok {
 			return nil
 		}
 		flags = append([]bool{prevUnmeasured[cur]}, flags...)
+		unseen = append([]bool{prevUnseen[cur]}, unseen...)
 		nodes = append([]uuid.UUID{p.node}, nodes...)
 		cur = p
 	}
-	return &Path{Nodes: nodes, Cost: bestCost, Unmeasured: flags}
+	return &Path{Nodes: nodes, Cost: bestCost, Unmeasured: flags, Unseen: unseen}
 }
 
 // DefaultMaxHopsFallback guards a zero Config (tests that only set weights).
@@ -240,9 +249,10 @@ func maxHopsOrDefault(configured int) int {
 	return configured
 }
 
-func pathCost(g Graph, cfg Config, nodes []uuid.UUID, now time.Time) (float64, []bool) {
+func pathCost(g Graph, cfg Config, nodes []uuid.UUID, now time.Time) (float64, []bool, []bool) {
 	var total float64
 	flags := make([]bool, 0, len(nodes)-1)
+	unseen := make([]bool, 0, len(nodes)-1)
 	for i := 0; i+1 < len(nodes); i++ {
 		found := false
 		for _, e := range g.Edges[nodes[i]] {
@@ -250,15 +260,17 @@ func pathCost(g Graph, cfg Config, nodes []uuid.UUID, now time.Time) (float64, [
 				c, u := cfg.LegCost(e, now)
 				total += c
 				flags = append(flags, u)
+				unseen = append(unseen, e.Unseen())
 				found = true
 				break
 			}
 		}
 		if !found {
 			flags = append(flags, true)
+			unseen = append(unseen, true)
 		}
 	}
-	return total, flags
+	return total, flags, unseen
 }
 
 func equalPrefix(p, prefix []uuid.UUID) bool {

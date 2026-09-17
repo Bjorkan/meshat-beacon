@@ -334,6 +334,8 @@
     "via": "via {{nodes}}",
     "unmeasuredLeg": "Unmeasured",
     "unmeasuredHint": "Legs without a fresh signal reading cost extra but are still used.",
+    "unseenLeg": "Unconfirmed possible",
+    "unseenHint": "No packet was ever seen taking this hop in this direction — topologically possible but unproven, so the route prefers confirmed hops.",
     "staleNode": "Stale",
     "noRoute": "No route found between these nodes.",
     "pickBoth": "Pick a from-node and a to-node to plan a route.",

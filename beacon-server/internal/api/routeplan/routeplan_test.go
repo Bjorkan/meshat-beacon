@@ -27,6 +27,7 @@ func testCfg() Config {
 		TrafficFullCount:     1000.0,
 		TrafficMeasuredShare: 0.125,
 		UnmeasuredFloor:      0.4,
+		UnseenPenalty:        8.0,
 		NeighborBonus:        0.4,
 		SNRFreshness:         7 * 24 * time.Hour,
 		DirectFreshness:      7 * 24 * time.Hour,
@@ -56,8 +57,8 @@ func ts(t time.Time) pgtype.Timestamptz {
 func TestLegCost_MeasuredBeatsUnmeasured(t *testing.T) {
 	cfg := testCfg()
 	now := time.Now()
-	measured := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-time.Hour)}
-	unmeasured := Edge{}
+	measured := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-time.Hour), Observations: 1}
+	unmeasured := Edge{Observations: 1}
 	mc, mu := cfg.LegCost(measured, now)
 	uc, uu := cfg.LegCost(unmeasured, now)
 	if mu || !uu {
@@ -77,7 +78,7 @@ func TestLegCost_MeasuredBeatsUnmeasured(t *testing.T) {
 func TestLegCost_StaleCountsAsUnmeasured(t *testing.T) {
 	cfg := testCfg()
 	now := time.Now()
-	stale := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-30 * 24 * time.Hour)}
+	stale := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-30 * 24 * time.Hour), Observations: 1}
 	c, u := cfg.LegCost(stale, now)
 	if !u {
 		t.Error("stale SNR should count as unmeasured")
@@ -93,20 +94,20 @@ func TestLegCost_Interpolation(t *testing.T) {
 	// Kink at 0 dB: positive readings degrade gently (cap 0.25 -> 0.6875
 	// at zero), negative readings degrade faster (0.6875 -> max 2.0).
 	// zeroPenalty = 0.25 + 1.75 * (5/20) = 0.6875.
-	mid := Edge{SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now}
+	mid := Edge{SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, Observations: 1}
 	c, u := cfg.LegCost(mid, now)
 	// frac = 5/15 below zero: 0.6875 + (5/15)*(2.0-0.6875) = 1.125
 	if u || c != 1.125 {
 		t.Errorf("mid SNR should cost 1.125 measured, got %v unmeasured=%v", c, u)
 	}
-	pos := Edge{SNR: f32(3), SNRSampleCount: 2, SNRLastSeen: now}
+	pos := Edge{SNR: f32(3), SNRSampleCount: 2, SNRLastSeen: now, Observations: 1}
 	pc, _ := cfg.LegCost(pos, now)
 	// frac = (5-3)/5 above zero: 0.25 + 0.4*(0.6875-0.25) = 0.425
 	// (float64 arithmetic: compare with tolerance, not ==).
 	if math.Abs(pc-0.425) > 1e-9 {
 		t.Errorf("+3 dB should cost 0.425, got %v", pc)
 	}
-	worst := Edge{SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now}
+	worst := Edge{SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, Observations: 1}
 	wc, _ := cfg.LegCost(worst, now)
 	if wc != cfg.SNRMaxPenalty {
 		t.Errorf("worst SNR should cap at maxPenalty %v, got %v", cfg.SNRMaxPenalty, wc)
@@ -118,7 +119,9 @@ func TestLegCost_SubZeroCostsMorePerDB(t *testing.T) {
 	// step down while still positive. +1 -> 0 must be cheaper than 0 -> -1.
 	cfg := testCfgNoTraffic()
 	now := time.Now()
-	mk := func(snr float32) Edge { return Edge{SNR: f32(snr), SNRSampleCount: 2, SNRLastSeen: now} }
+	mk := func(snr float32) Edge {
+		return Edge{SNR: f32(snr), SNRSampleCount: 2, SNRLastSeen: now, Observations: 1}
+	}
 	cPos1, _ := cfg.LegCost(mk(1), now)
 	cZero, _ := cfg.LegCost(mk(0), now)
 	cNeg1, _ := cfg.LegCost(mk(-1), now)
@@ -133,8 +136,8 @@ func TestLegCost_NeighborBonusBeatsOverheard(t *testing.T) {
 	// Same WEAK reading (so the strong cap does not swallow the bonus):
 	// the explicitly marked neighbor leg must win. (A fresh direct
 	// confirmation is required for the bonus.)
-	marked := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
-	overheard := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+	marked := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
+	overheard := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	mc, mu := cfg.LegCost(marked, now)
 	oc, ou := cfg.LegCost(overheard, now)
 	if mu || ou {
@@ -146,8 +149,8 @@ func TestLegCost_NeighborBonusBeatsOverheard(t *testing.T) {
 	// ...but the bonus must never promote a SPECULATIVE unmeasured leg
 	// above a measured one (proven unmeasured legs may win: that is the
 	// traffic-evidence feature, covered separately).
-	unmarkedWorst := Edge{SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now}
-	markedUnmeasured := Edge{Neighbor: true, DirectLastSeen: now}
+	unmarkedWorst := Edge{SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, Observations: 1}
+	markedUnmeasured := Edge{Neighbor: true, DirectLastSeen: now, Observations: 1}
 	wc, _ := cfg.LegCost(unmarkedWorst, now)
 	uc, uu := cfg.LegCost(markedUnmeasured, now)
 	if !uu {
@@ -167,9 +170,8 @@ func TestLegCost_StaleDirectLosesBonus(t *testing.T) {
 	// (-5 dB) so the strong cap does not swallow the bonus.
 	staleDirect := Edge{
 		Neighbor: true, DirectLastSeen: now.Add(-30 * 24 * time.Hour),
-		SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now,
-	}
-	overheard := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+		SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
+	overheard := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	sc, _ := cfg.LegCost(staleDirect, now)
 	oc, _ := cfg.LegCost(overheard, now)
 	if sc != oc {
@@ -198,11 +200,11 @@ func TestIsFreshNeighbor_ZeroBonusKeepsIdentity(t *testing.T) {
 	cfg := testCfgNoTraffic()
 	cfg.NeighborBonus = 0
 	now := time.Now()
-	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	if !cfg.IsFreshNeighbor(e, now) {
 		t.Error("fresh direct must stay a neighbor even with NeighborBonus=0")
 	}
-	plain := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+	plain := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	c, _ := cfg.LegCost(e, now)
 	pc, _ := cfg.LegCost(plain, now)
 	if c != pc {
@@ -215,7 +217,7 @@ func TestIsFreshNeighbor_FutureConfirmationRejected(t *testing.T) {
 	// negative age is rejected rather than treated as "within window".
 	cfg := testCfg()
 	now := time.Now()
-	e := Edge{Neighbor: true, DirectLastSeen: now.Add(time.Hour), SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	e := Edge{Neighbor: true, DirectLastSeen: now.Add(time.Hour), SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	if cfg.IsFreshNeighbor(e, now) {
 		t.Error("future DirectLastSeen must not count as a fresh neighbor")
 	}
@@ -229,11 +231,11 @@ func TestIsFreshNeighbor_DisabledFreshness(t *testing.T) {
 	cfg := testCfgNoTraffic()
 	cfg.DirectFreshness = 0
 	now := time.Now()
-	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	if cfg.IsFreshNeighbor(e, now) {
 		t.Error("zero DirectFreshness must never report a fresh neighbor")
 	}
-	plain := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now}
+	plain := Edge{SNR: f32(-5), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	c, _ := cfg.LegCost(e, now)
 	pc, _ := cfg.LegCost(plain, now)
 	if c != pc {
@@ -262,7 +264,7 @@ func TestFromResolved_NoDirectFreshnessFallback(t *testing.T) {
 		t.Errorf("explicit 0 must reach routeplan.Config as 0, got %v", pc.DirectFreshness)
 	}
 	now := time.Now()
-	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, Observations: 1}
 	if pc.IsFreshNeighbor(e, now) {
 		t.Error("explicit 0 must never grant the neighbor bonus/badge")
 	}
@@ -335,16 +337,141 @@ func TestLegCost_TrafficEvidence(t *testing.T) {
 	if hc != cfg.UnmeasuredFloor {
 		t.Errorf("maximally proven unmeasured must cost the floor %v, got %v", cfg.UnmeasuredFloor, hc)
 	}
-	strong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, HashWidth: 32}
+	strong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, HashWidth: 32, Observations: 1}
 	sc, _ := cfg.LegCost(strong, now)
 	if hc <= sc {
 		t.Errorf("proven unmeasured (%v) must stay costlier than strong measured (%v)", hc, sc)
 	}
 	// Zero traffic earns zero discount: the bare penalty.
-	bare := Edge{}
+	bare := Edge{Observations: 1}
 	bc, _ := cfg.LegCost(bare, now)
 	if bc != cfg.UnmeasuredPenalty {
 		t.Errorf("zero observations must pay the bare penalty %v, got %v", cfg.UnmeasuredPenalty, bc)
+	}
+}
+
+func TestLegCost_UnseenPenalty(t *testing.T) {
+	// The user's rule: a hop no packet ever crossed in that direction
+	// (observation_count == 0) pays a large extra penalty -- on top of
+	// everything, after all floors -- and is flagged unseen. Directional:
+	// the count sums only this directed pair's rows.
+	cfg := testCfg()
+	now := time.Now()
+	seenStrong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, Observations: 5, HashWidth: 32}
+	unseenStrong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	sc, su := cfg.LegCost(seenStrong, now)
+	uc, uu := cfg.LegCost(unseenStrong, now)
+	if su || uu {
+		t.Errorf("both measured: seen unmeasured=%v, unseen unmeasured=%v", su, uu)
+	}
+	if uc-sc != cfg.UnseenPenalty {
+		t.Errorf("unseen strong must cost exactly penalty more: seen=%v unseen=%v diff=%v want %v",
+			sc, uc, uc-sc, cfg.UnseenPenalty)
+	}
+	if !unseenStrong.Unseen() || seenStrong.Unseen() {
+		t.Error("Unseen() must be true exactly when observation_count == 0")
+	}
+	// Unmeasured + unseen: penalty on top of the bare penalty.
+	seenBare := Edge{Observations: 1}
+	unseenBare := Edge{}
+	sbc, _ := cfg.LegCost(seenBare, now)
+	ubc, uu2 := cfg.LegCost(unseenBare, now)
+	if !uu2 {
+		t.Error("zero-observation leg without SNR must count as unmeasured")
+	}
+	if ubc-sbc != cfg.UnseenPenalty {
+		t.Errorf("unseen unmeasured must cost exactly penalty more: seen=%v unseen=%v", sbc, ubc)
+	}
+	if !unseenBare.Unseen() || seenBare.Unseen() {
+		t.Error("Unseen() must be true exactly when observation_count == 0")
+	}
+	// The penalty dwarfs every modeled difference: a maximally proven
+	// unmeasured leg (floor 0.4) still loses to the unseen hop -- unless
+	// no alternative exists, the planner routes around it.
+	proven := Edge{Observations: 1000000, HashWidth: 3}
+	pc, _ := cfg.LegCost(proven, now)
+	if pc >= ubc {
+		t.Errorf("unseen hop (%v) must stay costlier than the best proven leg (%v)", ubc, pc)
+	}
+	// Zero disables the penalty but keeps the flag.
+	off := testCfg()
+	off.UnseenPenalty = 0
+	oc, _ := off.LegCost(unseenStrong, now)
+	if oc != sc {
+		t.Errorf("unseen_penalty=0 must disable the penalty (want %v, got %v)", sc, oc)
+	}
+	if !unseenStrong.Unseen() {
+		t.Error("flag must survive even with the penalty disabled")
+	}
+}
+
+func TestShortestPaths_AvoidsUnseenHop(t *testing.T) {
+	// Direct A->C is a strong measured leg but unseen (never observed);
+	// the detour A->B->C is weaker but proven. The unseen penalty must
+	// route around the unproven hop despite fewer hops.
+	cfg := testCfg()
+	now := time.Now()
+	a, b, c := uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {
+				{From: a, To: c, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, HashWidth: 32},
+				{From: a, To: b, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now, Observations: 50, HashWidth: 3},
+			},
+			b: {{From: b, To: c, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now, Observations: 50, HashWidth: 3}},
+		},
+	}
+	paths := ShortestPaths(g, cfg, a, c, 2, now)
+	if len(paths) != 2 {
+		t.Fatalf("expected 2 paths, got %d", len(paths))
+	}
+	if len(paths[0].Nodes) != 3 || paths[0].Nodes[1] != b {
+		t.Errorf("best path must route around the unseen hop via B, got %v", paths[0].Nodes)
+	}
+	if len(paths[0].Unseen) != 2 || paths[0].Unseen[0] || paths[0].Unseen[1] {
+		t.Errorf("detour legs must not be unseen, got %v", paths[0].Unseen)
+	}
+	// The direct unseen leg survives as the alternative, flagged.
+	if len(paths[1].Nodes) != 2 {
+		t.Fatalf("alternative should be the direct unseen leg, got %v", paths[1].Nodes)
+	}
+	if len(paths[1].Unseen) != 1 || !paths[1].Unseen[0] {
+		t.Errorf("direct leg must be flagged unseen, got %v", paths[1].Unseen)
+	}
+	if paths[1].Cost-paths[0].Cost < cfg.UnseenPenalty/2 {
+		t.Errorf("unseen alternative must trail by ~penalty: best=%v alt=%v", paths[0].Cost, paths[1].Cost)
+	}
+}
+
+func TestShortestPaths_UnseenHopStillUsable(t *testing.T) {
+	// No alternative exists: the unseen hop must still route (penalized but
+	// usable -- the graph never fragments), flagged end to end.
+	cfg := testCfg()
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {{From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, HashWidth: 32}},
+		},
+	}
+	paths := ShortestPaths(g, cfg, a, b, 1, now)
+	if len(paths) != 1 {
+		t.Fatalf("expected the lone unseen hop to route, got %d paths", len(paths))
+	}
+	if len(paths[0].Unseen) != 1 || !paths[0].Unseen[0] {
+		t.Errorf("lone leg must be flagged unseen, got %v", paths[0].Unseen)
+	}
+	want := cfg.SNRStrongCap + cfg.UnseenPenalty
+	if paths[0].Cost != want {
+		t.Errorf("lone unseen strong leg should cost cap+penalty=%v, got %v", want, paths[0].Cost)
 	}
 }
 
@@ -366,7 +493,7 @@ func TestLegCost_OneByteNeverDiscounts(t *testing.T) {
 		c, _ := cfg.LegCost(e, now)
 		var want float64
 		if e.SNR != nil {
-			want, _ = testCfgNoTraffic().LegCost(Edge{SNR: e.SNR, SNRSampleCount: 2, SNRLastSeen: now}, now)
+			want, _ = testCfgNoTraffic().LegCost(Edge{SNR: e.SNR, SNRSampleCount: 2, SNRLastSeen: now, Observations: 1}, now)
 		} else {
 			want = cfg.UnmeasuredPenalty
 		}
@@ -459,7 +586,7 @@ func TestShortestPaths_HopBoundKeepsLowHopArrival(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), x: loc(x), d: loc(d)},
@@ -467,7 +594,7 @@ func TestShortestPaths_HopBoundKeepsLowHopArrival(t *testing.T) {
 			// A->B cap 0.25, B->X cap 0.25 (2 hops, budget exhausted at X),
 			// A->X speculative unmeasured 1.5, X->D cap 0.25:
 			// valid A->X->D costs 1.75.
-			a: {strong(a, b), {From: a, To: x}},
+			a: {strong(a, b), {From: a, To: x, Observations: 1}},
 			b: {strong(b, x)},
 			x: {strong(x, d)},
 		},
@@ -506,14 +633,14 @@ func TestShortestPaths_YenHonorsRemainingBudget(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), x: loc(x), d: loc(d)},
 		Edges: map[uuid.UUID][]Edge{
 			a: {strong(a, b)},
-			b: {strong(b, c), strong(b, d)},                                                           // direct B->D: alternative spur target
-			c: {{From: c, To: x, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}, {From: c, To: d}}, // C->X cheap, C->D pricey unmeasured
+			b: {strong(b, c), strong(b, d)},                                                                                             // direct B->D: alternative spur target
+			c: {{From: c, To: x, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}, {From: c, To: d, Observations: 1}}, // C->X cheap, C->D pricey unmeasured
 			x: {strong(x, d)},
 		},
 	}
@@ -553,7 +680,7 @@ func TestShortestPaths_YenRejectsOverBudgetCombined(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d)},
@@ -587,7 +714,7 @@ func TestShortestPaths_AllPathsRespectMaxHops(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d), e: loc(e)},
@@ -619,7 +746,7 @@ func TestShortestPaths_ZeroMaxHopsUsesDefaultEverywhere(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c)},
@@ -651,10 +778,10 @@ func TestShortestPaths_PrefersMarkedNeighbor(t *testing.T) {
 	// via-b uses explicitly marked neighbor legs, via-d merely overheard
 	// ones. The bonus (0.4/leg) must break the tie toward the marked route.
 	weak := func(from, to uuid.UUID, marked bool) Edge {
-		return Edge{From: from, To: to, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: marked, DirectLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now, Neighbor: marked, DirectLastSeen: now, Observations: 1}
 	}
 	plain := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(-5), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d)},
@@ -684,9 +811,9 @@ func TestShortestPaths_PrefersStrongSignal(t *testing.T) {
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c)},
 		Edges: map[uuid.UUID][]Edge{
 			// direct leg exists but is speculative unmeasured (cost 2.5)
-			a: {{From: a, To: c}, {From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}},
+			a: {{From: a, To: c, Observations: 1}, {From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}},
 			// two strong measured legs (cap 0.25 + 0.25)
-			b: {{From: b, To: c, SNR: f32(6), SNRSampleCount: 2, SNRLastSeen: now}},
+			b: {{From: b, To: c, SNR: f32(6), SNRSampleCount: 2, SNRLastSeen: now, Observations: 1}},
 		},
 	}
 	paths := ShortestPaths(g, cfg, a, c, 2, now)
@@ -719,13 +846,13 @@ func TestShortestPaths_PrefersMoreStrongHopsOverOneWeakHop(t *testing.T) {
 		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
 	}
 	strong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	g := Graph{
 		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), d: loc(d), e: loc(e)},
 		Edges: map[uuid.UUID][]Edge{
 			a: {
-				{From: a, To: e, SNR: f32(-13.5), SNRSampleCount: 1, SNRLastSeen: now},
+				{From: a, To: e, SNR: f32(-13.5), SNRSampleCount: 1, SNRLastSeen: now, Observations: 1},
 				strong(a, b),
 			},
 			b: {strong(b, c)},
@@ -768,7 +895,7 @@ func TestShortestPaths_MidNodeTypeGate(t *testing.T) {
 		return Node{ID: id, Type: typ, Lat: 59.6, Lng: 16.5}
 	}
 	newStrong := func(from, to uuid.UUID) Edge {
-		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 1}
 	}
 	// Companion/sensor AND room_server mid-nodes must not transit: only
 	// repeaters forward a planned MeshCore repeater route.

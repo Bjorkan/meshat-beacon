@@ -42,12 +42,14 @@ function route(snr: number | undefined, unmeasured: boolean): PlannedRoute {
         snrLastSeen: 1,
         observationCount: 3,
         unmeasured,
+        unseen: false,
         neighbor: false,
       },
     ],
     totalCost: 1,
     hopCount: 1,
     hasUnmeasuredLegs: unmeasured,
+    hasUnseenLegs: false,
     containsStaleNodes: false,
   };
 }
@@ -127,6 +129,7 @@ function meshcoreLeg(from: string, to: string): PlannedRouteLeg {
     snrLastSeen: 0,
     observationCount: 1,
     unmeasured: true,
+    unseen: false,
     neighbor: false,
   };
 }
@@ -147,6 +150,7 @@ function meshcoreRoute(keys: string[]): PlannedRoute {
     totalCost: legs.length,
     hopCount: legs.length,
     hasUnmeasuredLegs: true,
+    hasUnseenLegs: false,
     containsStaleNodes: false,
   };
 }

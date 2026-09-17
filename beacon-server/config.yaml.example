@@ -160,6 +160,10 @@ routes:
 #  traffic_full_count: 1000   # default: 1000 obs earn the full discount
 #  traffic_measured_share: 0.125  # default: 0.125 of the discount for measured legs
 #  unmeasured_floor: 0.4    # default: 0.4; proven unmeasured never beats strong measured
+#  unseen_penalty: 8.0      # default: 8.0; extra cost of a hop no packet was
+#                           # ever observed crossing in that direction (flagged
+#                           # "unconfirmed possible" in the UI); 0 disables the
+#                           # penalty but keeps the flag
 #  neighbor_bonus: 0.4      # default: 0.4
 #  snr_freshness: 168h      # default: 168h (7 days, the neighbor retention window)
 #  direct_freshness: 168h   # default: same as snr_freshness; how long a direct

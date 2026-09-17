@@ -34,6 +34,17 @@
 // the cheapest possible leg cost is exactly SNRStrongCap, keeping the
 // Dijkstra positivity invariant trivially checkable.
 //
+// Unseen legs: an edge exists in node_neighbors (topologically possible --
+// a /neighbors claim, TRACE pair, or path adjacency) but no packet was EVER
+// observed crossing it in THIS direction (merged observation_count == 0).
+// Such a hop is plausible but unproven, so it pays UnseenPenalty on top of
+// everything and is flagged for the UI (Edge.Unseen, "unconfirmed
+// possible"). The penalty dwarfs every modeled difference, so any route
+// avoiding the unseen hop wins unless no alternative exists within MaxHops
+// -- and the hop stays usable, so the graph never fragments for lack of
+// traffic. Directional: reverse traffic never confirms this direction.
+// Zero disables the penalty (the flag is still reported).
+//
 // Because the strong-leg cap sits well below 1.0 while a weak measured leg
 // costs ~1.0, several strong measured hops can together cost less than one
 // weak measured hop: the planner prefers more hops when every hop has a
@@ -108,8 +119,13 @@ type Config struct {
 	// how much traffic proves it. Keeps the cheapest speculative leg above
 	// the strong cap so a fresh strong reading always wins per-leg.
 	UnmeasuredFloor float64
-	NeighborBonus   float64 // discount for explicitly marked neighbor legs (see package doc)
-	SNRFreshness    time.Duration
+	// UnseenPenalty is the extra cost of a leg no packet was ever observed
+	// crossing in that direction (merged observation_count == 0). Added
+	// last, after all floors, so it always bites. Zero disables the
+	// penalty (the Unseen flag is still reported). See the package doc.
+	UnseenPenalty float64
+	NeighborBonus float64 // discount for explicitly marked neighbor legs (see package doc)
+	SNRFreshness  time.Duration
 	// DirectFreshness bounds how old a direct confirmation (direct_last_seen)
 	// may be before the neighbor bonus/badge stops applying. Resolve defaults
 	// unset to SNRFreshness; an explicit 0 disables the bonus (see
@@ -136,6 +152,7 @@ func FromResolved(r config.ResolvedConfig) Config {
 		TrafficFullCount:     r.RoutePlanTrafficFullCount,
 		TrafficMeasuredShare: r.RoutePlanTrafficMeasuredShare,
 		UnmeasuredFloor:      r.RoutePlanUnmeasuredFloor,
+		UnseenPenalty:        r.RoutePlanUnseenPenalty,
 		NeighborBonus:        r.RoutePlanNeighborBonus,
 		SNRFreshness:         r.RoutePlanSNRFreshness,
 		DirectFreshness:      r.RoutePlanDirectFreshness,
@@ -200,6 +217,16 @@ func (e Edge) discountableProvenance() bool {
 	return e.HashWidth >= 2
 }
 
+// Unseen reports whether the leg exists topologically but no packet was EVER
+// observed crossing it in this direction (merged observation_count == 0):
+// the hop is plausible but unproven ("unconfirmed possible" in the UI).
+// Directional by construction -- the count sums only this directed pair's
+// IATA rows, so reverse traffic never confirms this direction. Negative
+// counts cannot happen from SQL SUM (defensive: not unseen).
+func (e Edge) Unseen() bool {
+	return e.Observations == 0
+}
+
 // Graph is the directed planning graph: located nodes plus directed edges.
 type Graph struct {
 	Nodes map[uuid.UUID]Node
@@ -227,7 +254,7 @@ func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
 }
 
 // LegCost returns the cost of traversing e plus whether the leg counts as
-// unmeasured (no fresh SNR reading backs it). The cost has three parts:
+// unmeasured (no fresh SNR reading backs it). The cost has four parts:
 //
 //	signal term: strong legs (fresh SNR at/above SNRGoodDB) cost exactly
 //	SNRStrongCap; weaker readings interpolate toward SNRMaxPenalty with a
@@ -251,6 +278,9 @@ func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
 //	fact. The bonus applies to weak/interpolated legs (where it breaks ties
 //	between equally-measured legs) but never to a capped strong leg,
 //	keeping the cheapest possible cost exactly the strong cap.
+//	unseen penalty: a leg no packet ever crossed in this direction (see
+//	Edge.Unseen) pays UnseenPenalty on top, after all floors, so it always
+//	bites. Zero disables the penalty but the flag is still reported.
 //
 // A node that moves (new advert with different lat/lon) deletes all its
 // neighbor rows outright at ingest (see UpsertNode), so stale-position
@@ -260,7 +290,8 @@ func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
 // rule holds end to end even for legacy rows.
 //
 // Costs stay positive for Dijkstra (ValidateResolved enforces bonus < gap,
-// cap in (0, 1), and the traffic/full-count/floor relations). now anchors
+// cap in (0, 1), non-negative unseen penalty, and the
+// traffic/full-count/floor relations). now anchors
 // the freshness checks so tests can pin time.
 func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	bonus := 0.0
@@ -275,7 +306,7 @@ func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	if measured {
 		snr := float64(*e.SNR)
 		if snr >= c.SNRGoodDB {
-			return c.SNRStrongCap, false
+			return c.SNRStrongCap + c.unseenPenalty(e), false
 		}
 		signal := c.SNRMaxPenalty
 		if snr > c.SNRBadDB {
@@ -285,13 +316,23 @@ func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 		if cost < c.SNRStrongCap {
 			cost = c.SNRStrongCap
 		}
-		return cost, false
+		return cost + c.unseenPenalty(e), false
 	}
 	cost = c.UnmeasuredPenalty - traffic - bonus
 	if cost < c.UnmeasuredFloor {
 		cost = c.UnmeasuredFloor
 	}
-	return cost, true
+	return cost + c.unseenPenalty(e), true
+}
+
+// unseenPenalty returns UnseenPenalty when the leg is unseen (see
+// Edge.Unseen), else 0. Non-negative by validation, so it can only raise
+// costs and never break the positivity invariant.
+func (c Config) unseenPenalty(e Edge) float64 {
+	if e.Unseen() {
+		return c.UnseenPenalty
+	}
+	return 0
 }
 
 // interpolateSignal maps a fresh SNR strictly inside (SNRBadDB, SNRGoodDB)

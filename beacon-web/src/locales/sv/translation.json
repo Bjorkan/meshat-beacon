@@ -334,6 +334,8 @@
     "via": "via {{nodes}}",
     "unmeasuredLeg": "Omätt",
     "unmeasuredHint": "Ben utan färsk signalmätning kostar extra men används ändå.",
+    "unseenLeg": "Ej bekräftad möjlig",
+    "unseenHint": "Inget paket har någonsin setts ta detta hopp åt detta håll — topologiskt möjligt men obevisat, så rutten föredrar bekräftade hopp.",
     "staleNode": "Inaktuell",
     "noRoute": "Ingen rutt hittades mellan dessa noder.",
     "pickBoth": "Välj en från-nod och en till-nod för att planera en rutt.",

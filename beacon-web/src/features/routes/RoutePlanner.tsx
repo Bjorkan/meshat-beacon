@@ -38,6 +38,14 @@ function LegRow({ leg, index }: { leg: PlannedRouteLeg; index: number }) {
           {t('routes.neighborLeg')}
         </span>
       )}
+      {leg.unseen && (
+        <span
+          className="shrink-0 rounded border border-warn/40 px-1 text-warn"
+          title={t('routes.unseenHint')}
+        >
+          {t('routes.unseenLeg')}
+        </span>
+      )}
       {leg.unmeasured ? (
         <span
           className="shrink-0 rounded border border-border px-1 text-text-dim"
@@ -122,6 +130,14 @@ function RouteCard({
         {route.containsStaleNodes && (
           <span className="rounded border border-warn/40 px-1 font-mono text-[10px] text-warn">
             {t('routes.staleNode')}
+          </span>
+        )}
+        {route.hasUnseenLegs && (
+          <span
+            className="rounded border border-warn/40 px-1 font-mono text-[10px] text-warn"
+            title={t('routes.unseenHint')}
+          >
+            {t('routes.unseenLeg')}
           </span>
         )}
         <span className="flex-1" />
