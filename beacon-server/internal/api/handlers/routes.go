@@ -91,11 +91,11 @@ func listKnownRoutes(reader api.Reader) http.HandlerFunc {
 // bestRoute godoc
 //
 //	@Summary	Plan the best route between two nodes
-//	@Description	Computes best-first routes between two nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path has coordinates. An unroutable pair returns 200 with an empty paths array and a reason, never an error.
+//	@Description	Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.
 //	@Tags		Routes
 //	@Produce	json
-//	@Param		from			query		string	true	"Source node full public key (hex)"
-//	@Param		to				query		string	true	"Destination node full public key (hex)"
+//	@Param		from			query		string	true	"Source repeater full public key (hex)"
+//	@Param		to				query		string	true	"Destination repeater full public key (hex)"
 //	@Param		alternatives	query		int		false	"Alternatives beyond the best path (0-2, default 2)"
 //	@Success	200				{object}	api.BestRouteResult
 //	@Failure	400				{object}	handlers.APIError
@@ -129,6 +129,28 @@ func bestRoute(reader api.Reader) http.HandlerFunc {
 				return
 			}
 			alternatives = n
+		}
+		// The planner is repeater-only end-to-end (MeshCore repeater routes):
+		// reject non-repeater endpoints with 400 before planning. The API can
+		// be called directly and route URLs can be manipulated, so this stays
+		// server-side even though the frontend picker filters to repeaters.
+		for _, ep := range []struct {
+			name   string
+			pubkey []byte
+		}{{"from", fromBytes}, {"to", toBytes}} {
+			ntype, err := reader.GetNodeTypeByPubkey(r.Context(), ep.pubkey)
+			if err != nil {
+				respondError(w, http.StatusInternalServerError, "internal server error")
+				return
+			}
+			if ntype == nil {
+				respondError(w, http.StatusNotFound, "unknown "+ep.name+" node")
+				return
+			}
+			if *ntype != 2 {
+				respondError(w, http.StatusBadRequest, ep.name+" must be a repeater node for route planning")
+				return
+			}
 		}
 		// Pubkeys are globally unique: resolve both to node IDs first so the
 		// planner works on stable identities and can 404 unknown keys.

@@ -345,6 +345,20 @@ func (s *Store) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUI
 	return &id, nil
 }
 
+// GetNodeTypeByPubkey implements api.Reader: full public key to node type,
+// nil without error when the key is unknown. The repeater-only route planner
+// uses this to reject non-repeater endpoints before planning.
+func (s *Store) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
+	t, err := s.q.GetNodeTypeByPubkey(ctx, pubkey)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &t, nil
+}
+
 // ListAmbiguousPrefix2 returns every 2-byte prefix claimed by more than one infra
 // node, globally. The path map uses it to decide whether a 2-byte route is safe to
 // draw: with zero collisions in the whole database, a high-confidence 2-byte hit is

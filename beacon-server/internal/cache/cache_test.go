@@ -205,6 +205,10 @@ func (s *stubReader) GetNodeIDByPubkey(_ context.Context, _ []byte) (*uuid.UUID,
 	return nil, nil
 }
 
+func (s *stubReader) GetNodeTypeByPubkey(_ context.Context, _ []byte) (*int16, error) {
+	return nil, nil
+}
+
 func (s *stubReader) ListTraceTags(_ context.Context, _ []string, _, _ string, _, _ time.Time, _ time.Time, _ int32) ([]api.TraceTagSummary, error) {
 	return nil, nil
 }

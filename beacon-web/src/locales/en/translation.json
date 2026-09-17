@@ -341,6 +341,10 @@
     "openNode": "Open node {{name}}",
     "copyMeshcoreRoute": "Copy MeshCore route",
     "meshcoreRouteCopied": "MeshCore route copied",
+    "meshcoreTooLong": "3-byte MeshCore routes support at most 21 repeaters/hashes.",
+    "mapFailed": "Map failed to load — route details above are unaffected.",
+    "nonRepeaterEndpoint": "Route endpoints must be repeaters — pick a repeater node.",
+    "multibyteUnconfirmed": "3-byte forwarding support is not confirmed for every repeater in this route. Older MeshCore firmware may drop the message.",
     "neighborLeg": "Neighbor",
     "neighborHint": "Both endpoints marked each other as neighbors — this hop is preferred when planning."
   },

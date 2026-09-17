@@ -531,6 +531,19 @@ func (q *Queries) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]Get
 	return items, nil
 }
 
+const getNodeTypeByPubkey = `-- name: GetNodeTypeByPubkey :one
+SELECT node_type FROM nodes WHERE public_key = $1
+`
+
+// Route-planner endpoint validation: the planner is repeater-only, so the
+// handler must know the endpoint type. NULL (no row) means unknown key.
+func (q *Queries) GetNodeTypeByPubkey(ctx context.Context, publicKey []byte) (int16, error) {
+	row := q.db.QueryRow(ctx, getNodeTypeByPubkey, publicKey)
+	var node_type int16
+	err := row.Scan(&node_type)
+	return node_type, err
+}
+
 const getNodesByIDs = `-- name: GetNodesByIDs :many
 SELECT id, public_key, name, latitude, longitude
 FROM nodes
@@ -1163,9 +1176,11 @@ SELECT
     nn.node_id AS from_id,
     nf.public_key AS from_pubkey, nf.name AS from_name, nf.node_type AS from_type,
     nf.latitude AS from_lat, nf.longitude AS from_lng,
+    nf.supports_multibyte_paths AS from_supports_multibyte_paths,
     nn.neighbor_id AS to_id,
     nt.public_key AS to_pubkey, nt.name AS to_name, nt.node_type AS to_type,
     nt.latitude AS to_lat, nt.longitude AS to_lng,
+    nt.supports_multibyte_paths AS to_supports_multibyte_paths,
   SUM(nn.observation_count)::bigint AS observation_count,
   MIN(nn.first_seen)::timestamptz AS first_seen,
   MAX(nn.last_seen)::timestamptz AS last_seen,
@@ -1187,33 +1202,37 @@ JOIN nodes nf ON nf.id = nn.node_id
 JOIN nodes nt ON nt.id = nn.neighbor_id
 GROUP BY nn.node_id, nn.neighbor_id,
     nf.public_key, nf.name, nf.node_type, nf.latitude, nf.longitude,
-    nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude
+    nf.supports_multibyte_paths,
+    nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude,
+    nt.supports_multibyte_paths
 `
 
 type GetRoutePlanGraphRow struct {
-	FromID           uuid.UUID          `json:"from_id"`
-	FromPubkey       []byte             `json:"from_pubkey"`
-	FromName         *string            `json:"from_name"`
-	FromType         int16              `json:"from_type"`
-	FromLat          *float64           `json:"from_lat"`
-	FromLng          *float64           `json:"from_lng"`
-	ToID             uuid.UUID          `json:"to_id"`
-	ToPubkey         []byte             `json:"to_pubkey"`
-	ToName           *string            `json:"to_name"`
-	ToType           int16              `json:"to_type"`
-	ToLat            *float64           `json:"to_lat"`
-	ToLng            *float64           `json:"to_lng"`
-	ObservationCount int64              `json:"observation_count"`
-	FirstSeen        pgtype.Timestamptz `json:"first_seen"`
-	LastSeen         pgtype.Timestamptz `json:"last_seen"`
-	SnrWeightedSum   float32            `json:"snr_weighted_sum"`
-	SnrSampleCount   int64              `json:"snr_sample_count"`
-	SnrLastSeen      pgtype.Timestamptz `json:"snr_last_seen"`
-	EdgeLastSeen     pgtype.Timestamptz `json:"edge_last_seen"`
-	FromLastSeen     pgtype.Timestamptz `json:"from_last_seen"`
-	ToLastSeen       pgtype.Timestamptz `json:"to_last_seen"`
-	Direct           bool               `json:"direct"`
-	DirectLastSeen   pgtype.Timestamptz `json:"direct_last_seen"`
+	FromID                     uuid.UUID          `json:"from_id"`
+	FromPubkey                 []byte             `json:"from_pubkey"`
+	FromName                   *string            `json:"from_name"`
+	FromType                   int16              `json:"from_type"`
+	FromLat                    *float64           `json:"from_lat"`
+	FromLng                    *float64           `json:"from_lng"`
+	FromSupportsMultibytePaths bool               `json:"from_supports_multibyte_paths"`
+	ToID                       uuid.UUID          `json:"to_id"`
+	ToPubkey                   []byte             `json:"to_pubkey"`
+	ToName                     *string            `json:"to_name"`
+	ToType                     int16              `json:"to_type"`
+	ToLat                      *float64           `json:"to_lat"`
+	ToLng                      *float64           `json:"to_lng"`
+	ToSupportsMultibytePaths   bool               `json:"to_supports_multibyte_paths"`
+	ObservationCount           int64              `json:"observation_count"`
+	FirstSeen                  pgtype.Timestamptz `json:"first_seen"`
+	LastSeen                   pgtype.Timestamptz `json:"last_seen"`
+	SnrWeightedSum             float32            `json:"snr_weighted_sum"`
+	SnrSampleCount             int64              `json:"snr_sample_count"`
+	SnrLastSeen                pgtype.Timestamptz `json:"snr_last_seen"`
+	EdgeLastSeen               pgtype.Timestamptz `json:"edge_last_seen"`
+	FromLastSeen               pgtype.Timestamptz `json:"from_last_seen"`
+	ToLastSeen                 pgtype.Timestamptz `json:"to_last_seen"`
+	Direct                     bool               `json:"direct"`
+	DirectLastSeen             pgtype.Timestamptz `json:"direct_last_seen"`
 }
 
 // Full neighbor-graph dump for the /routes/best planner: every directed
@@ -1241,12 +1260,14 @@ func (q *Queries) GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow
 			&i.FromType,
 			&i.FromLat,
 			&i.FromLng,
+			&i.FromSupportsMultibytePaths,
 			&i.ToID,
 			&i.ToPubkey,
 			&i.ToName,
 			&i.ToType,
 			&i.ToLat,
 			&i.ToLng,
+			&i.ToSupportsMultibytePaths,
 			&i.ObservationCount,
 			&i.FirstSeen,
 			&i.LastSeen,

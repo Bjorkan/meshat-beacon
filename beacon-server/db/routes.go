@@ -509,6 +509,7 @@ func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg Rout
 			ID: n.ID, PublicKey: n.Pubkey, Name: n.Name,
 			Latitude: &lat, Longitude: &lng,
 			NodeType: n.Type, NodeTypeName: api.NodeTypeName(n.Type), Stale: n.Stale,
+			SupportsMultibytePaths: n.SupportsMultibytePaths,
 		})
 		if n.Stale {
 			hasStale = true

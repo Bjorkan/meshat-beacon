@@ -53,6 +53,47 @@ func TestBestRoute_Validation(t *testing.T) {
 	}
 }
 
+func TestBestRoute_NonRepeaterFrom400(t *testing.T) {
+	one := int16(1) // companion
+	r := bestRouter(stubReader{
+		getNodeTypeByPubkey: func(context.Context, []byte) (*int16, error) {
+			return &one, nil
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for non-repeater from, got %d", w.Code)
+	}
+}
+
+func TestBestRoute_NonRepeaterTo400(t *testing.T) {
+	from := uuid.New()
+	two := int16(2) // repeater
+	three := int16(3)
+	r := bestRouter(stubReader{
+		getNodeIDByPubkey: func(_ context.Context, pubkey []byte) (*uuid.UUID, error) {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
+				return &from, nil
+			}
+			return nil, nil
+		},
+		getNodeTypeByPubkey: func(_ context.Context, pubkey []byte) (*int16, error) {
+			if len(pubkey) == 32 && pubkey[0] == 0xaa {
+				return &two, nil
+			}
+			return &three, nil // room server destination
+		},
+	})
+	req := httptest.NewRequest(http.MethodGet, "/routes/best?from=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa&to=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc", nil)
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for non-repeater to, got %d", w.Code)
+	}
+}
+
 func TestBestRoute_UnknownFrom404(t *testing.T) {
 	r := bestRouter(stubReader{
 		getNodeIDByPubkey: func(context.Context, []byte) (*uuid.UUID, error) {

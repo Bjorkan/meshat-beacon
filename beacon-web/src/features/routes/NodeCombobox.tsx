@@ -4,6 +4,11 @@
 // rule as node-search.ts). A pasted FULL public key resolves exactly.
 // Nodes without coordinates are shown disabled with a hint — they can never
 // be drawn on the map, so they can never be a route endpoint.
+//
+// The planner is repeater-only end-to-end (MeshCore repeater routes): only
+// repeater nodes (nodeType 2) are listed, resolvable, or committable here.
+// Non-repeaters never appear as suggestions and are rejected on exact-key
+// entry, so no code path in this picker can produce a non-repeater endpoint.
 import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -16,10 +21,17 @@ export interface NodePick {
   name: string | null;
   lat: number | null;
   lng: number | null;
+  nodeType: number; // 2 = repeater; the planner only ever picks repeaters
 }
 
 function toPick(n: NodeSummary): NodePick {
-  return { publicKey: n.publicKey.toLowerCase(), name: n.name, lat: n.lat, lng: n.lng };
+  return {
+    publicKey: n.publicKey.toLowerCase(),
+    name: n.name,
+    lat: n.lat,
+    lng: n.lng,
+    nodeType: n.nodeType,
+  };
 }
 
 function isHexLike(value: string): boolean {
@@ -85,13 +97,16 @@ export function NodeCombobox({
         limit: 8,
         sort: 'name',
         direction: 'asc',
+        type: 'repeater',
         ...(hexLike ? { pubkeyPrefix: query.replace(/\s+/g, '').toLowerCase() } : { name: query }),
       }),
     enabled: open && query.length > 0 && !(value && query === (value.name ?? '')),
     staleTime: 30_000,
   });
+  // Belt and suspenders: the server filters type=repeater, but never trust a
+  // non-repeater suggestion through any picker path.
   const suggestions = (data?.items ?? []).filter(
-    (n) => n.publicKey.toLowerCase() !== excludePublicKey?.toLowerCase(),
+    (n) => n.nodeType === 2 && n.publicKey.toLowerCase() !== excludePublicKey?.toLowerCase(),
   );
 
   const commit = (pick: NodePick) => {
@@ -100,13 +115,15 @@ export function NodeCombobox({
   };
 
   // full pubkey pasted (or typed): resolve exactly on Enter. Only a full
-  // 64-hex key can become a route endpoint (matching /routes/best).
+  // 64-hex key for a REPEATER can become a route endpoint (matching
+  // /routes/best, which 400s non-repeater endpoints).
   const commitExactKey = async (raw: string) => {
     const hex = raw.replace(/\s+/g, '').toLowerCase();
     if (!/^[0-9a-f]{64}$/.test(hex)) return false;
     const page = await getNodesPage(undefined, { pubkeyPrefix: hex, limit: 10 });
     const exact = page.items.find((n) => n.publicKey.toLowerCase() === hex);
     if (exact) {
+      if (exact.nodeType !== 2) return 'nonrepeater';
       if (exact.lat == null || exact.lng == null) return 'noloc';
       if (exact.publicKey.toLowerCase() === excludePublicKey?.toLowerCase()) return 'excluded';
       commit(toPick(exact));
@@ -147,7 +164,8 @@ export function NodeCombobox({
       }
       // no suggestion highlighted: try an exact full-key match
       const result = await commitExactKey(text);
-      if (result === 'noloc') setNotice(t('routes.noPositionHint'));
+      if (result === 'nonrepeater') setNotice(t('routes.nonRepeaterEndpoint'));
+      else if (result === 'noloc') setNotice(t('routes.noPositionHint'));
       else if (result === 'excluded') setNotice(t('routes.sameNodeHint'));
       else if (result === false) setNotice(t('routes.noMatchHint'));
       else setNotice(null);

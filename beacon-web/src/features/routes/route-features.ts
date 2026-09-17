@@ -28,27 +28,55 @@ function nodeLabel(n: { name?: string; publicKey: string }): string {
 // hashes (first 3 bytes / 6 hex chars of each repeater's full public key),
 // e.g. "030680,ab6b92,73f8a9". Lowercase hex, no spaces.
 //
+// A MeshCore packet carries at most a 64-byte path payload, so a 3-byte-hash
+// route holds at most 21 hashes (21*3 = 63). The limit applies to exported
+// 3-byte IDs (legs.length + 1 with the requested start+end semantics), not
+// just the planner's leg count.
+//
 // The canonical ordered repeater list is built leg-by-leg: the first leg's
 // `from` (the chosen start repeater — never prepend anything before it),
-// then every leg's `to` in order. Legs are the source of truth, not
-// path.nodes, so a duplicated start/target across nodes+legs can never
-// produce a doubled first/last entry. Returns null when any hop lacks a
-// valid full public key (64 hex chars) — never copy a broken/partial route.
-export function plannedRouteToMeshcore(route: PlannedRoute): string | null {
-  if (route.legs.length === 0) return null;
+// then every leg's `to` in order. Legs must form one continuous chain and
+// are the source of truth, not path.nodes, so a duplicated start/target
+// across nodes+legs can never produce a doubled first/last entry.
+export const MESHCORE_3BYTE_MAX_HASHES = 21;
+
+export type MeshCoreRouteExport =
+  { ok: true; value: string } | { ok: false; reason: 'invalid-key' | 'too-long' | 'discontinuous' };
+
+function normalizeFullKey(key: string): string | null {
+  const hex = key.replace(/\s+/g, '').toLowerCase();
+  return /^[0-9a-f]{64}$/.test(hex) ? hex : null;
+}
+
+export function exportMeshcoreRoute(route: PlannedRoute): MeshCoreRouteExport {
+  if (route.legs.length === 0) return { ok: false, reason: 'invalid-key' };
   const first = route.legs[0];
-  if (first == null) return null;
+  if (first == null) return { ok: false, reason: 'invalid-key' };
+  // Legs must form one continuous chain: A->B, B->C — never A->B, C->D.
+  for (let i = 1; i < route.legs.length; i++) {
+    const prev = normalizeFullKey(route.legs[i - 1]?.to ?? '');
+    const cur = normalizeFullKey(route.legs[i]?.from ?? '');
+    if (prev == null || cur == null || prev !== cur) return { ok: false, reason: 'discontinuous' };
+  }
   // Canonical ordered repeater list: first leg's `from` is the chosen start
   // repeater (never prepend anything before it), then every leg's `to`.
   const orderedKeys: string[] = [first.from];
   for (const leg of route.legs) orderedKeys.push(leg.to);
+  if (orderedKeys.length > MESHCORE_3BYTE_MAX_HASHES) return { ok: false, reason: 'too-long' };
   const ids: string[] = [];
   for (const key of orderedKeys) {
-    const hex = key.replace(/\s+/g, '').toLowerCase();
-    if (!/^[0-9a-f]{64}$/.test(hex)) return null;
+    const hex = normalizeFullKey(key);
+    if (hex == null) return { ok: false, reason: 'invalid-key' };
     ids.push(hex.slice(0, 6));
   }
-  return ids.join(',');
+  return { ok: true, value: ids.join(',') };
+}
+
+// Legacy string-or-null wrapper. Prefer exportMeshcoreRoute for new code so
+// callers can explain *why* copying is unavailable (too-long vs invalid).
+export function plannedRouteToMeshcore(route: PlannedRoute): string | null {
+  const res = exportMeshcoreRoute(route);
+  return res.ok ? res.value : null;
 }
 
 export function routesToFeatures(

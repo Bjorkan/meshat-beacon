@@ -65,6 +65,7 @@ type stubReader struct {
 	searchCrossIATARoutes        func(ctx context.Context, fromHash, fromIATA, toHash, toIATA string) ([]api.CrossIATARoute, error)
 	getNodesByIDs                func(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*api.ResolvedNode, error)
 	getNodeIDByPubkey            func(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
+	getNodeTypeByPubkey          func(ctx context.Context, pubkey []byte) (*int16, error)
 	planBestRoute                func(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error)
 }
 
@@ -406,6 +407,16 @@ func (s stubReader) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid
 		return s.getNodeIDByPubkey(ctx, pubkey)
 	}
 	return nil, nil
+}
+
+func (s stubReader) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
+	if s.getNodeTypeByPubkey != nil {
+		return s.getNodeTypeByPubkey(ctx, pubkey)
+	}
+	// Default test double: endpoints are repeaters (node type 2), so existing
+	// tests exercise the happy path without wiring the new field.
+	two := int16(2)
+	return &two, nil
 }
 
 func (s stubReader) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {

@@ -512,19 +512,59 @@ func TestShortestPaths_NoRoute(t *testing.T) {
 func TestShortestPaths_MidNodeTypeGate(t *testing.T) {
 	cfg := testCfg()
 	now := time.Now()
-	a, mid, c := uuid.New(), uuid.New(), uuid.New()
+	a, mid, room, c := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	mk := func(id uuid.UUID, typ int16) Node {
 		return Node{ID: id, Type: typ, Lat: 59.6, Lng: 16.5}
 	}
+	newStrong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	// Companion/sensor AND room_server mid-nodes must not transit: only
+	// repeaters forward a planned MeshCore repeater route.
 	g := Graph{
-		Nodes: map[uuid.UUID]Node{a: mk(a, NodeTypeRepeater), mid: mk(mid, 1 /* companion */), c: mk(c, NodeTypeRepeater)},
+		Nodes: map[uuid.UUID]Node{
+			a:    mk(a, NodeTypeRepeater),
+			mid:  mk(mid, 1 /* companion */),
+			room: mk(room, NodeTypeRoomServer),
+			c:    mk(c, NodeTypeRepeater),
+		},
 		Edges: map[uuid.UUID][]Edge{
-			a:   {{From: a, To: mid}},
-			mid: {{From: mid, To: c}},
+			a:    {newStrong(a, mid), newStrong(a, room)},
+			mid:  {newStrong(mid, c)},
+			room: {newStrong(room, c)},
 		},
 	}
 	if paths := ShortestPaths(g, cfg, a, c, 2, now); len(paths) != 0 {
-		t.Errorf("companion mid-node must not route, got %v", paths)
+		t.Errorf("companion/room_server mid-nodes must not route, got %v", paths)
+	}
+}
+
+func TestBuildGraph_DropsNonRepeaters(t *testing.T) {
+	now := time.Now()
+	a, room, comp := uuid.New(), uuid.New(), uuid.New()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	mkrow := func(from, to uuid.UUID, ftype, ttype int16) db.GetRoutePlanGraphRow {
+		return db.GetRoutePlanGraphRow{
+			FromID: from, FromPubkey: from[:], FromType: ftype, FromLat: &lat, FromLng: &lng,
+			ToID: to, ToPubkey: to[:], ToType: ttype, ToLat: &lat2, ToLng: &lng2,
+			ObservationCount: 1, FirstSeen: ts(now), LastSeen: ts(now),
+			FromLastSeen: ts(now), ToLastSeen: ts(now), EdgeLastSeen: ts(now),
+		}
+	}
+	g := BuildGraph([]db.GetRoutePlanGraphRow{
+		mkrow(a, room, 2, 3), // repeater -> room_server: dropped
+		mkrow(a, comp, 2, 1), // repeater -> companion: dropped
+		mkrow(room, a, 3, 2), // room_server -> repeater: dropped
+	}, 24*time.Hour, 0, now)
+	if len(g.Edges) != 0 {
+		t.Errorf("non-repeater legs must not enter the planning graph, got %+v", g.Edges)
+	}
+	if _, ok := g.Nodes[room]; ok {
+		t.Error("room_server must not enter the planning graph")
+	}
+	if _, ok := g.Nodes[comp]; ok {
+		t.Error("companion must not enter the planning graph")
 	}
 }
 

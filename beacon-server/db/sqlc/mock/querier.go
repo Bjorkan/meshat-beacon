@@ -335,6 +335,21 @@ func (mr *MockQuerierMockRecorder) GetNodePathPublicKey(ctx, id any) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodePathPublicKey", reflect.TypeOf((*MockQuerier)(nil).GetNodePathPublicKey), ctx, id)
 }
 
+// GetNodeTypeByPubkey mocks base method.
+func (m *MockQuerier) GetNodeTypeByPubkey(ctx context.Context, publicKey []byte) (int16, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNodeTypeByPubkey", ctx, publicKey)
+	ret0, _ := ret[0].(int16)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNodeTypeByPubkey indicates an expected call of GetNodeTypeByPubkey.
+func (mr *MockQuerierMockRecorder) GetNodeTypeByPubkey(ctx, publicKey any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNodeTypeByPubkey", reflect.TypeOf((*MockQuerier)(nil).GetNodeTypeByPubkey), ctx, publicKey)
+}
+
 // GetNodesByIDs mocks base method.
 func (m *MockQuerier) GetNodesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]db.GetNodesByIDsRow, error) {
 	m.ctrl.T.Helper()

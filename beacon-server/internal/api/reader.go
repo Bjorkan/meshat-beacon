@@ -126,6 +126,11 @@ type Reader interface {
 	// Returns nil, nil when no node carries that key.
 	GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
 
+	// GetNodeTypeByPubkey resolves a full node public key to its node type.
+	// Returns nil, nil when no node carries that key. Used by the repeater-only
+	// route planner to reject non-repeater endpoints with 4xx.
+	GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error)
+
 	// ListNodeObservations returns a paginated list of packet observations originating from a node.
 	// Pass cursor=0 to start from the beginning.
 	ListNodeObservations(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (Page[PacketObservationSummary], error)

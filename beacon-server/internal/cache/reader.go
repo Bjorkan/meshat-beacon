@@ -482,6 +482,12 @@ func (cr *CachedReader) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*
 	return cr.inner.GetNodeIDByPubkey(ctx, pubkey)
 }
 
+// GetNodeTypeByPubkey implements [api.Reader]. Bypasses the cache like the
+// other single-key route-planning lookup.
+func (cr *CachedReader) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
+	return cr.inner.GetNodeTypeByPubkey(ctx, pubkey)
+}
+
 // ListTraceTags implements [api.Reader].
 func (cr *CachedReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
 	return cr.inner.ListTraceTags(ctx, iatas, scope, traceType, since, until, cursor, limit)

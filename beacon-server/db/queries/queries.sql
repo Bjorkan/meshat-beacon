@@ -759,6 +759,11 @@ WHERE id = ANY($1::uuid[]);
 -- name: GetNodeByPubkey :one
 SELECT id FROM nodes WHERE public_key = $1;
 
+-- name: GetNodeTypeByPubkey :one
+-- Route-planner endpoint validation: the planner is repeater-only, so the
+-- handler must know the endpoint type. NULL (no row) means unknown key.
+SELECT node_type FROM nodes WHERE public_key = $1;
+
 -- name: ListNodes :many
 -- Keyset-paginated node list. $7 preserves the legacy last_seen cursor; new clients round-trip
 -- nextPageToken, which supplies $14-$17 and remains correct for every supported sort field.
@@ -1698,9 +1703,11 @@ SELECT
     nn.node_id AS from_id,
     nf.public_key AS from_pubkey, nf.name AS from_name, nf.node_type AS from_type,
     nf.latitude AS from_lat, nf.longitude AS from_lng,
+    nf.supports_multibyte_paths AS from_supports_multibyte_paths,
     nn.neighbor_id AS to_id,
     nt.public_key AS to_pubkey, nt.name AS to_name, nt.node_type AS to_type,
     nt.latitude AS to_lat, nt.longitude AS to_lng,
+    nt.supports_multibyte_paths AS to_supports_multibyte_paths,
   SUM(nn.observation_count)::bigint AS observation_count,
   MIN(nn.first_seen)::timestamptz AS first_seen,
   MAX(nn.last_seen)::timestamptz AS last_seen,
@@ -1722,4 +1729,6 @@ JOIN nodes nf ON nf.id = nn.node_id
 JOIN nodes nt ON nt.id = nn.neighbor_id
 GROUP BY nn.node_id, nn.neighbor_id,
     nf.public_key, nf.name, nf.node_type, nf.latitude, nf.longitude,
-    nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude;
+    nf.supports_multibyte_paths,
+    nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude,
+    nt.supports_multibyte_paths;

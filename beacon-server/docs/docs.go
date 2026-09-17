@@ -1630,7 +1630,7 @@ const docTemplate = `{
         },
         "/routes/best": {
             "get": {
-                "description": "Computes best-first routes between two nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path has coordinates. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
+                "description": "Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
                 "produces": [
                     "application/json"
                 ],
@@ -1641,14 +1641,14 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Source node full public key (hex)",
+                        "description": "Source repeater full public key (hex)",
                         "name": "from",
                         "in": "query",
                         "required": true
                     },
                     {
                         "type": "string",
-                        "description": "Destination node full public key (hex)",
+                        "description": "Destination repeater full public key (hex)",
                         "name": "to",
                         "in": "query",
                         "required": true
@@ -4348,7 +4348,8 @@ const docTemplate = `{
                 "nodeType",
                 "nodeTypeName",
                 "publicKey",
-                "stale"
+                "stale",
+                "supportsMultibytePaths"
             ],
             "properties": {
                 "id": {
@@ -4374,6 +4375,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "stale": {
+                    "type": "boolean"
+                },
+                "supportsMultibytePaths": {
+                    "description": "SupportsMultibytePaths reports confirmed 3-byte path-hash forwarding\n(firmware 1.14+). False means \"not confirmed yet\", NOT \"known\nincompatible\": the flag starts false on a cold deployment until enough\nadvert/path traffic has been observed. The MeshCore exporter warns\n(without blocking the copy) when any repeater in the route is\nunconfirmed. Tri-state (confirmed/unknown/unsupported) is future work;\ntoday only confirmed-true is actionable.",
                     "type": "boolean"
                 }
             }

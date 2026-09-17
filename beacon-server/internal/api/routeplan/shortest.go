@@ -52,11 +52,13 @@ type bans struct {
 }
 
 // ShortestPaths returns up to k loopless shortest paths from src to dst
-// (Yen's algorithm over Dijkstra), best first. Mid-nodes must be
-// repeaters/room servers; endpoints may be any type. The effective hop bound
-// is computed once from cfg and used for the first search, every spur
-// search's remaining budget, and the combined-length guard, so all three
-// always agree. now anchors the SNR freshness check.
+// (Yen's algorithm over Dijkstra), best first. The planner is repeater-only
+// end-to-end (MeshCore repeater routes): endpoints are validated repeaters by
+// the caller (db/handler layer) and only repeaters are routable as
+// intermediate transit nodes. The effective hop bound is computed once from
+// cfg and used for the first search, every spur search's remaining budget,
+// and the combined-length guard, so all three always agree. now anchors the
+// SNR freshness check.
 func ShortestPaths(g Graph, cfg Config, src, dst uuid.UUID, k int, now time.Time) []Path {
 	if k <= 0 {
 		return nil
@@ -182,9 +184,13 @@ func dijkstra(g Graph, cfg Config, src, dst uuid.UUID, b *bans, now time.Time, m
 					continue
 				}
 			}
+			// Repeater-only transit: endpoints are validated repeaters
+			// upstream, and every intermediate hop must be a repeater.
+			// Companion/sensor/room_server can never forward a MeshCore
+			// repeater route.
 			if v != dst {
 				n, ok := g.Nodes[v]
-				if !ok || (n.Type != NodeTypeRepeater && n.Type != NodeTypeRoomServer) {
+				if !ok || n.Type != NodeTypeRepeater {
 					continue
 				}
 			}

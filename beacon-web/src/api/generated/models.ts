@@ -91,7 +91,7 @@ export type PlannedRoute = { containsStaleNodes: boolean; hasUnmeasuredLegs: boo
 
 export type PlannedRouteLeg = { from: string; neighbor: boolean; observationCount: number; snr?: number; snrLastSeen: number; snrSampleCount: number; to: string; unmeasured: boolean; };
 
-export type PlannedRouteNode = { id: string; latitude?: number; longitude?: number; name?: string; nodeType: number; nodeTypeName: string; publicKey: string; stale: boolean; };
+export type PlannedRouteNode = { id: string; latitude?: number; longitude?: number; name?: string; nodeType: number; nodeTypeName: string; publicKey: string; stale: boolean; supportsMultibytePaths: boolean; };
 
 export type RadioPreset = { codingRate?: number; count: number; iata: string; preset: string; sourceType: string; suggestedTitle?: string; };
 

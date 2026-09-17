@@ -65,6 +65,9 @@ type Querier interface {
 	// Copyright 2026 Beacon Contributors
 	// SPDX-License-Identifier: AGPL-3.0-or-later
 	GetNodePathPublicKey(ctx context.Context, id uuid.UUID) ([]byte, error)
+	// Route-planner endpoint validation: the planner is repeater-only, so the
+	// handler must know the endpoint type. NULL (no row) means unknown key.
+	GetNodeTypeByPubkey(ctx context.Context, publicKey []byte) (int16, error)
 	GetNodesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]GetNodesByIDsRow, error)
 	GetObserverBrokers(ctx context.Context, observerID uuid.UUID) ([]GetObserverBrokersRow, error)
 	GetObserverByID(ctx context.Context, id uuid.UUID) (Observer, error)

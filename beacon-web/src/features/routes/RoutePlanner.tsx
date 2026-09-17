@@ -17,7 +17,8 @@ import { RoutePlannerMapLazy } from './RoutePlannerMapLazy';
 import { NodeCombobox, type NodePick } from './NodeCombobox';
 import { NodeLabel } from './NodeLabel';
 import { CopyButton } from '../../components/CopyButton';
-import { plannedRouteToMeshcore } from './route-features';
+import { ErrorBoundary } from '../../components/ErrorBoundary';
+import { exportMeshcoreRoute } from './route-features';
 import type { PlannedRoute, PlannedRouteLeg, PlannedRouteNode } from '../../types/api';
 
 function LegRow({ leg, index }: { leg: PlannedRouteLeg; index: number }) {
@@ -70,9 +71,16 @@ function RouteCard({
   const { t } = useTranslation();
   const via = route.nodes.slice(1, -1);
   // MeshCore export for this card's route (best or alternative): canonical
-  // ordered repeater list from the legs, or null when a hop lacks a valid
-  // full public key — then no copy button is rendered at all.
-  const meshcoreRoute = plannedRouteToMeshcore(route);
+  // ordered repeater list from the legs. `too-long` (over the 21-hash
+  // MeshCore limit) renders an explanation; other failures hide the row so
+  // no broken/partial route can ever be copied.
+  const meshcoreExport = exportMeshcoreRoute(route);
+  const meshcoreRoute = meshcoreExport.ok ? meshcoreExport.value : null;
+  const meshcoreTooLong = !meshcoreExport.ok && meshcoreExport.reason === 'too-long';
+  // 3-byte forwarding is confirmed per node from the planner response.
+  // Unconfirmed (unknown, never "known incompatible") warns without
+  // blocking the copy.
+  const multibyteUnconfirmed = route.nodes.some((n) => n.supportsMultibytePaths !== true);
   return (
     <div
       className={`w-full rounded border px-3 py-2 text-left transition-colors ${
@@ -141,21 +149,39 @@ function RouteCard({
           <LegRow key={`${leg.from}-${leg.to}-${i}`} leg={leg} index={i} />
         ))}
       </div>
-      {meshcoreRoute != null && (
-        <div className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5">
-          <span
-            className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-dim"
-            title={meshcoreRoute}
-          >
-            {meshcoreRoute}
-          </span>
-          <CopyButton
-            value={meshcoreRoute}
-            label={t('routes.copyMeshcoreRoute')}
-            copiedLabel={t('routes.meshcoreRouteCopied')}
-            ariaLabel={t('routes.copyMeshcoreRoute')}
-            className="shrink-0"
-          />
+      {meshcoreTooLong ? (
+        <div
+          role="status"
+          className="mt-1.5 border-t border-border-subtle pt-1.5 font-mono text-[11px] text-warn"
+        >
+          {t('routes.meshcoreTooLong')}
+        </div>
+      ) : (
+        meshcoreRoute != null && (
+          <div className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5">
+            <span
+              className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-dim"
+              title={meshcoreRoute}
+            >
+              {meshcoreRoute}
+            </span>
+            <CopyButton
+              value={meshcoreRoute}
+              label={t('routes.copyMeshcoreRoute')}
+              copiedLabel={t('routes.meshcoreRouteCopied')}
+              ariaLabel={t('routes.copyMeshcoreRoute')}
+              className="shrink-0"
+            />
+          </div>
+        )
+      )}
+      {meshcoreRoute != null && multibyteUnconfirmed && (
+        <div
+          role="status"
+          className="mt-1.5 font-mono text-[11px] text-warn"
+          title={t('routes.multibyteUnconfirmed')}
+        >
+          {t('routes.multibyteUnconfirmed')}
         </div>
       )}
     </div>
@@ -176,6 +202,8 @@ export function RoutePlanner() {
   // URL is the source of truth for shareable state; resolve pubkeys to picks once.
   // Derived during render (no effects): query data arriving flips the pick on
   // the next render, and user picks replace the whole value so no fight.
+  // Repeater-only: a URL pubkey resolving to a non-repeater (or an unlocated
+  // node) never becomes an endpoint — the planner shows a validation state.
   const urlFrom = search.from?.toLowerCase() ?? null;
   const urlTo = search.to?.toLowerCase() ?? null;
   const urlAlt = search.alt ?? 0;
@@ -186,26 +214,46 @@ export function RoutePlanner() {
   const { data: toNode } = useQuery({
     ...routeQueries.byPubkey(urlTo && !to ? urlTo : null),
   });
-  const resolvedFrom: NodePick | null =
-    from ??
-    (urlFrom && fromNode && fromNode.lat != null && fromNode.lng != null
-      ? {
-          publicKey: fromNode.publicKey.toLowerCase(),
-          name: fromNode.name,
-          lat: fromNode.lat,
-          lng: fromNode.lng,
-        }
-      : null);
-  const resolvedTo: NodePick | null =
-    to ??
-    (urlTo && toNode && toNode.lat != null && toNode.lng != null
-      ? {
-          publicKey: toNode.publicKey.toLowerCase(),
-          name: toNode.name,
-          lat: toNode.lat,
-          lng: toNode.lng,
-        }
-      : null);
+  // tri-state: undefined = still resolving (query in flight), null = resolved
+  // non-repeater/invalid (validation state), NodePick = usable repeater.
+  const urlFromPick: NodePick | null | undefined =
+    urlFrom == null || from
+      ? undefined
+      : fromNode === undefined
+        ? undefined
+        : fromNode != null &&
+            fromNode.nodeType === 2 &&
+            fromNode.lat != null &&
+            fromNode.lng != null
+          ? {
+              publicKey: fromNode.publicKey.toLowerCase(),
+              name: fromNode.name,
+              lat: fromNode.lat,
+              lng: fromNode.lng,
+              nodeType: fromNode.nodeType,
+            }
+          : null;
+  const urlToPick: NodePick | null | undefined =
+    urlTo == null || to
+      ? undefined
+      : toNode === undefined
+        ? undefined
+        : toNode != null && toNode.nodeType === 2 && toNode.lat != null && toNode.lng != null
+          ? {
+              publicKey: toNode.publicKey.toLowerCase(),
+              name: toNode.name,
+              lat: toNode.lat,
+              lng: toNode.lng,
+              nodeType: toNode.nodeType,
+            }
+          : null;
+  // A URL endpoint that finished resolving to a non-repeater (or an
+  // unlocated/unknown node): hard validation state, never a silent endpoint.
+  const urlFromInvalid = urlFrom != null && !from && fromNode !== undefined && urlFromPick == null;
+  const urlToInvalid = urlTo != null && !to && toNode !== undefined && urlToPick == null;
+  const urlEndpointInvalid = urlFromInvalid || urlToInvalid;
+  const resolvedFrom: NodePick | null = from ?? urlFromPick ?? null;
+  const resolvedTo: NodePick | null = to ?? urlToPick ?? null;
   const shownActive = urlAlt;
 
   const pair =
@@ -243,7 +291,7 @@ export function RoutePlanner() {
   };
 
   const sameNode = resolvedFrom && resolvedTo && resolvedFrom.publicKey === resolvedTo.publicKey;
-  const showResults = pair !== null && !sameNode;
+  const showResults = pair !== null && !sameNode && !urlEndpointInvalid;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -285,7 +333,12 @@ export function RoutePlanner() {
               {t('routes.sameNodeHint')}
             </div>
           )}
-          {!showResults && !sameNode && (
+          {urlEndpointInvalid && !sameNode && (
+            <div role="alert" className="font-mono text-[13px] text-warn">
+              {t('routes.nonRepeaterEndpoint')}
+            </div>
+          )}
+          {!showResults && !sameNode && !urlEndpointInvalid && (
             <div className="font-mono text-[13px] text-text-dim">{t('routes.pickBoth')}</div>
           )}
           {showResults && isLoading && (
@@ -317,7 +370,20 @@ export function RoutePlanner() {
         <div className="relative min-h-[320px] flex-1 lg:min-h-0">
           {paths.length > 0 ? (
             <div data-testid="route-map" className="absolute inset-0">
-              <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+              {/* Local boundary: a MapLibre/chunk/WebGL failure must never
+                  unmount the route cards above — map errors stay in this pane. */}
+              <ErrorBoundary
+                fallback={
+                  <div
+                    role="status"
+                    className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-3 text-center font-mono text-xs text-text-muted"
+                  >
+                    <span>{t('routes.mapFailed')}</span>
+                  </div>
+                }
+              >
+                <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+              </ErrorBoundary>
             </div>
           ) : (
             <div className="flex h-full min-h-[320px] items-center justify-center px-3 text-center font-mono text-xs text-text-muted">

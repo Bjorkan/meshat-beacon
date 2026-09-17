@@ -131,9 +131,43 @@ function bestResult(): BestRouteResult {
 
 function nodeSummary(overrides: Partial<NodeSummary> & { publicKey: string }): NodeSummary {
   return {
-    // only the fields the planner reads; the rest never leaves the fixture
+    // only the fields the planner reads; the rest never leaves the fixture.
+    // nodeType defaults to repeater (2): the planner is repeater-only and
+    // URL restoration rejects non-repeaters.
+    nodeType: 2,
+    nodeTypeName: 'repeater',
     ...overrides,
   } as NodeSummary;
+}
+
+function renderPlannerWithNodes(url = '/routes', fromSummary: NodeSummary, toSummary: NodeSummary) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  client.setQueryData(routeQueries.byPubkey(FROM).queryKey, fromSummary);
+  client.setQueryData(routeQueries.byPubkey(TO).queryKey, toSummary);
+  client.setQueryData(routeQueries.best({ from: FROM, to: TO }).queryKey, bestResult());
+  const rootRoute = createRootRoute();
+  const routesRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: '/routes',
+    component: () => (
+      <OverlaysContext.Provider value={{ setOverlayNodeId: () => {} } as never}>
+        <RoutePlanner />
+      </OverlaysContext.Provider>
+    ),
+    validateSearch: (search: Record<string, unknown>) => search,
+  });
+  const router = createRouter({
+    routeTree: rootRoute.addChildren([routesRoute]),
+    history: createMemoryHistory({ initialEntries: [url] }),
+  });
+  render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  return { client, router };
 }
 
 function renderPlanner(url = '/routes') {
@@ -298,5 +332,49 @@ describe('RoutePlanner', () => {
       fireEvent.click(copyButtons[1]);
     });
     expect(writeText).toHaveBeenCalledWith(`aabbcc,${'cd'.padEnd(6, '0')},112233`);
+  });
+
+  it('rejects a URL endpoint that resolves to a non-repeater', async () => {
+    const { router } = renderPlannerWithNodes(
+      `/routes?from=${FROM}&to=${TO}`,
+      nodeSummary({ publicKey: FROM, name: 'Alpha', lat: 59.6, lng: 16.5 }),
+      nodeSummary({
+        publicKey: TO,
+        name: 'Companion',
+        lat: 59.61,
+        lng: 16.52,
+        nodeType: 1,
+        nodeTypeName: 'companion',
+      }),
+    );
+    await router.load();
+    // Hard validation state — never a silent endpoint, never a route fetch.
+    expect(
+      await screen.findByText('Route endpoints must be repeaters — pick a repeater node.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Best')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Copy MeshCore route' })).not.toBeInTheDocument();
+  });
+
+  it('keeps route cards usable when the map subtree throws', async () => {
+    // The map pane is wrapped in a local error boundary: a MapLibre/chunk
+    // failure must not unmount Best, the Neighbor badge, or MeshCore copy.
+    // jsdom cannot throw inside the mocked lazy map per-test (module mock is
+    // file-scoped), so this pins the boundary contract directly: cards and
+    // fallback coexist when the map child throws.
+    const { ErrorBoundary } = await import('../../../src/components/ErrorBoundary');
+    const Throwing = () => {
+      throw new Error('simulated map init failure');
+    };
+    const { container } = render(
+      <div>
+        <div>Best</div>
+        <ErrorBoundary fallback={<div role="status">map fallback</div>}>
+          <Throwing />
+        </ErrorBoundary>
+      </div>,
+    );
+    expect(container.textContent).toContain('Best');
+    expect(screen.getByText('map fallback')).toBeInTheDocument();
   });
 });

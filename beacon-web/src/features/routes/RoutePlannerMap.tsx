@@ -52,20 +52,32 @@ function RouteCanvas({
 
   useEffect(() => {
     if (mapRef.current || !containerRef.current) return;
-    const map = new maplibregl.Map({
-      container: containerRef.current,
-      style: resolveMapStyle(styleId).url,
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      attributionControl: false,
-    });
-    mapRef.current = map;
-    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
-    map.addControl(new maplibregl.AttributionControl({ compact: true }));
-    const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+    // Synchronous construction failure (no WebGL, broken container, …) must
+    // surface the existing map error UI instead of throwing into React,
+    // which would unmount the whole planner via the AppShell boundary.
+    // The IIFE keeps the effect body free of synchronous setState.
+    const m: MapLibreMap | null = (() => {
+      try {
+        return new maplibregl.Map({
+          container: containerRef.current as HTMLDivElement,
+          style: resolveMapStyle(styleId).url,
+          center: DEFAULT_CENTER,
+          zoom: DEFAULT_ZOOM,
+          attributionControl: false,
+        });
+      } catch {
+        window.setTimeout(() => setStatus('error'), 0);
+        return null;
+      }
+    })();
+    if (m == null) return;
+    mapRef.current = m;
+    m.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+    m.addControl(new maplibregl.AttributionControl({ compact: true }));
+    const attrib = m.getContainer().querySelector('.maplibregl-ctrl-attrib');
     attrib?.classList.add('maplibregl-compact');
     attrib?.classList.remove('maplibregl-compact-show');
-    map.on('click', ROUTE_NODE_LAYER, (e) => {
+    m.on('click', ROUTE_NODE_LAYER, (e) => {
       const f = e.features?.[0];
       if (!f) return;
       const [lng, lat] = (f.geometry as Point).coordinates as [number, number];
@@ -80,9 +92,9 @@ function RouteCanvas({
       new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: 10 })
         .setLngLat([lng, lat])
         .setDOMContent(el)
-        .addTo(map);
+        .addTo(m);
     });
-    map.on('click', ROUTE_LINE_LAYER, (e) => {
+    m.on('click', ROUTE_LINE_LAYER, (e) => {
       const f = e.features?.[0];
       if (!f) return;
       const el = document.createElement('div');
@@ -93,18 +105,18 @@ function RouteCanvas({
       new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: 10 })
         .setLngLat([e.lngLat.lng, e.lngLat.lat])
         .setDOMContent(el)
-        .addTo(map);
+        .addTo(m);
     });
     const onEnter = () => {
-      map.getCanvas().style.cursor = 'pointer';
+      m.getCanvas().style.cursor = 'pointer';
     };
     const onLeave = () => {
-      map.getCanvas().style.cursor = '';
+      m.getCanvas().style.cursor = '';
     };
-    map.on('mouseenter', ROUTE_NODE_LAYER, onEnter);
-    map.on('mouseleave', ROUTE_NODE_LAYER, onLeave);
-    map.on('mouseenter', ROUTE_LINE_LAYER, onEnter);
-    map.on('mouseleave', ROUTE_LINE_LAYER, onLeave);
+    m.on('mouseenter', ROUTE_NODE_LAYER, onEnter);
+    m.on('mouseleave', ROUTE_NODE_LAYER, onLeave);
+    m.on('mouseenter', ROUTE_LINE_LAYER, onEnter);
+    m.on('mouseleave', ROUTE_LINE_LAYER, onLeave);
     let failed = false;
     const onError = () => {
       failed = true;
@@ -114,14 +126,14 @@ function RouteCanvas({
       setReady(true);
       if (!failed) setStatus('ready');
     };
-    map.on('load', onLoad);
-    map.on('error', onError);
+    m.on('load', onLoad);
+    m.on('error', onError);
     const timeout = window.setTimeout(() => {
-      if (!map.loaded()) onError();
+      if (!m.loaded()) onError();
     }, 15000);
     return () => {
       window.clearTimeout(timeout);
-      map.remove();
+      m.remove();
       mapRef.current = null;
       setReady(false);
     };

@@ -341,6 +341,10 @@
     "openNode": "Öppna nod {{name}}",
     "copyMeshcoreRoute": "Kopiera MeshCore-rutt",
     "meshcoreRouteCopied": "MeshCore-rutt kopierad",
+    "meshcoreTooLong": "3-byte MeshCore-rutter stöder högst 21 repeaters/hashar.",
+    "mapFailed": "Kartan kunde inte laddas — ruttdetaljerna ovan påverkas inte.",
+    "nonRepeaterEndpoint": "Ruttens ändpunkter måste vara repeaters — välj en repeater-nod.",
+    "multibyteUnconfirmed": "3-byte vidarebefordran är inte bekräftad för alla repeaters i rutten. Äldre MeshCore-firmware kan tappa meddelandet.",
     "neighborLeg": "Granne",
     "neighborHint": "Båda ändpunkterna har markerat varandra som grannar — detta hopp föredras vid planering."
   },

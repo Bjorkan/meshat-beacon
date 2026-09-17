@@ -51,6 +51,12 @@ const best: BestRouteResult = {
 
 async function mockApi(page: Page) {
   await page.addInitScript(() => localStorage.setItem('beacon-language', 'en'));
+  // console/pageerror capture: a map-init exception must be visible in CI
+  // logs rather than inferred from a disappearing element.
+  page.on('pageerror', (err) => console.log(`[browser-pageerror] ${err.message}`));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') console.log(`[browser-console-error] ${msg.text()}`);
+  });
   await page.route('**/api/v1/**', async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname;
@@ -62,6 +68,9 @@ async function mockApi(page: Page) {
       const pubkey = url.searchParams.get('pubkey');
       const name = url.searchParams.get('name');
       const prefix = url.searchParams.get('pubkeyPrefix');
+      // The repeater-only planner passes type=repeater on suggest/lookup
+      // calls; the mock honors it so picker filtering is actually exercised.
+      const onlyRepeaters = url.searchParams.get('type') === 'repeater';
       const items = [];
       const alpha = {
         id: 'id-a',
@@ -81,10 +90,21 @@ async function mockApi(page: Page) {
         nodeType: 2,
         nodeTypeName: 'repeater',
       };
+      const companion = {
+        id: 'id-c',
+        publicKey: 'cc'.padEnd(64, '0'),
+        name: 'Companion',
+        lat: 59.62,
+        lng: 16.53,
+        nodeType: 1,
+        nodeTypeName: 'companion',
+      };
       if (pubkey === FROM) items.push(alpha);
       else if (pubkey === TO) items.push(beta);
       else if (name && 'alpha'.includes(name.toLowerCase())) items.push(alpha);
       else if (name && 'beta'.includes(name.toLowerCase())) items.push(beta);
+      else if (name && 'companion'.includes(name.toLowerCase()) && !onlyRepeaters)
+        items.push(companion);
       else if (prefix && FROM.startsWith(prefix.toLowerCase())) items.push(alpha);
       else if (prefix && TO.startsWith(prefix.toLowerCase())) items.push(beta);
       await route.fulfill({ json: { items, hasMore: false } });
@@ -122,4 +142,18 @@ test('route planner picks nodes by name search', async ({ page }) => {
   await page.getByRole('option', { name: /Alpha/ }).click();
   // pick survived into the field
   await expect(fromBox).toHaveValue('Alpha');
+});
+
+test('route planner picker never surfaces non-repeaters', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/routes');
+  await expect(
+    page.getByText('Pick a from-node and a to-node to plan a route.').first(),
+  ).toBeVisible();
+  const fromBox = page.getByRole('combobox', { name: 'From' });
+  await fromBox.click();
+  await fromBox.fill('companion');
+  // A companion exists server-side but the repeater-only picker must not
+  // offer it through any picker path.
+  await expect(page.getByRole('option', { name: /Companion/ })).toHaveCount(0);
 });

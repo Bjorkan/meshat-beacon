@@ -48,6 +48,14 @@ type PlannedRouteNode struct {
 	NodeType     int16     `json:"nodeType" binding:"required"`
 	NodeTypeName string    `json:"nodeTypeName" binding:"required"`
 	Stale        bool      `json:"stale" binding:"required"`
+	// SupportsMultibytePaths reports confirmed 3-byte path-hash forwarding
+	// (firmware 1.14+). False means "not confirmed yet", NOT "known
+	// incompatible": the flag starts false on a cold deployment until enough
+	// advert/path traffic has been observed. The MeshCore exporter warns
+	// (without blocking the copy) when any repeater in the route is
+	// unconfirmed. Tri-state (confirmed/unknown/unsupported) is future work;
+	// today only confirmed-true is actionable.
+	SupportsMultibytePaths bool `json:"supportsMultibytePaths" binding:"required"`
 }
 
 // PlannedRoute is one computed path between two nodes, best first.

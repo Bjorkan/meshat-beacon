@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  MESHCORE_3BYTE_MAX_HASHES,
+  exportMeshcoreRoute,
   plannedRouteToMeshcore,
   routesToFeatures,
 } from '../../../src/features/routes/route-features';
@@ -152,5 +154,30 @@ describe('plannedRouteToMeshcore', () => {
     expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, 'bbbbbb']))).toBeNull();
     expect(plannedRouteToMeshcore(meshcoreRoute(['aaaaaa', FULL_B]))).toBeNull();
     expect(plannedRouteToMeshcore(meshcoreRoute([FULL_A, FULL_B, 'zz']))).toBeNull();
+  });
+
+  it('rejects a discontinuous leg chain instead of exporting a broken route', () => {
+    // A -> B, C -> D would naively export A,B,D — the exporter must refuse.
+    const broken: PlannedRoute = {
+      ...meshcoreRoute([FULL_A, FULL_B]),
+      legs: [meshcoreLeg(FULL_A, FULL_B), meshcoreLeg(FULL_C, FULL_D)],
+    };
+    const res = exportMeshcoreRoute(broken);
+    expect(res).toEqual({ ok: false, reason: 'discontinuous' });
+    expect(plannedRouteToMeshcore(broken)).toBeNull();
+  });
+
+  it(`accepts exactly ${21} exported ids and rejects 22 (legs+1 semantics)`, () => {
+    expect(MESHCORE_3BYTE_MAX_HASHES).toBe(21);
+    const keys21 = Array.from({ length: 21 }, (_, i) => i.toString(16).padStart(2, '0').repeat(32));
+    const ok21 = exportMeshcoreRoute(meshcoreRoute(keys21));
+    expect(ok21.ok).toBe(true);
+    if (ok21.ok) {
+      // 21 legs would be 22 ids; here legs = 20 so ids = 21.
+      expect(ok21.value.split(',')).toHaveLength(21);
+    }
+    const keys22 = [...keys21, 'ff'.repeat(32)];
+    expect(exportMeshcoreRoute(meshcoreRoute(keys22))).toEqual({ ok: false, reason: 'too-long' });
+    expect(plannedRouteToMeshcore(meshcoreRoute(keys22))).toBeNull();
   });
 });

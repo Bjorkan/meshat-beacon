@@ -40,13 +40,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-// NodeTypeRepeater and NodeTypeRoomServer are the only routable mid-node types,
-// mirroring path resolution (node_short_ids only covers infra types 2/3).
-// Endpoints may be any type.
-const (
-	NodeTypeRepeater   = 2
-	NodeTypeRoomServer = 3
-)
+// NodeTypeRepeater is the only routable node type in the planner: the route
+// planner is a MeshCore repeater-route feature (repeater -> repeater -> ...),
+// so BuildGraph drops non-repeater endpoints and dijkstra only transits
+// repeaters. Node_short_ids covers infra types 2/3 for path resolution, but
+// room servers never forward a planned repeater route.
+const NodeTypeRepeater = 2
+
+// NodeTypeRoomServer is retained for callers that classify node types outside
+// the planner (path resolution covers infra types 2/3). It is NOT routable.
+const NodeTypeRoomServer = 3
 
 // Config is the planner's cost model. Build it from config.ResolvedConfig via
 // FromResolved so defaults live in exactly one place.
@@ -87,14 +90,20 @@ func FromResolved(r config.ResolvedConfig) Config {
 	}
 }
 
-// Node is a located mesh node in the planning graph.
+// Node is a located mesh node in the planning graph. The route planner is
+// repeater-only end-to-end (MeshCore repeater routes): BuildGraph keeps
+// repeater nodes, and only repeaters are routable as endpoints or transit.
 type Node struct {
 	ID       uuid.UUID
 	Pubkey   string // lowercase hex
 	Name     *string
-	Type     int16
+	Type     int16 // always NodeTypeRepeater in planner graphs
 	Lat, Lng float64
 	Stale    bool
+	// SupportsMultibytePaths mirrors nodes.supports_multibyte_paths: true
+	// only when 3-byte forwarding is confirmed. False is "not confirmed
+	// yet", never "known incompatible".
+	SupportsMultibytePaths bool
 }
 
 // Edge is one directed, IATA-merged neighbor leg with its cost inputs.
@@ -187,8 +196,10 @@ func haversineKm(lat1, lon1, lat2, lon2 float64) float64 {
 	return 2 * r * math.Asin(math.Sqrt(a))
 }
 
-// BuildGraph folds directed neighbor rows into a planning graph. Rows
-// touching an unlocated endpoint are dropped (they cannot be drawn); legs
+// BuildGraph folds directed neighbor rows into a repeater-only planning
+// graph. Rows touching an unlocated endpoint are dropped (they cannot be
+// drawn); rows touching a non-repeater endpoint are dropped (the planner is
+// a MeshCore repeater-route feature: repeater -> repeater -> ...). Legs
 // longer than maxKm between two located endpoints are dropped (not radio
 // hops -- same sanity rule as ingest). Opposite directed rows stay separate
 // edges; their SNR is merged per direction across IATA rows, while the direct
@@ -206,6 +217,9 @@ func BuildGraph(rows []db.GetRoutePlanGraphRow, staleThreshold time.Duration, ma
 		if r.FromLat == nil || r.FromLng == nil || r.ToLat == nil || r.ToLng == nil {
 			continue
 		}
+		if r.FromType != NodeTypeRepeater || r.ToType != NodeTypeRepeater {
+			continue
+		}
 		if maxKm > 0 && haversineKm(*r.FromLat, *r.FromLng, *r.ToLat, *r.ToLng) > maxKm {
 			continue
 		}
@@ -213,12 +227,14 @@ func BuildGraph(rows []db.GetRoutePlanGraphRow, staleThreshold time.Duration, ma
 			nodes[r.FromID] = Node{
 				ID: r.FromID, Pubkey: lowerHex(r.FromPubkey), Name: r.FromName,
 				Type: r.FromType, Lat: *r.FromLat, Lng: *r.FromLng,
+				SupportsMultibytePaths: r.FromSupportsMultibytePaths,
 			}
 		}
 		if _, ok := nodes[r.ToID]; !ok {
 			nodes[r.ToID] = Node{
 				ID: r.ToID, Pubkey: lowerHex(r.ToPubkey), Name: r.ToName,
 				Type: r.ToType, Lat: *r.ToLat, Lng: *r.ToLng,
+				SupportsMultibytePaths: r.ToSupportsMultibytePaths,
 			}
 		}
 		key := dirKey{from: r.FromID, to: r.ToID}
