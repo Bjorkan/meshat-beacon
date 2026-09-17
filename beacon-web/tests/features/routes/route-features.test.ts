@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MESHCORE_3BYTE_MAX_HASHES,
   exportMeshcoreRoute,
+  plannedRouteCoords,
   plannedRouteToMeshcore,
   routesToFeatures,
 } from '../../../src/features/routes/route-features';
@@ -75,9 +76,41 @@ describe('routesToFeatures active ordering', () => {
       nodes: route(undefined, true).nodes.map((n) => ({ ...n, publicKey: `${n.publicKey}2` })),
       legs: [{ ...route(undefined, true).legs[0], from: 'aa2', to: 'bb2' }],
     };
-    const { lines } = routesToFeatures([r0, r1], 0, palette);
+    const { lines, points } = routesToFeatures([r0, r1], 0, palette);
     expect(lines.features.map((f) => f.properties.routeIndex)).toEqual([1, 0]);
     expect(lines.features[lines.features.length - 1].properties.active).toBe(true);
+    // shared nodes keep the active color too: inactive points sort first so
+    // the active point marker paints on top of its grey twin.
+    expect(points.features[points.features.length - 1].properties.active).toBe(true);
+  });
+});
+
+describe('plannedRouteCoords', () => {
+  it('returns ordered drawable coords and skips unlocated nodes', () => {
+    const r = route(undefined, true);
+    const withUnlocated: PlannedRoute = {
+      ...r,
+      nodes: [
+        r.nodes[0],
+        { ...r.nodes[1], latitude: undefined, longitude: undefined },
+        { ...r.nodes[0], publicKey: 'cc' },
+      ],
+    };
+    expect(plannedRouteCoords(r)).toEqual([
+      [16.5, 59.6],
+      [16.52, 59.61],
+    ]);
+    // unlocated middle node skipped: flow rides start → end directly
+    expect(plannedRouteCoords(withUnlocated)).toEqual([
+      [16.5, 59.6],
+      [16.5, 59.6],
+    ]);
+  });
+
+  it('returns an empty path for a route without drawable nodes', () => {
+    const r = route(undefined, true);
+    const empty: PlannedRoute = { ...r, nodes: [] };
+    expect(plannedRouteCoords(empty)).toEqual([]);
   });
 });
 

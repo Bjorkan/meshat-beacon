@@ -3,6 +3,24 @@ import type { BestRouteResult } from '../../src/types/api';
 
 const FROM = 'aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899';
 const TO = '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff';
+const MID = 'cc'.padEnd(64, '0');
+
+function leg(
+  from: string,
+  to: string,
+  extra: Partial<BestRouteResult['paths'][number]['legs'][number]> = {},
+) {
+  return {
+    from,
+    to,
+    snrSampleCount: 0,
+    snrLastSeen: 0,
+    observationCount: 5,
+    unmeasured: true,
+    neighbor: false,
+    ...extra,
+  };
+}
 
 const best: BestRouteResult = {
   paths: [
@@ -30,20 +48,56 @@ const best: BestRouteResult = {
         },
       ],
       legs: [
-        {
-          from: FROM,
-          to: TO,
+        leg(FROM, TO, {
           snr: 7.5,
           snrSampleCount: 3,
           snrLastSeen: 1,
-          observationCount: 5,
           unmeasured: false,
           neighbor: true,
-        },
+        }),
       ],
       totalCost: 0.6,
       hopCount: 1,
       hasUnmeasuredLegs: false,
+      containsStaleNodes: false,
+    },
+    {
+      nodes: [
+        {
+          id: 'id-a',
+          publicKey: FROM,
+          name: 'Alpha',
+          latitude: 59.6,
+          longitude: 16.5,
+          nodeType: 2,
+          nodeTypeName: 'repeater',
+          stale: false,
+        },
+        {
+          id: 'id-m',
+          publicKey: MID,
+          name: 'Mid',
+          latitude: 59.605,
+          longitude: 16.51,
+          nodeType: 2,
+          nodeTypeName: 'repeater',
+          stale: false,
+        },
+        {
+          id: 'id-b',
+          publicKey: TO,
+          name: 'Beta',
+          latitude: 59.61,
+          longitude: 16.52,
+          nodeType: 2,
+          nodeTypeName: 'repeater',
+          stale: false,
+        },
+      ],
+      legs: [leg(FROM, MID), leg(MID, TO)],
+      totalCost: 5,
+      hopCount: 2,
+      hasUnmeasuredLegs: true,
       containsStaleNodes: false,
     },
   ],
@@ -127,6 +181,16 @@ test('route planner restores from/to from the URL and shows the neighbor leg', a
   // map pane renders synchronously with results (the inner WebGL canvas is
   // engine-dependent and asserted separately from pane presence)
   await expect(page.getByTestId('route-map')).toBeVisible();
+});
+
+test('route planner switches route by clicking the whole alternative card', async ({ page }) => {
+  // Google-Maps-style: clicking anywhere on the grey alternative card body
+  // (not just the small select button) makes it the active route.
+  await mockApi(page);
+  await page.goto(`/routes?from=${FROM}&to=${TO}`);
+  await expect(page.getByText('Alternative 1')).toBeVisible();
+  await page.getByRole('button', { name: 'Show Alternative 1 on the map' }).click();
+  await expect(page).toHaveURL(/alt=1/);
 });
 
 test('route planner picks nodes by name search', async ({ page }) => {

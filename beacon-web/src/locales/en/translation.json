@@ -329,6 +329,7 @@
     "planning": "Planning…",
     "best": "Best",
     "alternative": "Alternative {{n}}",
+    "selectRoute": "Show {{label}} on the map",
     "hops": "{{count}} hops",
     "via": "via {{nodes}}",
     "unmeasuredLeg": "Unmeasured",

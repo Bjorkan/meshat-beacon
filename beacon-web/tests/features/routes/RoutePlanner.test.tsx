@@ -16,8 +16,28 @@ import type { NodeSummary } from '../../../src/features/nodes/types';
 
 // The WebGL map can't render in jsdom: stub the canvas, keep the route list logic.
 vi.mock('../../../src/features/routes/RoutePlannerMapLazy', () => ({
-  RoutePlannerMapLazy: ({ activeIndex }: { activeIndex: number }) => (
-    <div data-testid="route-map-stub">{`active:${activeIndex}`}</div>
+  RoutePlannerMapLazy: ({
+    activeIndex,
+    onSelectRoute,
+    paths,
+  }: {
+    activeIndex: number;
+    onSelectRoute: (index: number) => void;
+    paths: { hopCount: number }[];
+  }) => (
+    <div>
+      <div data-testid="route-map-stub">{`active:${activeIndex}`}</div>
+      {paths.map((_, i) => (
+        <button
+          key={i}
+          type="button"
+          data-testid={`route-line-${i}`}
+          onClick={() => onSelectRoute(i)}
+        >
+          {`line:${i}`}
+        </button>
+      ))}
+    </div>
   ),
 }));
 
@@ -254,6 +274,27 @@ describe('RoutePlanner', () => {
     const selectButtons = screen.getAllByRole('button', { name: /^(Best|Alternative 1)$/ });
     expect(selectButtons.length).toBe(2);
     fireEvent.click(selectButtons[1]);
+    await waitFor(() =>
+      expect(screen.getByTestId('route-map-stub').textContent).toContain('active:1'),
+    );
+  });
+
+  it('clicking anywhere on an inactive card body selects that route', async () => {
+    // Google-Maps-style: the whole card (not just the small select button)
+    // switches the active route; nested copy/open-node controls opt out.
+    await renderReady(`/routes?from=${FROM}&to=${TO}`);
+    await screen.findByText('Alternative 1');
+    const card = screen.getByRole('button', { name: 'Show Alternative 1 on the map' });
+    fireEvent.click(card);
+    await waitFor(() =>
+      expect(screen.getByTestId('route-map-stub').textContent).toContain('active:1'),
+    );
+  });
+
+  it('clicking an inactive map line selects that route', async () => {
+    await renderReady(`/routes?from=${FROM}&to=${TO}`);
+    await screen.findByText('Alternative 1');
+    fireEvent.click(screen.getByTestId('route-line-1'));
     await waitFor(() =>
       expect(screen.getByTestId('route-map-stub').textContent).toContain('active:1'),
     );

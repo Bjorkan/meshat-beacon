@@ -329,6 +329,7 @@
     "planning": "Planerar…",
     "best": "Bästa",
     "alternative": "Alternativ {{n}}",
+    "selectRoute": "Visa {{label}} på kartan",
     "hops": "{{count}} hopp",
     "via": "via {{nodes}}",
     "unmeasuredLeg": "Omätt",

@@ -12,6 +12,7 @@ export function RoutePlannerMapLazy(props: {
   paths: PlannedRoute[];
   activeIndex: number;
   styleId: string;
+  onSelectRoute: (index: number) => void;
 }) {
   const { t } = useTranslation();
   return (

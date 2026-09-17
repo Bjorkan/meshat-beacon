@@ -147,13 +147,27 @@ export function routesToFeatures(
       });
     });
   });
-  // alternatives under the best path: draw dimmed routes first so the active
-  // route paints on top. Active features sort last (source order = paint
-  // order for the single line layer).
+  // alternatives under the active route: draw inactive routes first so the
+  // active route paints on top. Active features sort last (source order =
+  // paint order for the single line layer — and for coincident point
+  // markers, so a node shared with the active route keeps its active color).
   lines.sort((a, b) => Number(a.properties.active) - Number(b.properties.active));
+  points.sort((a, b) => Number(a.properties.active) - Number(b.properties.active));
   return {
     lines: { type: 'FeatureCollection', features: lines },
     points: { type: 'FeatureCollection', features: points },
     bounds,
   };
+}
+
+// Ordered drawable coordinates of one planned route (start → end), skipping
+// unlocated nodes. Pure (no maplibre) so the map's hop-flow animation stays
+// unit-testable; the path is loopless from Yen so no dedupe is needed.
+export function plannedRouteCoords(path: PlannedRoute): [number, number][] {
+  const out: [number, number][] = [];
+  for (const n of path.nodes) {
+    if (n.latitude == null || n.longitude == null) continue;
+    out.push([n.longitude, n.latitude]);
+  }
+  return out;
 }

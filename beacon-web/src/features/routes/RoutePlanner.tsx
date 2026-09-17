@@ -81,9 +81,27 @@ function RouteCard({
   // Unconfirmed (unknown, never "known incompatible") warns without
   // blocking the copy.
   const multibyteUnconfirmed = route.nodes.some((n) => n.supportsMultibytePaths !== true);
+  const label = index === 0 ? t('routes.best') : t('routes.alternative', { n: index });
+  // Whole card selects the route (Google-Maps-style: click any grey route
+  // to make it active). Nested interactive controls stop propagation so
+  // copying or opening a node never switches the selection. Keyboard: the
+  // dedicated select button keeps a native focus target + aria-pressed.
   return (
     <div
-      className={`w-full rounded border px-3 py-2 text-left transition-colors ${
+      role="button"
+      tabIndex={active ? -1 : 0}
+      aria-pressed={active}
+      aria-label={t('routes.selectRoute', { label })}
+      onClick={() => {
+        if (!active) onSelect();
+      }}
+      onKeyDown={(e) => {
+        if (!active && (e.key === 'Enter' || e.key === ' ')) {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`w-full cursor-pointer rounded border px-3 py-2 text-left transition-colors ${
         active
           ? 'border-primary-dim bg-primary/5'
           : 'border-border bg-bg-base hover:border-text-dim'
@@ -109,11 +127,14 @@ function RouteCard({
         <span className="flex-1" />
         <button
           type="button"
-          onClick={onSelect}
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelect();
+          }}
           aria-pressed={active}
           className="shrink-0 rounded border border-border px-2 py-0.5 font-mono text-[11px] text-text-muted hover:border-text-dim hover:text-text-normal"
         >
-          {index === 0 ? t('routes.best') : t('routes.alternative', { n: index })}
+          {label}
         </button>
       </div>
       {via.length > 0 && (
@@ -137,7 +158,10 @@ function RouteCard({
                 name: n.name ?? n.publicKey.slice(0, 6).toUpperCase(),
               })}
               className="shrink-0 cursor-pointer font-mono text-[11px] text-primary hover:underline"
-              onClick={() => onOpenNode(n.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenNode(n.id);
+              }}
             >
               ↗
             </button>
@@ -158,7 +182,11 @@ function RouteCard({
         </div>
       ) : (
         meshcoreRoute != null && (
-          <div className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5">
+          <div
+            className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          >
             <span
               className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-dim"
               title={meshcoreRoute}
@@ -407,7 +435,12 @@ export function RoutePlanner() {
             </div>
           }
         >
-          <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+          <RoutePlannerMapLazy
+            paths={paths}
+            activeIndex={active}
+            styleId={styleId}
+            onSelectRoute={selectAlt}
+          />
         </ErrorBoundary>
       </div>
     </div>
