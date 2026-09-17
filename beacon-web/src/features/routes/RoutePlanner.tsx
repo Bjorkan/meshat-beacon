@@ -291,9 +291,11 @@ export function RoutePlanner() {
             />
           ))}
         </div>
-        <div className="relative min-h-[320px] flex-1 lg:min-h-0" data-testid="route-map">
+        <div className="relative min-h-[320px] flex-1 lg:min-h-0">
           {paths.length > 0 ? (
-            <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+            <div data-testid="route-map" className="absolute inset-0">
+              <RoutePlannerMapLazy paths={paths} activeIndex={active} styleId={styleId} />
+            </div>
           ) : (
             <div className="flex h-full min-h-[320px] items-center justify-center px-3 text-center font-mono text-xs text-text-muted">
               {showResults ? t('routes.planning') : t('routes.pickBoth')}

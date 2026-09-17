@@ -142,6 +142,34 @@ func TestLegCost_StaleDirectLosesBonus(t *testing.T) {
 	}
 }
 
+func TestIsFreshNeighbor_ZeroBonusKeepsIdentity(t *testing.T) {
+	// NeighborBonus == 0 disables only the routing discount, never the
+	// topology fact: a freshly confirmed direct edge is still a neighbor
+	// (badge true) but earns no cost discount.
+	cfg := testCfg()
+	cfg.NeighborBonus = 0
+	now := time.Now()
+	e := Edge{Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	if !cfg.IsFreshNeighbor(e, now) {
+		t.Error("fresh direct must stay a neighbor even with NeighborBonus=0")
+	}
+	c, _ := cfg.LegCost(e, now)
+	if c != 1.0 {
+		t.Errorf("zero bonus must grant no discount (cost 1.0), got %v", c)
+	}
+}
+
+func TestIsFreshNeighbor_FutureConfirmationRejected(t *testing.T) {
+	// A DirectLastSeen in the future (clock skew) must not count as fresh:
+	// negative age is rejected rather than treated as "within window".
+	cfg := testCfg()
+	now := time.Now()
+	e := Edge{Neighbor: true, DirectLastSeen: now.Add(time.Hour), SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	if cfg.IsFreshNeighbor(e, now) {
+		t.Error("future DirectLastSeen must not count as a fresh neighbor")
+	}
+}
+
 func TestIsFreshNeighbor_DisabledFreshness(t *testing.T) {
 	// DirectFreshness <= 0 disables the bonus/badge entirely, even with a
 	// brand-new confirmation -- this is what explicit direct_freshness: 0

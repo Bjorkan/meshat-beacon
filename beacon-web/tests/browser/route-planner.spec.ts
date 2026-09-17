@@ -104,7 +104,8 @@ test('route planner restores from/to from the URL and shows the neighbor leg', a
   await expect(page.getByText('AABBCC').first()).toBeVisible();
   // explicitly marked neighbor leg carries its badge
   await expect(page.getByText('Neighbor').first()).toBeVisible();
-  // map pane exists (WebGL canvas itself is engine-dependent)
+  // map pane renders synchronously with results (the inner WebGL canvas is
+  // engine-dependent and asserted separately from pane presence)
   await expect(page.getByTestId('route-map')).toBeVisible();
 });
 

@@ -118,16 +118,20 @@ routes:
 # cost) and snr_bad_db (full snr_max_penalty) is linearly interpolated;
 # unmeasured or stale legs pay unmeasured_penalty instead, which must stay >=
 # snr_max_penalty so a measured leg always beats an unmeasured one. The
-# reporter marking its peer as a neighbor (directional, freshly confirmed)
-# discounts the leg by neighbor_bonus, which must stay below
+# reporter marking its peer as a neighbor (directional, freshly confirmed
+# within direct_freshness) discounts the leg by neighbor_bonus and marks the
+# leg neighbor=true in the API, which must stay below
 # (unmeasured_penalty - snr_max_penalty) and below 1.0 so every edge cost
-# stays strictly positive for Dijkstra.
+# stays strictly positive for Dijkstra. neighbor_bonus: 0 disables ONLY the
+# routing discount -- a freshly confirmed edge still reports neighbor=true.
+# direct_freshness: 0 disables BOTH bonus and badge (no confirmation is ever
+# fresh).
 #
 # All fields are optional and unset means "use the default". An explicit value
-# -- including 0 -- is honored: neighbor_bonus: 0 disables the neighbor
-# discount, max_alternatives: 0 disables alternatives. Partial blocks are
-# validated AFTER defaults are applied, so e.g. neighbor_bonus: 10 alone is
-# rejected (it would zero out costs against the default penalties).
+# -- including 0 -- is honored: max_alternatives: 0 disables alternatives.
+# Partial blocks are validated AFTER defaults are applied, so e.g.
+# neighbor_bonus: 10 alone is rejected (it would zero out costs against the
+# default penalties).
 #routeplan:
 #  unmeasured_penalty: 2.5  # default: 2.5
 #  snr_good_db: 5.0         # default: 5.0

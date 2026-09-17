@@ -126,23 +126,30 @@ type Graph struct {
 // IsFreshNeighbor is the single shared definition of "fresh direct neighbor"
 // used by both route cost (LegCost) and API projection (toPlannedRoute): the
 // edge must be explicitly marked AND its confirmation must be within
-// DirectFreshness. DirectFreshness <= 0 means no confirmation is ever fresh,
-// i.e. the bonus/badge is disabled. now anchors the check so tests pin time.
+// DirectFreshness. Freshness is independent of the size of the cost bonus:
+// NeighborBonus == 0 disables only the routing discount, never the topology
+// fact (or the badge). DirectFreshness <= 0 means no confirmation is ever
+// fresh, i.e. the bonus/badge is disabled. A confirmation timestamp in the
+// future (clock skew) is rejected, not treated as fresh. now anchors the
+// check so tests pin time.
 func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
-	if !e.Neighbor || c.NeighborBonus <= 0 || e.DirectLastSeen.IsZero() {
+	if !e.Neighbor || e.DirectLastSeen.IsZero() {
 		return false
 	}
 	if c.DirectFreshness <= 0 {
 		return false
 	}
-	return now.Sub(e.DirectLastSeen) <= c.DirectFreshness
+	age := now.Sub(e.DirectLastSeen)
+	return age >= 0 && age <= c.DirectFreshness
 }
 
 // LegCost returns the cost of traversing e plus whether the leg counts as
 // unmeasured (no fresh SNR reading backs it). A freshly-confirmed neighbor
-// leg (see IsFreshNeighbor) earns the configured bonus; the cost is floored
-// at a small epsilon above zero so costs stay positive for Dijkstra. now
-// anchors the freshness checks so tests can pin time.
+// leg (see IsFreshNeighbor) earns the configured bonus -- zero is naturally
+// a no-op so NeighborBonus == 0 disables only the discount, never the
+// topology fact. The cost is floored at a small epsilon above zero so costs
+// stay positive for Dijkstra. now anchors the freshness checks so tests can
+// pin time.
 func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	const base = 1.0
 	bonus := 0.0
