@@ -3,7 +3,7 @@
 // suggestions), the server computes best-first paths over the global neighbor
 // graph preferring known signal strength, and the map draws them with per-leg
 // SNR colors. State lives in the URL (?from=&to=&alt=) so routes are shareable.
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useSearch } from '@tanstack/react-router';
@@ -12,53 +12,37 @@ import { useTheme } from '../../hooks/useTheme';
 import { mapStyleForTheme } from '../map/types';
 import { useOverlays } from '../../routes/overlays';
 import { formatSnr } from '../../lib/formatters';
-import { snrBars } from '../../lib/signal';
+import { Timestamp } from '../../components/Timestamp';
 import { RoutePlannerMapLazy } from './RoutePlannerMapLazy';
 import { NodeCombobox, type NodePick } from './NodeCombobox';
-import { NodeLabel } from './NodeLabel';
 import { CopyButton } from '../../components/CopyButton';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { exportMeshcoreRoute } from './route-features';
 import type { PlannedRoute, PlannedRouteLeg, PlannedRouteNode } from '../../types/api';
 
-function LegRow({ leg, index }: { leg: PlannedRouteLeg; index: number }) {
+function LegRow({ leg }: { leg: PlannedRouteLeg }) {
   const { t } = useTranslation();
-  const bars = leg.unmeasured ? null : snrBars(leg.snr ?? null, leg.snrSampleCount);
   return (
-    <div className="flex items-center gap-2 font-mono text-[11px] text-text-muted">
-      <span className="shrink-0 text-text-dim">#{index + 1}</span>
-      <span className="min-w-0 flex-1 truncate" title={`${leg.from} → ${leg.to}`}>
-        {leg.from.slice(0, 6).toUpperCase()} → {leg.to.slice(0, 6).toUpperCase()}
-      </span>
-      {leg.neighbor && (
-        <span
-          className="shrink-0 rounded border border-primary-dim/50 px-1 text-primary"
-          title={t('routes.neighborHint')}
-        >
-          {t('routes.neighborLeg')}
-        </span>
+    <div className="ml-2 space-y-1 border-l border-border py-2 pl-4 text-xs text-text-muted">
+      <p className="tabular-nums">
+        {leg.unmeasured
+          ? t('routes.unmeasuredLeg')
+          : leg.snr != null
+            ? `${formatSnr(leg.snr)} dB`
+            : t('routes.legNoSnr')}
+      </p>
+      {leg.unmeasured && leg.snr != null && (
+        <p>{t('routes.lastKnownSnr', { snr: formatSnr(leg.snr) })}</p>
       )}
-      {leg.unseen && (
-        <span
-          className="shrink-0 rounded border border-warn/40 px-1 text-warn"
-          title={t('routes.unseenHint')}
-        >
-          {t('routes.unseenLeg')}
-        </span>
+      {leg.snrSampleCount > 0 && leg.snrLastSeen > 0 && (
+        <p>
+          {t('routes.snrSamples', { count: leg.snrSampleCount })}
+          {' · '}
+          <Timestamp value={leg.snrLastSeen} static />
+        </p>
       )}
-      {leg.unmeasured ? (
-        <span
-          className="shrink-0 rounded border border-border px-1 text-text-dim"
-          title={t('routes.unmeasuredHint')}
-        >
-          {t('routes.unmeasuredLeg')}
-        </span>
-      ) : (
-        <span className="shrink-0 tabular-nums">
-          {leg.snr != null ? `${formatSnr(leg.snr)} dB` : t('routes.legNoSnr')}
-          {bars !== null && <span aria-hidden="true"> {'▂▄▆█'.slice(0, bars) || '·'}</span>}
-        </span>
-      )}
+      {leg.unseen && <p className="text-warn">{t('routes.unseenLeg')}</p>}
+      {leg.neighbor && <p>{t('routes.neighborDirection')}</p>}
     </div>
   );
 }
@@ -77,7 +61,24 @@ function RouteCard({
   onOpenNode: (nodeId: string) => void;
 }) {
   const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  const detailsId = useId();
+  const titleId = useId();
   const via = route.nodes.slice(1, -1);
+  const measuredCount = route.legs.filter((leg) => !leg.unmeasured && leg.snr != null).length;
+  const unseenCount = route.legs.filter((leg) => leg.unseen).length;
+  const staleCount = route.nodes.filter((node) => node.stale).length;
+  const nodeName = (node: PlannedRouteNode) =>
+    node.name ?? node.publicKey.slice(0, 6).toUpperCase();
+  const viaNames = via.map(nodeName);
+  const viaSummary =
+    via.length > 3
+      ? [
+          viaNames[0],
+          t('routes.moreNodes', { count: via.length - 2 }),
+          viaNames[via.length - 1],
+        ].join(' → ')
+      : viaNames.join(' → ');
   // MeshCore export for this card's route (best or alternative): canonical
   // ordered repeater list from the legs. `too-long` (over the 21-hash
   // MeshCore limit) renders an explanation; other failures hide the row so
@@ -90,145 +91,111 @@ function RouteCard({
   // blocking the copy.
   const multibyteUnconfirmed = route.nodes.some((n) => n.supportsMultibytePaths !== true);
   const label = index === 0 ? t('routes.best') : t('routes.alternative', { n: index });
-  // Whole card selects the route (Google-Maps-style: click any grey route
-  // to make it active). Nested interactive controls stop propagation so
-  // copying or opening a node never switches the selection. Keyboard: the
-  // dedicated select button keeps a native focus target + aria-pressed.
   return (
-    <div
-      role="button"
-      tabIndex={active ? -1 : 0}
-      aria-pressed={active}
-      aria-label={t('routes.selectRoute', { label })}
-      onClick={() => {
+    <article
+      aria-labelledby={titleId}
+      onClick={(e) => {
+        if (!(e.target instanceof Element) || e.target.closest('button, a, [data-route-details]'))
+          return;
         if (!active) onSelect();
       }}
-      onKeyDown={(e) => {
-        if (!active && (e.key === 'Enter' || e.key === ' ')) {
-          e.preventDefault();
-          onSelect();
-        }
-      }}
-      className={`w-full cursor-pointer rounded border px-3 py-2 text-left transition-colors ${
-        active
-          ? 'border-primary-dim bg-primary/5'
-          : 'border-border bg-bg-base hover:border-text-dim'
+      className={`w-full cursor-pointer rounded border p-3 text-left transition-colors ${
+        active ? 'border-primary-dim bg-bg-base' : 'border-border bg-bg-base hover:border-text-dim'
       }`}
     >
-      <div className="flex items-center gap-2">
-        <span className="font-mono text-[11px] text-text-dim">
+      <button
+        type="button"
+        aria-label={t('routes.selectRoute', { label })}
+        aria-pressed={active}
+        onClick={onSelect}
+        className="flex min-h-9 w-full flex-wrap items-baseline gap-x-2 gap-y-1 rounded text-left text-sm focus-visible:outline-2 focus-visible:outline-primary"
+      >
+        <span id={titleId} className="font-semibold text-text-normal">
+          {label}
+        </span>
+        <span className="font-mono text-xs text-text-muted">
           {t('routes.hops', { count: route.hopCount })}
         </span>
-        {route.hasUnmeasuredLegs && (
-          <span
-            className="rounded border border-border px-1 font-mono text-[10px] text-text-dim"
-            title={t('routes.unmeasuredHint')}
-          >
-            {t('routes.unmeasuredLeg')}
-          </span>
+        {active && <span className="ml-auto text-xs text-primary">{t('routes.selected')}</span>}
+      </button>
+      {!expanded && (
+        <p className="mt-1 break-words text-[13px] leading-relaxed text-text-normal">
+          {via.length > 0 ? t('routes.via', { nodes: viaSummary }) : t('routes.directRoute')}
+        </p>
+      )}
+      <div className="mt-2 space-y-1 text-xs leading-relaxed text-text-muted">
+        <p>{t('routes.snrCoverage', { measured: measuredCount, total: route.legs.length })}</p>
+        {unseenCount > 0 && (
+          <p className="text-warn">{t('routes.unseenHops', { count: unseenCount })}</p>
         )}
-        {route.containsStaleNodes && (
-          <span className="rounded border border-warn/40 px-1 font-mono text-[10px] text-warn">
-            {t('routes.staleNode')}
-          </span>
+        {staleCount > 0 && (
+          <p className="text-warn">{t('routes.staleNodes', { count: staleCount })}</p>
         )}
-        {route.hasUnseenLegs && (
-          <span
-            className="rounded border border-warn/40 px-1 font-mono text-[10px] text-warn"
-            title={t('routes.unseenHint')}
-          >
-            {t('routes.unseenLeg')}
-          </span>
+      </div>
+      <div id={detailsId} hidden={!expanded} data-route-details className="cursor-auto">
+        {expanded && (
+          <>
+            <ol className="mt-3 border-t border-border-subtle pt-2">
+              {route.nodes.map((node, i) => (
+                <li key={`${node.publicKey}-${i}`}>
+                  <button
+                    type="button"
+                    aria-label={t('routes.openNode', { name: nodeName(node) })}
+                    className="min-h-9 w-full rounded py-1 text-left text-[13px] hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                    onClick={() => onOpenNode(node.id)}
+                  >
+                    <span className="break-words font-semibold">{nodeName(node)}</span>
+                    {node.name && (
+                      <span className="ml-2 inline-block font-mono text-[11px] text-text-muted">
+                        {node.publicKey.slice(0, 6).toUpperCase()}
+                      </span>
+                    )}
+                  </button>
+                  {node.stale && <p className="pb-1 text-xs text-warn">{t('routes.staleNode')}</p>}
+                  {route.legs[i] && <LegRow leg={route.legs[i]} />}
+                </li>
+              ))}
+            </ol>
+            {meshcoreRoute != null && (
+              <div className="mt-2 border-t border-border-subtle pt-2 text-xs text-text-muted">
+                <p>{t('routes.meshcoreFormat')}</p>
+                <code className="mt-1 block select-text break-all">{meshcoreRoute}</code>
+              </div>
+            )}
+          </>
         )}
-        <span className="flex-1" />
+      </div>
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <button
           type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onSelect();
-          }}
-          aria-pressed={active}
-          className="shrink-0 rounded border border-border px-2 py-0.5 font-mono text-[11px] text-text-muted hover:border-text-dim hover:text-text-normal"
+          aria-expanded={expanded}
+          aria-controls={detailsId}
+          onClick={() => setExpanded((shown) => !shown)}
+          className="min-h-9 rounded text-xs text-text-muted underline underline-offset-4 hover:text-text-normal focus-visible:outline-2 focus-visible:outline-primary"
         >
-          {label}
+          {t(expanded ? 'routes.hideDetails' : 'routes.showDetails')}
         </button>
+        {meshcoreRoute != null && (
+          <CopyButton
+            value={meshcoreRoute}
+            label={t('routes.copyMeshcoreRoute')}
+            copiedLabel={t('routes.meshcoreRouteCopied')}
+            ariaLabel={t('routes.copyMeshcoreRoute')}
+            className="min-h-9 max-w-full !border-transparent !px-0 !font-sans !font-normal !tracking-normal !normal-case hover:!text-primary"
+          />
+        )}
       </div>
-      {via.length > 0 && (
-        <div className="mt-1 truncate font-mono text-[11px] text-text-muted">
-          {t('routes.via', {
-            nodes: via
-              .map((n: PlannedRouteNode) => n.name ?? n.publicKey.slice(0, 6).toUpperCase())
-              .join(' → '),
-          })}
-        </div>
-      )}
-      <div className="mt-1.5 flex flex-col gap-1">
-        {route.nodes.map((n: PlannedRouteNode) => (
-          <span key={n.publicKey} className="flex min-w-0 items-center gap-1 text-[13px]">
-            <span className="min-w-0 flex-1">
-              <NodeLabel name={n.name} publicKey={n.publicKey} />
-            </span>
-            <button
-              type="button"
-              aria-label={t('routes.openNode', {
-                name: n.name ?? n.publicKey.slice(0, 6).toUpperCase(),
-              })}
-              className="shrink-0 cursor-pointer font-mono text-[11px] text-primary hover:underline"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenNode(n.id);
-              }}
-            >
-              ↗
-            </button>
-          </span>
-        ))}
-      </div>
-      <div className="mt-1.5 flex flex-col gap-0.5 border-t border-border-subtle pt-1.5">
-        {route.legs.map((leg: PlannedRouteLeg, i: number) => (
-          <LegRow key={`${leg.from}-${leg.to}-${i}`} leg={leg} index={i} />
-        ))}
-      </div>
-      {meshcoreTooLong ? (
-        <div
-          role="status"
-          className="mt-1.5 border-t border-border-subtle pt-1.5 font-mono text-[11px] text-warn"
-        >
+      {meshcoreTooLong && (
+        <p role="status" className="mt-2 text-xs leading-relaxed text-warn">
           {t('routes.meshcoreTooLong')}
-        </div>
-      ) : (
-        meshcoreRoute != null && (
-          <div
-            className="mt-1.5 flex items-center gap-2 border-t border-border-subtle pt-1.5"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => e.stopPropagation()}
-          >
-            <span
-              className="min-w-0 flex-1 truncate font-mono text-[11px] text-text-dim"
-              title={meshcoreRoute}
-            >
-              {meshcoreRoute}
-            </span>
-            <CopyButton
-              value={meshcoreRoute}
-              label={t('routes.copyMeshcoreRoute')}
-              copiedLabel={t('routes.meshcoreRouteCopied')}
-              ariaLabel={t('routes.copyMeshcoreRoute')}
-              className="shrink-0"
-            />
-          </div>
-        )
+        </p>
       )}
       {meshcoreRoute != null && multibyteUnconfirmed && (
-        <div
-          role="status"
-          className="mt-1.5 font-mono text-[11px] text-warn"
-          title={t('routes.multibyteUnconfirmed')}
-        >
+        <p role="status" className="mt-2 text-xs leading-relaxed text-warn">
           {t('routes.multibyteUnconfirmed')}
-        </div>
+        </p>
       )}
-    </div>
+    </article>
   );
 }
 
@@ -423,16 +390,20 @@ export function RoutePlanner() {
               {data?.reason === 'no-route' ? t('routes.noRoute') : t('routes.unknownNode')}
             </div>
           )}
+          {paths.length > 0 && (
+            <p className="rounded border border-border bg-bg-base px-3 py-2 text-xs leading-relaxed text-text-muted">
+              {t('routes.rankingHint')}
+            </p>
+          )}
           {paths.map((route: PlannedRoute, i: number) => (
-            <div key={i} className="rounded-lg border border-border bg-bg-base shadow-lg">
-              <RouteCard
-                route={route}
-                index={i}
-                active={i === active}
-                onSelect={() => selectAlt(i)}
-                onOpenNode={setOverlayNodeId}
-              />
-            </div>
+            <RouteCard
+              key={route.nodes.map((node) => node.publicKey).join('-')}
+              route={route}
+              index={i}
+              active={i === active}
+              onSelect={() => selectAlt(i)}
+              onOpenNode={setOverlayNodeId}
+            />
           ))}
         </div>
       </div>

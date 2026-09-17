@@ -58,16 +58,18 @@ function bestResult(): BestRouteResult {
             nodeType: 2,
             nodeTypeName: 'repeater',
             stale: false,
+            supportsMultibytePaths: false,
           },
           {
             id: 'id-b',
             publicKey: TO,
-            name: null,
+            name: undefined,
             latitude: 59.61,
             longitude: 16.52,
             nodeType: 2,
             nodeTypeName: 'repeater',
             stale: false,
+            supportsMultibytePaths: false,
           },
         ],
         legs: [
@@ -100,6 +102,7 @@ function bestResult(): BestRouteResult {
             nodeType: 2,
             nodeTypeName: 'repeater',
             stale: false,
+            supportsMultibytePaths: false,
           },
           {
             id: 'id-m',
@@ -110,16 +113,18 @@ function bestResult(): BestRouteResult {
             nodeType: 2,
             nodeTypeName: 'repeater',
             stale: false,
+            supportsMultibytePaths: false,
           },
           {
             id: 'id-b',
             publicKey: TO,
-            name: null,
+            name: undefined,
             latitude: 59.61,
             longitude: 16.52,
             nodeType: 2,
             nodeTypeName: 'repeater',
             stale: false,
+            supportsMultibytePaths: false,
           },
         ],
         legs: [
@@ -256,20 +261,23 @@ describe('RoutePlanner', () => {
 
   it('restores from/to from the URL and renders best + alternative', async () => {
     await renderReady(`/routes?from=${FROM}&to=${TO}`);
-    // best first + one alternative, name first with grey 3-byte prefix
-    expect(await screen.findByText('Best')).toBeTruthy();
+    expect(await screen.findByText('First ranked')).toBeTruthy();
     expect(screen.getByText('Alternative 1')).toBeTruthy();
-    // Alpha appears in both the best card and the alternative card
-    expect(screen.getAllByText('Alpha').length).toBe(2);
-    // grey 3-byte suffix likewise once per card showing Alpha
-    expect(screen.getAllByText('AABBCC').length).toBe(2);
-    // nameless endpoint shows its prefix as the name (once per card)
-    expect(screen.getAllByText('112233').length).toBe(2);
-    // unmeasured legs carry the badge; the marked neighbor leg carries its own
-    expect(screen.getAllByText('Unmeasured').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Neighbor').length).toBeGreaterThan(0);
-    // the zero-observation leg is flagged unseen at leg level and route level
-    expect(screen.getAllByText('Unconfirmed possible').length).toBeGreaterThan(0);
+    expect(screen.getByText('Fresh SNR: 1 of 1 hops')).toBeInTheDocument();
+    expect(screen.getByText('Fresh SNR: 0 of 2 hops')).toBeInTheDocument();
+    expect(screen.getByText('1 hop never observed in this direction')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Open node / })).not.toBeInTheDocument();
+    expect(screen.queryByText('aabbcc,112233')).not.toBeInTheDocument();
+    for (const button of screen.getAllByRole('button', { name: 'Show details' })) {
+      fireEvent.click(button);
+    }
+    expect(screen.getAllByText('Alpha')).toHaveLength(2);
+    expect(screen.getAllByText('AABBCC')).toHaveLength(2);
+    expect(screen.getAllByText('112233')).toHaveLength(2);
+    expect(screen.getAllByText('No fresh SNR')).toHaveLength(2);
+    expect(screen.getByText('Neighbor-marked in this direction')).toBeInTheDocument();
+    expect(screen.getByText('Never observed in this direction')).toBeInTheDocument();
+    expect(screen.queryByText('via Mid')).not.toBeInTheDocument();
     expect(screen.getByTestId('route-map-stub').textContent).toContain('active:0');
   });
 
@@ -278,7 +286,7 @@ describe('RoutePlanner', () => {
     await screen.findByText('Alternative 1');
     // Route selection is a dedicated button (sibling of the node buttons),
     // not the whole card: keyboard and pointer activation must not open nodes.
-    const selectButtons = screen.getAllByRole('button', { name: /^(Best|Alternative 1)$/ });
+    const selectButtons = screen.getAllByRole('button', { name: /^Show .* on the map$/ });
     expect(selectButtons.length).toBe(2);
     fireEvent.click(selectButtons[1]);
     await waitFor(() =>
@@ -291,7 +299,7 @@ describe('RoutePlanner', () => {
     // switches the active route; nested copy/open-node controls opt out.
     await renderReady(`/routes?from=${FROM}&to=${TO}`);
     await screen.findByText('Alternative 1');
-    const card = screen.getByRole('button', { name: 'Show Alternative 1 on the map' });
+    const card = screen.getByRole('article', { name: 'Alternative 1' });
     fireEvent.click(card);
     await waitFor(() =>
       expect(screen.getByTestId('route-map-stub').textContent).toContain('active:1'),
@@ -344,9 +352,13 @@ describe('RoutePlanner', () => {
       </QueryClientProvider>,
     );
     await router.load();
-    await screen.findByText('Best');
+    await screen.findByText('First ranked');
     // open-node buttons are real buttons with accessible names, siblings of
     // the route-selection buttons (no nested interactive controls).
+    // open-node buttons only exist in expanded details, with accessible names
+    for (const button of screen.getAllByRole('button', { name: 'Show details' })) {
+      fireEvent.click(button);
+    }
     const openButtons = screen.getAllByRole('button', { name: /^Open node / });
     expect(openButtons.length).toBeGreaterThan(0);
     fireEvent.click(openButtons[0]);
@@ -367,7 +379,7 @@ describe('RoutePlanner', () => {
       configurable: true,
     });
     await renderReady(`/routes?from=${FROM}&to=${TO}`);
-    await screen.findByText('Best');
+    await screen.findByText('First ranked');
     // One copy button per card (best + alternative), each exporting its own
     // canonical ordered repeater list as 3-byte ids.
     const copyButtons = screen.getAllByRole('button', { name: 'Copy MeshCore route' });
@@ -401,7 +413,7 @@ describe('RoutePlanner', () => {
     expect(
       await screen.findByText('Route endpoints must be repeaters — pick a repeater node.'),
     ).toBeInTheDocument();
-    expect(screen.queryByText('Best')).not.toBeInTheDocument();
+    expect(screen.queryByText('First ranked')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Copy MeshCore route' })).not.toBeInTheDocument();
   });
 
@@ -417,13 +429,13 @@ describe('RoutePlanner', () => {
     };
     const { container } = render(
       <div>
-        <div>Best</div>
+        <div>First ranked</div>
         <ErrorBoundary fallback={<div role="status">map fallback</div>}>
           <Throwing />
         </ErrorBoundary>
       </div>,
     );
-    expect(container.textContent).toContain('Best');
+    expect(container.textContent).toContain('First ranked');
     expect(screen.getByText('map fallback')).toBeInTheDocument();
   });
 });

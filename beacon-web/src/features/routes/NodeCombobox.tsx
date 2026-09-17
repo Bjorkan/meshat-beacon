@@ -250,6 +250,7 @@ export function NodeCombobox({
                   role="option"
                   aria-selected={i === highlight}
                   aria-disabled={!located}
+                  aria-description={!located ? t('routes.noPositionHint') : undefined}
                 >
                   <button
                     type="button"
@@ -264,8 +265,8 @@ export function NodeCombobox({
                     <span className="min-w-0 flex-1">
                       <NodeLabel name={n.name} publicKey={n.publicKey} />
                     </span>
-                    <span className="shrink-0 font-mono text-[11px]" aria-hidden="true">
-                      {located ? '📍' : '🚫'}
+                    <span className="min-w-0 max-w-[40%] shrink-0 text-right font-mono text-[11px] break-words whitespace-normal text-text-muted">
+                      {n.iatas?.length ? n.iatas.map((entry) => entry.iata).join(', ') : '—'}
                     </span>
                   </button>
                 </li>
