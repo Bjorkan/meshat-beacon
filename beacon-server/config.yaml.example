@@ -113,17 +113,30 @@ routes:
 #  # old timestamp. Defaults to 168h, matching neighbors.retention.
 #  region_scope_freshness: 168h
 
-# Route planner (/routes/best) edge cost model. Every leg costs a 1.0 base per
-# hop plus a signal term: a fresh SNR reading between snr_good_db (no extra
-# cost) and snr_bad_db (full snr_max_penalty) is linearly interpolated;
-# unmeasured or stale legs pay unmeasured_penalty instead, which must stay >=
-# snr_max_penalty so a measured leg always beats an unmeasured one. The
-# reporter marking its peer as a neighbor (directional, freshly confirmed
-# within direct_freshness) discounts the leg by neighbor_bonus and marks the
-# leg neighbor=true in the API, which must stay below
-# (unmeasured_penalty - snr_max_penalty) and below 1.0 so every edge cost
-# stays strictly positive for Dijkstra. neighbor_bonus: 0 disables ONLY the
-# routing discount -- a freshly confirmed edge still reports neighbor=true.
+# Route planner (/routes/best) edge cost model. Each leg costs a signal term
+# minus a traffic-evidence discount, floored per leg at snr_strong_cap: a
+# fresh SNR reading at/above snr_good_db costs the cap; between snr_good_db
+# and snr_bad_db the signal term interpolates toward snr_max_penalty with a
+# kink at 0 dB (sub-zero readings degrade faster per dB, so every step down
+# into the negative costs more than a step down while still positive);
+# unmeasured or stale legs pay unmeasured_penalty as their signal term
+# instead, which must stay >= snr_max_penalty so a speculative leg (no
+# traffic) always costs more than any measured leg. Proven traffic (the
+# directed pair's merged observation_count: every packet that demonstrably
+# crossed the hop, e.g. via 3-byte path hashes) discounts the signal term on
+# a log10 scale up to traffic_max_discount at traffic_full_count
+# observations: hundreds of passed packets discount far more than a handful,
+# letting a proven-but-SNR-less hop (HuskvarnaS -> Gisebo ~1000 obs)
+# outrank a weak measured hop with thin history. Unmeasured legs earn the
+# full discount (traffic is their only quality signal, floored at
+# unmeasured_floor); measured legs earn only traffic_measured_share of it,
+# so SNR stays the primary signal where it exists. The reporter marking its
+# peer as a neighbor (directional, freshly confirmed within
+# direct_freshness) discounts weak/interpolated legs by neighbor_bonus and
+# marks the leg neighbor=true in the API, which must stay below
+# (unmeasured_penalty - snr_max_penalty) so a speculative leg still loses to
+# every measured leg. neighbor_bonus: 0 disables ONLY the routing discount
+# -- a freshly confirmed edge still reports neighbor=true.
 # direct_freshness: 0 disables BOTH bonus and badge (no confirmation is ever
 # fresh).
 #
@@ -137,6 +150,11 @@ routes:
 #  snr_good_db: 5.0         # default: 5.0
 #  snr_bad_db: -15.0        # default: -15.0
 #  snr_max_penalty: 2.0     # default: 2.0
+#  snr_strong_cap: 0.25     # default: 0.25; cheapest any leg can get
+#  traffic_max_discount: 4.0  # default: 4.0; 0 disables traffic evidence
+#  traffic_full_count: 1000   # default: 1000 obs earn the full discount
+#  traffic_measured_share: 0.125  # default: 0.125 of the discount for measured legs
+#  unmeasured_floor: 0.4    # default: 0.4; proven unmeasured never beats strong measured
 #  neighbor_bonus: 0.4      # default: 0.4
 #  snr_freshness: 168h      # default: 168h (7 days, the neighbor retention window)
 #  direct_freshness: 168h   # default: same as snr_freshness; how long a direct

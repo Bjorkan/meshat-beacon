@@ -163,9 +163,11 @@ func TestPlanBestRoute_StaleDirectGrantsNoBonusOrBadge(t *testing.T) {
 	if leg.Neighbor {
 		t.Error("stale direct confirmation must not set leg.neighbor=true")
 	}
-	// Strong measured SNR (8dB mean) with no bonus costs exactly base 1.0.
-	if res.Paths[0].TotalCost != 1.0 {
-		t.Errorf("stale direct must grant no bonus (cost 1.0), got %v", res.Paths[0].TotalCost)
+	// Strong measured SNR (8dB mean) with no bonus costs exactly the
+	// strong cap (the strongest a leg can score).
+	if res.Paths[0].TotalCost != DefaultRoutePlanConfig().Cost.SNRStrongCap {
+		t.Errorf("stale direct must grant no bonus (cost %v), got %v",
+			DefaultRoutePlanConfig().Cost.SNRStrongCap, res.Paths[0].TotalCost)
 	}
 }
 
@@ -208,9 +210,10 @@ func TestPlanBestRoute_ZeroBonusKeepsBadge(t *testing.T) {
 	if !leg.Neighbor {
 		t.Error("fresh direct must set leg.neighbor=true even with NeighborBonus=0")
 	}
-	// Strong measured SNR with zero bonus costs exactly base 1.0.
-	if res.Paths[0].TotalCost != 1.0 {
-		t.Errorf("zero bonus must grant no discount (cost 1.0), got %v", res.Paths[0].TotalCost)
+	// Strong measured SNR with zero bonus costs exactly the strong cap.
+	if res.Paths[0].TotalCost != DefaultRoutePlanConfig().Cost.SNRStrongCap {
+		t.Errorf("zero bonus must grant no discount (cost %v), got %v",
+			DefaultRoutePlanConfig().Cost.SNRStrongCap, res.Paths[0].TotalCost)
 	}
 }
 

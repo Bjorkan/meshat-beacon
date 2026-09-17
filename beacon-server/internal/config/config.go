@@ -74,15 +74,20 @@ type ResolvedConfig struct {
 	// resolve to defaults when unset. A nil pointer means "not configured" and
 	// resolves to the default; an explicit value (including 0) is honored, so
 	// operators can disable the neighbor bonus or alternatives with 0.
-	RoutePlanUnmeasuredPenalty float64
-	RoutePlanSNRGoodDB         float64
-	RoutePlanSNRBadDB          float64
-	RoutePlanSNRMaxPenalty     float64
-	RoutePlanNeighborBonus     float64
-	RoutePlanSNRFreshness      time.Duration
-	RoutePlanDirectFreshness   time.Duration
-	RoutePlanMaxHops           int
-	RoutePlanMaxAlternatives   int
+	RoutePlanUnmeasuredPenalty    float64
+	RoutePlanSNRGoodDB            float64
+	RoutePlanSNRBadDB             float64
+	RoutePlanSNRMaxPenalty        float64
+	RoutePlanSNRStrongCap         float64
+	RoutePlanTrafficMaxDiscount   float64
+	RoutePlanTrafficFullCount     float64
+	RoutePlanTrafficMeasuredShare float64
+	RoutePlanUnmeasuredFloor      float64
+	RoutePlanNeighborBonus        float64
+	RoutePlanSNRFreshness         time.Duration
+	RoutePlanDirectFreshness      time.Duration
+	RoutePlanMaxHops              int
+	RoutePlanMaxAlternatives      int
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -244,12 +249,35 @@ type NeighborsConfig struct {
 }
 
 // RoutePlanConfig tunes the /routes/best route planner's edge cost model.
-// Every leg costs a 1.0 base per hop plus a signal term: a fresh SNR reading
-// between SNRGoodDB (no extra cost) and SNRBadDB (full SNRMaxPenalty) is
-// linearly interpolated; unmeasured or stale-SNR legs pay UnmeasuredPenalty
-// instead. UnmeasuredPenalty must be >= SNRMaxPenalty so a measured leg always
-// beats an unmeasured one. SNRFreshness bounds how old an SNR reading may be
-// before it counts as unmeasured.
+// Each leg costs a signal term minus a traffic-evidence discount, floored
+// per leg at SNRStrongCap: a fresh SNR reading at/above SNRGoodDB costs the
+// cap; between SNRGoodDB and SNRBadDB the signal term interpolates toward
+// SNRMaxPenalty with a kink at 0 dB (sub-zero readings degrade faster per
+// dB, so every step down into the negative costs more than a step down
+// while still positive); unmeasured or stale-SNR legs pay UnmeasuredPenalty
+// as their signal term instead. UnmeasuredPenalty must be >= SNRMaxPenalty
+// so a speculative leg (no traffic) always costs more than any measured leg.
+// SNRFreshness bounds how old an SNR reading may be before it counts as
+// unmeasured.
+//
+// Traffic evidence (the directed pair's merged observation_count) discounts
+// the signal term on a log10 scale up to TrafficMaxDiscount at
+// TrafficFullCount observations: hundreds of passed packets discount far
+// more than a handful, letting a proven-but-SNR-less hop outrank a weak
+// measured hop with thin history. Unmeasured legs earn the full discount
+// (traffic is their only quality signal, floored at UnmeasuredFloor);
+// measured legs earn only TrafficMeasuredShare of it, so SNR stays the
+// primary signal where it exists. TrafficMaxDiscount: 0 disables traffic
+// evidence entirely (pure SNR model).
+//
+// SNRStrongCap is the maximum cost of a single strong leg (fresh SNR at or
+// above SNRGoodDB) and the floor for every discounted leg. Because it is
+// well below 1.0, several strong measured hops can together cost less than
+// one weak measured hop: the planner prefers more hops when each hop has a
+// strong signal, instead of minimizing the hop count first. Must stay in
+// (0, 1): non-positive would break Dijkstra, and >= 1 would restore
+// hop-count dominance for strong legs. UnmeasuredFloor must stay above it
+// so a fresh strong reading always wins per-leg.
 //
 // NeighborBonus discounts legs whose reporter explicitly marked the peer as a
 // neighbor (a DIRECT row in node_neighbors for that directed pair): the
@@ -267,15 +295,25 @@ type NeighborsConfig struct {
 // config, so a partial block cannot pass validation and become invalid only
 // after defaults are filled in.
 type RoutePlanConfig struct {
-	UnmeasuredPenalty *float64  `yaml:"unmeasured_penalty"`
-	SNRGoodDB         *float64  `yaml:"snr_good_db"`
-	SNRBadDB          *float64  `yaml:"snr_bad_db"`
-	SNRMaxPenalty     *float64  `yaml:"snr_max_penalty"`
-	NeighborBonus     *float64  `yaml:"neighbor_bonus"`
-	SNRFreshness      *duration `yaml:"snr_freshness"`
-	DirectFreshness   *duration `yaml:"direct_freshness"`
-	MaxHops           *int      `yaml:"max_hops"`
-	MaxAlternatives   *int      `yaml:"max_alternatives"`
+	UnmeasuredPenalty *float64 `yaml:"unmeasured_penalty"`
+	SNRGoodDB         *float64 `yaml:"snr_good_db"`
+	SNRBadDB          *float64 `yaml:"snr_bad_db"`
+	SNRMaxPenalty     *float64 `yaml:"snr_max_penalty"`
+	SNRStrongCap      *float64 `yaml:"snr_strong_cap"`
+	// TrafficMaxDiscount caps the traffic-evidence discount (see above).
+	TrafficMaxDiscount *float64 `yaml:"traffic_max_discount"`
+	// TrafficFullCount is the observation count earning the full discount.
+	TrafficFullCount *float64 `yaml:"traffic_full_count"`
+	// TrafficMeasuredShare is the 0..1 fraction of the traffic discount
+	// applying to measured legs.
+	TrafficMeasuredShare *float64 `yaml:"traffic_measured_share"`
+	// UnmeasuredFloor is the cheapest an unmeasured leg can get.
+	UnmeasuredFloor *float64  `yaml:"unmeasured_floor"`
+	NeighborBonus   *float64  `yaml:"neighbor_bonus"`
+	SNRFreshness    *duration `yaml:"snr_freshness"`
+	DirectFreshness *duration `yaml:"direct_freshness"`
+	MaxHops         *int      `yaml:"max_hops"`
+	MaxAlternatives *int      `yaml:"max_alternatives"`
 }
 
 // ObserversConfig controls observer row retention behaviour.
@@ -420,6 +458,31 @@ const (
 	DefaultRoutePlanSNRGoodDB         = 5.0
 	DefaultRoutePlanSNRBadDB          = -15.0
 	DefaultRoutePlanSNRMaxPenalty     = 2.0
+	// DefaultRoutePlanSNRStrongCap is the maximum cost of a single strong
+	// leg (fresh SNR at/above goodDB). 0.25 means four strong hops cost the
+	// same as one weak measured hop (1.0), so the planner routes around a
+	// weak link via several strong ones instead of minimizing hop count.
+	DefaultRoutePlanSNRStrongCap = 0.25
+	// DefaultRoutePlanTrafficMaxDiscount is the largest discount proven
+	// traffic can earn. 4.0 against the default unmeasured penalty 2.5
+	// means a maximally proven unmeasured leg bottoms out at the
+	// unmeasured floor instead of going free, while speculative legs
+	// (a few observations) keep almost no discount.
+	DefaultRoutePlanTrafficMaxDiscount = 4.0
+	// DefaultRoutePlanTrafficFullCount earns the full traffic discount at
+	// ~1000 observations (log10 scale: 100 obs earn ~2/3 of the max, 10
+	// obs ~1/3). HuskvarnaS -> Gisebo style evidence (~1000+) discounts
+	// nearly fully; a 3-packet leg barely moves.
+	DefaultRoutePlanTrafficFullCount = 1000.0
+	// DefaultRoutePlanTrafficMeasuredShare lets measured legs earn 1/8 of
+	// the traffic discount: SNR stays the primary signal where it exists,
+	// while traffic breaks ties between equally-measured legs.
+	DefaultRoutePlanTrafficMeasuredShare = 0.125
+	// DefaultRoutePlanUnmeasuredFloor is the cheapest an unmeasured leg can
+	// get no matter the traffic. 0.4 sits above the strong cap (0.25) so a
+	// fresh strong reading always wins per-leg, while proven traffic
+	// (~1000+ obs) still beats any weak measured leg.
+	DefaultRoutePlanUnmeasuredFloor = 0.4
 	// DefaultRoutePlanNeighborBonus discounts an explicitly marked neighbor
 	// leg. 0.4 sits strictly inside the measured band (worst measured pays
 	// 2.0): it outranks an equally-measured overheard leg but can never lift
@@ -446,6 +509,21 @@ func (c *RoutePlanConfig) Validate() error {
 	if c.SNRMaxPenalty != nil && *c.SNRMaxPenalty < 0 {
 		return fmt.Errorf("config: routeplan.snr_max_penalty (%v) must be non-negative", *c.SNRMaxPenalty)
 	}
+	if c.SNRStrongCap != nil && (*c.SNRStrongCap <= 0 || *c.SNRStrongCap >= 1) {
+		return fmt.Errorf("config: routeplan.snr_strong_cap (%v) must be in (0, 1)", *c.SNRStrongCap)
+	}
+	if c.TrafficMaxDiscount != nil && *c.TrafficMaxDiscount < 0 {
+		return fmt.Errorf("config: routeplan.traffic_max_discount (%v) must be non-negative", *c.TrafficMaxDiscount)
+	}
+	if c.TrafficFullCount != nil && *c.TrafficFullCount < 1 {
+		return fmt.Errorf("config: routeplan.traffic_full_count (%v) must be >= 1", *c.TrafficFullCount)
+	}
+	if c.TrafficMeasuredShare != nil && (*c.TrafficMeasuredShare < 0 || *c.TrafficMeasuredShare > 1) {
+		return fmt.Errorf("config: routeplan.traffic_measured_share (%v) must be in [0, 1]", *c.TrafficMeasuredShare)
+	}
+	if c.UnmeasuredFloor != nil && *c.UnmeasuredFloor < 0 {
+		return fmt.Errorf("config: routeplan.unmeasured_floor (%v) must be non-negative", *c.UnmeasuredFloor)
+	}
 	if c.NeighborBonus != nil && *c.NeighborBonus < 0 {
 		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be non-negative", *c.NeighborBonus)
 	}
@@ -469,17 +547,45 @@ func (c *RoutePlanConfig) Validate() error {
 
 // ValidateResolved enforces every planner invariant against fully resolved
 // values (defaults applied): good strictly beats bad, penalties and bonus are
-// non-negative, unmeasured never beats the worst measured leg, the neighbor
-// bonus fits strictly inside that gap, and every possible resulting edge cost
-// is strictly positive for Dijkstra (measured strong/interpolated/bad plus
-// unmeasured, each with and without the bonus). Limits must be consistent with
-// the API behavior (non-negative; alternatives honor the handler cap).
+// non-negative, a speculative unmeasured leg (no traffic) never beats the
+// worst measured leg, the neighbor bonus fits strictly inside that gap, the
+// strong-leg cap sits in (0, 1) so several strong hops can beat one weak
+// hop, the unmeasured floor sits above the strong cap so a fresh strong
+// reading always wins per-leg, traffic weights are shaped sanely, and every
+// possible resulting edge cost is strictly positive for Dijkstra (measured
+// strong/interpolated/bad plus unmeasured, each with and without the bonus).
+// Limits must be consistent with the API behavior (non-negative;
+// alternatives honor the handler cap).
 func ValidateResolved(r ResolvedConfig) error {
 	if r.RoutePlanSNRGoodDB <= r.RoutePlanSNRBadDB {
 		return fmt.Errorf("config: routeplan.snr_good_db (%v) must exceed snr_bad_db (%v)", r.RoutePlanSNRGoodDB, r.RoutePlanSNRBadDB)
 	}
+	if r.RoutePlanSNRGoodDB <= 0 {
+		return fmt.Errorf("config: routeplan.snr_good_db (%v) must be positive (the 0 dB kink needs a positive goodDB)", r.RoutePlanSNRGoodDB)
+	}
+	if r.RoutePlanSNRBadDB >= 0 {
+		return fmt.Errorf("config: routeplan.snr_bad_db (%v) must be negative (the 0 dB kink needs a negative badDB)", r.RoutePlanSNRBadDB)
+	}
 	if r.RoutePlanUnmeasuredPenalty < 0 || r.RoutePlanSNRMaxPenalty < 0 || r.RoutePlanNeighborBonus < 0 {
 		return fmt.Errorf("config: routeplan penalties and neighbor_bonus must be non-negative")
+	}
+	if r.RoutePlanSNRStrongCap <= 0 || r.RoutePlanSNRStrongCap >= 1 {
+		return fmt.Errorf("config: routeplan.snr_strong_cap (%v) must be in (0, 1)", r.RoutePlanSNRStrongCap)
+	}
+	if r.RoutePlanTrafficMaxDiscount < 0 {
+		return fmt.Errorf("config: routeplan.traffic_max_discount (%v) must be non-negative", r.RoutePlanTrafficMaxDiscount)
+	}
+	if r.RoutePlanTrafficFullCount < 1 {
+		return fmt.Errorf("config: routeplan.traffic_full_count (%v) must be >= 1", r.RoutePlanTrafficFullCount)
+	}
+	if r.RoutePlanTrafficMeasuredShare < 0 || r.RoutePlanTrafficMeasuredShare > 1 {
+		return fmt.Errorf("config: routeplan.traffic_measured_share (%v) must be in [0, 1]", r.RoutePlanTrafficMeasuredShare)
+	}
+	if r.RoutePlanUnmeasuredFloor < 0 {
+		return fmt.Errorf("config: routeplan.unmeasured_floor (%v) must be non-negative", r.RoutePlanUnmeasuredFloor)
+	}
+	if r.RoutePlanUnmeasuredFloor <= r.RoutePlanSNRStrongCap {
+		return fmt.Errorf("config: routeplan.unmeasured_floor (%v) must exceed snr_strong_cap (%v) so a fresh strong reading always wins", r.RoutePlanUnmeasuredFloor, r.RoutePlanSNRStrongCap)
 	}
 	if r.RoutePlanUnmeasuredPenalty < r.RoutePlanSNRMaxPenalty {
 		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must be >= snr_max_penalty (%v)", r.RoutePlanUnmeasuredPenalty, r.RoutePlanSNRMaxPenalty)
@@ -488,10 +594,21 @@ func ValidateResolved(r ResolvedConfig) error {
 	if r.RoutePlanNeighborBonus >= gap {
 		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < unmeasured_penalty - snr_max_penalty (%v)", r.RoutePlanNeighborBonus, gap)
 	}
-	// Every resulting edge cost must be strictly positive: base 1.0 minus the
-	// bonus is the cheapest possible leg (strong measured neighbor leg).
-	if 1.0-r.RoutePlanNeighborBonus <= 0 {
-		return fmt.Errorf("config: routeplan.neighbor_bonus (%v) must be < 1.0 so every edge cost stays positive", r.RoutePlanNeighborBonus)
+	// Every resulting edge cost must be strictly positive. The cheapest
+	// discounted legs: a weak measured leg pays maxPenalty minus the full
+	// measured traffic share and the bonus (floored at the strong cap, so
+	// positivity holds via the cap); an unmeasured leg pays the penalty
+	// minus the full traffic discount and the bonus (floored at
+	// unmeasured_floor, so positivity needs floor > 0 OR the unfloored
+	// worst case positive). Strong capped legs never take discounts.
+	if r.RoutePlanUnmeasuredFloor <= 0 &&
+		r.RoutePlanUnmeasuredPenalty-r.RoutePlanTrafficMaxDiscount-r.RoutePlanNeighborBonus <= 0 {
+		return fmt.Errorf("config: routeplan.unmeasured_penalty (%v) must exceed traffic_max_discount + neighbor_bonus (%v) when unmeasured_floor is 0, so every edge cost stays positive",
+			r.RoutePlanUnmeasuredPenalty, r.RoutePlanTrafficMaxDiscount+r.RoutePlanNeighborBonus)
+	}
+	if r.RoutePlanSNRMaxPenalty-r.RoutePlanTrafficMaxDiscount*r.RoutePlanTrafficMeasuredShare-r.RoutePlanNeighborBonus <= 0 &&
+		r.RoutePlanSNRStrongCap <= 0 {
+		return fmt.Errorf("config: routeplan penalties minus traffic share and neighbor_bonus must stay positive (or snr_strong_cap must floor them)")
 	}
 	if r.RoutePlanMaxHops < 0 || r.RoutePlanMaxAlternatives < 0 {
 		return fmt.Errorf("config: routeplan max_hops and max_alternatives must be non-negative")
@@ -565,15 +682,20 @@ func Resolve(cfg *Config) ResolvedConfig {
 		ObserverDeleteAfter:     cfg.Observers.DeleteAfter.Duration,
 		MeshCoreRegionFreshness: cfg.Neighbors.RegionScopeFreshness.Duration,
 
-		RoutePlanUnmeasuredPenalty: derefFloat(cfg.RoutePlan.UnmeasuredPenalty, DefaultRoutePlanUnmeasuredPenalty),
-		RoutePlanSNRGoodDB:         derefFloat(cfg.RoutePlan.SNRGoodDB, DefaultRoutePlanSNRGoodDB),
-		RoutePlanSNRBadDB:          derefFloat(cfg.RoutePlan.SNRBadDB, DefaultRoutePlanSNRBadDB),
-		RoutePlanSNRMaxPenalty:     derefFloat(cfg.RoutePlan.SNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty),
-		RoutePlanNeighborBonus:     derefFloat(cfg.RoutePlan.NeighborBonus, DefaultRoutePlanNeighborBonus),
-		RoutePlanSNRFreshness:      derefDuration(cfg.RoutePlan.SNRFreshness, DefaultRoutePlanSNRFreshness),
-		RoutePlanDirectFreshness:   derefDuration(cfg.RoutePlan.DirectFreshness, 0),
-		RoutePlanMaxHops:           derefInt(cfg.RoutePlan.MaxHops, DefaultRoutePlanMaxHops),
-		RoutePlanMaxAlternatives:   derefInt(cfg.RoutePlan.MaxAlternatives, DefaultRoutePlanMaxAlternatives),
+		RoutePlanUnmeasuredPenalty:    derefFloat(cfg.RoutePlan.UnmeasuredPenalty, DefaultRoutePlanUnmeasuredPenalty),
+		RoutePlanSNRGoodDB:            derefFloat(cfg.RoutePlan.SNRGoodDB, DefaultRoutePlanSNRGoodDB),
+		RoutePlanSNRBadDB:             derefFloat(cfg.RoutePlan.SNRBadDB, DefaultRoutePlanSNRBadDB),
+		RoutePlanSNRMaxPenalty:        derefFloat(cfg.RoutePlan.SNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty),
+		RoutePlanSNRStrongCap:         derefFloat(cfg.RoutePlan.SNRStrongCap, DefaultRoutePlanSNRStrongCap),
+		RoutePlanTrafficMaxDiscount:   derefFloat(cfg.RoutePlan.TrafficMaxDiscount, DefaultRoutePlanTrafficMaxDiscount),
+		RoutePlanTrafficFullCount:     derefFloat(cfg.RoutePlan.TrafficFullCount, DefaultRoutePlanTrafficFullCount),
+		RoutePlanTrafficMeasuredShare: derefFloat(cfg.RoutePlan.TrafficMeasuredShare, DefaultRoutePlanTrafficMeasuredShare),
+		RoutePlanUnmeasuredFloor:      derefFloat(cfg.RoutePlan.UnmeasuredFloor, DefaultRoutePlanUnmeasuredFloor),
+		RoutePlanNeighborBonus:        derefFloat(cfg.RoutePlan.NeighborBonus, DefaultRoutePlanNeighborBonus),
+		RoutePlanSNRFreshness:         derefDuration(cfg.RoutePlan.SNRFreshness, DefaultRoutePlanSNRFreshness),
+		RoutePlanDirectFreshness:      derefDuration(cfg.RoutePlan.DirectFreshness, 0),
+		RoutePlanMaxHops:              derefInt(cfg.RoutePlan.MaxHops, DefaultRoutePlanMaxHops),
+		RoutePlanMaxAlternatives:      derefInt(cfg.RoutePlan.MaxAlternatives, DefaultRoutePlanMaxAlternatives),
 	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
@@ -681,7 +803,7 @@ func derefDuration(p *duration, def time.Duration) time.Duration {
 
 func (r ResolvedConfig) String() string {
 	return fmt.Sprintf(
-		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s routePlanUnmeasured=%.2f routePlanGood=%.1f routePlanBad=%.1f routePlanMaxPen=%.2f routePlanNeighborBonus=%.2f routePlanFresh=%s routePlanDirectFresh=%s routePlanMaxHops=%d routePlanMaxAlt=%d",
+		"telemetryResolution=%s telemetryRetention=%s packetRetention=%s routeRetention=%s routeGrace=%s routeMinObs=%d neighborRetention=%s neighborMaxKm=%.0f maxConnsPerIP=%d viewRefresh=%s reconfirm=%s cleanup=%s presenceFlush=%s presencePacketTTL=%s clockDriftThreshold=%s nodeStaleThreshold=%s nodeDeleteAfter=%s nodeIataMembershipTTL=%s observerDeleteAfter=%s meshcoreRegionFreshness=%s routePlanUnmeasured=%.2f routePlanGood=%.1f routePlanBad=%.1f routePlanMaxPen=%.2f routePlanStrongCap=%.2f routePlanTrafficMax=%.2f routePlanTrafficFull=%.0f routePlanTrafficShare=%.3f routePlanUnmeasFloor=%.2f routePlanNeighborBonus=%.2f routePlanFresh=%s routePlanDirectFresh=%s routePlanMaxHops=%d routePlanMaxAlt=%d",
 		r.TelemetryResolution, r.TelemetryRetention, r.PacketRetention, r.RouteRetention, r.RouteGrace, r.RouteMinObservations,
 		r.NeighborRetention,
 		r.NeighborMaxKm,
@@ -689,6 +811,9 @@ func (r ResolvedConfig) String() string {
 		r.PresenceFlushInterval, r.PresencePacketTTL, r.ClockDriftThreshold,
 		r.NodeStaleThreshold, r.NodeDeleteAfter, r.NodeIATAMembershipTTL, r.ObserverDeleteAfter, r.MeshCoreRegionFreshness,
 		r.RoutePlanUnmeasuredPenalty, r.RoutePlanSNRGoodDB, r.RoutePlanSNRBadDB, r.RoutePlanSNRMaxPenalty,
+		r.RoutePlanSNRStrongCap,
+		r.RoutePlanTrafficMaxDiscount, r.RoutePlanTrafficFullCount, r.RoutePlanTrafficMeasuredShare,
+		r.RoutePlanUnmeasuredFloor,
 		r.RoutePlanNeighborBonus,
 		r.RoutePlanSNRFreshness, r.RoutePlanDirectFreshness, r.RoutePlanMaxHops, r.RoutePlanMaxAlternatives,
 	)

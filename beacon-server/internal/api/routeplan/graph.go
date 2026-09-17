@@ -2,14 +2,37 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
 // Package routeplan computes best routes between two mesh nodes over the
-// observed neighbor graph, preferring legs with known signal strength.
+// observed neighbor graph, preferring legs with known signal strength and
+// proven traffic history.
 //
 // Cost model (all weights from config, see internal/config.RoutePlanConfig):
-// every leg costs a 1.0 base per hop plus a signal term. A fresh SNR reading
-// between goodDB (no extra cost) and badDB (full maxPenalty) interpolates
-// linearly; unmeasured or stale-SNR legs pay unmeasuredPenalty instead, which
-// must exceed maxPenalty so a measured leg always beats an unmeasured one and
-// the graph never fragments for lack of measurements.
+// each leg costs a signal term minus a traffic-evidence discount, floored per
+// leg at SNRStrongCap. A fresh SNR reading at/above goodDB costs the cap
+// (no extra cost); between goodDB and badDB the signal term interpolates
+// linearly up to maxPenalty, with a kink at 0 dB: readings below zero degrade
+// faster per dB than readings above zero, so every step down into the
+// negative costs more than a step down while still positive. Unmeasured or
+// stale-SNR legs pay unmeasuredPenalty as their signal term instead, which
+// must exceed maxPenalty so a speculative leg (no traffic) always costs more
+// than any measured leg and the graph never fragments for lack of
+// measurements.
+//
+// Traffic evidence (the directed pair's merged observation_count: every
+// packet that demonstrably crossed the hop, e.g. via 3-byte path hashes)
+// discounts the signal term on a log scale: discount(obs) =
+// trafficMaxDiscount * log10(1+obs) / log10(1+trafficFullCount). Hundreds of
+// passed packets (HuskvarnaS -> Gisebo ~1000) therefore discount far more
+// than a handful (3 packets), letting a proven-but-SNR-less hop outrank a
+// weak measured hop with thin history. Speculative legs (obs ~ 1) keep almost
+// no discount, so they still lose to every measured leg. Discounts never
+// apply to the strong cap itself: the cheapest possible leg cost is exactly
+// SNRStrongCap, keeping the Dijkstra positivity invariant trivially
+// checkable.
+//
+// Because the strong-leg cap sits well below 1.0 while a weak measured leg
+// costs ~1.0, several strong measured hops can together cost less than one
+// weak measured hop: the planner prefers more hops when every hop has a
+// strong signal, instead of minimizing the hop count first.
 //
 // A leg whose reporter explicitly marked the peer as a neighbor (a DIRECT
 // neighbor edge in node_neighbors for that directed pair, as opposed to a
@@ -17,7 +40,8 @@
 // an explicit mark is the reporter's own statement that the hop is real, so it
 // outranks an equally-measured overheard leg. The bonus must stay below
 // the unmeasured/measured gap (see Validate) so it can never promote an
-// unmeasured leg above a measured one. Reverse evidence does not mark this
+// unmeasured leg above a measured one, and below the strong cap so costs
+// stay positive. Reverse evidence does not mark this
 // direction: the semantic is directional, OR-merged only across IATA rows of
 // the same (reporter, peer) pair.
 //
@@ -58,8 +82,29 @@ type Config struct {
 	SNRGoodDB         float64
 	SNRBadDB          float64
 	SNRMaxPenalty     float64
-	NeighborBonus     float64 // discount for explicitly marked neighbor legs (see package doc)
-	SNRFreshness      time.Duration
+	// SNRStrongCap is the maximum cost of a single strong leg (fresh SNR at
+	// or above SNRGoodDB). Well below 1.0 so several strong hops beat one
+	// weak hop; see the package doc.
+	SNRStrongCap float64
+	// TrafficMaxDiscount is the largest discount proven traffic can earn
+	// (reached at TrafficFullCount observations). Log-scaled, so hundreds
+	// of passed packets discount far more than a handful; see the package
+	// doc. Zero disables traffic evidence entirely.
+	TrafficMaxDiscount float64
+	// TrafficFullCount is the observation count that earns the full traffic
+	// discount. Must stay >= 1: below that the log scale is degenerate.
+	TrafficFullCount float64
+	// TrafficMeasuredShare is the fraction (0..1) of the traffic discount
+	// that applies to measured legs. Unmeasured legs earn the full
+	// discount (traffic is their only quality signal); measured legs earn
+	// only this share, so SNR stays the primary signal where it exists.
+	TrafficMeasuredShare float64
+	// UnmeasuredFloor is the cheapest an unmeasured leg can get, no matter
+	// how much traffic proves it. Keeps the cheapest speculative leg above
+	// the strong cap so a fresh strong reading always wins per-leg.
+	UnmeasuredFloor float64
+	NeighborBonus   float64 // discount for explicitly marked neighbor legs (see package doc)
+	SNRFreshness    time.Duration
 	// DirectFreshness bounds how old a direct confirmation (direct_last_seen)
 	// may be before the neighbor bonus/badge stops applying. Resolve defaults
 	// unset to SNRFreshness; an explicit 0 disables the bonus (see
@@ -77,16 +122,21 @@ type Config struct {
 // IsFreshNeighbor: DirectFreshness <= 0 grants no bonus).
 func FromResolved(r config.ResolvedConfig) Config {
 	return Config{
-		UnmeasuredPenalty: r.RoutePlanUnmeasuredPenalty,
-		SNRGoodDB:         r.RoutePlanSNRGoodDB,
-		SNRBadDB:          r.RoutePlanSNRBadDB,
-		SNRMaxPenalty:     r.RoutePlanSNRMaxPenalty,
-		NeighborBonus:     r.RoutePlanNeighborBonus,
-		SNRFreshness:      r.RoutePlanSNRFreshness,
-		DirectFreshness:   r.RoutePlanDirectFreshness,
-		MaxHops:           r.RoutePlanMaxHops,
-		MaxAlternatives:   r.RoutePlanMaxAlternatives,
-		MaxDistanceKm:     r.NeighborMaxKm,
+		UnmeasuredPenalty:    r.RoutePlanUnmeasuredPenalty,
+		SNRGoodDB:            r.RoutePlanSNRGoodDB,
+		SNRBadDB:             r.RoutePlanSNRBadDB,
+		SNRMaxPenalty:        r.RoutePlanSNRMaxPenalty,
+		SNRStrongCap:         r.RoutePlanSNRStrongCap,
+		TrafficMaxDiscount:   r.RoutePlanTrafficMaxDiscount,
+		TrafficFullCount:     r.RoutePlanTrafficFullCount,
+		TrafficMeasuredShare: r.RoutePlanTrafficMeasuredShare,
+		UnmeasuredFloor:      r.RoutePlanUnmeasuredFloor,
+		NeighborBonus:        r.RoutePlanNeighborBonus,
+		SNRFreshness:         r.RoutePlanSNRFreshness,
+		DirectFreshness:      r.RoutePlanDirectFreshness,
+		MaxHops:              r.RoutePlanMaxHops,
+		MaxAlternatives:      r.RoutePlanMaxAlternatives,
+		MaxDistanceKm:        r.NeighborMaxKm,
 	}
 }
 
@@ -153,34 +203,86 @@ func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
 }
 
 // LegCost returns the cost of traversing e plus whether the leg counts as
-// unmeasured (no fresh SNR reading backs it). A freshly-confirmed neighbor
-// leg (see IsFreshNeighbor) earns the configured bonus -- zero is naturally
-// a no-op so NeighborBonus == 0 disables only the discount, never the
-// topology fact. The cost is floored at a small epsilon above zero so costs
-// stay positive for Dijkstra. now anchors the freshness checks so tests can
-// pin time.
+// unmeasured (no fresh SNR reading backs it). The cost has three parts:
+//
+//	signal term: strong legs (fresh SNR at/above SNRGoodDB) cost exactly
+//	SNRStrongCap; weaker readings interpolate toward SNRMaxPenalty with a
+//	kink at 0 dB (sub-zero degrades faster per dB); unmeasured legs pay
+//	UnmeasuredPenalty. The kink makes every step down into the negative
+//	cost more than a step down while still positive.
+//	traffic discount: discount(obs) = TrafficMaxDiscount *
+//	log10(1+obs)/log10(1+TrafficFullCount), log-scaled so hundreds of
+//	passed packets discount far more than a handful. Unmeasured legs earn
+//	the full discount (traffic is their only quality signal, floored at
+//	UnmeasuredFloor); measured legs earn only TrafficMeasuredShare of it,
+//	so SNR stays the primary signal where it exists. Zero observations
+//	earn zero discount.
+//	neighbor bonus: a freshly-confirmed neighbor leg (see IsFreshNeighbor)
+//	earns the configured bonus -- zero is naturally a no-op so
+//	NeighborBonus == 0 disables only the discount, never the topology
+//	fact. The bonus applies to weak/interpolated legs (where it breaks ties
+//	between equally-measured legs) but never to a capped strong leg,
+//	keeping the cheapest possible cost exactly the strong cap.
+//
+// Costs stay positive for Dijkstra (ValidateResolved enforces bonus < gap,
+// cap in (0, 1), and the traffic/full-count/floor relations). now anchors
+// the freshness checks so tests can pin time.
 func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
-	const base = 1.0
 	bonus := 0.0
 	if c.IsFreshNeighbor(e, now) {
 		bonus = c.NeighborBonus
 	}
-	if e.SNR == nil || e.SNRSampleCount == 0 || now.Sub(e.SNRLastSeen) > c.SNRFreshness {
-		return base + c.UnmeasuredPenalty - bonus, true
-	}
-	snr := float64(*e.SNR)
-	if snr >= c.SNRGoodDB {
-		cost := base - bonus
-		if cost < 0.01 {
-			cost = 0.01
+	traffic := c.trafficDiscount(e.Observations)
+	measured := !(e.SNR == nil || e.SNRSampleCount == 0 || now.Sub(e.SNRLastSeen) > c.SNRFreshness)
+	if measured {
+		snr := float64(*e.SNR)
+		if snr >= c.SNRGoodDB {
+			return c.SNRStrongCap, false
+		}
+		signal := c.SNRMaxPenalty
+		if snr > c.SNRBadDB {
+			signal = c.interpolateSignal(snr)
+		}
+		cost := signal - traffic*c.TrafficMeasuredShare - bonus
+		if cost < c.SNRStrongCap {
+			cost = c.SNRStrongCap
 		}
 		return cost, false
 	}
-	if snr <= c.SNRBadDB {
-		return base + c.SNRMaxPenalty - bonus, false
+	cost = c.UnmeasuredPenalty - traffic - bonus
+	if cost < c.UnmeasuredFloor {
+		cost = c.UnmeasuredFloor
 	}
-	frac := (c.SNRGoodDB - snr) / (c.SNRGoodDB - c.SNRBadDB)
-	return base + frac*c.SNRMaxPenalty - bonus, false
+	return cost, true
+}
+
+// interpolateSignal maps a fresh SNR strictly inside (SNRBadDB, SNRGoodDB)
+// onto (0, SNRMaxPenalty] with a kink at 0 dB: positive readings degrade
+// gently from the strong cap to the zero-penalty, negative readings degrade
+// faster from the zero-penalty to the max. Callers handle the at/above-good
+// (cap) and at/below-bad (max) endpoints; snr must be strictly inside.
+func (c Config) interpolateSignal(snr float64) float64 {
+	zeroPenalty := c.SNRStrongCap + (c.SNRMaxPenalty-c.SNRStrongCap)*
+		(c.SNRGoodDB/(c.SNRGoodDB-c.SNRBadDB))
+	if snr >= 0 {
+		// GoodDB -> cap, 0 -> zeroPenalty (gentle positive slope).
+		frac := (c.SNRGoodDB - snr) / c.SNRGoodDB
+		return c.SNRStrongCap + frac*(zeroPenalty-c.SNRStrongCap)
+	}
+	// 0 -> zeroPenalty, BadDB -> maxPenalty (steeper negative slope).
+	frac := -snr / -c.SNRBadDB
+	return zeroPenalty + frac*(c.SNRMaxPenalty-zeroPenalty)
+}
+
+// trafficDiscount maps a directed pair's merged observation count onto
+// [0, TrafficMaxDiscount] on a log10 scale: 0 observations earn nothing, the
+// full count earns the max, and hundreds of packets sit far above a handful.
+// Negative counts (cannot happen from SQL SUM, defensive only) earn nothing.
+func (c Config) trafficDiscount(observations int64) float64 {
+	if c.TrafficMaxDiscount <= 0 || observations <= 0 {
+		return 0
+	}
+	return c.TrafficMaxDiscount * math.Log10(1+float64(observations)) / math.Log10(1+c.TrafficFullCount)
 }
 
 // haversineKm is the great-circle distance between two points. Kept local

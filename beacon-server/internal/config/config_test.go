@@ -185,6 +185,21 @@ func TestResolve_RoutePlanDefaults(t *testing.T) {
 	if r.RoutePlanSNRMaxPenalty != DefaultRoutePlanSNRMaxPenalty {
 		t.Errorf("RoutePlanSNRMaxPenalty = %v, want %v", r.RoutePlanSNRMaxPenalty, DefaultRoutePlanSNRMaxPenalty)
 	}
+	if r.RoutePlanSNRStrongCap != DefaultRoutePlanSNRStrongCap {
+		t.Errorf("RoutePlanSNRStrongCap = %v, want %v", r.RoutePlanSNRStrongCap, DefaultRoutePlanSNRStrongCap)
+	}
+	if r.RoutePlanTrafficMaxDiscount != DefaultRoutePlanTrafficMaxDiscount {
+		t.Errorf("RoutePlanTrafficMaxDiscount = %v, want %v", r.RoutePlanTrafficMaxDiscount, DefaultRoutePlanTrafficMaxDiscount)
+	}
+	if r.RoutePlanTrafficFullCount != DefaultRoutePlanTrafficFullCount {
+		t.Errorf("RoutePlanTrafficFullCount = %v, want %v", r.RoutePlanTrafficFullCount, DefaultRoutePlanTrafficFullCount)
+	}
+	if r.RoutePlanTrafficMeasuredShare != DefaultRoutePlanTrafficMeasuredShare {
+		t.Errorf("RoutePlanTrafficMeasuredShare = %v, want %v", r.RoutePlanTrafficMeasuredShare, DefaultRoutePlanTrafficMeasuredShare)
+	}
+	if r.RoutePlanUnmeasuredFloor != DefaultRoutePlanUnmeasuredFloor {
+		t.Errorf("RoutePlanUnmeasuredFloor = %v, want %v", r.RoutePlanUnmeasuredFloor, DefaultRoutePlanUnmeasuredFloor)
+	}
 	if r.RoutePlanNeighborBonus != DefaultRoutePlanNeighborBonus {
 		t.Errorf("RoutePlanNeighborBonus = %v, want %v", r.RoutePlanNeighborBonus, DefaultRoutePlanNeighborBonus)
 	}
@@ -229,6 +244,19 @@ func TestRoutePlanConfig_Validate(t *testing.T) {
 	negativeBonus.NeighborBonus = fptr(-0.1)
 	if err := negativeBonus.Validate(); err == nil {
 		t.Error("expected error for negative neighbor_bonus")
+	}
+	for name, mutate := range map[string]func(*RoutePlanConfig){
+		"bad strong cap":     func(c *RoutePlanConfig) { c.SNRStrongCap = fptr(1.5) },
+		"negative traffic":   func(c *RoutePlanConfig) { c.TrafficMaxDiscount = fptr(-1) },
+		"degenerate full":    func(c *RoutePlanConfig) { c.TrafficFullCount = fptr(0.5) },
+		"share out of range": func(c *RoutePlanConfig) { c.TrafficMeasuredShare = fptr(1.5) },
+		"negative floor":     func(c *RoutePlanConfig) { c.UnmeasuredFloor = fptr(-0.1) },
+	} {
+		bad := good
+		mutate(&bad)
+		if err := bad.Validate(); err == nil {
+			t.Errorf("expected error for %s", name)
+		}
 	}
 	// Raw validation only checks shape: partial configs pass here and are
 	// rejected by ValidateResolved after defaults are applied (see below).
@@ -300,6 +328,43 @@ func TestValidateResolved_PositiveCosts(t *testing.T) {
 	cfg.RoutePlan.NeighborBonus = fptr(0.5) // gap is 2.5-2.0 = 0.5
 	if err := ValidateResolved(Resolve(cfg)); err == nil {
 		t.Error("expected rejection when neighbor_bonus >= unmeasured - max gap")
+	}
+}
+
+func TestValidateResolved_TrafficInvariants(t *testing.T) {
+	if err := ValidateResolved(Resolve(&Config{})); err != nil {
+		t.Fatalf("default resolve should validate, got %v", err)
+	}
+	cases := map[string]func(*Config){
+		// Floor at/below the strong cap: a proven unmeasured leg could tie
+		// or beat a fresh strong reading per-leg.
+		"floor below cap": func(c *Config) { c.RoutePlan.UnmeasuredFloor = fptr(0.25) },
+		// Degenerate log scale.
+		"full count < 1": func(c *Config) { c.RoutePlan.TrafficFullCount = fptr(0.5) },
+		// Share outside [0, 1].
+		"share > 1": func(c *Config) { c.RoutePlan.TrafficMeasuredShare = fptr(2) },
+		// Zero floor with penalties fully discountable to zero/negative.
+		"zero floor, free unmeasured": func(c *Config) {
+			c.RoutePlan.UnmeasuredFloor = fptr(0)
+			c.RoutePlan.UnmeasuredPenalty = fptr(2.0)
+			c.RoutePlan.TrafficMaxDiscount = fptr(2.0)
+		},
+		// Kink needs goodDB > 0 > badDB.
+		"goodDB at zero": func(c *Config) { c.RoutePlan.SNRGoodDB = fptr(0) },
+		"badDB at zero":  func(c *Config) { c.RoutePlan.SNRBadDB = fptr(0) },
+	}
+	for name, mutate := range cases {
+		cfg := &Config{}
+		mutate(cfg)
+		if err := ValidateResolved(Resolve(cfg)); err == nil {
+			t.Errorf("expected rejection for %s", name)
+		}
+	}
+	// traffic_max_discount: 0 is valid: pure-SNR model (share irrelevant).
+	off := &Config{}
+	off.RoutePlan.TrafficMaxDiscount = fptr(0)
+	if err := ValidateResolved(Resolve(off)); err != nil {
+		t.Errorf("traffic_max_discount 0 should validate, got %v", err)
 	}
 }
 

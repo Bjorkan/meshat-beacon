@@ -1630,7 +1630,7 @@ const docTemplate = `{
         },
         "/routes/best": {
             "get": {
-                "description": "Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with known signal strength. Unmeasured legs pay a configured penalty but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
+                "description": "Computes best-first repeater routes between two repeater nodes over the observed neighbor graph, preferring legs with strong signal and proven traffic history. Unmeasured legs pay a configured penalty discounted by passed-packet evidence but are still used, so the graph never fragments. Every node in a returned path is a repeater with coordinates. Non-repeater endpoints are rejected with 400. An unroutable pair returns 200 with an empty paths array and a reason, never an error.",
                 "produces": [
                     "application/json"
                 ],
