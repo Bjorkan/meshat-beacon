@@ -95,7 +95,11 @@ type Querier interface {
 	// summed counts, min/max timestamps) while the direct mark merges per directed
 	// pair with OR across IATAs (the planner's Neighbor semantic is directional:
 	// only the reporter hearing the peer counts, reverse evidence does not mark
-	// this direction) plus MAX(direct_last_seen) for bonus freshness.
+	// this direction) plus MAX(direct_last_seen) for bonus freshness. Provenance
+	// merges with MAX(hash_width): the widest hash that ever confirmed the pair,
+	// so one unambiguous confirmation keeps the discount even if later traffic
+	// arrives narrower. NULL (legacy, pre-provenance) merges as unknown: it
+	// never upgrades and never blocks a real width.
 	GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow, error)
 	GetScopeByName(ctx context.Context, name string) (GetScopeByNameRow, error)
 	GetScopeNames(ctx context.Context) ([]string, error)
@@ -324,6 +328,15 @@ type Querier interface {
 	// FALSE). direct_last_seen advances only on explicit direct confirmations, so
 	// the planner can age the bonus out: overheard traffic refreshes last_seen
 	// (keeping the row alive under retention) but never refreshes direct_last_seen.
+	// hashWidth records the provenance of the confirmation for the route
+	// planner's traffic-evidence discount: 32 = exact pubkey identity (direct RF
+	// evidence, always unambiguous), 2/3/4/8 = path/trace hash width in bytes
+	// (only passed when the hash resolved to exactly one node globally --
+	// ambiguous hashes never reach this upsert), 1 = a 1-byte hash (never
+	// discountable: ~1/256 of the fleet shares any 1-byte prefix). Pass NULL
+	// only when the caller carries no provenance claim at all. On conflict the
+	// widest hash wins (GREATEST, NULL-safe: a real width always beats NULL),
+	// so a concurrent narrower confirmation can never downgrade provenance.
 	// On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 	// a stable map link quality while making recent RF conditions matter more than old samples.
 	UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighborParams) error

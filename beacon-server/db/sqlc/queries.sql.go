@@ -1196,7 +1196,8 @@ SELECT
   MAX(nf.last_seen)::timestamptz AS from_last_seen,
   MAX(nt.last_seen)::timestamptz AS to_last_seen,
   BOOL_OR(nn.direct) AS direct,
-  MAX(nn.direct_last_seen)::timestamptz AS direct_last_seen
+  MAX(nn.direct_last_seen)::timestamptz AS direct_last_seen,
+  MAX(nn.hash_width)::smallint AS hash_width
 FROM node_neighbors nn
 JOIN nodes nf ON nf.id = nn.node_id
 JOIN nodes nt ON nt.id = nn.neighbor_id
@@ -1233,6 +1234,7 @@ type GetRoutePlanGraphRow struct {
 	ToLastSeen                 pgtype.Timestamptz `json:"to_last_seen"`
 	Direct                     bool               `json:"direct"`
 	DirectLastSeen             pgtype.Timestamptz `json:"direct_last_seen"`
+	HashWidth                  int16              `json:"hash_width"`
 }
 
 // Full neighbor-graph dump for the /routes/best planner: every directed
@@ -1243,7 +1245,11 @@ type GetRoutePlanGraphRow struct {
 // summed counts, min/max timestamps) while the direct mark merges per directed
 // pair with OR across IATAs (the planner's Neighbor semantic is directional:
 // only the reporter hearing the peer counts, reverse evidence does not mark
-// this direction) plus MAX(direct_last_seen) for bonus freshness.
+// this direction) plus MAX(direct_last_seen) for bonus freshness. Provenance
+// merges with MAX(hash_width): the widest hash that ever confirmed the pair,
+// so one unambiguous confirmation keeps the discount even if later traffic
+// arrives narrower. NULL (legacy, pre-provenance) merges as unknown: it
+// never upgrades and never blocks a real width.
 func (q *Queries) GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow, error) {
 	rows, err := q.db.Query(ctx, getRoutePlanGraph)
 	if err != nil {
@@ -1279,6 +1285,7 @@ func (q *Queries) GetRoutePlanGraph(ctx context.Context) ([]GetRoutePlanGraphRow
 			&i.ToLastSeen,
 			&i.Direct,
 			&i.DirectLastSeen,
+			&i.HashWidth,
 		); err != nil {
 			return nil, err
 		}
@@ -4838,13 +4845,14 @@ func (q *Queries) UpsertNodeIATA(ctx context.Context, arg UpsertNodeIATAParams) 
 const upsertNodeNeighbor = `-- name: UpsertNodeNeighbor :exec
 
 INSERT INTO node_neighbors (
-  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen, direct, direct_last_seen
+  node_id, neighbor_id, iata, observation_count, snr, snr_sample_count, snr_last_seen, region_scope, region_scope_last_seen, direct, direct_last_seen, hash_width
 )
 VALUES (
   $1, $2, $3, 1, $4, CASE WHEN $4::real IS NULL THEN 0 ELSE 1 END,
   CASE WHEN $4::real IS NULL THEN NULL ELSE NOW() END, $5,
   CASE WHEN $5::text IS NULL THEN NULL ELSE NOW() END, $6,
-  CASE WHEN $6::boolean THEN NOW() ELSE NULL END
+  CASE WHEN $6::boolean THEN NOW() ELSE NULL END,
+  $7
 )
 ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
   last_seen         = NOW(),
@@ -4854,6 +4862,7 @@ ON CONFLICT (node_id, neighbor_id, iata) DO UPDATE SET
                         WHEN EXCLUDED.direct THEN COALESCE(EXCLUDED.direct_last_seen, NOW())
                         ELSE node_neighbors.direct_last_seen
                       END,
+  hash_width        = (SELECT MAX(w) FROM unnest(ARRAY[node_neighbors.hash_width, EXCLUDED.hash_width]) AS w),
   snr               = CASE
                         WHEN EXCLUDED.snr IS NULL THEN node_neighbors.snr
                         WHEN node_neighbors.snr IS NULL THEN EXCLUDED.snr
@@ -4877,6 +4886,7 @@ type UpsertNodeNeighborParams struct {
 	Snr         *float32  `json:"snr"`
 	RegionScope *string   `json:"region_scope"`
 	Direct      bool      `json:"direct"`
+	HashWidth   *int16    `json:"hash_width"`
 }
 
 // ============================================================
@@ -4894,6 +4904,15 @@ type UpsertNodeNeighborParams struct {
 // FALSE). direct_last_seen advances only on explicit direct confirmations, so
 // the planner can age the bonus out: overheard traffic refreshes last_seen
 // (keeping the row alive under retention) but never refreshes direct_last_seen.
+// hashWidth records the provenance of the confirmation for the route
+// planner's traffic-evidence discount: 32 = exact pubkey identity (direct RF
+// evidence, always unambiguous), 2/3/4/8 = path/trace hash width in bytes
+// (only passed when the hash resolved to exactly one node globally --
+// ambiguous hashes never reach this upsert), 1 = a 1-byte hash (never
+// discountable: ~1/256 of the fleet shares any 1-byte prefix). Pass NULL
+// only when the caller carries no provenance claim at all. On conflict the
+// widest hash wins (GREATEST, NULL-safe: a real width always beats NULL),
+// so a concurrent narrower confirmation can never downgrade provenance.
 // On conflict, valid SNR samples feed a bounded exponentially weighted mean. This preserves
 // a stable map link quality while making recent RF conditions matter more than old samples.
 func (q *Queries) UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighborParams) error {
@@ -4904,6 +4923,7 @@ func (q *Queries) UpsertNodeNeighbor(ctx context.Context, arg UpsertNodeNeighbor
 		arg.Snr,
 		arg.RegionScope,
 		arg.Direct,
+		arg.HashWidth,
 	)
 	return err
 }

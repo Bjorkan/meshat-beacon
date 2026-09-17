@@ -178,7 +178,7 @@ func (w *Worker) writeNeighbors(ctx context.Context, iata, pubkeyHex string, pub
 			regionScope = &n.Scopes
 		}
 
-		if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, neighborNodeID, iata, &snr, regionScope, true); err != nil {
+		if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, neighborNodeID, iata, &snr, regionScope, true, hashWidthExact()); err != nil {
 			log.Printf("ingest[%s]: db: upsert neighbor failed for %s -> %s: %v", w.cfg.BrokerName, pubkeyHex, n.PubKey, err)
 		}
 	}

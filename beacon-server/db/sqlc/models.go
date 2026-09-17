@@ -173,6 +173,7 @@ type NodeNeighbor struct {
 	RegionScopeLastSeen pgtype.Timestamptz `json:"region_scope_last_seen"`
 	Direct              bool               `json:"direct"`
 	DirectLastSeen      pgtype.Timestamptz `json:"direct_last_seen"`
+	HashWidth           *int16             `json:"hash_width"`
 }
 
 type NodeShortID struct {

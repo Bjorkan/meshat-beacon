@@ -1,0 +1,33 @@
+-- Copyright 2026 Beacon Contributors
+-- SPDX-License-Identifier: AGPL-3.0-or-later
+
+-- Provenance for the route planner's traffic-evidence discount: which
+-- evidence confirmed the pair, and at which hash width. The planner only
+-- discounts legs whose evidence is unambiguous (exactly one node could have
+-- been the hop), mirroring the rules the rest of the system already holds:
+--
+-- hash_width:
+--   32 = exact pubkey identity, no hash involved (/neighbors reports,
+--     zero-hop advert RX, DISCOVER_RESP RX: the reporter itself heard the
+--     neighbor over RF). Always unambiguous.
+--   2/3/4/8 = path/trace hash width in bytes that confirmed the pair
+--     (path-derived adjacency needs >= 3, traces use the firmware's
+--     1<<(flags&3) widths 1/2/4/8). Stored only when the hash resolved to
+--     exactly one node globally -- ambiguous or unresolved hashes never
+--     reach the upsert (see internal/ingest/packet.go).
+--   1 = a 1-byte hash "confirmed" the pair. 1-byte prefixes collide across
+--     ~1/256 of the fleet, so the hop could have been any node: the route
+--     planner NEVER discounts these legs. Stored explicitly (rather than
+--     NULL) so it is distinguishable from "no evidence recorded yet".
+--   NULL = legacy rows predating provenance tracking. The planner treats
+--     these as NOT discountable (fail-closed, same stance as 035's direct
+--     flag: no column could prove provenance for old rows, so none is
+--     claimed). Fresh observations promote rows after deployment via the
+--     upsert's GREATEST merge below.
+--
+-- A node that moves (new advert with different lat/lon) deletes all its
+-- neighbor rows outright (see UpsertNode), so stale-position evidence can
+-- never discount -- same rule as the neighbor system itself. The planner
+-- additionally drops legs longer than the distance cap at plan time
+-- (BuildGraph maxKm), so the "within 150km" rule holds end to end.
+ALTER TABLE node_neighbors ADD COLUMN hash_width SMALLINT;

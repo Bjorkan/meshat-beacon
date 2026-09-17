@@ -319,7 +319,7 @@ func (s *stubDB) UpsertKnownRoute(_ context.Context, _ []uuid.UUID, _ [][]byte, 
 	return nil
 }
 
-func (s *stubDB) UpsertNodeNeighbor(_ context.Context, _, _ uuid.UUID, _ string, _ *float32, _ *string, _ bool) error {
+func (s *stubDB) UpsertNodeNeighbor(_ context.Context, _, _ uuid.UUID, _ string, _ *float32, _ *string, _ bool, _ *int16) error {
 	s.upsertNeighborCalls++
 	return nil
 }

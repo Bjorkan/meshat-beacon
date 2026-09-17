@@ -18,16 +18,21 @@
 // measurements.
 //
 // Traffic evidence (the directed pair's merged observation_count: every
-// packet that demonstrably crossed the hop, e.g. via 3-byte path hashes)
-// discounts the signal term on a log scale: discount(obs) =
-// trafficMaxDiscount * log10(1+obs) / log10(1+trafficFullCount). Hundreds of
-// passed packets (HuskvarnaS -> Gisebo ~1000) therefore discount far more
-// than a handful (3 packets), letting a proven-but-SNR-less hop outrank a
-// weak measured hop with thin history. Speculative legs (obs ~ 1) keep almost
-// no discount, so they still lose to every measured leg. Discounts never
-// apply to the strong cap itself: the cheapest possible leg cost is exactly
-// SNRStrongCap, keeping the Dijkstra positivity invariant trivially
-// checkable.
+// packet that demonstrably crossed the hop) discounts the signal term on a
+// log scale: discount(obs) = trafficMaxDiscount *
+// log10(1+obs) / log10(1+trafficFullCount). Hundreds of passed packets
+// (HuskvarnaS -> Gisebo ~1000) therefore discount far more than a handful
+// (3 packets), letting a proven-but-SNR-less hop outrank a weak measured
+// hop with thin history. ONLY legs with unambiguous provenance earn the
+// discount (see Edge.discountableProvenance): exact identity or a 2+ byte
+// hash that resolved to exactly one node globally -- the same uniqueness
+// rule the rest of the system already holds. A 1-byte hash never discounts
+// (any node could have been the hop: ~1/256 of the fleet shares any
+// 1-byte prefix), and legacy rows without provenance fail closed.
+// Speculative legs (obs ~ 1) keep almost no discount, so they still lose
+// to every measured leg. Discounts never apply to the strong cap itself:
+// the cheapest possible leg cost is exactly SNRStrongCap, keeping the
+// Dijkstra positivity invariant trivially checkable.
 //
 // Because the strong-leg cap sits well below 1.0 while a weak measured leg
 // costs ~1.0, several strong measured hops can together cost less than one
@@ -163,6 +168,16 @@ type Edge struct {
 	SNRSampleCount int64
 	SNRLastSeen    time.Time // zero when never measured
 	Observations   int64
+	// HashWidth is the widest provenance width (in bytes) that ever
+	// confirmed this directed pair: 32 = exact pubkey identity (direct RF
+	// evidence, always unambiguous), 2/3/4/8 = the path/trace hash width
+	// that confirmed it (stored only for globally unique resolutions),
+	// 1 = a 1-byte hash (never discountable: ~1/256 of the fleet shares
+	// any 1-byte prefix). Zero/negative = legacy row predating provenance
+	// tracking: fail-closed, never discounted. Merged with MAX across IATA
+	// rows of the same directed pair, so one unambiguous confirmation keeps
+	// the discount even if later traffic arrives narrower.
+	HashWidth int16
 	// Neighbor is true when the reporter explicitly marked the peer as a
 	// neighbor (a DIRECT row in node_neighbors for this directed pair).
 	// Overheard third-party legs leave it false. Directional: reverse evidence
@@ -174,6 +189,15 @@ type Edge struct {
 	// never advances it. The planner grants the neighbor bonus only while it
 	// is within Config.DirectFreshness.
 	DirectLastSeen time.Time
+}
+
+// discountableProvenance reports whether the leg's evidence is unambiguous
+// enough for the traffic-evidence discount: exact identity (32) or a 2+ byte
+// hash that resolved to exactly one node globally. 1-byte hashes are never
+// discountable (any node could have been the hop), and legacy rows without
+// recorded provenance (<= 0) fail closed.
+func (e Edge) discountableProvenance() bool {
+	return e.HashWidth >= 2
 }
 
 // Graph is the directed planning graph: located nodes plus directed edges.
@@ -212,17 +236,28 @@ func (c Config) IsFreshNeighbor(e Edge, now time.Time) bool {
 //	cost more than a step down while still positive.
 //	traffic discount: discount(obs) = TrafficMaxDiscount *
 //	log10(1+obs)/log10(1+TrafficFullCount), log-scaled so hundreds of
-//	passed packets discount far more than a handful. Unmeasured legs earn
-//	the full discount (traffic is their only quality signal, floored at
-//	UnmeasuredFloor); measured legs earn only TrafficMeasuredShare of it,
-//	so SNR stays the primary signal where it exists. Zero observations
-//	earn zero discount.
+//	passed packets discount far more than a handful. ONLY legs with
+//	unambiguous provenance earn it (see Edge.discountableProvenance):
+//	exact identity or a 2+ byte hash that resolved to exactly one node
+//	globally. 1-byte evidence never discounts (any node could have been
+//	the hop) and legacy rows without provenance fail closed. Unmeasured
+//	legs earn the full discount (traffic is their only quality signal,
+//	floored at UnmeasuredFloor); measured legs earn only
+//	TrafficMeasuredShare of it, so SNR stays the primary signal where it
+//	exists. Zero observations earn zero discount.
 //	neighbor bonus: a freshly-confirmed neighbor leg (see IsFreshNeighbor)
 //	earns the configured bonus -- zero is naturally a no-op so
 //	NeighborBonus == 0 disables only the discount, never the topology
 //	fact. The bonus applies to weak/interpolated legs (where it breaks ties
 //	between equally-measured legs) but never to a capped strong leg,
 //	keeping the cheapest possible cost exactly the strong cap.
+//
+// A node that moves (new advert with different lat/lon) deletes all its
+// neighbor rows outright at ingest (see UpsertNode), so stale-position
+// evidence can never discount -- the same invalidation rule as the
+// neighbor system itself. The planner additionally drops legs longer than
+// the distance cap at plan time (BuildGraph maxKm), so the "within 150km"
+// rule holds end to end even for legacy rows.
 //
 // Costs stay positive for Dijkstra (ValidateResolved enforces bonus < gap,
 // cap in (0, 1), and the traffic/full-count/floor relations). now anchors
@@ -232,7 +267,10 @@ func (c Config) LegCost(e Edge, now time.Time) (cost float64, unmeasured bool) {
 	if c.IsFreshNeighbor(e, now) {
 		bonus = c.NeighborBonus
 	}
-	traffic := c.trafficDiscount(e.Observations)
+	traffic := 0.0
+	if e.discountableProvenance() {
+		traffic = c.trafficDiscount(e.Observations)
+	}
 	measured := !(e.SNR == nil || e.SNRSampleCount == 0 || now.Sub(e.SNRLastSeen) > c.SNRFreshness)
 	if measured {
 		snr := float64(*e.SNR)
@@ -347,6 +385,13 @@ func BuildGraph(rows []db.GetRoutePlanGraphRow, staleThreshold time.Duration, ma
 			order = append(order, key)
 		}
 		e.Observations += r.ObservationCount
+		// Provenance merges with MAX: the widest hash that ever confirmed
+		// the pair, so one unambiguous confirmation keeps the discount even
+		// if later traffic arrives narrower. Legacy rows (0) never upgrade
+		// and never block a real width.
+		if r.HashWidth > e.HashWidth {
+			e.HashWidth = r.HashWidth
+		}
 		if r.Direct {
 			e.Neighbor = true
 		}

@@ -93,7 +93,7 @@ func TestNeighborDirectMigrationIntegration(t *testing.T) {
 
 	// Historical TRACE-style edge WITH an SNR sample, explicitly non-direct.
 	snr := float32(-7.5)
-	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, false); err != nil {
+	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, false, i16(2)); err != nil {
 		t.Fatal(err)
 	}
 
@@ -117,7 +117,7 @@ func TestNeighborDirectMigrationIntegration(t *testing.T) {
 	}
 
 	// A subsequent explicit direct observation must still promote the edge.
-	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, true); err != nil {
+	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, true, i16(32)); err != nil {
 		t.Fatal(err)
 	}
 	if err := pool.QueryRow(ctx, `SELECT direct FROM node_neighbors WHERE node_id = $1 AND neighbor_id = $2`, aID, bID).Scan(&promoted); err != nil {
@@ -140,7 +140,7 @@ func TestNeighborDirectMigrationIntegration(t *testing.T) {
 	if err := pool.QueryRow(ctx, `SELECT direct_last_seen::text FROM node_neighbors WHERE node_id = $1 AND neighbor_id = $2`, aID, bID).Scan(&before); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, false); err != nil {
+	if err := store.UpsertNodeNeighbor(ctx, aID, bID, "YVR", &snr, nil, false, i16(2)); err != nil {
 		t.Fatal(err)
 	}
 	var after string
@@ -154,4 +154,17 @@ func TestNeighborDirectMigrationIntegration(t *testing.T) {
 	if before != after {
 		t.Fatal("overheard traffic must not refresh direct_last_seen")
 	}
+
+	// Provenance: the TRACE upsert stored width 2, the direct upsert must
+	// have widened it to 32 (exact identity), and the later narrower TRACE
+	// upsert must NOT have downgraded it again.
+	var width int16
+	if err := pool.QueryRow(ctx, `SELECT hash_width FROM node_neighbors WHERE node_id = $1 AND neighbor_id = $2`, aID, bID).Scan(&width); err != nil {
+		t.Fatal(err)
+	}
+	if width != 32 {
+		t.Fatalf("widest provenance must win (want 32, got %d)", width)
+	}
 }
+
+func i16(v int16) *int16 { return &v }

@@ -121,11 +121,16 @@ routes:
 # into the negative costs more than a step down while still positive);
 # unmeasured or stale legs pay unmeasured_penalty as their signal term
 # instead, which must stay >= snr_max_penalty so a speculative leg (no
-# traffic) always costs more than any measured leg. Proven traffic (the
-# directed pair's merged observation_count: every packet that demonstrably
-# crossed the hop, e.g. via 3-byte path hashes) discounts the signal term on
-# a log10 scale up to traffic_max_discount at traffic_full_count
-# observations: hundreds of passed packets discount far more than a handful,
+# trustworthy traffic) always costs more than any measured leg. Proven
+# traffic (the directed pair's merged observation_count: every packet that
+# demonstrably crossed the hop) discounts the signal term on a log10 scale
+# up to traffic_max_discount at traffic_full_count observations -- BUT only
+# for unambiguous evidence: exact pubkey identity or a 2+ byte hash that
+# resolved to exactly one node globally (same uniqueness rule the rest of
+# the system holds). A 1-byte hash NEVER discounts (any node could have
+# been the hop), legacy rows without provenance fail closed, a moved node
+# deletes all its edges at ingest, and legs beyond 150 km never plan. So
+# hundreds of unambiguous passed packets discount far more than a handful,
 # letting a proven-but-SNR-less hop (HuskvarnaS -> Gisebo ~1000 obs)
 # outrank a weak measured hop with thin history. Unmeasured legs earn the
 # full discount (traffic is their only quality signal, floored at

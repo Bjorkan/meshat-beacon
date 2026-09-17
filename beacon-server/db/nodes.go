@@ -75,7 +75,7 @@ func (s *Store) UpsertNodeShortID(ctx context.Context, nodeID uuid.UUID, iata st
 	})
 }
 
-func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool) error {
+func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool, hashWidth *int16) error {
 	// A neighbor edge claims the two nodes hear each other over RF, which is
 	// impossible beyond a bounded range. When both endpoints report
 	// coordinates, refuse links longer than the cap — packets and /neighbors
@@ -100,6 +100,7 @@ func (s *Store) UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.
 		Snr:         snr,
 		RegionScope: regionScope,
 		Direct:      direct,
+		HashWidth:   hashWidth,
 	})
 }
 

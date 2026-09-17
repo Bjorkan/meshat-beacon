@@ -262,9 +262,15 @@ type NeighborsConfig struct {
 //
 // Traffic evidence (the directed pair's merged observation_count) discounts
 // the signal term on a log10 scale up to TrafficMaxDiscount at
-// TrafficFullCount observations: hundreds of passed packets discount far
-// more than a handful, letting a proven-but-SNR-less hop outrank a weak
-// measured hop with thin history. Unmeasured legs earn the full discount
+// TrafficFullCount observations -- but ONLY for unambiguous evidence (see
+// routeplan.Edge: exact pubkey identity or a 2+ byte hash that resolved to
+// exactly one node globally, the same uniqueness rule the rest of the
+// system holds). A 1-byte hash never discounts, legacy rows without
+// provenance fail closed, a moved node deletes all its edges at ingest,
+// and legs beyond the distance cap never plan. So hundreds of unambiguous
+// passed packets discount far more than a handful, letting a
+// proven-but-SNR-less hop outrank a weak measured hop with thin history.
+// Unmeasured legs earn the full discount
 // (traffic is their only quality signal, floored at UnmeasuredFloor);
 // measured legs earn only TrafficMeasuredShare of it, so SNR stays the
 // primary signal where it exists. TrafficMaxDiscount: 0 disables traffic

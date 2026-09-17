@@ -274,18 +274,21 @@ func TestLegCost_AllBranchesPositive(t *testing.T) {
 	// Traffic-heavy variants: even maximally discounted legs must stay
 	// positive (measured floor at the strong cap, unmeasured at the floor).
 	cases := map[string]Edge{
-		"strong":            {SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now},
-		"strong+bonus":      {Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now},
-		"mid":               {SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now},
-		"mid+bonus":         {Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now},
-		"bad":               {SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now},
-		"bad+bonus":         {Neighbor: true, DirectLastSeen: now, SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now},
+		"strong":            {SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, HashWidth: 32},
+		"strong+bonus":      {Neighbor: true, DirectLastSeen: now, SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, HashWidth: 32},
+		"mid":               {SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, HashWidth: 3},
+		"mid+bonus":         {Neighbor: true, DirectLastSeen: now, SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, HashWidth: 3},
+		"bad":               {SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, HashWidth: 3},
+		"bad+bonus":         {Neighbor: true, DirectLastSeen: now, SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, HashWidth: 3},
 		"unmeasured":        {},
 		"unmeasured+bonus":  {Neighbor: true, DirectLastSeen: now},
 		"stale":             {SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now.Add(-30 * 24 * time.Hour)},
-		"proven-unmeasured": {Observations: 100000},
-		"proven-mid":        {SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, Observations: 100000},
-		"proven-bad+bonus":  {Neighbor: true, DirectLastSeen: now, SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, Observations: 100000},
+		"proven-unmeasured": {Observations: 100000, HashWidth: 3},
+		"proven-mid":        {SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, Observations: 100000, HashWidth: 3},
+		"proven-bad+bonus":  {Neighbor: true, DirectLastSeen: now, SNR: f32(-20), SNRSampleCount: 1, SNRLastSeen: now, Observations: 100000, HashWidth: 3},
+		// 1-byte evidence and legacy rows: traffic must NOT move the cost.
+		"onebyte-unmeasured": {Observations: 100000, HashWidth: 1},
+		"legacy-unmeasured":  {Observations: 100000},
 	}
 	for name, e := range cases {
 		c, _ := cfg.LegCost(e, now)
@@ -300,9 +303,10 @@ func TestLegCost_TrafficEvidence(t *testing.T) {
 	now := time.Now()
 	// The user's core rule: more passed packets = heavier weight. A
 	// proven-but-SNR-less hop (HuskvarnaS -> Gisebo ~1000 obs) must beat a
-	// 3-packet hop, and ~400 obs must beat ~3 obs.
-	proven := Edge{Observations: 1000}
-	thin := Edge{Observations: 3}
+	// 3-packet hop, and ~400 obs must beat ~3 obs. Provenance 3 = 3-byte
+	// path hashes, each resolving to exactly one node globally.
+	proven := Edge{Observations: 1000, HashWidth: 3}
+	thin := Edge{Observations: 3, HashWidth: 3}
 	pc, pu := cfg.LegCost(proven, now)
 	tc, tu := cfg.LegCost(thin, now)
 	if !pu || !tu {
@@ -314,8 +318,8 @@ func TestLegCost_TrafficEvidence(t *testing.T) {
 	// The log scale separates thin from moderate traffic; heavily proven
 	// legs both bottom out at the floor (that IS the point: proven is
 	// proven). Use counts on the slope for the ordering check.
-	light := Edge{Observations: 3}
-	moderate := Edge{Observations: 30}
+	light := Edge{Observations: 3, HashWidth: 3}
+	moderate := Edge{Observations: 30, HashWidth: 3}
 	lc, _ := cfg.LegCost(light, now)
 	mc, _ := cfg.LegCost(moderate, now)
 	if mc >= lc {
@@ -326,12 +330,12 @@ func TestLegCost_TrafficEvidence(t *testing.T) {
 	}
 	// Proven traffic bottoms out at the floor, never below: it must not
 	// beat a fresh strong reading per-leg.
-	huge := Edge{Observations: 1000000}
+	huge := Edge{Observations: 1000000, HashWidth: 3}
 	hc, _ := cfg.LegCost(huge, now)
 	if hc != cfg.UnmeasuredFloor {
 		t.Errorf("maximally proven unmeasured must cost the floor %v, got %v", cfg.UnmeasuredFloor, hc)
 	}
-	strong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now}
+	strong := Edge{SNR: f32(10), SNRSampleCount: 5, SNRLastSeen: now, HashWidth: 32}
 	sc, _ := cfg.LegCost(strong, now)
 	if hc <= sc {
 		t.Errorf("proven unmeasured (%v) must stay costlier than strong measured (%v)", hc, sc)
@@ -344,6 +348,42 @@ func TestLegCost_TrafficEvidence(t *testing.T) {
 	}
 }
 
+func TestLegCost_OneByteNeverDiscounts(t *testing.T) {
+	// The user's rule: a 1-byte hash can never identify the hop (~1/256 of
+	// the fleet shares any 1-byte prefix), so its traffic must NEVER buy a
+	// discount -- not measured, not unmeasured, no matter the count.
+	// Legacy rows without provenance (width 0) fail closed the same way.
+	cfg := testCfg()
+	now := time.Now()
+	for name, e := range map[string]Edge{
+		"one-byte unmeasured": {Observations: 1000000, HashWidth: 1},
+		"legacy unmeasured":   {Observations: 1000000},
+		"one-byte measured": {
+			SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now,
+			Observations: 1000000, HashWidth: 1,
+		},
+	} {
+		c, _ := cfg.LegCost(e, now)
+		var want float64
+		if e.SNR != nil {
+			want, _ = testCfgNoTraffic().LegCost(Edge{SNR: e.SNR, SNRSampleCount: 2, SNRLastSeen: now}, now)
+		} else {
+			want = cfg.UnmeasuredPenalty
+		}
+		if c != want {
+			t.Errorf("%s: traffic must not discount (want bare %v, got %v)", name, want, c)
+		}
+	}
+	// ...while width 2 (trace) and 32 (exact identity) DO discount.
+	for name, w := range map[string]int16{"two-byte": 2, "exact": 32} {
+		e := Edge{Observations: 1000000, HashWidth: w}
+		c, _ := cfg.LegCost(e, now)
+		if c != cfg.UnmeasuredFloor {
+			t.Errorf("%s: proven traffic must reach the floor %v, got %v", name, cfg.UnmeasuredFloor, c)
+		}
+	}
+}
+
 func TestLegCost_TrafficStaysSecondaryToSNR(t *testing.T) {
 	// Measured legs earn only TrafficMeasuredShare of the discount: two
 	// equally-measured legs split on traffic, but traffic alone cannot
@@ -351,7 +391,7 @@ func TestLegCost_TrafficStaysSecondaryToSNR(t *testing.T) {
 	cfg := testCfg()
 	now := time.Now()
 	mk := func(obs int64) Edge {
-		return Edge{SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, Observations: obs}
+		return Edge{SNR: f32(-5), SNRSampleCount: 2, SNRLastSeen: now, Observations: obs, HashWidth: 3}
 	}
 	rich, _ := cfg.LegCost(mk(100000), now)
 	poor, _ := cfg.LegCost(mk(1), now)
@@ -387,12 +427,12 @@ func TestShortestPaths_PrefersProvenTraffic(t *testing.T) {
 		Edges: map[uuid.UUID][]Edge{
 			// Direct: weak thin measured leg + speculative leg.
 			a: {
-				{From: a, To: d, SNR: f32(-13.5), SNRSampleCount: 1, SNRLastSeen: now, Observations: 1},
-				{From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 3000},
+				{From: a, To: d, SNR: f32(-13.5), SNRSampleCount: 1, SNRLastSeen: now, Observations: 1, HashWidth: 3},
+				{From: a, To: b, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now, Observations: 3000, HashWidth: 32},
 			},
 			// Detour: strong proven leg + proven unmeasured leg.
-			b: {{From: b, To: c, Observations: 1000}},
-			c: {{From: c, To: d, SNR: f32(3), SNRSampleCount: 5, SNRLastSeen: now, Observations: 500}},
+			b: {{From: b, To: c, Observations: 1000, HashWidth: 3}},
+			c: {{From: c, To: d, SNR: f32(3), SNRSampleCount: 5, SNRLastSeen: now, Observations: 500, HashWidth: 3}},
 		},
 	}
 	paths := ShortestPaths(g, cfg, a, d, 1, now)
@@ -815,7 +855,7 @@ func TestBuildGraph_MergesDirectedSNR(t *testing.T) {
 		ToLat: f64(59.61), ToLng: f64(16.52),
 		ObservationCount: 4, FirstSeen: ts(now), LastSeen: ts(now),
 		SnrWeightedSum: 20, SnrSampleCount: 4, SnrLastSeen: ts(now),
-		Direct: true, DirectLastSeen: ts(now),
+		Direct: true, DirectLastSeen: ts(now), HashWidth: 3,
 	}
 	g := BuildGraph([]db.GetRoutePlanGraphRow{row}, 24*time.Hour, 0, now)
 	if len(g.Edges[a]) != 1 {
@@ -830,6 +870,50 @@ func TestBuildGraph_MergesDirectedSNR(t *testing.T) {
 	}
 	if !e.Neighbor {
 		t.Error("expected direct mark to survive aggregation")
+	}
+	if e.HashWidth != 3 {
+		t.Errorf("expected provenance width 3 to survive aggregation, got %d", e.HashWidth)
+	}
+}
+
+func TestBuildGraph_MergesWidestProvenance(t *testing.T) {
+	// Two IATA rows for one directed pair: a 1-byte row with heavy traffic
+	// and a 3-byte row with light traffic. The merged edge keeps the SUMMED
+	// observations but the WIDEST provenance -- one unambiguous
+	// confirmation keeps the discount even though most traffic arrived
+	// narrower.
+	now := time.Now()
+	a, b := uuid.New(), uuid.New()
+	mkrow := func(width int16, obs int64) db.GetRoutePlanGraphRow {
+		return db.GetRoutePlanGraphRow{
+			FromID: a, FromPubkey: a[:], FromType: 2,
+			FromLat: f64(59.6), FromLng: f64(16.5),
+			ToID: b, ToPubkey: b[:], ToType: 2,
+			ToLat: f64(59.61), ToLng: f64(16.52),
+			ObservationCount: obs, FirstSeen: ts(now), LastSeen: ts(now),
+			HashWidth: width,
+		}
+	}
+	g := BuildGraph([]db.GetRoutePlanGraphRow{mkrow(1, 9000), mkrow(3, 5)}, 24*time.Hour, 0, now)
+	if len(g.Edges[a]) != 1 {
+		t.Fatalf("expected one merged edge, got %+v", g.Edges)
+	}
+	e := g.Edges[a][0]
+	if e.Observations != 9005 {
+		t.Errorf("expected summed observations 9005, got %d", e.Observations)
+	}
+	if e.HashWidth != 3 {
+		t.Errorf("expected widest provenance 3, got %d", e.HashWidth)
+	}
+	if !e.discountableProvenance() {
+		t.Error("one unambiguous confirmation must make the merged leg discountable")
+	}
+	c, u := testCfg().LegCost(e, now)
+	if !u {
+		t.Error("expected unmeasured leg")
+	}
+	if c == testCfg().UnmeasuredPenalty {
+		t.Error("widest-provenance merge must earn a traffic discount, got bare penalty")
 	}
 }
 

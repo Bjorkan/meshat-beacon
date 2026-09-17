@@ -211,11 +211,37 @@ type DB interface {
 	// direct marks an explicit neighbor claim (the reporter itself heard the
 	// neighbor over RF); overheard third-party path topology passes false. Once
 	// true it sticks (OR-merged on conflict).
-	UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool) error
+	// hashWidth records the provenance width for the route planner's
+	// traffic-evidence discount: 32 = exact pubkey identity (direct RF
+	// evidence), 2/3/4/8 = the path/trace hash width in bytes (pass only
+	// when the hash resolved to exactly one node globally), 1 = a 1-byte
+	// hash (the planner NEVER discounts these: ~1/256 of the fleet shares
+	// any 1-byte prefix). Nil = no provenance claim. On conflict the widest
+	// width wins, so provenance never downgrades.
+	UpsertNodeNeighbor(ctx context.Context, nodeID, neighborID uuid.UUID, iata string, snr *float32, regionScope *string, direct bool, hashWidth *int16) error
 
 	// UpdateObserverRegionScope records the observer's own OTA-reported region
 	// scope, from the "self" field of a /neighbors report.
 	UpdateObserverRegionScope(ctx context.Context, observerID uuid.UUID, regionScope string) error
+}
+
+// hashWidthExact is the provenance width for direct RF evidence
+// (/neighbors reports, zero-hop advert RX, DISCOVER_RESP RX): the reporter
+// itself heard the neighbor, so identity is exact (32 = full pubkey, no
+// hash involved) and always unambiguous for the route planner.
+func hashWidthExact() *int16 {
+	w := int16(32)
+	return &w
+}
+
+// hashWidthFor passes the path/trace hash width that confirmed a pair. The
+// caller must only pass widths whose hashes resolved to exactly one node
+// globally; ambiguous hashes never reach the upsert. Width 1 is stored
+// (not dropped) so the planner can tell "proven by nothing trustworthy"
+// apart from "no evidence recorded yet" -- it never discounts width 1.
+func hashWidthFor(width uint8) *int16 {
+	w := int16(width)
+	return &w
 }
 
 // ChannelKeyStore is a read-only view of the channel keys loaded from config.
