@@ -169,11 +169,21 @@ function RouteCanvas({
     m.on('mouseenter', ROUTE_LINE_LAYER, onEnter);
     m.on('mouseleave', ROUTE_LINE_LAYER, onLeave);
     let failed = false;
-    const onError = () => {
+    let hasLoaded = false;
+    const onError = (e?: { error?: Error; sourceId?: string; tile?: unknown }) => {
+      // Transient tile/source failures (one basemap tile timing out, a
+      // momentary network blip) are non-fatal: the rest of the map stays
+      // usable, so never blank it for those. MapLibre tags tile/source
+      // errors with a tile/sourceId; style-level errors have neither.
+      // Same rule as the main map (useMapLibre): only a style-level error
+      // before anything ever loaded is fatal.
+      if (e != null && (e.sourceId != null || e.tile != null)) return;
+      if (hasLoaded) return;
       failed = true;
       setStatus('error');
     };
     const onLoad = () => {
+      hasLoaded = true;
       setReady(true);
       if (!failed) setStatus('ready');
     };
@@ -264,7 +274,18 @@ function RouteCanvas({
         (acc, p) => acc.extend(p),
         new maplibregl.LngLatBounds(bounds[0], bounds[0]),
       );
-      map.fitBounds(b, { padding: 60, maxZoom: IATA_ZOOM });
+      // The floating results panel overlays the left side of the map: keep
+      // the route clear of it (Google-Maps-style) while framing as tightly
+      // as the bounds allow. Panel is max-w-md (28rem) + p-3/4 padding;
+      // fall back to a fraction of the width on narrow screens where the
+      // panel spans (almost) full width. Capped like the main map so a
+      // single short hop still gets a readable zoom, never a continent.
+      const w = map.getContainer().clientWidth;
+      const panelReserve = Math.min(w >= 640 ? 28 * 16 + 32 : w * 0.9, Math.max(0, w - 160));
+      map.fitBounds(b, {
+        padding: { top: 60, bottom: 60, left: panelReserve + 60, right: 60 },
+        maxZoom: IATA_ZOOM,
+      });
     }
   }, [ready, paths, activeIndex]);
 
