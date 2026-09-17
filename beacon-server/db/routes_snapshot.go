@@ -5,50 +5,124 @@ package db
 
 import (
 	"context"
+	"log"
 	"time"
 
+	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
 	"github.com/google/uuid"
 )
 
-// routeSnapshot is the store's immutable in-memory routing view. PostgreSQL
-// stays the source of truth; the snapshot is a periodically refreshed copy
-// holding only planner inputs plus the pubkey index and location flags, so
-// steady-state planning needs no global graph aggregate and no endpoint
-// database round trip on hits.
+// This file is the Store's adapter over routeplan.Holder -- the single
+// snapshot manager. PostgreSQL stays the source of truth; steady-state
+// planning reads the Holder's immutable snapshot instead of rebuilding the
+// global graph per request. Holder owns the concurrency/freshness logic
+// (atomic swap, single-flight rebuilds, build/failure counters); the Store
+// only adapts its querier as a SnapshotSource and logs the Holder's health
+// stats on every refresh.
+
+// storeSnapshotSource adapts the Store's sqlc querier to
+// routeplan.SnapshotSource so Holder.rebuild reads through the same queries
+// as the rest of the store.
+type storeSnapshotSource struct {
+	q sqlc.Querier
+}
+
+func (s storeSnapshotSource) GetRoutePlanGraph(ctx context.Context) ([]sqlc.GetRoutePlanGraphRow, error) {
+	return s.q.GetRoutePlanGraph(ctx)
+}
+
+func (s storeSnapshotSource) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) ([]sqlc.GetNodesByIDsRow, error) {
+	return s.q.GetNodesByIDs(ctx, ids)
+}
+
+// routeSnapshotOrNil returns the current snapshot, or nil when none has been
+// installed yet (startup/tests fall back to a single PostgreSQL dump).
 func (s *Store) routeSnapshotOrNil() *routeplan.Snapshot {
 	if s == nil {
 		return nil
 	}
+	h := s.routeHolderOrNil()
+	if h == nil {
+		return nil
+	}
+	return h.Current()
+}
+
+func (s *Store) routeHolderOrNil() *routeplan.Holder {
 	s.routeSnapMu.RLock()
 	defer s.routeSnapMu.RUnlock()
-	return s.routeSnap
+	return s.routeHolder
 }
 
 // SetRouteSnapshot atomically installs a rebuilt snapshot. Build the
 // replacement off to the side and swap only on success; readers never observe
 // a partial graph and a failed rebuild leaves the previous snapshot serving.
+// (Kept for tests/callers that construct snapshots directly; production
+// refreshes through RefreshRouteSnapshot + Holder below.)
 func (s *Store) SetRouteSnapshot(snap *routeplan.Snapshot) {
 	s.routeSnapMu.Lock()
 	defer s.routeSnapMu.Unlock()
-	s.routeSnap = snap
+	if s.routeHolder == nil {
+		s.routeHolder = routeplan.NewHolderForTest(snap)
+		return
+	}
+	s.routeHolder.SwapForTest(snap)
 }
 
-// RefreshRouteSnapshot rebuilds the snapshot from one PostgreSQL dump and
-// swaps it in atomically. On error the previous snapshot keeps serving and
-// the error is returned for logging/metrics (age, counts, failures are the
-// operator's staleness signal).
+// RefreshRouteSnapshot rebuilds the snapshot through the Holder (single
+// flight, atomic swap, counters) and logs freshness/health: age, node/edge
+// counts, rebuild duration, success/failure counts. On error the previous
+// snapshot keeps serving and the error is returned to the caller. The first
+// call creates the Holder, whose initial build already is the refresh -- no
+// second aggregate query follows.
 func (s *Store) RefreshRouteSnapshot(ctx context.Context) error {
-	cfg := s.routePlanOrDefault()
-	now := time.Now()
-	rows, err := s.q.GetRoutePlanGraph(ctx)
-	if err != nil {
+	h := s.routeHolderOrNil()
+	if h == nil {
+		s.routeSnapMu.Lock()
+		if s.routeHolder == nil {
+			cfg := s.routePlanOrDefault()
+			nh, err := routeplan.NewHolder(ctx, storeSnapshotSource{q: s.q}, cfg.Cost, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg))
+			if err != nil {
+				s.routeSnapMu.Unlock()
+				return err
+			}
+			s.routeHolder = nh
+			h = nh
+			s.routeSnapMu.Unlock()
+			st := h.Stats(time.Now())
+			log.Printf("routeplan: snapshot age=%s nodes=%d edges=%d rows=%d rebuild=%s builds=%d failures=%d",
+				st.Age, st.Nodes, st.Edges, st.Rows, time.Duration(st.LastBuildNanos), st.Builds, st.Failures)
+			return nil
+		}
+		h = s.routeHolder
+		s.routeSnapMu.Unlock()
+	} else {
+		// Keep planner config/thresholds current across config reloads.
+		cfg := s.routePlanOrDefault()
+		h.SetConfig(cfg.Cost, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg))
+	}
+	if err := h.Refresh(ctx); err != nil {
+		st := h.Stats(time.Now())
+		log.Printf("routeplan: snapshot refresh failed (failures=%d lastErr=%d), serving previous snapshot age=%s",
+			st.Failures, st.LastErrorSecs, st.Age)
 		return err
 	}
-	snap := routeplan.BuildSnapshot(rows, nil, cfg.Cost, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg), now)
-	s.SetRouteSnapshot(snap)
+	st := h.Stats(time.Now())
+	log.Printf("routeplan: snapshot age=%s nodes=%d edges=%d rows=%d rebuild=%s builds=%d failures=%d",
+		st.Age, st.Nodes, st.Edges, st.Rows, time.Duration(st.LastBuildNanos), st.Builds, st.Failures)
 	return nil
+}
+
+// RouteSnapshotStats exposes Holder health for metrics/diagnostics. ok=false
+// when no snapshot has been installed yet.
+func (s *Store) RouteSnapshotStats(now time.Time) (routeplan.Stats, bool) {
+	h := s.routeHolderOrNil()
+	if h == nil {
+		return routeplan.Stats{}, false
+	}
+	return h.Stats(now), true
 }
 
 // planOnSnapshot runs the whole request in memory: endpoint resolution from

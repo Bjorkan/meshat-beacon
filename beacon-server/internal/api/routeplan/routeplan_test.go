@@ -195,6 +195,61 @@ func TestShortestPaths_HopBoundKeepsLowHopArrival(t *testing.T) {
 	}
 }
 
+func TestShortestPaths_YenHonorsRemainingBudget(t *testing.T) {
+	// MaxHops=2. Best path A->B->D (2 hops, cheap). For the alternative, Yen
+	// splits at spur node B with root A->B (1 hop), leaving 1 hop. The
+	// cheapest spur from B is B->C->D (2 hops, too long); a pricier direct
+	// spur B->E->... no -- B->D is banned (used by the best path via this
+	// root), so the valid spur is B->E->D? That is 2 hops too. Construct
+	// instead: spur candidates from B are B->C->D (cheap, 2 hops) and B->D
+	// via a DIFFERENT root split... Simplest faithful shape: increase the
+	// budget split -- best A->B->D with MaxHops=3, spur at C with root
+	// A->B->C (2 hops, remaining 1): cheapest C->X->D (2 hops) over limit,
+	// pricier C->D (1 hop) fits. Yen must return A->B->C->D (3 hops), not
+	// discard it because Dijkstra first found the cheaper over-limit spur.
+	cfg := testCfg()
+	cfg.MaxHops = 3
+	cfg.NeighborBonus = 0
+	now := time.Now()
+	a, b, c, x, d := uuid.New(), uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	loc := func(id uuid.UUID) Node {
+		return Node{ID: id, Pubkey: id.String(), Type: NodeTypeRepeater, Lat: 59.6, Lng: 16.5}
+	}
+	strong := func(from, to uuid.UUID) Edge {
+		return Edge{From: from, To: to, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}
+	}
+	g := Graph{
+		Nodes: map[uuid.UUID]Node{a: loc(a), b: loc(b), c: loc(c), x: loc(x), d: loc(d)},
+		Edges: map[uuid.UUID][]Edge{
+			a: {strong(a, b)},
+			b: {strong(b, c), strong(b, d)},                                                           // direct B->D: alternative spur target
+			c: {{From: c, To: x, SNR: f32(8), SNRSampleCount: 3, SNRLastSeen: now}, {From: c, To: d}}, // C->X cheap, C->D pricey unmeasured
+			x: {strong(x, d)},
+		},
+	}
+	// Sanity: best must be A->B->C->X->D? No -- that is 4 hops > 3. Best
+	// within 3 hops: A->B->D (2 hops, cost 2.0). Alternatives: Yen splits
+	// best at i=0 (root [A], spur A, remaining 3): bans A->B, spur A->...
+	// nothing else from A -> no candidate. At i=1 (root [A,B], spur B,
+	// remaining 2): bans B->D, spur B->C->? C->X->D is 3 hops > 2 (skip),
+	// C->D pricey 1 hop fits -> candidate A->B->C->D (3 hops, cost
+	// 1+1+3.5=5.5). With the OLD code (spur searched with full MaxHops=3),
+	// Dijkstra from B would return B->C->X->D (3 hops, cost 3.0), combined
+	// A->B->C->X->D (4 hops) discarded by the guard -> NO alternative.
+	// With the fix, Dijkstra from B honors remaining=2 and returns B->C->D.
+	paths := ShortestPaths(g, cfg, a, d, 2, now)
+	if len(paths) != 2 {
+		t.Fatalf("expected best + 1 bounded alternative, got %d: %v", len(paths), paths)
+	}
+	alt := paths[1].Nodes
+	if len(alt) != 4 || alt[0] != a || alt[1] != b || alt[2] != c || alt[3] != d {
+		t.Errorf("expected alternative A->B->C->D, got %v", alt)
+	}
+	if len(alt)-1 > cfg.MaxHops {
+		t.Errorf("alternative exceeds MaxHops: %v", alt)
+	}
+}
+
 func TestShortestPaths_YenRejectsOverBudgetCombined(t *testing.T) {
 	// Best A->B->D (2 hops). A Yen spur B->C->D is individually within a
 	// 2-hop budget from B, but combined A->B->C->D is 3 hops and must not be

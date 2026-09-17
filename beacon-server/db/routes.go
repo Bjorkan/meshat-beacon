@@ -381,9 +381,9 @@ func extractFromNode(hops []api.RouteHop, nodeID uuid.UUID) []api.RouteHop {
 	return hops
 }
 
-// PlanBestRoute serves planning requests from the in-memory routing snapshot
-// when one is installed (see SetRouteSnapshot); otherwise it falls back to a
-// single PostgreSQL dump (startup/tests). Endpoints are resolved by UUID (the
+// PlanBestRoute serves planning requests from the Holder's in-memory routing
+// snapshot when one is installed (see RefreshRouteSnapshot); otherwise it
+// falls back to a single PostgreSQL dump (startup/tests). Endpoints are resolved by UUID (the
 // handler maps full pubkeys to IDs). Endpoint metadata is resolved
 // independently of the neighbor graph, so a known + located but isolated
 // endpoint yields "no-route" (200, empty paths) while a known endpoint

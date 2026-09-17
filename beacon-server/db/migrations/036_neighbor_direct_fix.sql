@@ -1,22 +1,22 @@
 -- Copyright 2026 Beacon Contributors
 -- SPDX-License-Identifier: AGPL-3.0-or-later
 
--- Corrects the 035 backfill heuristic. 035 assumed an SNR sample proves a
--- direct reception, but pre-PR TRACE ingest wrote consecutive path-hop pairs
--- to node_neighbors WITH an SNR sample (see internal/ingest/packet.go). Those
--- rows are overheard third-party topology, not explicit neighbor claims.
+-- The unsafe 035 backfill was removed before any deployment (035 now adds the
+-- column with no UPDATE), so there is nothing to reset: this migration only
+-- adds provenance freshness for the direct mark (see PR95 review item 6). One
+-- old direct observation must not discount the edge forever while only
+-- overheard traffic keeps the row alive. direct_last_seen advances only on
+-- explicit direct confirmations; the planner applies the neighbor bonus only
+-- while the confirmation is within the freshness window.
 --
--- No existing column can prove direct provenance for legacy rows, so the
--- conservative fix is to reset every row to direct=false and let fresh
--- /neighbors, zero-hop advert, or DISCOVER_RESP observations promote the edge
--- after deployment. The upsert keeps direct sticky (OR semantics), so without
--- this reset a wrongly promoted row could never be corrected by future
--- direct=false TRACE observations.
-UPDATE node_neighbors SET direct = FALSE WHERE direct = TRUE;
+-- Kept as a separate migration (rather than folding into 035) so databases
+-- that already applied the pre-fix 035+036 pair migrate cleanly: the reset
+-- below is a no-op there (035 set no rows, 036 already added the column via
+-- IF NOT EXISTS).
+ALTER TABLE node_neighbors ADD COLUMN IF NOT EXISTS direct_last_seen TIMESTAMPTZ;
 
--- Provenance freshness for the direct mark (see PR95 review item 6): one old
--- direct observation must not discount the edge forever while only overheard
--- traffic keeps the row alive. direct_last_seen advances only on explicit
--- direct confirmations; the planner applies the neighbor bonus only while the
--- confirmation is within the freshness window.
-ALTER TABLE node_neighbors ADD COLUMN direct_last_seen TIMESTAMPTZ;
+-- No-op on databases where the old 035 backfill ran: defensively clear any
+-- direct=true rows that cannot be tied to a fresh explicit confirmation.
+-- direct_last_seen is NULL for such rows (the old upsert never set it), so
+-- only rows with a real confirmation timestamp survive.
+UPDATE node_neighbors SET direct = FALSE WHERE direct = TRUE AND direct_last_seen IS NULL;

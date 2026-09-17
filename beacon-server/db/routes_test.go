@@ -166,6 +166,57 @@ func TestPlanBestRoute_ConnectedUnchanged(t *testing.T) {
 	}
 }
 
+func TestPlanBestRoute_SnapshotServesWithoutPerRequestAggregate(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	mock := mockdb.NewMockQuerier(ctrl)
+	store := &Store{q: mock}
+	store.SetRoutePlanConfig(DefaultRoutePlanConfig())
+
+	from, mid, to := uuid.New(), uuid.New(), uuid.New()
+	now := time.Now()
+	lat, lng := 59.6, 16.5
+	lat2, lng2 := 59.61, 16.52
+	lat3, lng3 := 59.62, 16.54
+	row := func(f, tt uuid.UUID, flat, flng, tlat, tlng float64) sqlc.GetRoutePlanGraphRow {
+		return sqlc.GetRoutePlanGraphRow{
+			FromID: f, FromPubkey: f[:], FromType: 2, FromLat: &flat, FromLng: &flng,
+			ToID: tt, ToPubkey: tt[:], ToType: 2, ToLat: &tlat, ToLng: &tlng,
+			ObservationCount: 3,
+			FirstSeen:        pgtype.Timestamptz{Time: now.Add(-time.Hour), Valid: true},
+			LastSeen:         pgtype.Timestamptz{Time: now, Valid: true},
+			EdgeLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			FromLastSeen:     pgtype.Timestamptz{Time: now, Valid: true},
+			ToLastSeen:       pgtype.Timestamptz{Time: now, Valid: true},
+			SnrWeightedSum:   24, SnrSampleCount: 3,
+			SnrLastSeen: pgtype.Timestamptz{Time: now, Valid: true},
+		}
+	}
+	// Exactly ONE aggregate: the production refresh. The two PlanBestRoute
+	// calls below must not trigger another.
+	mock.EXPECT().GetRoutePlanGraph(gomock.Any()).Times(1).Return([]sqlc.GetRoutePlanGraphRow{
+		row(from, mid, lat, lng, lat2, lng2),
+		row(mid, to, lat2, lng2, lat3, lng3),
+	}, nil)
+
+	if err := store.RefreshRouteSnapshot(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	st, ok := store.RouteSnapshotStats(time.Now())
+	if !ok || st.Nodes != 3 || st.Edges != 2 || st.Builds != 1 {
+		t.Fatalf("expected healthy snapshot stats, got %+v ok=%v", st, ok)
+	}
+	for i := 0; i < 2; i++ {
+		res, err := store.PlanBestRoute(context.Background(), from, to, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(res.Paths) != 1 {
+			t.Fatalf("request %d: expected 1 path, got %+v", i, res)
+		}
+	}
+}
+
 func TestExtractFromNode_Found(t *testing.T) {
 	a, b, c := uuid.New(), uuid.New(), uuid.New()
 	hops := []api.RouteHop{

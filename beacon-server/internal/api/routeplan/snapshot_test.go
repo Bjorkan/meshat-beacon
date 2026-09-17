@@ -88,14 +88,14 @@ func TestSnapshot_RefreshFailureKeepsPrevious(t *testing.T) {
 	if h.Current() != first {
 		t.Error("failed refresh must keep the previous snapshot in service")
 	}
-	if got := h.Stats(now); got.Failures != 1 || got.Builds != 0 {
-		t.Errorf("expected 0 builds + 1 failure, got %+v", got)
+	if got := h.Stats(now); got.Failures != 1 || got.Builds != 1 {
+		t.Errorf("expected 1 initial build + 1 failure, got %+v", got)
 	}
 	src.err = nil
 	if err := h.Refresh(context.Background()); err != nil {
 		t.Fatal(err)
 	}
-	if got := h.Stats(now); got.Builds != 1 {
+	if got := h.Stats(now); got.Builds != 2 {
 		t.Errorf("expected successful refresh to swap, got %+v", got)
 	}
 }

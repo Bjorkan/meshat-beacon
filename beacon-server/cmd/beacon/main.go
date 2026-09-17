@@ -119,10 +119,11 @@ func main() {
 		StaleThreshold: resolved.NodeStaleThreshold,
 	})
 	// Routing snapshot: PostgreSQL stays the source of truth; steady-state
-	// /routes/best requests plan against this immutable in-memory copy built
-	// once at startup and refreshed periodically (30s bound). A failed
-	// refresh keeps the previous snapshot serving; startup itself fails
-	// closed since no known-good snapshot exists yet.
+	// /routes/best requests plan against the Holder's immutable in-memory
+	// copy built once at startup and refreshed periodically (30s bound).
+	// RefreshRouteSnapshot logs age/node/edge/rebuild/build/failure counters
+	// on every attempt. A failed refresh keeps the previous snapshot serving;
+	// startup itself fails closed since no known-good snapshot exists yet.
 	if err := store.RefreshRouteSnapshot(ctx); err != nil {
 		log.Fatalf("initial route snapshot failed: %v", err)
 	}

@@ -35,11 +35,12 @@ type Store struct {
 	presetCatalogue     *radiopreset.Catalogue
 	routePlan           RoutePlanConfig // /routes/best cost model; zero value falls back to defaults
 	routePlanSet        bool
-	// routeSnap is the immutable in-memory routing snapshot (see
+	// routeHolder is the single routing-snapshot manager (see
 	// routes_snapshot.go). PostgreSQL stays the source of truth; steady-state
-	// planning reads this instead of rebuilding the global graph per request.
+	// planning reads the Holder's immutable snapshot instead of rebuilding
+	// the global graph per request.
 	routeSnapMu sync.RWMutex
-	routeSnap   *routeplan.Snapshot
+	routeHolder *routeplan.Holder
 }
 
 // SetPresetCatalogue installs the startup-loaded MeshCore suggested-settings catalogue used to

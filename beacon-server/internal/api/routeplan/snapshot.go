@@ -104,15 +104,22 @@ const DefaultSnapshotRefreshInterval = 30 * time.Second
 
 // NewHolder builds the initial snapshot synchronously (failing the caller on
 // error: no known-good snapshot exists yet) and returns a holder that serves
-// it until Refresh or Run is called.
+// it until Refresh or Run is called. The initial build counts toward Builds
+// and LastSuccess so observability reflects reality from startup.
 func NewHolder(ctx context.Context, src SnapshotSource, planner Config, staleThreshold time.Duration, maxKm float64) (*Holder, error) {
 	h := &Holder{src: src, mu: make(chan struct{}, 1)}
 	h.cfg.Store(&holderConfig{planner: planner, staleThreshold: staleThreshold, maxKm: maxKm, refresh: DefaultSnapshotRefreshInterval})
+	start := time.Now()
 	snap, err := h.rebuild(ctx)
+	h.lastDur.Store(int64(time.Since(start)))
 	if err != nil {
+		h.lastErr.Store(time.Now().UnixNano())
+		h.failures.Add(1)
 		return nil, err
 	}
 	h.cur.Store(snap)
+	h.lastOK.Store(time.Now().UnixNano())
+	h.builds.Add(1)
 	return h, nil
 }
 
@@ -192,6 +199,23 @@ func (h *Holder) Run(ctx context.Context) {
 			}
 		}
 	}
+}
+
+// NewHolderForTest installs an already-built snapshot without touching a
+// source. Test-only: production always builds through NewHolder/Refresh so
+// counters and timestamps stay truthful.
+func NewHolderForTest(snap *Snapshot) *Holder {
+	h := &Holder{mu: make(chan struct{}, 1)}
+	h.cfg.Store(&holderConfig{refresh: DefaultSnapshotRefreshInterval})
+	if snap != nil {
+		h.cur.Store(snap)
+	}
+	return h
+}
+
+// SwapForTest atomically replaces the current snapshot. Test-only.
+func (h *Holder) SwapForTest(snap *Snapshot) {
+	h.cur.Store(snap)
 }
 
 // Stats exposes snapshot age and rebuild health for metrics/logging.
