@@ -77,7 +77,7 @@ export function ResultsSheet({
         <div
           id="route-results-list"
           data-testid="route-results-list"
-          className="min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y px-3 pb-3"
+          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-3 pb-3"
         >
           {showResults && !isLoading && !isError && paths.length === 0 && (
             <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">

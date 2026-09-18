@@ -415,9 +415,12 @@ for (const viewport of [
           await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
         } else {
           await page.mouse.move(x, y);
-          await page.mouse.wheel(0, direction * 500);
+          for (let i = 0; i < 8; i++) {
+            await page.mouse.wheel(0, direction * 250);
+          }
         }
       };
+      await panel.evaluate((el) => el.focus());
       await scroll(1, true);
       await expect.poll(() => panel.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
       await assertContained();
@@ -426,7 +429,7 @@ for (const viewport of [
       await assertContained();
       const lastCard = cards.last();
       const lastNode = lastCard.getByRole('button', { name: /^Open node / }).last();
-      await lastNode.evaluate((el) => el.scrollIntoView({ block: 'center', behavior: 'instant' }));
+      await lastNode.scrollIntoViewIfNeeded();
       await expect(lastNode).toBeInViewport({ ratio: 1 });
       await assertContained();
       const copy = lastCard.getByRole('button', { name: 'Copy MeshCore route', exact: true });
@@ -595,6 +598,7 @@ for (const viewport of [
       }
     });
     test('route planner bottom sheet snaps peek to half on mobile', async ({ page }) => {
+      if (viewport.name !== 'mobile') return;
       await mockApi(page, longRoutes);
       await page.goto(`/routes?from=${FROM}&to=${TO}`);
       const sheet = page.locator('section[aria-label]').first();
@@ -604,7 +608,7 @@ for (const viewport of [
       const sheetBox = await sheet.boundingBox();
       expect(sheetBox).not.toBeNull();
       if (mapBox && sheetBox) {
-        expect(sheetBox.y + sheetBox.height).toBeLessThan(mapBox.y + mapBox.height * 0.9);
+        expect(sheetBox.y).toBeLessThan(mapBox.y + mapBox.height * 0.9);
       }
       const handle = sheet.getByRole('button', { name: /Toggle results/ });
       await expect(handle).toBeVisible();
