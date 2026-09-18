@@ -85,12 +85,7 @@ export function useBottomSheet(hasResults: boolean) {
       }
       setDragPx(null);
       if (!dragActiveRef.current) {
-        if (sheet && snap !== 'peek') {
-          const current = sheet.getBoundingClientRect().height;
-          if (current > SNAP_PEEK + 20) {
-            setSheetHeightPx(SNAP_PEEK);
-          }
-        }
+        setSheetHeightPx(targetPx);
         return;
       }
       if (deltaY < -DRAG_THRESHOLD || (deltaY < 0 && velocity > DRAG_VELOCITY)) {
