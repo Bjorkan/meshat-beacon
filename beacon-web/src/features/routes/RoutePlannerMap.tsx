@@ -278,9 +278,7 @@ function RouteCanvas({
       );
       const w = map.getContainer().clientWidth;
       const isNarrow = w < 1024;
-      const panelReserve = isNarrow
-        ? 0
-        : Math.min(28 * 16 + 32, Math.max(0, w - 160));
+      const panelReserve = isNarrow ? 0 : Math.min(28 * 16 + 32, Math.max(0, w - 160));
       map.fitBounds(b, {
         padding: {
           top: isNarrow ? 108 : 60,

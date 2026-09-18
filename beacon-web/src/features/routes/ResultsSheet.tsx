@@ -32,9 +32,7 @@ export function ResultsSheet({
   const nodeName = (node: { name?: string; publicKey: string }) =>
     node.name ?? node.publicKey.slice(0, 6).toUpperCase();
   const activeRoute = paths[active] ?? null;
-  const viaSummary = activeRoute
-    ? activeRoute.nodes.slice(1, -1).map(nodeName).join(' → ')
-    : '';
+  const viaSummary = activeRoute ? activeRoute.nodes.slice(1, -1).map(nodeName).join(' → ') : '';
 
   if (!isMobile) return null;
   return (
@@ -60,7 +58,8 @@ export function ResultsSheet({
           <span aria-hidden className="h-1 w-9 rounded-full bg-border" />
           {snap === 'peek' && activeRoute && (
             <span className="px-4 font-mono text-[11px] text-text-muted">
-              {t('routes.best')} · {activeRoute.hopCount} {t('routes.hops', { count: activeRoute.hopCount })}
+              {t('routes.best')} · {activeRoute.hopCount}{' '}
+              {t('routes.hops', { count: activeRoute.hopCount })}
               {viaSummary ? ` · via ${viaSummary}` : ''} · {t('routes.tapToExpand')}
             </span>
           )}
@@ -106,7 +105,14 @@ export function ResultsSheet({
               {t('routes.pickBoth')}
             </div>
           )}
-          {hasResults && <ResultsList paths={paths} active={active} onSelect={onSelect} onOpenNode={onOpenNode} />}
+          {hasResults && (
+            <ResultsList
+              paths={paths}
+              active={active}
+              onSelect={onSelect}
+              onOpenNode={onOpenNode}
+            />
+          )}
         </div>
       </div>
     </section>

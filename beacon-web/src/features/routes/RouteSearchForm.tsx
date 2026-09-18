@@ -30,9 +30,7 @@ export function RouteSearchForm({
         autoFocus={autoFocus}
       />
       <div className="flex items-center gap-2">
-        <div className="px-1 font-mono text-[11px] text-text-dim">
-          {t('routes.globalHint')}
-        </div>
+        <div className="px-1 font-mono text-[11px] text-text-dim">{t('routes.globalHint')}</div>
         <span className="flex-1" />
         <button
           type="button"

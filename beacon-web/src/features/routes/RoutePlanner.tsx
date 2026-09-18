@@ -168,14 +168,23 @@ function RoutePlanner() {
           onClearTo={() => setPair(resolvedFrom, null)}
           autoFocus
         />
-        <div data-testid="route-panel" className="min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y">
+        <div
+          data-testid="route-panel"
+          className="min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y"
+        >
           {sameNode && (
-            <div role="alert" className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg">
+            <div
+              role="alert"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
+            >
               {t('routes.sameNodeHint')}
             </div>
           )}
           {urlEndpointInvalid && !sameNode && (
-            <div role="alert" className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg">
+            <div
+              role="alert"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
+            >
               {t('routes.nonRepeaterEndpoint')}
             </div>
           )}
@@ -185,12 +194,18 @@ function RoutePlanner() {
             </div>
           )}
           {showResults && isLoading && (
-            <div role="status" className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
+            <div
+              role="status"
+              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg"
+            >
               {t('routes.planning')}
             </div>
           )}
           {showResults && isError && (
-            <div role="alert" className="rounded-lg border border-danger/40 bg-bg-base px-3 py-2 font-mono text-[13px] text-danger shadow-lg">
+            <div
+              role="alert"
+              className="rounded-lg border border-danger/40 bg-bg-base px-3 py-2 font-mono text-[13px] text-danger shadow-lg"
+            >
               {(error as Error)?.message || 'Error'}
             </div>
           )}
@@ -199,7 +214,12 @@ function RoutePlanner() {
               {data?.reason === 'no-route' ? t('routes.noRoute') : t('routes.unknownNode')}
             </div>
           )}
-          <ResultsList paths={paths} active={active} onSelect={selectAlt} onOpenNode={setOverlayNodeId} />
+          <ResultsList
+            paths={paths}
+            active={active}
+            onSelect={selectAlt}
+            onOpenNode={setOverlayNodeId}
+          />
         </div>
       </div>
 

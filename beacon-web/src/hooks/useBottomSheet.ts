@@ -88,7 +88,7 @@ export function useBottomSheet(hasResults: boolean) {
         return;
       }
       if (deltaY > DRAG_THRESHOLD || (deltaY > 0 && velocity > DRAG_VELOCITY)) {
-        setSheetHeightPx(snap === 'full' ? snapHeightPx('half') : snapHeightPx('peek'));
+        setSheetHeightPx(snapHeightPx('peek'));
       } else if (deltaY < -DRAG_THRESHOLD || (deltaY < 0 && velocity > DRAG_VELOCITY)) {
         setSheetHeightPx(snap === 'peek' ? snapHeightPx('half') : snapHeightPx('full'));
       } else {
