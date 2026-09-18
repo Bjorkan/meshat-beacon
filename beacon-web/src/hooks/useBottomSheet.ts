@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Snap = 'peek' | 'half' | 'full';
 
-const SNAP_PEEK = 112;
-const SNAP_HALF_RATIO = 0.45;
+const SNAP_PEEK = 148;
+const SNAP_HALF_RATIO = 0.65;
 const SNAP_FULL_RATIO = 0.85;
 const DRAG_THRESHOLD = 60;
 const DRAG_VELOCITY = 0.5;
@@ -34,6 +34,12 @@ export function useBottomSheet(hasResults: boolean) {
   const startYRef = useRef(0);
   const startHeightRef = useRef(0);
   const dragActiveRef = useRef(false);
+
+  useEffect(() => {
+    if (!draggingRef.current) {
+      setSheetHeightPx(targetPx);
+    }
+  }, [targetPx]);
 
   const displayHeight = dragPx ?? sheetHeightPx;
 
@@ -87,9 +93,9 @@ export function useBottomSheet(hasResults: boolean) {
         }
         return;
       }
-      if (deltaY > DRAG_THRESHOLD || (deltaY > 0 && velocity > DRAG_VELOCITY)) {
+      if (deltaY < -DRAG_THRESHOLD || (deltaY < 0 && velocity > DRAG_VELOCITY)) {
         setSheetHeightPx(snapHeightPx('peek'));
-      } else if (deltaY < -DRAG_THRESHOLD || (deltaY < 0 && velocity > DRAG_VELOCITY)) {
+      } else if (deltaY > DRAG_THRESHOLD || (deltaY > 0 && velocity > DRAG_VELOCITY)) {
         setSheetHeightPx(snap === 'peek' ? snapHeightPx('half') : snapHeightPx('full'));
       } else {
         setSheetHeightPx(targetPx);

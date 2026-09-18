@@ -144,20 +144,6 @@ function RoutePlanner() {
         </ErrorBoundary>
       </div>
 
-      <div className="absolute inset-x-0 top-0 z-20 p-2 pointer-events-none lg:hidden">
-        <div className="pointer-events-auto mr-12 rounded-xl border border-border bg-bg-base/95 p-3 shadow-lg backdrop-blur">
-          <RouteSearchForm
-            resolvedFrom={resolvedFrom}
-            resolvedTo={resolvedTo}
-            onPair={setPair}
-            onSwap={swap}
-            onClearFrom={() => setPair(null, resolvedTo)}
-            onClearTo={() => setPair(resolvedFrom, null)}
-            autoFocus={false}
-          />
-        </div>
-      </div>
-
       <div className="absolute inset-y-0 left-0 z-10 hidden w-full max-w-md flex-col gap-2 overflow-y-auto overscroll-y-contain p-3 lg:p-4 lg:flex">
         <RouteSearchForm
           resolvedFrom={resolvedFrom}
@@ -232,6 +218,12 @@ function RoutePlanner() {
         active={active}
         onSelect={selectAlt}
         onOpenNode={setOverlayNodeId}
+        resolvedFrom={resolvedFrom}
+        resolvedTo={resolvedTo}
+        onPair={setPair}
+        onSwap={swap}
+        onClearFrom={() => setPair(null, resolvedTo)}
+        onClearTo={() => setPair(resolvedFrom, null)}
       />
     </div>
   );

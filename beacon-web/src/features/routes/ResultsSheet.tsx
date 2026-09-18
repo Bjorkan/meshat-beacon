@@ -1,5 +1,7 @@
 import { useTranslation } from 'react-i18next';
 import type { PlannedRoute } from '../../types/api';
+import { type NodePick } from './NodeCombobox';
+import { RouteSearchForm } from './RouteSearchForm';
 import { ResultsList } from './ResultsList';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
 
@@ -14,6 +16,12 @@ export function ResultsSheet({
   active,
   onSelect,
   onOpenNode,
+  resolvedFrom,
+  resolvedTo,
+  onPair,
+  onSwap,
+  onClearFrom,
+  onClearTo,
 }: {
   showResults: boolean;
   isLoading: boolean;
@@ -23,6 +31,12 @@ export function ResultsSheet({
   active: number;
   onSelect: (index: number) => void;
   onOpenNode: (nodeId: string) => void;
+  resolvedFrom: NodePick | null;
+  resolvedTo: NodePick | null;
+  onPair: (from: NodePick | null, to: NodePick | null) => void;
+  onSwap: () => void;
+  onClearFrom: () => void;
+  onClearTo: () => void;
 }) {
   const { t } = useTranslation();
   const hasResults = paths.length > 0;
@@ -43,7 +57,7 @@ export function ResultsSheet({
       <div
         ref={sheetRef}
         style={{ height: `${sheetHeightPx}px` }}
-        className="flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-bg-base shadow-2xl pb-[env(safe-area-inset-bottom)] transition-[height] duration-200 ease-out motion-reduce:transition-none"
+        className="flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-bg-base pb-[calc(3.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-[height] duration-200 ease-out motion-reduce:transition-none"
       >
         <button
           type="button"
@@ -74,6 +88,17 @@ export function ResultsSheet({
             </span>
           )}
         </button>
+        <div className="border-b border-border px-3 pt-2">
+          <RouteSearchForm
+            resolvedFrom={resolvedFrom}
+            resolvedTo={resolvedTo}
+            onPair={onPair}
+            onSwap={onSwap}
+            onClearFrom={onClearFrom}
+            onClearTo={onClearTo}
+            autoFocus={false}
+          />
+        </div>
         <div
           id="route-results-list"
           data-testid="route-results-list"
