@@ -366,7 +366,12 @@
     "nonRepeaterEndpoint": "Ruttens ändpunkter måste vara repeaters — välj en repeater-nod.",
     "multibyteUnconfirmed": "3-byte vidarebefordran är inte bekräftad för alla repeaters i rutten. Äldre MeshCore-firmware kan tappa meddelandet.",
     "neighborLeg": "Granne",
-    "neighborHint": "Den rapporterande noden har markerat den andra som granne i denna riktning — detta hopp föredras vid planering."
+    "neighborHint": "Den rapporterande noden har markerat den andra som granne i denna riktning — detta hopp föredras vid planering.",
+    "results": "Resultat",
+    "toggleResults": "Växla resultat",
+    "tapToExpand": "Tryck för att expandera",
+    "pinchToExpand": "Pincha för att expandera",
+    "swipeDownToCollapse": "Svepa nedåt för att skapa ihop"
   },
   "traces": {
     "firstHeard": "Först hörd",

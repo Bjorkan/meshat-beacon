@@ -69,12 +69,14 @@ function RouteCanvas({
   styleId,
   onRetry,
   onSelectRoute,
+  bottomPadding = 0,
 }: {
   paths: PlannedRoute[];
   activeIndex: number;
   styleId: string;
   onRetry: () => void;
   onSelectRoute: (index: number) => void;
+  bottomPadding?: number;
 }) {
   const { t } = useTranslation();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -274,20 +276,22 @@ function RouteCanvas({
         (acc, p) => acc.extend(p),
         new maplibregl.LngLatBounds(bounds[0], bounds[0]),
       );
-      // The floating results panel overlays the left side of the map: keep
-      // the route clear of it (Google-Maps-style) while framing as tightly
-      // as the bounds allow. Panel is max-w-md (28rem) + p-3/4 padding;
-      // fall back to a fraction of the width on narrow screens where the
-      // panel spans (almost) full width. Capped like the main map so a
-      // single short hop still gets a readable zoom, never a continent.
       const w = map.getContainer().clientWidth;
-      const panelReserve = Math.min(w >= 640 ? 28 * 16 + 32 : w * 0.9, Math.max(0, w - 160));
+      const isNarrow = w < 1024;
+      const panelReserve = isNarrow
+        ? 0
+        : Math.min(28 * 16 + 32, Math.max(0, w - 160));
       map.fitBounds(b, {
-        padding: { top: 60, bottom: 60, left: panelReserve + 60, right: 60 },
+        padding: {
+          top: isNarrow ? 108 : 60,
+          bottom: isNarrow ? 60 + bottomPadding : 60,
+          left: panelReserve + 60,
+          right: 60,
+        },
         maxZoom: IATA_ZOOM,
       });
     }
-  }, [ready, paths, activeIndex]);
+  }, [ready, paths, activeIndex, bottomPadding]);
 
   // Always-on hop-flow overlay for the active route: a dot riding start →
   // end (same language as live mode: transmit = expanding ring, receive =
@@ -558,11 +562,13 @@ export function RoutePlannerMapInner({
   activeIndex,
   styleId,
   onSelectRoute,
+  bottomPadding,
 }: {
   paths: PlannedRoute[];
   activeIndex: number;
   styleId: string;
   onSelectRoute: (index: number) => void;
+  bottomPadding?: number;
 }) {
   const [attempt, setAttempt] = useState(0);
   return (
@@ -573,6 +579,7 @@ export function RoutePlannerMapInner({
       styleId={styleId}
       onRetry={() => setAttempt((n) => n + 1)}
       onSelectRoute={onSelectRoute}
+      bottomPadding={bottomPadding}
     />
   );
 }

@@ -366,7 +366,12 @@
     "nonRepeaterEndpoint": "Route endpoints must be repeaters — pick a repeater node.",
     "multibyteUnconfirmed": "3-byte forwarding support is not confirmed for every repeater in this route. Older MeshCore firmware may drop the message.",
     "neighborLeg": "Neighbor",
-    "neighborHint": "The reporting node marked its peer as a neighbor in this direction — this hop is preferred when planning."
+    "neighborHint": "The reporting node marked its peer as a neighbor in this direction — this hop is preferred when planning.",
+    "results": "Results",
+    "toggleResults": "Toggle results",
+    "tapToExpand": "Tap to expand",
+    "pinchToExpand": "Pinch to expand",
+    "swipeDownToCollapse": "Swipe down to collapse"
   },
   "traces": {
     "firstHeard": "First heard",

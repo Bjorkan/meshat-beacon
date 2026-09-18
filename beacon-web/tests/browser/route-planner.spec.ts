@@ -364,7 +364,10 @@ for (const viewport of [
       const cards = page.getByRole('article');
       await expect(cards).toHaveCount(3);
       await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
-      const panel = cards.first().locator('../..');
+      const panel =
+        viewport.name === 'mobile'
+          ? page.getByTestId('route-results-list')
+          : page.getByTestId('route-panel');
       const map = page.getByTestId('route-map');
       const footer = viewport.hasTouch ? page.getByRole('tablist') : page.getByRole('contentinfo');
       const mapBounds = await map.boundingBox();
@@ -590,6 +593,33 @@ for (const viewport of [
         ).toHaveAttribute('aria-expanded', 'false');
         await expect(card.locator('[data-route-details]')).toBeHidden();
       }
+    });
+    test('route planner bottom sheet snaps peek to half on mobile', async ({ page }) => {
+      await mockApi(page, longRoutes);
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      const sheet = page.locator('section[aria-label]').first();
+      await expect(sheet).toBeVisible();
+      const map = page.getByTestId('route-map');
+      const mapBox = await map.boundingBox();
+      const sheetBox = await sheet.boundingBox();
+      expect(sheetBox).not.toBeNull();
+      if (mapBox && sheetBox) {
+        expect(sheetBox.y + sheetBox.height).toBeLessThan(mapBox.y + mapBox.height * 0.9);
+      }
+      const handle = sheet.getByRole('button', { name: /Toggle results/ });
+      await expect(handle).toBeVisible();
+      for (const card of await page.getByRole('article').all()) {
+        await expect(card).toBeVisible();
+      }
+    });
+
+    test('route planner map is visible behind sheet in peek on mobile', async ({ page }) => {
+      await mockApi(page);
+      await page.goto('/routes');
+      const map = page.getByTestId('route-map');
+      await expect(map).toBeVisible();
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      await expect(map).toBeVisible();
     });
   });
 }
