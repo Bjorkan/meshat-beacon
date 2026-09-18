@@ -88,7 +88,7 @@ export function ResultsSheet({
             </span>
           )}
         </button>
-        <div className="border-b border-border px-3 pt-2">
+        <div className="border-b border-border rounded-lg bg-bg-surface/50 px-3 pt-2">
           <RouteSearchForm
             resolvedFrom={resolvedFrom}
             resolvedTo={resolvedTo}

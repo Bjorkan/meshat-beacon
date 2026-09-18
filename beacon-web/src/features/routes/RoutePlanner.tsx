@@ -145,15 +145,17 @@ function RoutePlanner() {
       </div>
 
       <div className="absolute inset-y-0 left-0 z-10 hidden w-full max-w-md flex-col gap-2 overflow-y-auto overscroll-y-contain p-3 lg:p-4 lg:flex">
-        <RouteSearchForm
-          resolvedFrom={resolvedFrom}
-          resolvedTo={resolvedTo}
-          onPair={setPair}
-          onSwap={swap}
-          onClearFrom={() => setPair(null, resolvedTo)}
-          onClearTo={() => setPair(resolvedFrom, null)}
-          autoFocus
-        />
+        <div className="rounded-xl border border-border bg-bg-base shadow-lg p-3">
+          <RouteSearchForm
+            resolvedFrom={resolvedFrom}
+            resolvedTo={resolvedTo}
+            onPair={setPair}
+            onSwap={swap}
+            onClearFrom={() => setPair(null, resolvedTo)}
+            onClearTo={() => setPair(resolvedFrom, null)}
+            autoFocus
+          />
+        </div>
         <div
           data-testid="route-panel"
           className="min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y"
