@@ -3157,6 +3157,8 @@ const listPackets = `-- name: ListPackets :many
 SELECT
   p.packet_hash,
   p.payload_type,
+  COALESCE(CASE WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+    THEN p.parsed_payload #>> '{appData,name}' END, '')::text AS summary,
   p.route_type,
   p.first_heard_at,
   p.last_heard_at,
@@ -3206,6 +3208,7 @@ type ListPacketsParams struct {
 type ListPacketsRow struct {
 	PacketHash                      []byte             `json:"packet_hash"`
 	PayloadType                     int16              `json:"payload_type"`
+	Summary                         string             `json:"summary"`
 	RouteType                       int16              `json:"route_type"`
 	FirstHeardAt                    pgtype.Timestamptz `json:"first_heard_at"`
 	LastHeardAt                     pgtype.Timestamptz `json:"last_heard_at"`
@@ -3245,6 +3248,7 @@ func (q *Queries) ListPackets(ctx context.Context, arg ListPacketsParams) ([]Lis
 		if err := rows.Scan(
 			&i.PacketHash,
 			&i.PayloadType,
+			&i.Summary,
 			&i.RouteType,
 			&i.FirstHeardAt,
 			&i.LastHeardAt,
@@ -3274,6 +3278,8 @@ const listPacketsAfterID = `-- name: ListPacketsAfterID :many
 SELECT
   p.packet_hash,
   p.payload_type,
+  COALESCE(CASE WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+    THEN p.parsed_payload #>> '{appData,name}' END, '')::text AS summary,
   p.route_type,
   p.first_heard_at,
   p.last_heard_at,
@@ -3312,6 +3318,7 @@ type ListPacketsAfterIDParams struct {
 type ListPacketsAfterIDRow struct {
 	PacketHash                      []byte             `json:"packet_hash"`
 	PayloadType                     int16              `json:"payload_type"`
+	Summary                         string             `json:"summary"`
 	RouteType                       int16              `json:"route_type"`
 	FirstHeardAt                    pgtype.Timestamptz `json:"first_heard_at"`
 	LastHeardAt                     pgtype.Timestamptz `json:"last_heard_at"`
@@ -3348,6 +3355,7 @@ func (q *Queries) ListPacketsAfterID(ctx context.Context, arg ListPacketsAfterID
 		if err := rows.Scan(
 			&i.PacketHash,
 			&i.PayloadType,
+			&i.Summary,
 			&i.RouteType,
 			&i.FirstHeardAt,
 			&i.LastHeardAt,
@@ -3419,6 +3427,8 @@ page AS (
 SELECT
   p.packet_hash,
   p.payload_type,
+  COALESCE(CASE WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+    THEN p.parsed_payload #>> '{appData,name}' END, '')::text AS summary,
   p.route_type,
   p.first_heard_at,
   p.last_heard_at,
@@ -3467,6 +3477,7 @@ type ListPacketsByIATAsParams struct {
 type ListPacketsByIATAsRow struct {
 	PacketHash                      []byte             `json:"packet_hash"`
 	PayloadType                     int16              `json:"payload_type"`
+	Summary                         string             `json:"summary"`
 	RouteType                       int16              `json:"route_type"`
 	FirstHeardAt                    pgtype.Timestamptz `json:"first_heard_at"`
 	LastHeardAt                     pgtype.Timestamptz `json:"last_heard_at"`
@@ -3521,6 +3532,7 @@ func (q *Queries) ListPacketsByIATAs(ctx context.Context, arg ListPacketsByIATAs
 		if err := rows.Scan(
 			&i.PacketHash,
 			&i.PayloadType,
+			&i.Summary,
 			&i.RouteType,
 			&i.FirstHeardAt,
 			&i.LastHeardAt,
