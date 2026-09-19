@@ -3094,6 +3094,10 @@ const docTemplate = `{
                     "description": "UUID of the associated observer row, if any",
                     "type": "string"
                 },
+                "possiblyForeign": {
+                    "description": "PossiblyForeign compares a repeater's stored position with this server's\nconfigured IATA border union. Omitted when disabled, unknown, or not repeater.",
+                    "type": "boolean"
+                },
                 "publicKey": {
                     "description": "hex-encoded Ed25519 public key",
                     "type": "string"
@@ -3223,6 +3227,10 @@ const docTemplate = `{
                 "observerId": {
                     "description": "UUID of the associated observer row, if any",
                     "type": "string"
+                },
+                "possiblyForeign": {
+                    "description": "PossiblyForeign compares a repeater's stored position with this server's\nconfigured IATA border union. Omitted when disabled, unknown, or not repeater.",
+                    "type": "boolean"
                 },
                 "publicKey": {
                     "description": "hex-encoded Ed25519 public key",
