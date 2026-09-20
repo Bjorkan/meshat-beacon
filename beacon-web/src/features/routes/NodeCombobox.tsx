@@ -89,6 +89,7 @@ export function NodeCombobox({
   }, []);
 
   const query = debounced;
+  const searching = open && query.length > 0 && (!value || query !== externalText);
   const hexLike = isHexLike(query.replace(/\s+/g, ''));
   const { data, isLoading } = useQuery({
     queryKey: ['routes-node-suggest', query.toLowerCase()],
@@ -100,7 +101,7 @@ export function NodeCombobox({
         type: 'repeater',
         ...(hexLike ? { pubkeyPrefix: query.replace(/\s+/g, '').toLowerCase() } : { name: query }),
       }),
-    enabled: open && query.length > 0 && !(value && query === (value.name ?? '')),
+    enabled: searching,
     staleTime: 30_000,
   });
   // Belt and suspenders: the server filters type=repeater, but never trust a
@@ -174,24 +175,21 @@ export function NodeCombobox({
 
   return (
     <div ref={boxRef} className="relative min-w-0 flex-1">
-      <label
-        htmlFor={inputId}
-        className="mb-1 block text-[11px] font-mono uppercase tracking-wider text-text-muted"
-      >
+      <label htmlFor={inputId} className="sr-only">
         {label}
       </label>
-      <div className="flex items-center gap-1">
+      <div className="relative flex items-center">
         <input
           id={inputId}
           role="combobox"
-          aria-expanded={open && suggestions.length > 0}
+          aria-expanded={searching && suggestions.length > 0}
           aria-controls={listId}
           aria-activedescendant={
-            open && suggestions[highlight] ? `${listId}-${highlight}` : undefined
+            searching && suggestions[highlight] ? `${listId}-${highlight}` : undefined
           }
           autoFocus={autoFocus}
-          className="min-w-0 flex-1 rounded-sm border border-border bg-bg-surface px-2 py-1.5 font-mono text-[13px] text-text-bright placeholder:text-text-dim"
-          placeholder={t('routes.nodeSearchPlaceholder')}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-border bg-bg-surface/50 pl-3 pr-10 text-base text-text-bright placeholder:text-text-muted focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          placeholder={label}
           value={text}
           onChange={(e) => {
             setText(e.target.value);
@@ -212,7 +210,7 @@ export function NodeCombobox({
               setNotice(null);
               onClear();
             }}
-            className="shrink-0 rounded px-1.5 py-1 font-mono text-text-dim hover:text-text-normal"
+            className="absolute right-0 flex h-11 w-10 items-center justify-center rounded-lg text-xl text-text-muted hover:text-text-bright"
           >
             ×
           </button>
@@ -223,13 +221,13 @@ export function NodeCombobox({
           {notice}
         </div>
       )}
-      {open && query.length > 0 && (
+      {searching && (
         <div className="absolute inset-x-0 top-full z-30 mt-1">
           <ul
             id={listId}
             role="listbox"
             aria-label={label}
-            className="max-h-64 overflow-y-auto rounded border border-border bg-bg-raised py-1 shadow-lg"
+            className="max-h-[min(16rem,40dvh)] overflow-y-auto overscroll-contain rounded-xl border border-border bg-bg-raised py-1 shadow-lg"
           >
             {isLoading && (
               <li role="status" className="px-3 py-2 font-mono text-xs text-text-dim">
@@ -258,7 +256,7 @@ export function NodeCombobox({
                     onMouseEnter={() => setHighlight(i)}
                     onClick={() => located && commit(toPick(n))}
                     title={located ? n.publicKey : `${n.publicKey} · ${t('routes.noPositionHint')}`}
-                    className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-[13px] ${
+                    className={`flex w-full items-center gap-2 px-3 py-3 text-left text-sm ${
                       i === highlight ? 'bg-text-normal/5' : ''
                     } ${located ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}
                   >

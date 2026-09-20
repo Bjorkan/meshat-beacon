@@ -15,12 +15,7 @@ export function ResultsList({
 }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col gap-2">
-      {paths.length > 0 && (
-        <p className="rounded border border-border bg-bg-base px-3 py-2 text-xs leading-relaxed text-text-muted">
-          {t('routes.rankingHint')}
-        </p>
-      )}
+    <div className="flex flex-col">
       {paths.map((route: PlannedRoute, i: number) => (
         <RouteCard
           key={route.nodes.map((n) => n.publicKey).join('-')}
@@ -31,6 +26,11 @@ export function ResultsList({
           onOpenNode={onOpenNode}
         />
       ))}
+      {paths.length > 0 && (
+        <p className="px-5 py-4 text-xs leading-relaxed text-text-muted">
+          {t('routes.rankingHint')}
+        </p>
+      )}
     </div>
   );
 }

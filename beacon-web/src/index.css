@@ -272,3 +272,14 @@
   color: var(--color-text-muted);
   margin-top: 2px;
 }
+
+/* Keep map controls below the route planner's floating endpoint fields. */
+@media (max-width: 1023px) {
+  .route-planner .maplibregl-ctrl-bottom-right {
+    bottom: var(--route-sheet-height, 0px);
+  }
+
+  .route-planner .maplibregl-ctrl-top-right {
+    top: 140px;
+  }
+}

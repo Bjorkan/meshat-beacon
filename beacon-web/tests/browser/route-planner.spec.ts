@@ -291,6 +291,82 @@ for (const viewport of [
       hasTouch: viewport.hasTouch,
     });
 
+    test('sheet retains its position after repeated drags, taps and route changes', async ({
+      page,
+      browserName,
+    }) => {
+      test.skip(!viewport.hasTouch, 'Mobile sheet gestures');
+      await mockApi(page);
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      const sheet = page.getByTestId('route-sheet');
+      const handle = page.getByRole('button', { name: 'Toggle results' });
+      await expect(page.getByRole('article')).toHaveCount(2);
+      await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
+      await expect(sheet).toHaveAttribute('data-snap', 'half');
+      const session = browserName === 'chromium' ? await page.context().newCDPSession(page) : null;
+      const drag = async (distance: number) => {
+        const bounds = (await handle.boundingBox())!;
+        const x = bounds.x + bounds.width / 2;
+        const y = bounds.y + bounds.height / 2;
+        if (session) {
+          await session.send('Input.dispatchTouchEvent', {
+            type: 'touchStart',
+            touchPoints: [{ x, y }],
+          });
+        } else {
+          await page.mouse.move(x, y);
+          await page.mouse.down();
+        }
+        for (let step = 1; step <= 12; step++) {
+          const nextY = y - (distance * step) / 12;
+          if (session) {
+            await session.send('Input.dispatchTouchEvent', {
+              type: 'touchMove',
+              touchPoints: [{ x, y: nextY }],
+            });
+          } else {
+            await page.mouse.move(x, nextY);
+          }
+          await page.waitForTimeout(25);
+        }
+        // Release after pausing so this exercises position-based snapping.
+        await page.waitForTimeout(150);
+        if (session)
+          await session.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        else await page.mouse.up();
+        await page.waitForTimeout(250);
+      };
+      const initialHeight = (await sheet.boundingBox())!.height;
+      await drag(220);
+      await expect(sheet).toHaveAttribute('data-snap', 'full');
+      const fullHeight = (await sheet.boundingBox())!.height;
+      expect(fullHeight).toBeGreaterThan(initialHeight + 100);
+      await page.getByRole('button', { name: 'Show Alternative 1 on the map' }).tap();
+      await expect(page).toHaveURL(/alt=1/);
+      await expect(sheet).toHaveAttribute('data-snap', 'full');
+      expect((await sheet.boundingBox())!.height).toBeCloseTo(fullHeight, 0);
+      await drag(-220);
+      await expect(sheet).toHaveAttribute('data-snap', 'half');
+      await drag(-250);
+      await expect(sheet).toHaveAttribute('data-snap', 'peek');
+      expect((await sheet.boundingBox())!.height).toBeCloseTo(112, 0);
+      await expect(handle).toHaveAttribute('aria-expanded', 'false');
+      // A fresh tap works after a drag and repeated taps use the saved snap.
+      await handle.tap();
+      await expect(sheet).toHaveAttribute('data-snap', 'half');
+      await page.waitForTimeout(250);
+      await handle.tap();
+      await expect(sheet).toHaveAttribute('data-snap', 'peek');
+      await handle.focus();
+      await page.keyboard.press('End');
+      await expect(sheet).toHaveAttribute('data-snap', 'full');
+      await page.keyboard.press('Home');
+      await expect(sheet).toHaveAttribute('data-snap', 'peek');
+      await page.keyboard.press('Enter');
+      await expect(sheet).toHaveAttribute('data-snap', 'half');
+      await session?.detach();
+    });
+
     test('route planner selects the card body without expanding details', async ({
       page,
     }, testInfo) => {
@@ -655,4 +731,69 @@ test('route planner picker never surfaces non-repeaters', async ({ page }) => {
   // A companion exists server-side but the repeater-only picker must not
   // offer it through any picker path.
   await expect(page.getByRole('option', { name: /Companion/ })).toHaveCount(0);
+});
+
+test('planner adapts between desktop and mobile without reloading or duplicating controls', async ({
+  page,
+}) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/routes?from=${FROM}&to=${TO}`);
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('combobox')).toHaveCount(2);
+  await expect(page.getByRole('button', { name: 'Toggle results' })).toBeHidden();
+  await page.setViewportSize({ width: 390, height: 844 });
+  const handle = page.getByRole('button', { name: 'Toggle results' });
+  await expect(handle).toBeVisible();
+  await handle.click();
+  await expect(page.getByTestId('route-sheet')).toHaveAttribute('data-snap', 'peek');
+  const search = (await page.getByTestId('route-search').boundingBox())!;
+  const sheet = (await page.getByTestId('route-sheet').boundingBox())!;
+  expect(search.y + search.height).toBeLessThan(sheet.y);
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await expect(handle).toBeHidden();
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByRole('combobox')).toHaveCount(2);
+  await expect(page.getByTestId('route-panel')).toBeVisible();
+});
+
+test('Swedish light layout fits a small phone and keeps search accessible after rotation', async ({
+  page,
+}, testInfo) => {
+  await mockApi(page);
+  await page.addInitScript(() => {
+    localStorage.setItem('beacon-theme', 'meshat-light');
+    localStorage.setItem('beacon-language', 'sv');
+  });
+  await page.setViewportSize({ width: 320, height: 740 });
+  await page.goto(`/routes?from=${FROM}&to=${TO}`);
+  await expect(page.getByRole('article')).toHaveCount(2);
+  await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
+  const handle = page.getByRole('button', { name: 'Växla resultat' });
+  await handle.focus();
+  await page.keyboard.press('End');
+  await expect(page.getByTestId('route-sheet')).toHaveAttribute('data-snap', 'full');
+  const assertFits = async () => {
+    await expect
+      .poll(async () => {
+        const search = (await page.getByTestId('route-search').boundingBox())!;
+        const sheet = (await page.getByTestId('route-sheet').boundingBox())!;
+        return sheet.y - search.y - search.height;
+      })
+      .toBeGreaterThanOrEqual(0);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
+    ).toBe(0);
+    for (const card of await page.getByRole('article').all()) {
+      expect(await card.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+    }
+  };
+  await assertFits();
+  await page.screenshot({ path: testInfo.outputPath('small-phone-light-sv.png') });
+  await page.setViewportSize({ width: 740, height: 390 });
+  await assertFits();
+  await expect(page.getByRole('combobox')).toHaveCount(2);
+  await page.getByRole('combobox', { name: 'Från', exact: true }).fill('alp');
+  await expect(page.getByRole('option', { name: /Alpha/ })).toBeVisible();
+  await page.getByRole('option', { name: /Alpha/ }).click();
 });

@@ -7,7 +7,8 @@
 // dedicated accent color distinct from the SNR/blue scale. Clicking an
 // inactive route line selects it. Never dashed — every leg shown was
 // computed, none is uncertain.
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTranslation } from 'react-i18next';
 import maplibregl from 'maplibre-gl';
 import type {
@@ -278,13 +279,15 @@ function RouteCanvas({
       );
       const w = map.getContainer().clientWidth;
       const isNarrow = w < 1024;
-      const panelReserve = isNarrow ? 0 : Math.min(28 * 16 + 32, Math.max(0, w - 160));
+      const panelReserve = isNarrow ? 0 : Math.min(400, Math.max(0, w - 160));
+      const h = map.getContainer().clientHeight;
+      const top = isNarrow ? Math.min(160, h * 0.3) : 60;
       map.fitBounds(b, {
         padding: {
-          top: isNarrow ? 108 : 60,
-          bottom: isNarrow ? 60 + bottomPadding : 60,
-          left: panelReserve + 60,
-          right: 60,
+          top,
+          bottom: isNarrow ? Math.min(24 + bottomPadding, Math.max(0, h - top - 80)) : 60,
+          left: panelReserve + (isNarrow ? 24 : 60),
+          right: isNarrow ? 24 : 60,
         },
         maxZoom: IATA_ZOOM,
       });
@@ -532,7 +535,10 @@ function RouteCanvas({
   }, [ready, reducedMotion]);
 
   return (
-    <div className="relative h-full w-full">
+    <div
+      className="relative h-full w-full"
+      style={{ '--route-sheet-height': `${bottomPadding}px` } as CSSProperties}
+    >
       <div ref={containerRef} data-dark={resolveMapStyle(styleId).dark} className="h-full w-full" />
       {status !== 'ready' && (
         <div

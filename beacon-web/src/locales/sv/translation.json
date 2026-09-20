@@ -370,8 +370,8 @@
     "results": "Resultat",
     "toggleResults": "Växla resultat",
     "tapToExpand": "Tryck för att expandera",
-    "pinchToExpand": "Pincha för att expandera",
-    "swipeDownToCollapse": "Svepa nedåt för att skapa ihop"
+    "pinchToExpand": "Dra uppåt för att expandera",
+    "swipeDownToCollapse": "Dra nedåt för att fälla ihop"
   },
   "traces": {
     "firstHeard": "Först hörd",

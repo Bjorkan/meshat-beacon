@@ -370,7 +370,7 @@
     "results": "Results",
     "toggleResults": "Toggle results",
     "tapToExpand": "Tap to expand",
-    "pinchToExpand": "Pinch to expand",
+    "pinchToExpand": "Drag up to expand",
     "swipeDownToCollapse": "Swipe down to collapse"
   },
   "traces": {

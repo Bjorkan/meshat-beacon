@@ -1,144 +1,111 @@
 import { useTranslation } from 'react-i18next';
 import type { PlannedRoute } from '../../types/api';
-import { type NodePick } from './NodeCombobox';
-import { RouteSearchForm } from './RouteSearchForm';
 import { ResultsList } from './ResultsList';
-import { useBottomSheet } from '../../hooks/useBottomSheet';
-
-const isMobile = typeof window !== 'undefined' && window.innerWidth < 1024;
+import type { useBottomSheet } from '../../hooks/useBottomSheet';
 
 export function ResultsSheet({
+  sheet,
+  sheetRef,
+  isMobile,
   showResults,
   isLoading,
   isError,
   error,
+  notice,
+  emptyMessage,
   paths,
   active,
   onSelect,
   onOpenNode,
-  resolvedFrom,
-  resolvedTo,
-  onPair,
-  onSwap,
-  onClearFrom,
-  onClearTo,
 }: {
+  sheet: Omit<ReturnType<typeof useBottomSheet>, 'sheetRef' | 'containerRef'>;
+  sheetRef: ReturnType<typeof useBottomSheet>['sheetRef'];
+  isMobile: boolean;
   showResults: boolean;
   isLoading: boolean;
   isError: boolean;
   error: unknown;
+  notice?: string;
+  emptyMessage: string;
   paths: PlannedRoute[];
   active: number;
   onSelect: (index: number) => void;
   onOpenNode: (nodeId: string) => void;
-  resolvedFrom: NodePick | null;
-  resolvedTo: NodePick | null;
-  onPair: (from: NodePick | null, to: NodePick | null) => void;
-  onSwap: () => void;
-  onClearFrom: () => void;
-  onClearTo: () => void;
 }) {
   const { t } = useTranslation();
-  const hasResults = paths.length > 0;
-  const { snap, sheetRef, sheetHeightPx, onPointerDown, onPointerMove, onPointerUp } =
-    useBottomSheet(hasResults);
+  const activeRoute = paths[active];
+  const summary = activeRoute
+    ? `${t('routes.hops', { count: activeRoute.hopCount })} · ${active === 0 ? t('routes.best') : t('routes.alternative', { n: active })}`
+    : t('routes.pickBoth');
 
-  const nodeName = (node: { name?: string; publicKey: string }) =>
-    node.name ?? node.publicKey.slice(0, 6).toUpperCase();
-  const activeRoute = paths[active] ?? null;
-  const viaSummary = activeRoute ? activeRoute.nodes.slice(1, -1).map(nodeName).join(' → ') : '';
-
-  if (!isMobile) return null;
   return (
     <section
+      ref={sheetRef}
       aria-label={t('routes.results')}
-      className="absolute inset-x-0 bottom-0 z-20 lg:hidden"
+      data-testid="route-sheet"
+      data-snap={sheet.snap}
+      style={
+        isMobile
+          ? { height: sheet.sheetHeightPx, transition: sheet.isDragging ? 'none' : undefined }
+          : undefined
+      }
+      className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex min-h-0 flex-col overflow-hidden rounded-t-3xl border-t border-border bg-bg-base shadow-[0_-4px_24px_#0002] transition-[height] duration-200 ease-out motion-reduce:transition-none lg:relative lg:inset-auto lg:flex-1 lg:rounded-none lg:border-0 lg:shadow-none"
     >
-      <div
-        ref={sheetRef}
-        style={{ height: `${sheetHeightPx}px` }}
-        className="flex max-h-[85dvh] flex-col rounded-t-2xl border border-border bg-bg-base pb-[calc(3.5rem+env(safe-area-inset-bottom))] shadow-2xl transition-[height] duration-200 ease-out motion-reduce:transition-none"
+      <button
+        type="button"
+        aria-expanded={sheet.snap !== 'peek'}
+        aria-controls="route-results-list"
+        aria-label={t('routes.toggleResults')}
+        onPointerDown={sheet.onPointerDown}
+        onPointerMove={sheet.onPointerMove}
+        onPointerUp={sheet.onPointerUp}
+        onPointerCancel={sheet.onPointerCancel}
+        onLostPointerCapture={sheet.onPointerCancel}
+        onKeyDown={sheet.onKeyDown}
+        onClick={sheet.togglePeek}
+        className="flex min-h-11 w-full shrink-0 touch-none select-none cursor-grab items-center justify-center active:cursor-grabbing lg:hidden"
       >
-        <button
-          type="button"
-          aria-expanded={snap !== 'peek'}
-          aria-controls="route-results-list"
-          aria-label={t('routes.toggleResults')}
-          onPointerDown={onPointerDown}
-          onPointerMove={onPointerMove}
-          onPointerUp={onPointerUp}
-          className="flex min-h-11 w-full touch-none select-none cursor-grab flex-col items-center justify-center gap-1 pt-2 outline-none focus-visible:outline-2 focus-visible:outline-primary"
-        >
-          <span aria-hidden className="h-1 w-9 rounded-full bg-border" />
-          {snap === 'peek' && activeRoute && (
-            <span className="px-4 font-mono text-[11px] text-text-muted">
-              {t('routes.best')} · {activeRoute.hopCount}{' '}
-              {t('routes.hops', { count: activeRoute.hopCount })}
-              {viaSummary ? ` · via ${viaSummary}` : ''} · {t('routes.tapToExpand')}
-            </span>
-          )}
-          {snap === 'peek' && !activeRoute && (
-            <span className="px-4 font-mono text-[11px] text-text-muted">
-              {t('routes.tapToExpand')}
-            </span>
-          )}
-          {snap !== 'peek' && (
-            <span className="px-4 font-mono text-[10px] text-text-dim">
-              {snap === 'half' ? t('routes.pinchToExpand') : t('routes.swipeDownToCollapse')}
-            </span>
-          )}
-        </button>
-        <div className="border-b border-border rounded-lg bg-bg-surface/50 px-3 pt-2">
-          <RouteSearchForm
-            resolvedFrom={resolvedFrom}
-            resolvedTo={resolvedTo}
-            onPair={onPair}
-            onSwap={onSwap}
-            onClearFrom={onClearFrom}
-            onClearTo={onClearTo}
-            autoFocus={false}
-          />
-        </div>
-        <div
-          id="route-results-list"
-          data-testid="route-results-list"
-          className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y px-3 pb-3"
-        >
-          {showResults && !isLoading && !isError && paths.length === 0 && (
-            <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
-              {t('routes.noRoute')}
-            </div>
-          )}
-          {showResults && isLoading && (
-            <div
-              role="status"
-              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg"
-            >
-              {t('routes.planning')}
-            </div>
-          )}
-          {showResults && isError && (
-            <div
-              role="alert"
-              className="rounded-lg border border-danger/40 bg-bg-base px-3 py-2 font-mono text-[13px] text-danger shadow-lg"
-            >
-              {(error as Error)?.message || 'Error'}
-            </div>
-          )}
-          {!showResults && (
-            <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
-              {t('routes.pickBoth')}
-            </div>
-          )}
-          {hasResults && (
+        <span aria-hidden className="h-1 w-10 rounded-full bg-text-muted/40" />
+      </button>
+      <div className="shrink-0 border-b border-border-subtle px-5 pb-3 lg:pt-5">
+        <h2 className="text-lg font-semibold text-text-bright">{t('routes.results')}</h2>
+        <p className="truncate text-sm text-text-muted">{summary}</p>
+      </div>
+      <div
+        id="route-results-list"
+        data-testid={isMobile ? 'route-results-list' : 'route-panel'}
+        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain touch-pan-y pb-[env(safe-area-inset-bottom)]"
+      >
+        {notice ? (
+          <p role="alert" className="px-5 py-4 text-sm text-warn">
+            {notice}
+          </p>
+        ) : (
+          <>
+            {!showResults && (
+              <p className="px-5 py-4 text-sm text-text-muted">{t('routes.globalHint')}</p>
+            )}
+            {showResults && isLoading && (
+              <p role="status" className="px-5 py-4 text-sm text-text-muted">
+                {t('routes.planning')}
+              </p>
+            )}
+            {showResults && isError && (
+              <p role="alert" className="px-5 py-4 text-sm text-danger">
+                {(error as Error)?.message || 'Error'}
+              </p>
+            )}
+            {showResults && !isLoading && !isError && paths.length === 0 && (
+              <p className="px-5 py-4 text-sm text-text-muted">{emptyMessage}</p>
+            )}
             <ResultsList
               paths={paths}
               active={active}
               onSelect={onSelect}
               onOpenNode={onOpenNode}
             />
-          )}
-        </div>
+          </>
+        )}
       </div>
     </section>
   );

@@ -78,8 +78,10 @@ export function RouteCard({
           return;
         if (!active) onSelect();
       }}
-      className={`w-full cursor-pointer rounded-lg border p-3 text-left shadow-lg transition-colors ${
-        active ? 'border-primary-dim bg-bg-base' : 'border-border bg-bg-base hover:border-text-dim'
+      className={`w-full cursor-pointer border-b border-border-subtle border-l-[3px] px-5 py-4 text-left transition-colors ${
+        active
+          ? 'border-l-primary bg-primary/5'
+          : 'border-l-transparent bg-bg-base hover:bg-bg-surface'
       }`}
     >
       <button
@@ -87,26 +89,26 @@ export function RouteCard({
         aria-label={t('routes.selectRoute', { label })}
         aria-pressed={active}
         onClick={onSelect}
-        className="flex min-h-9 w-full flex-wrap items-baseline gap-x-2 gap-y-1 rounded text-left text-sm focus-visible:outline-2 focus-visible:outline-primary"
+        className="flex min-h-11 w-full flex-wrap items-center gap-x-3 gap-y-1 rounded text-left text-sm focus-visible:outline-2 focus-visible:outline-primary"
       >
-        <span id={titleId} className="font-mono text-[13px] font-semibold text-text-bright">
+        <span id={titleId} className="text-base font-semibold text-text-bright">
           {label}
         </span>
-        <span className="font-mono text-[11px] text-text-muted">
+        <span className="ml-auto text-lg font-semibold tabular-nums text-text-bright">
           {t('routes.hops', { count: route.hopCount })}
         </span>
         {active && (
-          <span className="ml-auto font-mono text-[10px] uppercase tracking-wider text-primary">
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             {t('routes.selected')}
           </span>
         )}
       </button>
       {!expanded && (
-        <p className="mt-1 break-words font-mono text-[11px] leading-relaxed text-text-muted">
+        <p className="mt-1 break-words text-sm leading-relaxed text-text-muted">
           {via.length > 0 ? t('routes.via', { nodes: viaSummary }) : t('routes.directRoute')}
         </p>
       )}
-      <div className="mt-2 space-y-1 font-mono text-[11px] leading-relaxed text-text-muted">
+      <div className="mt-2 space-y-1 text-xs leading-relaxed text-text-muted">
         <p>{t('routes.snrCoverage', { measured: measuredCount, total: route.legs.length })}</p>
         {unseenCount > 0 && (
           <p className="text-warn">{t('routes.unseenHops', { count: unseenCount })}</p>
@@ -154,7 +156,7 @@ export function RouteCard({
           aria-expanded={expanded}
           aria-controls={detailsId}
           onClick={() => setExpanded((shown) => !shown)}
-          className="min-h-9 rounded text-xs text-text-muted underline underline-offset-4 hover:text-text-normal focus-visible:outline-2 focus-visible:outline-primary"
+          className="min-h-11 rounded-full px-3 text-sm font-medium text-primary hover:bg-primary/10 focus-visible:outline-2 focus-visible:outline-primary"
         >
           {t(expanded ? 'routes.hideDetails' : 'routes.showDetails')}
         </button>
@@ -164,7 +166,7 @@ export function RouteCard({
             label={t('routes.copyMeshcoreRoute')}
             copiedLabel={t('routes.meshcoreRouteCopied')}
             ariaLabel={t('routes.copyMeshcoreRoute')}
-            className="min-h-9 max-w-full focus-visible:outline-2 focus-visible:outline-primary"
+            className="min-h-11 max-w-full scroll-my-2 rounded-full! px-3! font-sans! text-xs! tracking-normal! normal-case! focus-visible:outline-2 focus-visible:outline-primary"
           />
         )}
       </div>
@@ -173,7 +175,7 @@ export function RouteCard({
           {t('routes.meshcoreTooLong')}
         </p>
       )}
-      {meshcoreRoute != null && multibyteUnconfirmed && (
+      {expanded && meshcoreRoute != null && multibyteUnconfirmed && (
         <p role="status" className="mt-2 text-xs leading-relaxed text-warn">
           {t('routes.multibyteUnconfirmed')}
         </p>

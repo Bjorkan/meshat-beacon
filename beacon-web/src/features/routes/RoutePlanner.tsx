@@ -4,8 +4,8 @@
 // graph preferring known signal strength, and the map draws them with per-leg
 // SNR colors. State lives in the URL (?from=&to=&alt=) so routes are shareable.
 // Mobile (<1024px): map always visible behind a floating search bar and a
-// draggable bottom sheet with snap points. Desktop (>=1024px): floating
-// left panel as before.
+// draggable bottom sheet with snap points. Desktop (>=1024px): a continuous
+// left sidebar for search and route alternatives.
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
@@ -17,10 +17,10 @@ import { useOverlays } from '../../routes/overlays';
 import { RoutePlannerMapLazy } from './RoutePlannerMapLazy';
 import { type NodePick } from './NodeCombobox';
 import { RouteSearchForm } from './RouteSearchForm';
-import { ResultsList } from './ResultsList';
 import { ResultsSheet } from './ResultsSheet';
 import { ErrorBoundary } from '../../components/ErrorBoundary';
 import { useBottomSheet } from '../../hooks/useBottomSheet';
+import { useIsMobile } from '../../hooks/useMediaQuery';
 
 function RoutePlanner() {
   const { t } = useTranslation();
@@ -93,7 +93,8 @@ function RoutePlanner() {
   const active = Math.min(shownActive, Math.max(0, paths.length - 1));
 
   const hasResults = paths.length > 0;
-  const { sheetHeightPx } = useBottomSheet(hasResults);
+  const { containerRef, sheetRef, ...sheet } = useBottomSheet(hasResults);
+  const isMobile = useIsMobile();
 
   const setPair = (nextFrom: NodePick | null, nextTo: NodePick | null) => {
     setFrom(nextFrom);
@@ -122,7 +123,10 @@ function RoutePlanner() {
   const showResults = pair !== null && !sameNode && !urlEndpointInvalid;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col overflow-clip">
+    <div
+      ref={containerRef}
+      className="route-planner relative flex min-h-0 flex-1 flex-col overflow-clip"
+    >
       <div className="absolute inset-0 z-0" data-testid="route-map">
         <ErrorBoundary
           fallback={
@@ -139,13 +143,19 @@ function RoutePlanner() {
             activeIndex={active}
             styleId={styleId}
             onSelectRoute={selectAlt}
-            bottomPadding={sheetHeightPx}
+            bottomPadding={isMobile ? sheet.settledHeightPx : 0}
           />
         </ErrorBoundary>
       </div>
 
-      <div className="absolute inset-y-0 left-0 z-10 hidden w-full max-w-md flex-col gap-2 overflow-y-auto overscroll-y-contain p-3 lg:p-4 lg:flex">
-        <div className="rounded-xl border border-border bg-bg-base shadow-lg p-3">
+      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col lg:right-auto lg:w-[400px] lg:bg-bg-base lg:shadow-xl">
+        <div
+          className="pointer-events-auto relative z-30 mx-3 mt-3 shrink-0 rounded-2xl border border-border bg-bg-base p-3 shadow-lg lg:m-0 lg:rounded-none lg:border-x-0 lg:border-t-0 lg:p-5 lg:shadow-none"
+          data-testid="route-search"
+        >
+          <h1 className="mb-4 hidden text-xl font-semibold text-text-bright lg:block">
+            {t('navigation.tabs.routes')}
+          </h1>
           <RouteSearchForm
             resolvedFrom={resolvedFrom}
             resolvedTo={resolvedTo}
@@ -153,80 +163,31 @@ function RoutePlanner() {
             onSwap={swap}
             onClearFrom={() => setPair(null, resolvedTo)}
             onClearTo={() => setPair(resolvedFrom, null)}
-            autoFocus
+            autoFocus={!isMobile && !urlFrom}
           />
         </div>
-        <div
-          data-testid="route-panel"
-          className="min-h-0 overflow-y-auto overscroll-y-contain touch-pan-y"
-        >
-          {sameNode && (
-            <div
-              role="alert"
-              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
-            >
-              {t('routes.sameNodeHint')}
-            </div>
-          )}
-          {urlEndpointInvalid && !sameNode && (
-            <div
-              role="alert"
-              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-warn shadow-lg"
-            >
-              {t('routes.nonRepeaterEndpoint')}
-            </div>
-          )}
-          {!showResults && !sameNode && !urlEndpointInvalid && (
-            <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
-              {t('routes.pickBoth')}
-            </div>
-          )}
-          {showResults && isLoading && (
-            <div
-              role="status"
-              className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg"
-            >
-              {t('routes.planning')}
-            </div>
-          )}
-          {showResults && isError && (
-            <div
-              role="alert"
-              className="rounded-lg border border-danger/40 bg-bg-base px-3 py-2 font-mono text-[13px] text-danger shadow-lg"
-            >
-              {(error as Error)?.message || 'Error'}
-            </div>
-          )}
-          {showResults && !isLoading && !isError && paths.length === 0 && (
-            <div className="rounded-lg border border-border bg-bg-base px-3 py-2 font-mono text-[13px] text-text-dim shadow-lg">
-              {data?.reason === 'no-route' ? t('routes.noRoute') : t('routes.unknownNode')}
-            </div>
-          )}
-          <ResultsList
-            paths={paths}
-            active={active}
-            onSelect={selectAlt}
-            onOpenNode={setOverlayNodeId}
-          />
-        </div>
+        <ResultsSheet
+          sheet={sheet}
+          sheetRef={sheetRef}
+          isMobile={isMobile}
+          showResults={showResults}
+          isLoading={isLoading}
+          isError={isError}
+          error={error}
+          notice={
+            sameNode
+              ? t('routes.sameNodeHint')
+              : urlEndpointInvalid
+                ? t('routes.nonRepeaterEndpoint')
+                : undefined
+          }
+          emptyMessage={data?.reason === 'no-route' ? t('routes.noRoute') : t('routes.unknownNode')}
+          paths={paths}
+          active={active}
+          onSelect={selectAlt}
+          onOpenNode={setOverlayNodeId}
+        />
       </div>
-
-      <ResultsSheet
-        showResults={showResults}
-        isLoading={isLoading}
-        isError={isError}
-        error={error}
-        paths={paths}
-        active={active}
-        onSelect={selectAlt}
-        onOpenNode={setOverlayNodeId}
-        resolvedFrom={resolvedFrom}
-        resolvedTo={resolvedTo}
-        onPair={setPair}
-        onSwap={swap}
-        onClearFrom={() => setPair(null, resolvedTo)}
-        onClearTo={() => setPair(resolvedFrom, null)}
-      />
     </div>
   );
 }
