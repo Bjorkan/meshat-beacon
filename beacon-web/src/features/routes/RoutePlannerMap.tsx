@@ -21,17 +21,23 @@ import type {
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import type { PlannedRoute } from '../../types/api';
 import { traceSnrPalette } from '../traces/trace-path';
-import { plannedRouteCoords, routesToFeatures } from './route-features';
+import {
+  closestRoute,
+  plannedRouteCoords,
+  routesToFeatures,
+  type RouteEndpoint,
+} from './route-features';
 import { posAtHop, trailCoords } from '../map/packet-flow';
 import {
   PACKET_RELAY_FORWARD_DELAY_MS,
   packetPulseFrame,
   type PacketPulseDirection,
 } from '../map/packet-flow-pulses';
-import { resolveMapStyle, DEFAULT_CENTER, DEFAULT_ZOOM, IATA_ZOOM } from '../map/types';
+import { resolveMapStyle, DEFAULT_CENTER, DEFAULT_ZOOM } from '../map/types';
 
 const ROUTE_LINE_SOURCE = 'route-legs';
 const ROUTE_LINE_LAYER = 'route-legs';
+const ROUTE_HIT_LAYER = 'route-hit-area';
 const ROUTE_NODE_SOURCE = 'route-nodes';
 const ROUTE_NODE_LAYER = 'route-nodes';
 const ROUTE_NODE_LABEL_LAYER = 'route-node-labels';
@@ -66,6 +72,7 @@ function paletteVar(name: string, fallback: string): string {
 
 function RouteCanvas({
   paths,
+  endpoints,
   activeIndex,
   styleId,
   onRetry,
@@ -73,6 +80,7 @@ function RouteCanvas({
   bottomPadding = 0,
 }: {
   paths: PlannedRoute[];
+  endpoints: (RouteEndpoint | null)[];
   activeIndex: number;
   styleId: string;
   onRetry: () => void;
@@ -125,41 +133,27 @@ function RouteCanvas({
     const attrib = m.getContainer().querySelector('.maplibregl-ctrl-attrib');
     attrib?.classList.add('maplibregl-compact');
     attrib?.classList.remove('maplibregl-compact-show');
-    m.on('click', ROUTE_NODE_LAYER, (e) => {
-      const f = e.features?.[0];
-      if (!f) return;
-      const [lng, lat] = (f.geometry as Point).coordinates as [number, number];
-      const el = document.createElement('div');
-      const name = document.createElement('div');
-      name.className = 'pp-popup-name';
-      name.textContent = (f.properties?.title as string) ?? '';
-      const coords = document.createElement('div');
-      coords.className = 'pp-popup-coords';
-      coords.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      el.append(name, coords);
-      new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: 10 })
-        .setLngLat([lng, lat])
-        .setDOMContent(el)
-        .addTo(m);
-    });
-    m.on('click', ROUTE_LINE_LAYER, (e) => {
-      const f = e.features?.[0];
-      // Clicking a grey inactive route selects it (Google-Maps-style); the
-      // ref is read at event time so route changes never re-subscribe.
-      const idx = f?.properties?.routeIndex;
-      if (typeof idx === 'number' && Number.isInteger(idx)) {
-        onSelectRouteRef.current(idx);
-      }
-      if (!f) return;
-      const el = document.createElement('div');
-      const name = document.createElement('div');
-      name.className = 'pp-popup-name';
-      name.textContent = (f.properties?.label as string) ?? '';
-      el.append(name);
-      new maplibregl.Popup({ closeButton: false, closeOnClick: true, offset: 10 })
-        .setLngLat([e.lngLat.lng, e.lngLat.lat])
-        .setDOMContent(el)
-        .addTo(m);
+    m.on('click', ROUTE_HIT_LAYER, (e) => {
+      const candidates = (e.features ?? []).flatMap((feature) => {
+        const routeIndex = feature.properties?.routeIndex;
+        if (
+          typeof routeIndex !== 'number' ||
+          !Number.isInteger(routeIndex) ||
+          feature.geometry.type !== 'LineString'
+        )
+          return [];
+        return [
+          {
+            routeIndex,
+            active: feature.properties?.active === true,
+            points: feature.geometry.coordinates.map((coordinate) =>
+              m.project(coordinate as [number, number]),
+            ),
+          },
+        ];
+      });
+      const index = closestRoute(e.point, candidates);
+      if (index != null) onSelectRouteRef.current(index);
     });
     const onEnter = () => {
       m.getCanvas().style.cursor = 'pointer';
@@ -167,10 +161,8 @@ function RouteCanvas({
     const onLeave = () => {
       m.getCanvas().style.cursor = '';
     };
-    m.on('mouseenter', ROUTE_NODE_LAYER, onEnter);
-    m.on('mouseleave', ROUTE_NODE_LAYER, onLeave);
-    m.on('mouseenter', ROUTE_LINE_LAYER, onEnter);
-    m.on('mouseleave', ROUTE_LINE_LAYER, onLeave);
+    m.on('mouseenter', ROUTE_HIT_LAYER, onEnter);
+    m.on('mouseleave', ROUTE_HIT_LAYER, onLeave);
     let failed = false;
     let hasLoaded = false;
     const onError = (e?: { error?: Error; sourceId?: string; tile?: unknown }) => {
@@ -207,7 +199,7 @@ function RouteCanvas({
     const map = mapRef.current;
     if (!map || !ready) return;
     const palette = traceSnrPalette();
-    const { lines, points, bounds } = routesToFeatures(paths, activeIndex, palette);
+    const { lines, points, bounds } = routesToFeatures(paths, activeIndex, palette, endpoints);
 
     if (!map.getSource(ROUTE_LINE_SOURCE))
       map.addSource(ROUTE_LINE_SOURCE, { type: 'geojson', data: lines });
@@ -226,6 +218,15 @@ function RouteCanvas({
           'line-opacity': ['case', ['get', 'active'], 0.95, 0.45],
         },
       } as LineLayerSpecification);
+    }
+    if (!map.getLayer(ROUTE_HIT_LAYER)) {
+      map.addLayer({
+        id: ROUTE_HIT_LAYER,
+        type: 'line',
+        source: ROUTE_LINE_SOURCE,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: { 'line-width': 28, 'line-opacity': 0 },
+      });
     }
     if (!map.getSource(ROUTE_NODE_SOURCE))
       map.addSource(ROUTE_NODE_SOURCE, { type: 'geojson', data: points });
@@ -289,10 +290,12 @@ function RouteCanvas({
           left: panelReserve + (isNarrow ? 24 : 60),
           right: isNarrow ? 24 : 60,
         },
-        maxZoom: IATA_ZOOM,
+        // Fit the route rather than capping at the region overview zoom.
+        // Only limit extreme zoom for colocated or very close repeaters.
+        maxZoom: paths.length > 0 || bounds.length > 1 ? 16 : 14,
       });
     }
-  }, [ready, paths, activeIndex, bottomPadding]);
+  }, [ready, paths, endpoints, activeIndex, bottomPadding]);
 
   // Always-on hop-flow overlay for the active route: a dot riding start →
   // end (same language as live mode: transmit = expanding ring, receive =
@@ -563,12 +566,14 @@ function RouteCanvas({
 
 export function RoutePlannerMapInner({
   paths,
+  endpoints,
   activeIndex,
   styleId,
   onSelectRoute,
   bottomPadding,
 }: {
   paths: PlannedRoute[];
+  endpoints: (RouteEndpoint | null)[];
   activeIndex: number;
   styleId: string;
   onSelectRoute: (index: number) => void;
@@ -579,6 +584,7 @@ export function RoutePlannerMapInner({
     <RouteCanvas
       key={`${styleId}:${attempt}`}
       paths={paths}
+      endpoints={endpoints}
       activeIndex={activeIndex}
       styleId={styleId}
       onRetry={() => setAttempt((n) => n + 1)}

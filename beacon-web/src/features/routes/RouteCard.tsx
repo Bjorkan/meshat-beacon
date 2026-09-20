@@ -6,29 +6,83 @@ import { formatSnr } from '../../lib/formatters';
 import { CopyButton } from '../../components/CopyButton';
 import { exportMeshcoreRoute } from './route-features';
 
+function LegIcon({ kind }: { kind: 'signal' | 'samples' | 'neighbor' | 'warning' }) {
+  return (
+    <svg
+      aria-hidden="true"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="mt-0.5 shrink-0"
+    >
+      {kind === 'signal' && <path d="M4 20v-4m5 4v-8m5 8V8m5 12V4" />}
+      {kind === 'samples' && <path d="M5 4h14v16H5zM8 8h8M8 12h8M8 16h4" />}
+      {kind === 'neighbor' && (
+        <>
+          <circle cx="5" cy="12" r="3" />
+          <circle cx="19" cy="12" r="3" />
+          <path d="M8 12h8m-3-3 3 3-3 3" />
+        </>
+      )}
+      {kind === 'warning' && (
+        <>
+          <path d="m12 3 10 18H2L12 3Zm0 5v5" />
+          <path d="M12 17h.01" />
+        </>
+      )}
+    </svg>
+  );
+}
+
 export function LegRow({ leg }: { leg: PlannedRouteLeg }) {
   const { t } = useTranslation();
   return (
-    <div className="ml-2 space-y-1 border-l border-border py-2 pl-4 text-xs text-text-muted">
-      <p className="tabular-nums">
-        {leg.unmeasured
-          ? t('routes.unmeasuredLeg')
-          : leg.snr != null
-            ? `${formatSnr(leg.snr)} dB`
-            : t('routes.legNoSnr')}
-      </p>
-      {leg.unmeasured && leg.snr != null && (
-        <p>{t('routes.lastKnownSnr', { snr: formatSnr(leg.snr) })}</p>
-      )}
+    <div className="space-y-3 border-y border-border-subtle py-3 text-xs leading-relaxed text-text-muted">
+      <div className="flex items-start gap-2.5">
+        <LegIcon kind="signal" />
+        <div className="min-w-0">
+          <p className="mb-0.5 text-[11px]">{t('routes.signalSnr')}</p>
+          <p className="text-sm font-medium tabular-nums text-text-bright">
+            {leg.unmeasured
+              ? t('routes.unmeasuredLeg')
+              : leg.snr != null
+                ? `${formatSnr(leg.snr)} dB`
+                : t('routes.legNoSnr')}
+          </p>
+          {leg.unmeasured && leg.snr != null && (
+            <p className="mt-1">{t('routes.lastKnownSnr', { snr: formatSnr(leg.snr) })}</p>
+          )}
+        </div>
+      </div>
       {leg.snrSampleCount > 0 && leg.snrLastSeen > 0 && (
-        <p>
-          {t('routes.snrSamples', { count: leg.snrSampleCount })}
-          {' · '}
-          <Timestamp value={leg.snrLastSeen} static />
+        <div className="flex items-start gap-2.5">
+          <LegIcon kind="samples" />
+          <div className="min-w-0">
+            <p>{t('routes.snrSamples', { count: leg.snrSampleCount })}</p>
+            <p className="mt-0.5 flex flex-wrap gap-x-1">
+              <span>{t('routes.lastSample')}</span>
+              <Timestamp value={leg.snrLastSeen} static />
+            </p>
+          </div>
+        </div>
+      )}
+      {leg.unseen && (
+        <p className="flex items-start gap-2.5 text-warn">
+          <LegIcon kind="warning" />
+          <span>{t('routes.unseenLeg')}</span>
         </p>
       )}
-      {leg.unseen && <p className="text-warn">{t('routes.unseenLeg')}</p>}
-      {leg.neighbor && <p>{t('routes.neighborDirection')}</p>}
+      {leg.neighbor && (
+        <p className="flex items-start gap-2.5">
+          <LegIcon kind="neighbor" />
+          <span>{t('routes.neighborDirection')}</span>
+        </p>
+      )}
     </div>
   );
 }
@@ -120,24 +174,38 @@ export function RouteCard({
       <div id={detailsId} hidden={!expanded} data-route-details className="cursor-auto">
         {expanded && (
           <>
-            <ol className="mt-3 border-t border-border-subtle pt-2">
+            <ol className="mt-4 border-t border-border-subtle pt-4">
               {route.nodes.map((node, i) => (
-                <li key={`${node.publicKey}-${i}`}>
+                <li key={`${node.publicKey}-${i}`} className="relative pl-8">
+                  {i < route.nodes.length - 1 && (
+                    <span
+                      aria-hidden
+                      className="absolute -bottom-6 left-[7px] top-6 w-0.5 bg-primary/50"
+                    />
+                  )}
+                  <span
+                    aria-hidden
+                    className={`absolute left-0 top-4 h-4 w-4 rounded-full border-2 border-primary ${i === route.nodes.length - 1 ? 'bg-primary' : 'bg-bg-base'}`}
+                  />
                   <button
                     type="button"
                     aria-label={t('routes.openNode', { name: nodeName(node) })}
-                    className="min-h-9 w-full rounded py-1 text-left text-[13px] hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
+                    className="flex min-h-12 w-full flex-col items-start justify-center gap-0.5 rounded py-2 text-left text-sm text-text-bright hover:text-primary focus-visible:outline-2 focus-visible:outline-primary"
                     onClick={() => onOpenNode(node.id)}
                   >
-                    <span className="break-words font-semibold">{nodeName(node)}</span>
+                    <span className="w-full break-words font-semibold">{nodeName(node)}</span>
                     {node.name && (
-                      <span className="ml-2 inline-block font-mono text-[11px] text-text-muted">
+                      <span className="font-mono text-[11px] font-normal tracking-wide text-text-muted">
                         {node.publicKey.slice(0, 6).toUpperCase()}
                       </span>
                     )}
                   </button>
                   {node.stale && <p className="pb-1 text-xs text-warn">{t('routes.staleNode')}</p>}
-                  {route.legs[i] && <LegRow leg={route.legs[i]} />}
+                  {route.legs[i] && (
+                    <div className="pb-4 pt-2">
+                      <LegRow leg={route.legs[i]} />
+                    </div>
+                  )}
                 </li>
               ))}
             </ol>

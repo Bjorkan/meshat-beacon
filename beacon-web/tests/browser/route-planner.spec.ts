@@ -367,6 +367,95 @@ for (const viewport of [
       await session?.detach();
     });
 
+    test('shows a single selected or restored node before requesting routes and removes it on clear', async ({
+      page,
+    }, testInfo) => {
+      await mockApi(page);
+      let routeRequests = 0;
+      page.on('request', (request) => {
+        if (request.url().includes('/routes/best')) routeRequests++;
+      });
+      for (const endpoint of ['from', 'to']) {
+        if (endpoint === 'from') {
+          await page.goto('/routes');
+          await page.getByRole('combobox', { name: 'From', exact: true }).fill('alp');
+          await page.getByRole('option', { name: /Alpha/ }).click();
+        } else {
+          await page.goto(`/routes?to=${TO}`);
+          await expect(page.getByRole('combobox', { name: 'To', exact: true })).toHaveValue('Beta');
+        }
+        await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
+        await expect(page.locator('.maplibregl-canvas')).toBeVisible();
+        const map = (await page.getByTestId('route-map').boundingBox())!;
+        const sheet = (await page.getByTestId('route-sheet').boundingBox())!;
+        const left = viewport.hasTouch ? 24 : 460;
+        const right = viewport.hasTouch ? 24 : 60;
+        const top = viewport.hasTouch ? 160 : 60;
+        const bottom = viewport.hasTouch ? sheet.height + 24 : 60;
+        const x = map.x + (left + map.width - right) / 2;
+        const y = map.y + (top + map.height - bottom) / 2;
+        await page.waitForTimeout(1000);
+        await page.mouse.click(x, y);
+        await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+        await expect(page.getByRole('article')).toHaveCount(0);
+        expect(routeRequests).toBe(0);
+        await page.screenshot({
+          path: testInfo.outputPath(`${viewport.name}-${endpoint}-preview.png`),
+        });
+        await page.getByRole('button', { name: 'Clear', exact: true }).click();
+        await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+      }
+    });
+
+    test('fits all route nodes and selects an alternative near its line without a popup', async ({
+      page,
+    }) => {
+      // Separate the alternatives enough to test an off-line touch target.
+      const result = structuredClone(best);
+      result.paths[1].nodes[1].longitude = 16.47;
+      await mockApi(page, result);
+      await page.goto(`/routes?from=${FROM}&to=${TO}`);
+      await expect(page.getByRole('article')).toHaveCount(2);
+      await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
+      await expect(page.locator('.maplibregl-canvas')).toBeVisible();
+      const map = (await page.getByTestId('route-map').boundingBox())!;
+      const sheet = (await page.getByTestId('route-sheet').boundingBox())!;
+      // Expected positions when the node bounds fill the unobscured map.
+      // The former region zoom cap leaves the lines far from these positions.
+      const left = viewport.hasTouch ? 24 : 460;
+      const right = viewport.hasTouch ? 24 : 60;
+      const top = viewport.hasTouch ? 160 : 60;
+      const bottom = viewport.hasTouch ? sheet.height + 24 : 60;
+      const width = map.width - left - right;
+      const height = map.height - top - bottom;
+      const mercatorY = (lat: number) =>
+        (-Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360)) * 180) / Math.PI;
+      const minY = mercatorY(59.61);
+      const maxY = mercatorY(59.6);
+      const scale = Math.min(width / (16.52 - 16.47), height / (maxY - minY));
+      const project = (lng: number, lat: number) => ({
+        x: map.x + left + width / 2 + (lng - (16.47 + 16.52) / 2) * scale,
+        y: map.y + top + height / 2 + (mercatorY(lat) - (minY + maxY) / 2) * scale,
+      });
+      const from = project(16.5, 59.6);
+      const mid = project(16.47, 59.605);
+      const dx = mid.x - from.x;
+      const dy = mid.y - from.y;
+      const length = Math.hypot(dx, dy);
+      const x = (from.x + mid.x) / 2 - (9 * dy) / length;
+      const y = (from.y + mid.y) / 2 + (9 * dx) / length;
+      // Allow the initial camera animation to settle, then tap 9px off the
+      // 2px visible line: inside its touch target but outside its paint.
+      await page.waitForTimeout(1000);
+      if (viewport.hasTouch) await page.touchscreen.tap(x, y);
+      else await page.mouse.click(x, y);
+      await expect(page).toHaveURL(/alt=1/);
+      await expect(
+        page.getByRole('button', { name: 'Show Alternative 1 on the map' }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(page.locator('.maplibregl-popup')).toHaveCount(0);
+    });
+
     test('route planner selects the card body without expanding details', async ({
       page,
     }, testInfo) => {

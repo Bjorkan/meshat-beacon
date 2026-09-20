@@ -340,6 +340,8 @@
     "staleNodes_other": "{{count}} noder med inaktuella uppgifter",
     "moreNodes_one": "… {{count}} nod till …",
     "moreNodes_other": "… {{count}} noder till …",
+    "signalSnr": "Signalstyrka · SNR",
+    "lastSample": "Senaste mätning:",
     "lastKnownSnr": "Senast kända SNR: {{snr}} dB",
     "snrSamples_one": "{{count}} SNR-prov",
     "snrSamples_other": "{{count}} SNR-prover",

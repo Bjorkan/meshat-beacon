@@ -20,7 +20,7 @@ export interface PlannedNodeProps {
   endpoint: 'start' | 'end' | 'mid';
 }
 
-function nodeLabel(n: { name?: string; publicKey: string }): string {
+function nodeLabel(n: { name?: string | null; publicKey: string }): string {
   return n.name ?? n.publicKey.slice(0, 6).toUpperCase();
 }
 
@@ -79,10 +79,18 @@ export function plannedRouteToMeshcore(route: PlannedRoute): string | null {
   return res.ok ? res.value : null;
 }
 
+export interface RouteEndpoint {
+  publicKey: string;
+  name: string | null;
+  lat: number | null;
+  lng: number | null;
+}
+
 export function routesToFeatures(
   paths: PlannedRoute[],
   activeIndex: number,
   palette: TraceSnrPalette,
+  endpoints: (RouteEndpoint | null)[] = [],
 ): {
   lines: FeatureCollection<LineString, PlannedLegProps>;
   points: FeatureCollection<Point, PlannedNodeProps>;
@@ -123,17 +131,16 @@ export function routesToFeatures(
           ],
         },
       });
-      bounds.push([from.longitude, from.latitude]);
     });
-    const last = path.nodes[path.nodes.length - 1];
-    if (last && last.latitude != null && last.longitude != null)
-      bounds.push([last.longitude, last.latitude]);
     const seen = new Set<string>();
     path.nodes.forEach((n: PlannedRouteNode, i: number) => {
       if (n.latitude == null || n.longitude == null) return;
       const key = n.publicKey.toLowerCase();
       if (seen.has(key)) return;
       seen.add(key);
+      // Camera bounds must include every displayed node, even if a leg is
+      // missing coordinates or belongs to an inactive alternative.
+      bounds.push([n.longitude, n.latitude]);
       points.push({
         type: 'Feature',
         properties: {
@@ -147,6 +154,26 @@ export function routesToFeatures(
       });
     });
   });
+  // Show selected endpoints immediately, including while planning or when
+  // no route is found. Never draw a speculative connecting line.
+  if (paths.length === 0) {
+    endpoints.forEach((node, i) => {
+      if (node == null || node.lat == null || node.lng == null) return;
+      const coordinate: [number, number] = [node.lng, node.lat];
+      bounds.push(coordinate);
+      points.push({
+        type: 'Feature',
+        properties: {
+          routeIndex: -1,
+          active: true,
+          label: nodeLabel(node),
+          title: node.name ?? node.publicKey,
+          endpoint: i === 0 ? 'start' : 'end',
+        },
+        geometry: { type: 'Point', coordinates: coordinate },
+      });
+    });
+  }
   // alternatives under the active route: draw inactive routes first so the
   // active route paints on top. Active features sort last (source order =
   // paint order for the single line layer — and for coincident point
@@ -170,4 +197,38 @@ export function plannedRouteCoords(path: PlannedRoute): [number, number][] {
     out.push([n.longitude, n.latitude]);
   }
   return out;
+}
+
+// Pick the nearest visible line in screen pixels, independent of draw order.
+// For coincident lines, prefer an alternative so the active line cannot block it.
+export function closestRoute(
+  point: { x: number; y: number },
+  candidates: { routeIndex: number; active: boolean; points: { x: number; y: number }[] }[],
+): number | null {
+  let nearest: { routeIndex: number; active: boolean; distance: number } | null = null;
+  for (const candidate of candidates) {
+    for (let i = 1; i < candidate.points.length; i++) {
+      const start = candidate.points[i - 1]!;
+      const end = candidate.points[i]!;
+      const dx = end.x - start.x;
+      const dy = end.y - start.y;
+      const lengthSquared = dx * dx + dy * dy;
+      const t =
+        lengthSquared === 0
+          ? 0
+          : Math.max(
+              0,
+              Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared),
+            );
+      const distance = Math.hypot(point.x - start.x - t * dx, point.y - start.y - t * dy);
+      if (
+        !nearest ||
+        distance < nearest.distance - 0.5 ||
+        (Math.abs(distance - nearest.distance) <= 0.5 && nearest.active && !candidate.active)
+      ) {
+        nearest = { routeIndex: candidate.routeIndex, active: candidate.active, distance };
+      }
+    }
+  }
+  return nearest?.routeIndex ?? null;
 }

@@ -340,6 +340,8 @@
     "staleNodes_other": "{{count}} nodes with outdated information",
     "moreNodes_one": "… {{count}} more node …",
     "moreNodes_other": "… {{count}} more nodes …",
+    "signalSnr": "Signal strength · SNR",
+    "lastSample": "Last measured:",
     "lastKnownSnr": "Last known SNR: {{snr}} dB",
     "snrSamples_one": "{{count}} SNR sample",
     "snrSamples_other": "{{count}} SNR samples",

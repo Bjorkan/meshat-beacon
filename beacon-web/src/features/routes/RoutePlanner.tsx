@@ -43,42 +43,49 @@ function RoutePlanner() {
   const { data: toNode } = useQuery({
     ...routeQueries.byPubkey(urlTo && !to ? urlTo : null),
   });
-  const urlFromPick: NodePick | null | undefined =
-    urlFrom == null || from
-      ? undefined
-      : fromNode === undefined
+  const urlFromPick: NodePick | null | undefined = useMemo(
+    () =>
+      urlFrom == null || from
         ? undefined
-        : fromNode != null &&
-            fromNode.nodeType === 2 &&
-            fromNode.lat != null &&
-            fromNode.lng != null
-          ? {
-              publicKey: fromNode.publicKey.toLowerCase(),
-              name: fromNode.name,
-              lat: fromNode.lat,
-              lng: fromNode.lng,
-              nodeType: fromNode.nodeType,
-            }
-          : null;
-  const urlToPick: NodePick | null | undefined =
-    urlTo == null || to
-      ? undefined
-      : toNode === undefined
+        : fromNode === undefined
+          ? undefined
+          : fromNode != null &&
+              fromNode.nodeType === 2 &&
+              fromNode.lat != null &&
+              fromNode.lng != null
+            ? {
+                publicKey: fromNode.publicKey.toLowerCase(),
+                name: fromNode.name,
+                lat: fromNode.lat,
+                lng: fromNode.lng,
+                nodeType: fromNode.nodeType,
+              }
+            : null,
+    [urlFrom, from, fromNode],
+  );
+  const urlToPick: NodePick | null | undefined = useMemo(
+    () =>
+      urlTo == null || to
         ? undefined
-        : toNode != null && toNode.nodeType === 2 && toNode.lat != null && toNode.lng != null
-          ? {
-              publicKey: toNode.publicKey.toLowerCase(),
-              name: toNode.name,
-              lat: toNode.lat,
-              lng: toNode.lng,
-              nodeType: toNode.nodeType,
-            }
-          : null;
+        : toNode === undefined
+          ? undefined
+          : toNode != null && toNode.nodeType === 2 && toNode.lat != null && toNode.lng != null
+            ? {
+                publicKey: toNode.publicKey.toLowerCase(),
+                name: toNode.name,
+                lat: toNode.lat,
+                lng: toNode.lng,
+                nodeType: toNode.nodeType,
+              }
+            : null,
+    [urlTo, to, toNode],
+  );
   const urlFromInvalid = urlFrom != null && !from && fromNode !== undefined && urlFromPick == null;
   const urlToInvalid = urlTo != null && !to && toNode !== undefined && urlToPick == null;
   const urlEndpointInvalid = urlFromInvalid || urlToInvalid;
   const resolvedFrom: NodePick | null = from ?? urlFromPick ?? null;
   const resolvedTo: NodePick | null = to ?? urlToPick ?? null;
+  const endpoints = useMemo(() => [resolvedFrom, resolvedTo], [resolvedFrom, resolvedTo]);
   const shownActive = urlAlt;
 
   const pair =
@@ -140,6 +147,7 @@ function RoutePlanner() {
         >
           <RoutePlannerMapLazy
             paths={paths}
+            endpoints={endpoints}
             activeIndex={active}
             styleId={styleId}
             onSelectRoute={selectAlt}
