@@ -37,10 +37,14 @@ export function useStatsOverview() {
 }
 
 export function useStatsObservations(range: StatsRange) {
-  const { iatas, regionKey } = useRegion();
+  const { iatas, regionKey, isResolved } = useRegion();
   return useQuery({
-    queryKey: ["stats-observations", regionKey, range],
-    queryFn: () => getStatsObservations(iatas, sinceFor(range)),
+    queryKey: ["stats-observations", isResolved === false ? `${regionKey}:pending` : regionKey, range],
+    enabled: isResolved !== false,
+    queryFn: ({ signal }) => {
+      if (isResolved === false) throw new Error("Selected region is not available yet");
+      return getStatsObservations(iatas, sinceFor(range), signal);
+    },
     ...common,
     // feeds the observations chart + sparklines and gets no WS bumps, so refetch to stay fresh
     refetchInterval: 60_000,
@@ -121,11 +125,17 @@ export function useClockDrift(limit = 100) {
   });
 }
 
-// scopes are reported globally by the backend (no region filter), so the key is region-independent
+// Scope counts have no time window, but the selected region changes their membership.
 export function useScopes() {
+  const { iatas, regionKey, isResolved } = useRegion();
   return useQuery({
-    queryKey: ["stats-scopes"],
-    queryFn: getStatsScopes,
+    queryKey: ["stats-scopes", isResolved === false ? `${regionKey}:pending` : regionKey],
+    enabled: isResolved !== false,
+    queryFn: ({ signal }) => {
+      if (isResolved === false) throw new Error("Selected region is not available yet");
+      return getStatsScopes(iatas, signal);
+    },
     ...common,
+    refetchInterval: 60_000,
   });
 }
