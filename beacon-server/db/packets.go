@@ -377,18 +377,21 @@ func (s *Store) GetPacket(ctx context.Context, packetHash []byte) (*api.Packet, 
 			Ciphertext       string `json:"ciphertext"`
 			CiphertextLength int    `json:"ciphertextLength"`
 			Decrypted        *struct {
-				Sender  string `json:"sender"`
-				Content string `json:"content"`
-				SentAt  int64  `json:"sentAt"`
+				ChannelID *int32 `json:"channelId,omitempty"`
+				Sender    string `json:"sender"`
+				Content   string `json:"content"`
+				SentAt    int64  `json:"sentAt"`
 			} `json:"decrypted"`
 		}
 		if err := json.Unmarshal(row.ParsedPayload, &base); err == nil {
 			base.Decrypted = &struct {
-				Sender  string `json:"sender"`
-				Content string `json:"content"`
-				SentAt  int64  `json:"sentAt"`
+				ChannelID *int32 `json:"channelId,omitempty"`
+				Sender    string `json:"sender"`
+				Content   string `json:"content"`
+				SentAt    int64  `json:"sentAt"`
 			}{
-				Sender: *row.CmSenderName,
+				ChannelID: row.CmChannelID,
+				Sender:    *row.CmSenderName,
 				Content: func() string {
 					if row.CmContent != nil {
 						return *row.CmContent

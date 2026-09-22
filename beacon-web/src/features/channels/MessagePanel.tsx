@@ -1,4 +1,5 @@
-import { useMemo, useRef, useLayoutEffect, useState, useCallback } from 'react';
+import { useMemo, useRef, useLayoutEffect, useEffect, useState, useCallback } from 'react';
+import type { Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { channelQueries } from '../../api/queries';
@@ -24,16 +25,22 @@ function MessageRow({
   msg,
   heardCount,
   onAnalyze,
+  highlighted,
+  targetRef,
 }: {
   msg: ChannelMessage;
   heardCount?: number;
   onAnalyze?: (hash: string) => void;
+  highlighted?: boolean;
+  targetRef?: Ref<HTMLDivElement>;
 }) {
   // REST carries the server-side total; the live WS counter augments it during the session
   const reach = Math.max(msg.observationCount ?? 0, heardCount ?? 0);
   return (
     <div
-      className={`px-3 py-2${onAnalyze ? ' cursor-pointer hover:bg-bg-surface transition-colors' : ''}`}
+      ref={targetRef}
+      data-highlighted={highlighted || undefined}
+      className={`px-3 py-2${highlighted ? ' bg-primary/10 ring-1 ring-inset ring-primary/40' : ''}${onAnalyze ? ' cursor-pointer hover:bg-bg-surface transition-colors' : ''}`}
       onClick={onAnalyze ? () => onAnalyze(msg.packetHash) : undefined}
     >
       <div className="flex items-baseline gap-2">
@@ -51,6 +58,7 @@ function MessageRow({
 }
 
 interface MessagePanelProps {
+  targetMessageHash?: string;
   channel: ChannelSummary | null;
   suggestedChannel?: ChannelSummary;
   onSelectChannel?: (id: number) => void;
@@ -71,6 +79,7 @@ export function MessagePanel({
   regionKey,
   onAnalyze,
   onBack,
+  targetMessageHash,
 }: MessagePanelProps) {
   const { t } = useTranslation();
   const {
@@ -98,6 +107,18 @@ export function MessagePanel({
   );
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  const targetRef = useRef<HTMLDivElement>(null);
+  const visitedTarget = useRef<string | null>(null);
+  const targetKey = targetMessageHash ? `${regionKey}:${channel?.id}:${targetMessageHash}` : null;
+  const targetFound = sorted.some((msg) => msg.packetHash === targetMessageHash);
+
+  // Follow the existing history cursors until the linked message is present, including
+  // when it is older than the first page. Pause on errors so retry stays user-controlled.
+  useEffect(() => {
+    if (targetMessageHash && !targetFound && hasNextPage && !isFetching && !isError) {
+      void fetchNextPage();
+    }
+  }, [targetMessageHash, targetFound, hasNextPage, isFetching, isError, fetchNextPage]);
   const [userScrolled, setUserScrolled] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollAnchor = useRef<{ channelId?: number; count: number }>({ count: 0 });
@@ -118,6 +139,20 @@ export function MessagePanel({
   useLayoutEffect(() => {
     const el = scrollContainerRef.current;
     const anchor = scrollAnchor.current;
+
+    if (targetKey && visitedTarget.current !== targetKey) {
+      if (targetRef.current) {
+        targetRef.current.scrollIntoView({ block: 'center' });
+        visitedTarget.current = targetKey;
+        anchor.channelId = channel?.id;
+        anchor.count = sorted.length;
+        prepend.current.pending = false;
+        setUserScrolled(true);
+      }
+      // Loading more history must not jump to the bottom while seeking the target.
+      return;
+    }
+    if (!targetKey) visitedTarget.current = null;
 
     if (anchor.channelId !== channel?.id) {
       // first batch for this channel — jump to the bottom once it lands
@@ -142,7 +177,7 @@ export function MessagePanel({
       bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); // live message arrived; follow it down
     }
     anchor.count = sorted.length;
-  }, [sorted.length, channel?.id, isLoading, userScrolled]);
+  }, [sorted.length, channel?.id, isLoading, userScrolled, targetKey, targetFound]);
 
   const loadOlder = useCallback(() => {
     const el = scrollContainerRef.current;
@@ -248,6 +283,11 @@ export function MessagePanel({
         ref={scrollContainerRef}
         onScroll={handleScroll}
       >
+        {targetMessageHash && !targetFound && !isLoading && !isError && !hasNextPage && (
+          <div role="status" className="px-3 py-2 text-xs text-text-muted">
+            {t('channels.messageNotFound')}
+          </div>
+        )}
         {isLoading ? (
           <div className="flex items-center justify-center h-32 text-text-muted text-xs font-mono">
             {t('common.loading')}
@@ -260,6 +300,8 @@ export function MessagePanel({
                 msg={msg}
                 heardCount={heardCounts[msg.packetHash]}
                 onAnalyze={onAnalyze}
+                highlighted={msg.packetHash === targetMessageHash}
+                targetRef={msg.packetHash === targetMessageHash ? targetRef : undefined}
               />
             ))}
             <div ref={bottomRef} />

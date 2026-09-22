@@ -5,6 +5,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -704,5 +705,42 @@ func TestListPackets_PassesObserverAndSearchFilters(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestGetPacket_GroupTextChannelLink(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	mock := mockdb.NewMockQuerier(ctrl)
+	packetHash := []byte{0xaa, 0x11}
+	heardAt := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
+	sender, content, broker := "Alice", "Hello\nworld", "mqtt://test"
+	channelID := int32(42)
+	mock.EXPECT().GetPacketByHash(gomock.Any(), packetHash).Return(sqlc.GetPacketByHashRow{
+		PacketHash: packetHash, PayloadType: 5, ParsedPayload: []byte(`{"type":"group_text"}`),
+		FirstHeardAt: heardAt, LastHeardAt: heardAt,
+		CmSenderName: &sender, CmContent: &content, CmSentAt: heardAt, CmChannelID: &channelID,
+	}, nil)
+	mock.EXPECT().ListObservationsForPacket(gomock.Any(), packetHash).Return([]sqlc.ListObservationsForPacketRow{
+		{ID: 1, HeardAt: heardAt, Iata: "YVR", SourceBroker: &broker},
+	}, nil)
+	store := &Store{q: mock}
+	packet, err := store.GetPacket(context.Background(), packetHash)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var payload struct {
+		Decrypted struct {
+			ChannelID int32  `json:"channelId"`
+			Sender    string `json:"sender"`
+			Content   string `json:"content"`
+			SentAt    int64  `json:"sentAt"`
+		} `json:"decrypted"`
+	}
+	if err := json.Unmarshal(packet.ParsedPayload, &payload); err != nil {
+		t.Fatal(err)
+	}
+	got := payload.Decrypted
+	if got.ChannelID != channelID || got.Sender != sender || got.Content != content || got.SentAt != heardAt.Time.UnixMilli() {
+		t.Fatalf("unexpected channel message: %+v", got)
 	}
 }

@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { createMemoryHistory } from '@tanstack/react-router';
 import { App } from '../src/App';
+import { getChannelMessagesPage } from '../src/api/client';
+import { queryClient } from '../src/api/query-client';
 import { createAppRouter } from '../src/router';
 import type { PacketSummary, PacketDetail } from '../src/types/api';
 
@@ -48,8 +50,16 @@ vi.mock('../src/api/client', () => ({
   getRegion: async () => ({ id: 0, slug: '', displayName: '', iatas: [] }),
   getIatas: async () => [],
   getScopes: async () => [],
-  getChannels: async () => [],
-  getChannelMessagesPage: async () => ({ items: [], nextCursor: null, hasMore: false }),
+  getChannels: async () => ({ items: [], nextCursor: null, hasMore: false, unknownCount: 0 }),
+  getChannel: async (id: number) => ({
+    id,
+    name: 'Linked channel',
+    channelHash: '11',
+    keyKnown: true,
+    kind: 'hashtag',
+    lastSeen: 1000,
+  }),
+  getChannelMessagesPage: vi.fn(async () => ({ items: [], nextCursor: null, hasMore: false })),
 }));
 
 const packet: PacketSummary = {
@@ -93,6 +103,8 @@ const detail = {
   ],
 } as unknown as PacketDetail;
 
+let currentDetail = detail;
+
 vi.mock('../src/features/packets/usePackets', () => ({
   usePackets: () => ({
     allPackets: [packet],
@@ -114,7 +126,7 @@ vi.mock('../src/features/packets/usePackets', () => ({
 
 vi.mock('../src/features/packets/usePacketDetail', () => ({
   usePacketDetail: (hash: string | null) => ({
-    data: hash === 'AA11' ? detail : undefined,
+    data: hash === 'AA11' ? currentDetail : undefined,
     isLoading: false,
     isError: false,
     refetch: () => {},
@@ -181,6 +193,11 @@ function setMobile(matches: boolean) {
 }
 
 beforeEach(() => {
+  currentDetail = detail;
+  queryClient.clear();
+  vi.mocked(getChannelMessagesPage)
+    .mockReset()
+    .mockResolvedValue({ items: [], nextCursor: null, hasMore: false });
   vi.stubGlobal('localStorage', {
     getItem: () => null,
     setItem: () => {},
@@ -252,4 +269,83 @@ describe('leaving the Packets tab', () => {
 
     await waitFor(() => expect(screen.getByTestId('packet-analyzer-drawer')).toBeInTheDocument());
   });
+});
+
+it.each([false, true])(
+  'opens the exact channel and scrolls to an older packet message (mobile=%s)',
+  async (mobile) => {
+    setMobile(mobile);
+    const scroll = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scroll;
+    currentDetail = {
+      ...detail,
+      header: { ...detail.header, payloadType: 5 },
+      parsedPayload: {
+        decrypted: { sender: 'Alice', content: 'Linked message', sentAt: 1000, channelId: 42 },
+      },
+    };
+    const getPage = vi.mocked(getChannelMessagesPage);
+    getPage
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 2,
+            packetHash: 'bb22',
+            channelHash: '11',
+            senderName: 'Bob',
+            content: 'Newer message',
+            sentAt: 2000,
+          },
+        ],
+        nextCursor: 2,
+        hasMore: true,
+      })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: 1,
+            packetHash: 'aa11',
+            channelHash: '11',
+            senderName: 'Alice',
+            content: 'Linked message',
+            sentAt: 1000,
+          },
+        ],
+        nextCursor: null,
+        hasMore: false,
+      });
+    const router = renderApp('/packets?hash=AA11');
+    expect(await screen.findByText('Linked message')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('link', { name: 'Open in Channels' }));
+    await waitFor(() => expect(router.state.location.pathname).toBe('/channels'));
+    expect(router.state.location.search).toMatchObject({ channel: '42', message: 'aa11' });
+    expect(router.state.location.search.analyze).toBeUndefined();
+    expect(await screen.findByText('Newer message')).toBeInTheDocument();
+    const message = await screen.findByText('Linked message');
+    expect(message.closest('[data-highlighted]')).toHaveAttribute('data-highlighted', 'true');
+    expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+    expect(getPage).toHaveBeenLastCalledWith(42, { iatas: undefined, cursor: 2 });
+  },
+);
+
+it('restores a channel message directly from its URL', async () => {
+  window.HTMLElement.prototype.scrollIntoView = vi.fn();
+  vi.mocked(getChannelMessagesPage).mockResolvedValueOnce({
+    items: [
+      {
+        id: 1,
+        packetHash: 'cc33',
+        channelHash: '11',
+        senderName: 'Alice',
+        content: 'Restored message',
+        sentAt: 1000,
+      },
+    ],
+    nextCursor: null,
+    hasMore: false,
+  });
+  renderApp('/channels?channel=43&message=CC33');
+  const message = await screen.findByText('Restored message');
+  expect(message.closest('[data-highlighted]')).toHaveAttribute('data-highlighted', 'true');
+  expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' });
 });

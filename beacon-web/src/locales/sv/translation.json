@@ -189,6 +189,7 @@
     "client": "Klient"
   },
   "channels": {
+    "messageNotFound": "Meddelandet finns inte i kanalens tillgängliga historik för valt område.",
     "open": "Öppna {{name}}",
     "select": "Välj en kanal",
     "back": "Tillbaka till kanaler",
@@ -465,6 +466,7 @@
     "other": "Övrigt"
   },
   "packets": {
+    "openInChannels": "Öppna i Kanaler",
     "noPackets": "Inga paket",
     "noMatchesHint": "Inga paket matchar sökningen och de valda filtren. Rensa filtren för att visa paket i det valda området.",
     "noun": "paket",

@@ -48,6 +48,18 @@ export function ChannelsRoute() {
       onAnalyze={overlays.analyze}
       viewState={viewState}
       onViewStateChange={onViewStateChange}
+      selectedChannelId={search.channel}
+      targetMessageHash={search.message}
+      onSelectedChannelChange={(channel) => {
+        navigate({
+          to: '.',
+          search: (prev) => ({
+            ...prev,
+            channel: channel ?? undefined,
+            message: undefined,
+          }),
+        });
+      }}
     />
   );
 }

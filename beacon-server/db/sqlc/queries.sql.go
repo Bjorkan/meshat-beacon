@@ -913,7 +913,8 @@ const getPacketByHash = `-- name: GetPacketByHash :one
 SELECT p.packet_hash, p.payload_type, p.payload_version, p.route_type, p.transport_codes_present, p.region_code, p.sub_region_code, p.scope_id, p.origin_pubkey, p.raw_payload, p.raw_header, p.parsed_payload, p.decrypted, p.channel_hash, p.trace_tag, p.first_heard_at, p.last_heard_at, ts.name AS scope_name,
     cm.sender_name AS cm_sender_name,
     cm.content AS cm_content,
-    cm.sent_at AS cm_sent_at
+    cm.sent_at AS cm_sent_at,
+    cm.channel_id AS cm_channel_id
 FROM packets p
 LEFT JOIN transport_scopes ts ON ts.id = p.scope_id
 LEFT JOIN channel_messages cm ON cm.packet_hash = p.packet_hash
@@ -942,6 +943,7 @@ type GetPacketByHashRow struct {
 	CmSenderName          *string            `json:"cm_sender_name"`
 	CmContent             *string            `json:"cm_content"`
 	CmSentAt              pgtype.Timestamptz `json:"cm_sent_at"`
+	CmChannelID           *int32             `json:"cm_channel_id"`
 }
 
 func (q *Queries) GetPacketByHash(ctx context.Context, packetHash []byte) (GetPacketByHashRow, error) {
@@ -969,6 +971,7 @@ func (q *Queries) GetPacketByHash(ctx context.Context, packetHash []byte) (GetPa
 		&i.CmSenderName,
 		&i.CmContent,
 		&i.CmSentAt,
+		&i.CmChannelID,
 	)
 	return i, err
 }

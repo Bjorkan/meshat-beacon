@@ -402,7 +402,8 @@ WHERE p.packet_hash = v.packet_hash;
 SELECT p.*, ts.name AS scope_name,
     cm.sender_name AS cm_sender_name,
     cm.content AS cm_content,
-    cm.sent_at AS cm_sent_at
+    cm.sent_at AS cm_sent_at,
+    cm.channel_id AS cm_channel_id
 FROM packets p
 LEFT JOIN transport_scopes ts ON ts.id = p.scope_id
 LEFT JOIN channel_messages cm ON cm.packet_hash = p.packet_hash

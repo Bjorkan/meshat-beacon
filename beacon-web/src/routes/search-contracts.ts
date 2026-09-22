@@ -59,6 +59,8 @@ export function validateObserversSearch(search: Record<string, unknown>): Observ
 }
 
 export interface ChannelsSearch {
+  channel?: number;
+  message?: string;
   cq?: string;
   csf?: 'name' | 'hash';
   ck?: 'known' | 'unknown';
@@ -66,7 +68,14 @@ export interface ChannelsSearch {
 }
 
 export function validateChannelsSearch(search: Record<string, unknown>): ChannelsSearch {
+  const channel = Number(search.channel);
   return {
+    channel:
+      Number.isInteger(channel) && channel > 0 && channel <= 2147483647 ? channel : undefined,
+    message:
+      typeof search.message === 'string' && /^[0-9a-f]+$/i.test(search.message)
+        ? search.message.toLowerCase()
+        : undefined,
     cq: searchString(search.cq),
     csf: oneOf(search.csf, ['name', 'hash'] as const),
     ck: oneOf(search.ck, ['known', 'unknown'] as const),

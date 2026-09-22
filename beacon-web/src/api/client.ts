@@ -37,6 +37,7 @@ import {
   ApiError,
   rawGetBrokers,
   rawGetChannels,
+  rawGetChannelsChannelID,
   rawGetChannelsChannelIDMessages,
   rawGetIatas,
   rawGetNodes,
@@ -242,6 +243,10 @@ export function getRegions(): Promise<RegionSummary[]> {
 
 export function getRegion(regionId: number): Promise<Region> {
   return rawGetRegionsRegionId({ regionId });
+}
+
+export async function getChannel(id: number): Promise<ChannelSummary> {
+  return toChannelSummary(await rawGetChannelsChannelID({ channelID: id }));
 }
 
 export async function getChannels(params?: {

@@ -250,3 +250,15 @@ describe('PacketExpansion', () => {
     expect(onViewPath).toHaveBeenCalledTimes(1);
   });
 });
+
+it('does not offer a channel link for group text without a known message', () => {
+  usePacketDetail.mockReturnValue({
+    data: {
+      ...detailWithPath(),
+      header: { ...header(), payloadType: PayloadType.GROUP_TEXT },
+      parsedPayload: { type: 'group_text', ciphertext: 'abcdef' },
+    },
+  });
+  render(<PacketExpansion {...props} />);
+  expect(screen.queryByRole('link', { name: 'Open in Channels' })).not.toBeInTheDocument();
+});

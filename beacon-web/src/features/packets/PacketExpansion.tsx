@@ -7,6 +7,7 @@ import { usePacketDetail } from './usePacketDetail';
 import { ObservationTable } from './ObservationTable';
 import { buildPacketPathResult } from '../map/packet-path';
 import { PACKET_TABLE_X_PADDING } from './packet-grid';
+import { PacketChannelMessage } from './PacketChannelMessage';
 
 // Roughly what fits the scroll cap; observations are unbounded server-side.
 const SKELETON_ROW_CAP = 12;
@@ -105,6 +106,8 @@ export function PacketExpansion({
           {t('packets.viewPath')}
         </button>
       </div>
+
+      {data && <PacketChannelMessage packet={data} />}
 
       <div className="max-h-[360px] overflow-y-auto">
         {isError ? (

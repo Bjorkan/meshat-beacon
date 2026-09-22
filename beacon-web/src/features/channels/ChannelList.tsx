@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { channelQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -25,6 +25,9 @@ export interface ChannelListViewState {
 }
 
 interface ChannelListProps {
+  selectedChannelId?: number;
+  targetMessageHash?: string;
+  onSelectedChannelChange?: (id: number | null) => void;
   wsManager: WsManager;
   onAnalyze: (hash: string | null) => void;
   viewState: ChannelListViewState;
@@ -39,11 +42,15 @@ export function ChannelList({
   onAnalyze,
   viewState,
   onViewStateChange,
+  selectedChannelId,
+  targetMessageHash,
+  onSelectedChannelChange,
 }: ChannelListProps) {
   const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
   const isMobile = useIsMobile();
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [localSelectedId, setSelectedId] = useState<number | null>(null);
+  const selectedId = onSelectedChannelChange ? (selectedChannelId ?? null) : localSelectedId;
   const [heardCounts, setHeardCounts] = useState<Record<string, number>>({});
   const { search, searchField, keyFilter, hashtagFilter } = viewState;
 
@@ -52,14 +59,20 @@ export function ChannelList({
     if (prevRegion.current !== regionKey) {
       prevRegion.current = regionKey;
       setSelectedId(null);
+      // A linked message must survive asynchronous expansion of the initial region.
+      if (!targetMessageHash) onSelectedChannelChange?.(null);
       setHeardCounts({});
     }
-  }, [regionKey]);
+  }, [regionKey, onSelectedChannelChange, targetMessageHash]);
 
-  const handleSelect = useCallback((id: number) => {
-    setSelectedId(id);
-    setHeardCounts({});
-  }, []);
+  const handleSelect = useCallback(
+    (id: number | null) => {
+      setSelectedId(id);
+      onSelectedChannelChange?.(id);
+      setHeardCounts({});
+    },
+    [onSelectedChannelChange],
+  );
 
   const hash =
     searchField === 'hash' && /^[0-9a-f]{2}$/i.test(search.trim())
@@ -90,8 +103,14 @@ export function ChannelList({
     [sortedChannels, search, searchField, keyFilter, hashtagFilter],
   );
 
+  const listedChannel = sortedChannels.find((ch) => ch.id === selectedId);
+  const selectedDetail = useQuery({
+    ...channelQueries.detail(selectedId ?? undefined),
+    enabled: selectedId !== null && !listedChannel,
+  });
+
   // resolve against the full list so a selected channel keeps showing even when filtered out
-  const selectedChannel = sortedChannels.find((ch) => ch.id === selectedId) ?? null;
+  const selectedChannel = listedChannel ?? selectedDetail.data ?? null;
 
   const handleChannelMessage = useCallback(
     (data: ChannelMessage) => {
@@ -156,17 +175,30 @@ export function ChannelList({
             )}
           </div>
         )}
-        {(!isMobile || selectedChannel !== null) && (
-          <MessagePanel
-            channel={selectedChannel}
-            suggestedChannel={filteredChannels[0]}
-            onSelectChannel={handleSelect}
-            heardCounts={heardCounts}
-            iatas={iatas}
-            regionKey={regionKey}
-            onAnalyze={onAnalyze}
-            onBack={isMobile ? () => setSelectedId(null) : undefined}
-          />
+        {selectedId !== null && selectedDetail.isError && !selectedChannel ? (
+          <button
+            type="button"
+            className="p-3 text-xs text-red"
+            onClick={() => void selectedDetail.refetch()}
+          >
+            {t('common.failedToLoad')} · {t('common.tryAgain')}
+          </button>
+        ) : selectedId !== null && !selectedChannel ? (
+          <div className="p-3 text-xs text-text-muted">{t('common.loading')}</div>
+        ) : (
+          (!isMobile || selectedChannel !== null) && (
+            <MessagePanel
+              channel={selectedChannel}
+              suggestedChannel={filteredChannels[0]}
+              onSelectChannel={handleSelect}
+              heardCounts={heardCounts}
+              iatas={iatas}
+              regionKey={regionKey}
+              onAnalyze={onAnalyze}
+              onBack={isMobile ? () => handleSelect(null) : undefined}
+              targetMessageHash={targetMessageHash}
+            />
+          )
         )}
       </div>
     </div>

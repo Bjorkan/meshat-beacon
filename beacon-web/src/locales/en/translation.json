@@ -189,6 +189,7 @@
     "client": "Client"
   },
   "channels": {
+    "messageNotFound": "This message is not in the available channel history for the selected region.",
     "open": "Open {{name}}",
     "select": "Select a channel",
     "back": "Back to channels",
@@ -465,6 +466,7 @@
     "other": "Other"
   },
   "packets": {
+    "openInChannels": "Open in Channels",
     "noPackets": "No packets",
     "noMatchesHint": "No packets match the search and selected filters. Clear filters to show packets in the selected scope.",
     "noun": "packets",

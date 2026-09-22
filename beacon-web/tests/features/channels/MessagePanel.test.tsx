@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { getChannelMessagesPage } from '../../../src/api/client';
+import { channelQueries } from '../../../src/api/queries';
 import { MessagePanel } from '../../../src/features/channels/MessagePanel';
 import type { ChannelMessage, ChannelSummary } from '../../../src/features/channels/types';
 
@@ -173,4 +174,82 @@ it('offers an explicit action for a populated unselected workspace', () => {
   expect(select).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: 'Open Public' }));
   expect(select).toHaveBeenCalledWith(channel.id);
+});
+
+it('keeps the linked message in view when new messages arrive', async () => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <MessagePanel
+        channel={channel}
+        heardCounts={{}}
+        regionKey="*"
+        targetMessageHash={restMsg.packetHash}
+      />
+    </QueryClientProvider>,
+  );
+  await screen.findByText('from rest');
+  const scroll = vi.mocked(window.HTMLElement.prototype.scrollIntoView);
+  expect(scroll).toHaveBeenCalledWith({ block: 'center' });
+  scroll.mockClear();
+  act(() =>
+    qc.setQueryData(channelQueries.messages({ channelId: channel.id, regionKey: '*' }).queryKey, {
+      pages: [
+        {
+          items: [
+            restMsg,
+            liveMsgA,
+            liveMsgB,
+            multiLineMsg,
+            { ...liveMsgB, packetHash: 'new-live', content: 'Just arrived', sentAt: 5000 },
+          ],
+          nextCursor: null,
+          hasMore: false,
+        },
+      ],
+      pageParams: [undefined],
+    }),
+  );
+  await screen.findByText('Just arrived');
+  expect(scroll).not.toHaveBeenCalled();
+});
+
+it('stops seeking a missing message when history is exhausted', async () => {
+  const getPage = vi.mocked(getChannelMessagesPage);
+  getPage.mockResolvedValueOnce({ items: [restMsg], nextCursor: null, hasMore: false });
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <MessagePanel channel={channel} heardCounts={{}} regionKey="*" targetMessageHash="missing" />
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole('status')).toHaveTextContent(
+    'This message is not in the available channel history',
+  );
+  expect(screen.getByText('from rest')).toBeInTheDocument();
+});
+
+it('pauses seeking on a history error and finds the target after retry', async () => {
+  const getPage = vi.mocked(getChannelMessagesPage);
+  getPage.mockResolvedValueOnce({ items: [liveMsgA], nextCursor: 2, hasMore: true });
+  getPage.mockRejectedValueOnce(new Error('offline'));
+  getPage.mockResolvedValueOnce({ items: [restMsg], nextCursor: null, hasMore: false });
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  render(
+    <QueryClientProvider client={qc}>
+      <MessagePanel
+        channel={channel}
+        heardCounts={{}}
+        regionKey="*"
+        targetMessageHash={restMsg.packetHash}
+      />
+    </QueryClientProvider>,
+  );
+  await screen.findByRole('alert');
+  expect(screen.queryByText('from rest')).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /try again/i }));
+  await screen.findByText('from rest');
+  await waitFor(() =>
+    expect(window.HTMLElement.prototype.scrollIntoView).toHaveBeenCalledWith({ block: 'center' }),
+  );
 });

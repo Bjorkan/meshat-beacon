@@ -15,6 +15,7 @@ import {
   getAmbiguousPrefix2,
   getBrokers,
   getChannels,
+  getChannel,
   getChannelMessagesPage,
   getClockDrift,
   getIatas,
@@ -430,6 +431,13 @@ export const packetQueries = {
 
 export const channelQueries = {
   all: () => ['channels'] as const,
+  detail: (id: number | undefined) =>
+    queryOptions({
+      queryKey: ['channel', id] as const,
+      queryFn: () => getChannel(id!),
+      enabled: id !== undefined,
+      staleTime: 60_000,
+    }),
   list: (args: {
     regionKey: string;
     iatas?: string[];
