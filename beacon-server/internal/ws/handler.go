@@ -46,7 +46,7 @@ import (
 
 const (
 	pingTimeout  = 90 * time.Second // server closes connection if no message received within this window
-	writeTimeout = 10 * time.Second // TODO: apply per-write deadline once nhooyr supports it cleanly
+	writeTimeout = 10 * time.Second
 )
 
 // Handler returns an http.HandlerFunc that requires the hub to be injected.
@@ -70,6 +70,8 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 			return
 		}
 
+		defer conn.CloseNow()
+
 		connID := uuid.NewString()
 		client := h.NewClient()
 		defer h.Remove(client)
@@ -86,7 +88,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 		}
 		helloBytes, _ := json.Marshal(hello)
 		log.Printf("ws[%s]: connected, hello: %s", connID, helloBytes)
-		err = conn.Write(ctx, websocket.MessageText, helloBytes)
+		err = writeMessage(ctx, conn, helloBytes)
 		if err != nil {
 			log.Printf("ws[%s]: failed to send hello: %v", connID, err)
 			return
@@ -107,8 +109,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 						"data":  json.RawMessage(evt.Payload),
 					}
 					msgBytes, _ := json.Marshal(msg)
-					err = conn.Write(ctx, websocket.MessageText, msgBytes)
-					if err != nil {
+					if err := writeMessage(ctx, conn, msgBytes); err != nil {
 						log.Printf("ws[%s]: failed to write hub event: %v", connID, err)
 						cancel()
 						return
@@ -125,7 +126,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 						"since":        time.Now().UnixMilli(),
 					}
 					lagBytes, _ := json.Marshal(lagged)
-					if err := conn.Write(ctx, websocket.MessageText, lagBytes); err != nil {
+					if err := writeMessage(ctx, conn, lagBytes); err != nil {
 						log.Printf("ws[%s]: failed to write lagged notice: %v", connID, err)
 						cancel()
 						return
@@ -225,7 +226,7 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 			"v": 1, "type": "subscribed", "id": msg.ID, "subscriptionId": subID,
 		})
 		log.Printf("ws[%s]: subscribed %s → %s", connID, msg.ID, subID)
-		err := conn.Write(ctx, websocket.MessageText, reply)
+		err := writeMessage(ctx, conn, reply)
 		if err != nil {
 			log.Printf("ws[%s]: failed to send subscribed reply: %v", connID, err)
 		}
@@ -239,7 +240,7 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 			"v": 1, "type": "unsubscribed", "id": msg.ID, "subscriptionId": msg.SubscriptionID,
 		})
 		log.Printf("ws[%s]: unsubscribed %s", connID, msg.SubscriptionID)
-		if err := conn.Write(ctx, websocket.MessageText, reply); err != nil {
+		if err := writeMessage(ctx, conn, reply); err != nil {
 			log.Printf("ws[%s]: failed to send unsubscribed reply: %v", connID, err)
 		}
 
@@ -249,13 +250,13 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 			"v": 1, "type": "configured", "id": msg.ID, "resolvePath": msg.ResolvePath,
 		})
 		log.Printf("ws[%s]: configured resolvePath=%t", connID, msg.ResolvePath)
-		if err := conn.Write(ctx, websocket.MessageText, reply); err != nil {
+		if err := writeMessage(ctx, conn, reply); err != nil {
 			log.Printf("ws[%s]: failed to send configured reply: %v", connID, err)
 		}
 
 	case "ping":
 		reply, _ := json.Marshal(map[string]any{"v": 1, "type": "pong", "id": msg.ID})
-		err := conn.Write(ctx, websocket.MessageText, reply)
+		err := writeMessage(ctx, conn, reply)
 		if err != nil {
 			log.Printf("ws[%s]: failed to send pong: %v", connID, err)
 		}
@@ -263,4 +264,11 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 	default:
 		log.Printf("ws[%s]: unknown message type %q", connID, msg.Type)
 	}
+}
+
+// writeMessage bounds every write, including replies made by the read pump.
+func writeMessage(ctx context.Context, conn *websocket.Conn, payload []byte) error {
+	writeCtx, cancel := context.WithTimeout(ctx, writeTimeout)
+	defer cancel()
+	return conn.Write(writeCtx, websocket.MessageText, payload)
 }
