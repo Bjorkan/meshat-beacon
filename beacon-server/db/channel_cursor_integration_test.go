@@ -71,6 +71,7 @@ INSERT INTO channel_iatas(channel_hash,iata,last_heard) VALUES
 	router := handlers.ChannelsRouter(&Store{q: sqlc.New(queries)})
 	// Decode the wire contract so the same regression runs against the old server.
 	type wirePage struct {
+		UnknownCount   int64                `json:"unknownCount"`
 		Items          []api.ChannelSummary `json:"items"`
 		NextCursor     *int64               `json:"nextCursor"`
 		NextPageCursor *string              `json:"nextPageCursor"`
@@ -156,6 +157,29 @@ VALUES (8,'\xee','\x08','2026-09-08 12:00:02+00')`)
 			t.Error("fresh first page missed new activity")
 		}
 		exec("DELETE FROM channels WHERE id=8")
+	})
+
+	t.Run("precise cursor keeps regional unknown-key filtering", func(t *testing.T) {
+		exec(`INSERT INTO channels(id,channel_hash,key_known,last_seen) VALUES
+     (20,'\xfa',false,'2026-09-08 12:00:00.000321+00'),
+     (21,'\xfb',false,'2026-09-08 12:00:00.000321+00'),
+     (22,'\xfc',false,'2026-09-08 12:00:00.000321+00');
+     INSERT INTO channel_iatas(channel_hash,iata,last_heard) VALUES ('\xfa','YOW',now()),('\xfb','YYZ',now()),('\xfc','YOW',now());`)
+		defer exec(`DELETE FROM channels WHERE id IN (20,21,22); DELETE FROM channel_iatas WHERE channel_hash IN ('\xfa','\xfb','\xfc')`)
+		params := url.Values{"limit": {"1"}, "iata": {"YOW"}, "key": {"unknown"}}
+		first := request(t, params)
+		if len(first.Items) != 1 || first.Items[0].ID != 22 || first.UnknownCount != 2 || first.NextPageCursor == nil {
+			t.Fatalf("first unknown page: %+v", first)
+		}
+		params.Set("pageCursor", *first.NextPageCursor)
+		second := request(t, params)
+		if len(second.Items) != 1 || second.Items[0].ID != 20 || second.UnknownCount != 2 || second.HasMore {
+			t.Fatalf("second unknown page: %+v", second)
+		}
+		known := request(t, url.Values{"limit": {"50"}, "iata": {"YOW"}, "key": {"known"}})
+		if len(known.Items) != 4 || known.UnknownCount != 2 {
+			t.Fatalf("known page: %+v", known)
+		}
 	})
 
 	exec(`INSERT INTO channels(id,channel_hash,key_fingerprint,last_seen)

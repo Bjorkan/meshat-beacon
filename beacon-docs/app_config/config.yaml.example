@@ -1,3 +1,9 @@
+# Upstream integration: configure the exact reverse proxy CIDR before deployment.
+# An empty list trusts no proxy; visitors otherwise share its rate-limit bucket.
+# See UPSTREAM_SYNC.md and beacon-server/config.yaml.example for header handling.
+server:
+  trusted_proxies: []
+
 # Beacon configuration file
 # Copy to config.yaml and adjust as needed.
 
