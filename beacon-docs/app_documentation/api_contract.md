@@ -722,12 +722,15 @@ GET    /api/v1/observers?iata=YOW&type=meshcoretomqtt&broker=mqtt1&status=online
 GET    /api/v1/observers?iata=YOW&sort=status&direction=desc&pageToken=<opaque>
 GET    /api/v1/observers/{observerId}
 GET    /api/v1/observers/{observerId}/telemetry?range=24h
-GET    /api/v1/observers/{observerId}/adverts?limit=50&cursor=<id>
+GET    /api/v1/observers/{observerId}/activity?range=24h&interval=15m
+GET    /api/v1/observers/{observerId}/adverts?limit=50&cursor=<opaque>
 ```
 
 The observer list supports global server-side sorting by `name`, `type`, `radio`, `iata`, `status`, or `last_seen`. It uses the same opaque `nextPageToken` contract as `/nodes`, while retaining the legacy numeric cursor only for the default `last_seen desc` order.
 
-Telemetry response is a time-bucketed array suitable for direct chart consumption:
+Telemetry response is a time-bucketed array suitable for direct chart consumption. `airtimeTxSecs` and
+`airtimeRxSecs` are seconds of radio time as reported by the observer: cumulative since boot on
+`interval=1h` points, and the per-bucket delta on `6h`/`24h`. Divide by the bucket length for a percentage.
 
 ```json
 {
@@ -737,8 +740,8 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
     {
       "t": 1747612800000,
       "batteryMv": 4180,
-      "airtimeTxPct": 0.37,
-      "airtimeRxPct": 1.05,
+      "airtimeTxSecs": 13.4,
+      "airtimeRxSecs": 37.8,
       "noiseFloorDb": -103.2,
       "uptimeSeconds": 86400,
       "queueLength": 0,
@@ -747,8 +750,8 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
     {
       "t": 1747613100000,
       "batteryMv": 4175,
-      "airtimeTxPct": 0.42,
-      "airtimeRxPct": 1.12,
+      "airtimeTxSecs": 15.1,
+      "airtimeRxSecs": 40.3,
       "noiseFloorDb": -102.8,
       "uptimeSeconds": 86700,
       "queueLength": 1,
@@ -758,13 +761,77 @@ Telemetry response is a time-bucketed array suitable for direct chart consumptio
 }
 ```
 
+Activity reports what an observer actually heard, bucketed over a trailing window. `range` is a Go
+duration up to `720h` (default `24h`); `interval` is one of `5m`, `15m`, `1h`, `6h`, `24h`
+(default `15m`). `range / interval` may not exceed 1000 buckets, sub-hour intervals (`5m`, `15m`)
+additionally cap `range` at `48h`, and an unknown observer is a `404`.
+Buckets are aligned to the clock in UTC (a `15m` bucket always starts at :00, :15, :30 or :45) and the
+window start is rounded up to the next bucket boundary, so bucket starts are stable across requests.
+Only non-empty buckets are returned — gaps in `points` mean the observer heard nothing in that bucket,
+and the client is expected to render them as zero.
+
+`radio` echoes the observer's current radio parameters plus the preamble length the airtime maths
+assumes; it is `null` when those parameters are unknown, in which case `airtimeMs` is `null` on every
+bucket too (airtime cannot be costed without them). `snrAvg`, `snrMin` and `rssiAvg` are `null` for
+buckets whose observations carried no usable signal readings. The `payloadTypes` counts cover the same
+window and their total matches the sum of `observations` across `points`. On sub-hour intervals only,
+observations with an undetermined payload type are counted in `observations` but omitted from the
+breakdown; none exist within the retention window in practice.
+
+`airtimeMs` sums only the observations that could be costed. The migration that introduced airtime
+backfills the trailing 7 days, so for the first 30 days after deploy buckets older than 7 days may be
+only partially costed, and observations recorded without radio parameters are never costed.
+
+Intervals of `1h` and up are served from an hourly rollup refreshed on the `background.view_refresh`
+interval (1 hour by default), so the most recent hour can lag by up to one refresh. Sub-hour intervals
+read live observation rows and are always current.
+
+```json
+{
+  "range": "24h",
+  "interval": "15m",
+  "radio": {
+    "freqMhz": 869.525,
+    "sf": 11,
+    "bwKhz": 250,
+    "cr": 5,
+    "preambleSymbols": 16
+  },
+  "payloadTypes": [
+    { "payloadType": 4, "payloadTypeName": "advert", "count": 128 },
+    { "payloadType": 5, "payloadTypeName": "group_text", "count": 41 }
+  ],
+  "points": [
+    {
+      "t": 1747612800000,
+      "observations": 12,
+      "airtimeMs": 3120.5,
+      "snrAvg": 6.2,
+      "snrMin": -4.5,
+      "rssiAvg": -92.3
+    },
+    {
+      "t": 1747613700000,
+      "observations": 4,
+      "airtimeMs": 980.2,
+      "snrAvg": 5.1,
+      "snrMin": 1.0,
+      "rssiAvg": -95.0
+    }
+  ]
+}
+```
+
 ### Channels
 
 ```
-GET    /api/v1/channels?limit=50
+GET    /api/v1/channels?iata=YOW&limit=50
 GET    /api/v1/channels/{channelHash}
 GET    /api/v1/channels/{channelHash}/messages?since=<ts>&limit=50&cursor=<opaque>
 ```
+
+The list accepts a single `iata=` or comma-separated `iatas=YOW,YYZ` (case-insensitive)
+and returns channels heard in those IATAs within the packet retention window.
 
 Channel keys are configured via the server config file.
 
