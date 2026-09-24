@@ -125,13 +125,15 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, getEnv("POSTGRES_DSN"))
+	dsn := getEnv("POSTGRES_DSN")
+	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
 		// Parse errors can embed the complete DSN, including its password.
 		slog.Error("invalid PostgreSQL connection configuration; check POSTGRES_DSN", "component", "startup")
 		os.Exit(1)
 	}
 	defer pool.Close()
+	backupOpts := configureBackup(ctx, cfg, pool, dsn, configPath)
 
 	if err := db.RunMigrations(ctx, pool); err != nil {
 		slog.Error("migrations failed", "component", "startup", "error", err)
@@ -308,7 +310,10 @@ func main() {
 		MaxConnsPerIP:        resolved.MaxConnsPerIP,
 		MaxConnectsPerMinute: resolved.MaxConnectsPerMinute,
 		CORS:                 cfg.CORS, Server: cfg.Server, Auth: cfg.Auth, RateLimit: resolved.RateLimit,
-		AdminRoutes: map[string]http.Handler{"/accounts": handlers.AccountsRouter(store)},
+		AdminRoutes: map[string]http.Handler{
+			"/accounts": handlers.AccountsRouter(store),
+			"/backup":   handlers.BackupRouter(backupOpts),
+		},
 	})
 
 	srv := &http.Server{
