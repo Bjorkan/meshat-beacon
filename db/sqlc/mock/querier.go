@@ -577,6 +577,21 @@ func (mr *MockQuerierMockRecorder) GetPacketsByTraceTag(ctx, decode any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPacketsByTraceTag", reflect.TypeOf((*MockQuerier)(nil).GetPacketsByTraceTag), ctx, decode)
 }
 
+// GetPathStats mocks base method.
+func (m *MockQuerier) GetPathStats(ctx context.Context, arg db.GetPathStatsParams) ([]db.GetPathStatsRow, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPathStats", ctx, arg)
+	ret0, _ := ret[0].([]db.GetPathStatsRow)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPathStats indicates an expected call of GetPathStats.
+func (mr *MockQuerierMockRecorder) GetPathStats(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPathStats", reflect.TypeOf((*MockQuerier)(nil).GetPathStats), ctx, arg)
+}
+
 // GetRadioPresets mocks base method.
 func (m *MockQuerier) GetRadioPresets(ctx context.Context, arg db.GetRadioPresetsParams) ([]db.MvRadioPreset, error) {
 	m.ctrl.T.Helper()
@@ -1260,6 +1275,20 @@ func (m *MockQuerier) RefreshObserverActivity(ctx context.Context) error {
 func (mr *MockQuerierMockRecorder) RefreshObserverActivity(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshObserverActivity", reflect.TypeOf((*MockQuerier)(nil).RefreshObserverActivity), ctx)
+}
+
+// RefreshPathStats mocks base method.
+func (m *MockQuerier) RefreshPathStats(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshPathStats", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefreshPathStats indicates an expected call of RefreshPathStats.
+func (mr *MockQuerierMockRecorder) RefreshPathStats(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshPathStats", reflect.TypeOf((*MockQuerier)(nil).RefreshPathStats), ctx)
 }
 
 // RefreshPayloadBreakdown mocks base method.
