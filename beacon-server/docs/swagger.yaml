@@ -1,5 +1,66 @@
 basePath: /api/v1
 definitions:
+  github_com_MeshCore-Beacon_beacon-server_internal_api.Account:
+    properties:
+      active:
+        type: boolean
+      created_at:
+        type: string
+      deactivated_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.AccountList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Account'
+        type: array
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.AdminAuthConfig:
+    properties:
+      configured:
+        type: boolean
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.AdminCORSConfig:
+    properties:
+      allow_credentials:
+        type: boolean
+      allowed_headers:
+        items:
+          type: string
+        type: array
+      allowed_methods:
+        items:
+          type: string
+        type: array
+      allowed_origins:
+        items:
+          type: string
+        type: array
+      max_age:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.AdminConfig:
+    properties:
+      auth:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdminAuthConfig'
+      cors:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdminCORSConfig'
+      ingest:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdminIngestConfig'
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.AdminIngestConfig:
+    properties:
+      broker_count:
+        description: |-
+          BrokerCount counts configured broker workers, not active MQTT connections
+          or a configurable processing-worker pool.
+        type: integer
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.AdvertObservation:
     properties:
       heardAt:
@@ -147,6 +208,8 @@ definitions:
       nextCursor:
         type: integer
         x-nullable: true
+      nextPageCursor:
+        type: string
       unknownCount:
         type: integer
     required:
@@ -217,6 +280,13 @@ definitions:
     - nodeId
     - nodeType
     - nodeTypeName
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.CreateAccountRequest:
+    properties:
+      name:
+        type: string
+    required:
+    - name
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.CrossIATAHop:
     properties:
@@ -402,6 +472,11 @@ definitions:
       observerId:
         description: UUID of the associated observer row, if any
         type: string
+      possiblyForeign:
+        description: |-
+          PossiblyForeign compares a repeater's stored position with this server's
+          configured IATA border union. Omitted when disabled, unknown, or not repeater.
+        type: boolean
       publicKey:
         description: hex-encoded Ed25519 public key
         type: string
@@ -552,6 +627,11 @@ definitions:
       observerId:
         description: UUID of the associated observer row, if any
         type: string
+      possiblyForeign:
+        description: |-
+          PossiblyForeign compares a repeater's stored position with this server's
+          configured IATA border union. Omitted when disabled, unknown, or not repeater.
+        type: boolean
       publicKey:
         description: hex-encoded Ed25519 public key
         type: string
@@ -701,6 +781,52 @@ definitions:
     - publicKey
     - status
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivity:
+    properties:
+      interval:
+        type: string
+      payloadTypes:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PayloadBreakdownItem'
+        type: array
+      points:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityPoint'
+        type: array
+      radio:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio'
+      range:
+        type: string
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityPoint:
+    properties:
+      airtimeMs:
+        type: number
+      observations:
+        type: integer
+      rssiAvg:
+        type: number
+      snrAvg:
+        type: number
+      snrMin:
+        type: number
+      t:
+        description: bucket start, epoch ms
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio:
+    properties:
+      bwKhz:
+        type: number
+      cr:
+        type: integer
+      freqMhz:
+        type: number
+      preambleSymbols:
+        type: integer
+      sf:
+        type: integer
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverBroker:
     properties:
       lastPacketAt:
@@ -716,6 +842,27 @@ definitions:
     - lastPacketAt
     - lastSeenAt
     - name
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverComparison:
+    properties:
+      both:
+        type: integer
+      observerA:
+        type: string
+      observerB:
+        type: string
+      onlyA:
+        type: integer
+      onlyB:
+        type: integer
+      since:
+        description: inclusive, epoch milliseconds
+        type: integer
+      totalPackets:
+        type: integer
+      until:
+        description: exclusive, epoch milliseconds
+        type: integer
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode:
     properties:
@@ -782,9 +929,9 @@ definitions:
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverTelemetryPoint:
     properties:
-      airtimeRxPct:
+      airtimeRxSecs:
         type: number
-      airtimeTxPct:
+      airtimeTxSecs:
         type: number
       batteryMv:
         type: integer
@@ -954,7 +1101,9 @@ definitions:
         - $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ResolvedHop'
         description: |-
           ResolvedSource/ResolvedDestination are the packet's endpoints, when the payload type
-          carries a resolvable one: an exact match for ADVERT's full pubkey, an ambiguous
+          carries one. Prefer the snapshot captured at ingest; legacy observations without a
+          snapshot use the current node registry. Endpoint matching itself is unchanged:
+          an exact match for ADVERT's full pubkey, an ambiguous
           hash-prefix match (like intermediate hops) for TEXT_MESSAGE/PATH/ANON_REQ's 1-byte
           source/destination hashes. Nil when the payload type doesn't carry one at all (e.g.
           GRP_TXT/GRP_DATA/TRACE aren't node-to-node addressed) -- see BuildResolvedPath and
@@ -1060,7 +1209,7 @@ definitions:
         description: matched transport scope name e.g. "#bc"
         type: string
       summary:
-        description: human-readable payload summary
+        description: advert name from this packet; omitted when unavailable or unsupported
         type: string
     required:
     - firstHeardAt
@@ -1193,6 +1342,68 @@ definitions:
     required:
     - hasMore
     - items
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PathHashWidth:
+    properties:
+      bytes:
+        type: integer
+      receptions:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PathHour:
+    properties:
+      empty:
+        type: integer
+      hour:
+        type: integer
+      oneByte:
+        type: integer
+      receptions:
+        type: integer
+      threeByte:
+        type: integer
+      trace:
+        type: integer
+      twoByte:
+        type: integer
+      unclassified:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PathLengthBin:
+    properties:
+      entries:
+        type: integer
+      receptions:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.PathStats:
+    properties:
+      empty:
+        type: integer
+      hashWidths:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PathHashWidth'
+        type: array
+      hashed:
+        type: integer
+      hourly:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PathHour'
+        type: array
+      pathLengths:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PathLengthBin'
+        type: array
+      receptions:
+        type: integer
+      since:
+        type: integer
+      trace:
+        type: integer
+      unclassified:
+        type: integer
+      until:
+        type: integer
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PayloadBreakdownItem:
     properties:
@@ -1520,6 +1731,58 @@ definitions:
     - observerCount
     - packetCount
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.SignalBin:
+    properties:
+      count:
+        type: integer
+      lower:
+        type: number
+      upper:
+        type: number
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.SignalHour:
+    properties:
+      hour:
+        type: integer
+      receptions:
+        type: integer
+      rssiAverage:
+        type: number
+      rssiSamples:
+        type: integer
+      snrAverage:
+        type: number
+      snrSamples:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric:
+    properties:
+      average:
+        type: number
+      histogram:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalBin'
+        type: array
+      samples:
+        type: integer
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.SignalStats:
+    properties:
+      hourly:
+        items:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalHour'
+        type: array
+      receptions:
+        type: integer
+      rssi:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric'
+      since:
+        type: integer
+      snr:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric'
+      until:
+        type: integer
+    type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.StatsOverview:
     properties:
       activeIatas:
@@ -1733,6 +1996,31 @@ definitions:
     - traceTag
     - traceType
     type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminCORSRequest:
+    properties:
+      allowed_origins:
+        items:
+          type: string
+        type: array
+    required:
+    - allowed_origins
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminConfigRequest:
+    properties:
+      cors:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminCORSRequest'
+    required:
+    - cors
+    type: object
+  github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminConfigResponse:
+    properties:
+      config:
+        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdminConfig'
+      persisted:
+        type: boolean
+      requires_restart:
+        type: boolean
+    type: object
   internal_api_handlers.APIError:
     properties:
       code:
@@ -1757,14 +2045,375 @@ info:
   contact:
     name: MeshCore Beacon
     url: https://github.com/MeshCore-Beacon/beacon-server
-  description: MeshCore network observation backend. Ingests LoRa packets from MQTT
-    brokers, stores in PostgreSQL, and streams live events via WebSocket.
+  description: |-
+    MeshCore network observation backend. Ingests LoRa packets from MQTT brokers, stores in PostgreSQL, and streams live events via WebSocket.
+    REST requests share a configurable per-client rate limit (default 300/minute and a 300-request one-second burst cap). Exceeded limits return HTTP 429 with error.code=rate_limited and a Retry-After header in seconds. CORS preflights and WebSocket upgrades do not consume this API budget.
+    WebSocket upgrade attempts at /ws have a configurable per-client limit (default 10/minute, including failed handshakes). Rate exhaustion returns HTTP 429 with Retry-After before upgrade. An accepted socket exceeding the concurrent cap closes with code 1013 before hello; established connections remain open.
   license:
     name: AGPL-3-or-later
   termsOfService: https://github.com/MeshCore-Beacon/beacon-server
   title: MeshCore Beacon API
   version: 1.6.0
 paths:
+  /admin/accounts:
+    get:
+      description: Includes active and inactive accounts, newest first. These records
+        are not login users.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AccountList'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: List operator accounts
+      tags:
+      - Admin
+    post:
+      consumes:
+      - application/json
+      description: Trims the name; names are case-sensitive and unique among active
+        accounts. No credential or login is created.
+      parameters:
+      - description: Account name (1-128 Unicode characters, no control characters);
+          body at most 4 KiB
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.CreateAccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Account'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "415":
+          description: Unsupported Media Type
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Create an operator account
+      tags:
+      - Admin
+  /admin/accounts/{id}:
+    delete:
+      description: Soft deactivation preserves the record. Its name may be reused
+        by a new account.
+      parameters:
+      - description: Account UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Deactivated
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Deactivate an operator account
+      tags:
+      - Admin
+    get:
+      description: Returns active or inactive account records.
+      parameters:
+      - description: Account UUID
+        format: uuid
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.Account'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Get an operator account
+      tags:
+      - Admin
+  /admin/backup:
+    get:
+      description: Opt-in operator export. Returns only a completed bundle; one export/transfer
+        at a time. Contains secrets. Login sessions, external deployment files and
+        import are outside this endpoint.
+      produces:
+      - application/gzip
+      responses:
+        "200":
+          description: OK
+          headers:
+            Content-Disposition:
+              description: attachment; filename=beacon-backup.tar.gz
+              type: string
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "409":
+          description: Conflict
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "504":
+          description: Gateway Timeout
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "507":
+          description: Insufficient Storage
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Download a private database and saved-config backup
+      tags:
+      - Admin
+  /admin/config:
+    get:
+      description: Returns current CORS options, auth configuration status and configured
+        broker count. Credential fields and other configuration are excluded. Runtime
+        origin updates are lost on restart.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.AdminConfig'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Inspect selected running configuration
+      tags:
+      - Admin
+    put:
+      consumes:
+      - application/json
+      description: Replaces only cors.allowed_origins immediately. Updates are serialized;
+        concurrent valid updates are applied one at a time. Already-running requests
+        may finish with the previous policy. Nothing is persisted; restart reloads
+        saved configuration.
+      parameters:
+      - description: 1-32 ASCII HTTP(S) origins, at most 512 bytes each; one hostname
+          wildcard is supported, or a sole *. Empty/null lists and unsupported fields
+          are rejected. Body at most 16 KiB.
+        in: body
+        name: config
+        required: true
+        schema:
+          $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminConfigRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.UpdateAdminConfigResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "413":
+          description: Request Entity Too Large
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "415":
+          description: Unsupported Media Type
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            additionalProperties:
+              $ref: '#/definitions/internal_api_handlers.APIError'
+            type: object
+      security:
+      - AdminKey: []
+      summary: Update runtime CORS origins
+      tags:
+      - Admin
   /brokers:
     get:
       produces:
@@ -1801,6 +2450,11 @@ paths:
       - description: Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ
         in: query
         name: iatas
+        type: string
+      - description: Opaque nextPageCursor; preserves timestamp ties and precision.
+          Cannot be combined with a positive cursor.
+        in: query
+        name: pageCursor
         type: string
       - description: last_seen epoch ms of last item for pagination
         in: query
@@ -2467,6 +3121,45 @@ paths:
       summary: Get observer detail
       tags:
       - Observers
+  /observers/{observerId}/activity:
+    get:
+      parameters:
+      - description: Observer UUID
+        in: path
+        name: observerId
+        required: true
+        type: string
+      - description: Trailing window as a Go duration, max 720h (default 24h); max
+          48h when interval is under 1h
+        in: query
+        name: range
+        type: string
+      - description: 'Bucket size: 5m, 15m, 1h, 6h or 24h (default 15m)'
+        in: query
+        name: interval
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivity'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: Get observer heard-activity history
+      tags:
+      - Observers
   /observers/{observerId}/adverts:
     get:
       parameters:
@@ -3127,6 +3820,71 @@ paths:
       summary: Hourly observation time series
       tags:
       - Stats
+  /stats/observer-comparison:
+    get:
+      description: Counts distinct retained packet hashes with route type 0 or 1,
+        using reception time in [since, until). onlyA, onlyB and both partition totalPackets
+        (the union). Repeated receptions count once. These are reported receptions,
+        not a measure of radio packet loss or continuous observer coverage.
+      parameters:
+      - description: First observer UUID
+        in: query
+        name: observerA
+        required: true
+        type: string
+      - description: Second, distinct observer UUID
+        in: query
+        name: observerB
+        required: true
+        type: string
+      - description: Inclusive start, epoch milliseconds (0 through 253402300799999)
+        in: query
+        name: since
+        required: true
+        type: integer
+      - description: Exclusive end, epoch milliseconds; later than since
+        in: query
+        name: until
+        required: true
+        type: integer
+      - description: Comma-separated reception IATA codes
+        in: query
+        name: iatas
+        type: string
+      - description: Region ID, expands to member IATAs
+        in: query
+        name: regionId
+        type: integer
+      - description: Region slug, expands to member IATAs
+        in: query
+        name: region
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverComparison'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: Compare flood packets reported by two observers
+      tags:
+      - Stats
   /stats/overview:
     get:
       parameters:
@@ -3154,6 +3912,63 @@ paths:
           schema:
             $ref: '#/definitions/internal_api_handlers.APIError'
       summary: Network overview stats (last 24h)
+      tags:
+      - Stats
+  /stats/paths:
+    get:
+      description: Counts stored receptions in [since, until), at most 30 days. Hash
+        widths count only validated nonempty ordinary header paths (1/2/3 bytes).
+        Empty paths do not vote for a width. TRACE header paths contain signal readings
+        and are separate. Missing payload type or inconsistent/unsupported path metadata
+        is unclassified. The four categories partition total receptions. Flood paths
+        accumulate entries; direct paths contain remaining entries, so counts do not
+        measure distance or a complete traversed route. Both boundaries round down
+        to UTC hours and the response reports that effective window. Reads use materialized
+        snapshots refreshed by background.view_refresh; the current partial hour is
+        excluded and missing hours are omitted.
+      parameters:
+      - description: Inclusive start, epoch milliseconds (0 through 253402300799999)
+        in: query
+        name: since
+        required: true
+        type: integer
+      - description: Exclusive end, epoch milliseconds; at most 30 days after since
+        in: query
+        name: until
+        required: true
+        type: integer
+      - description: Comma-separated reception IATA codes
+        in: query
+        name: iatas
+        type: string
+      - description: Region ID, expands to member IATAs
+        in: query
+        name: regionId
+        type: integer
+      - description: Region slug, expands to member IATAs
+        in: query
+        name: region
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.PathStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: Received path-entry and hash-width distributions
       tags:
       - Stats
   /stats/payload-breakdown:
@@ -3228,6 +4043,28 @@ paths:
       - Stats
   /stats/scopes:
     get:
+      description: Counts each packet, observer and node once per scope. IATA filters
+        use retained observations for packets/observers and node IATA memberships
+        for nodes. Without filters, returns global totals. Scopes with zero matching
+        counts remain listed; an empty region returns an empty array.
+      parameters:
+      - description: Comma-separated IATA codes
+        in: query
+        name: iatas
+        type: string
+      - description: Single IATA code; used when iatas is absent
+        in: query
+        name: iata
+        type: string
+      - description: Filter by region ID, expands to member IATAs
+        in: query
+        name: regionId
+        type: integer
+      - description: Filter by region slug, expands to member IATAs; combined with
+          explicit IATAs
+        in: query
+        name: region
+        type: string
       produces:
       - application/json
       responses:
@@ -3237,11 +4074,71 @@ paths:
             items:
               $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ScopeStats'
             type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/internal_api_handlers.APIError'
       summary: Scope statistics
+      tags:
+      - Stats
+  /stats/signal:
+    get:
+      description: Aggregates stored observer receptions in [since, until), at most
+        30 days. SNR is dB; RSSI is dBm. Null/non-finite readings and the zero/zero
+        unavailable sentinel are excluded per metric; actual zero SNR with nonzero
+        RSSI remains valid. Averages are null without samples. Histogram bounds are
+        lower-inclusive/upper-exclusive, with null for unbounded ends. Both boundaries
+        round down to UTC hours and the response reports that effective window. Reads
+        use hourly materialized snapshots refreshed by background.view_refresh; the
+        current partial hour is excluded and absent hours are omitted. These last-hop
+        readings do not measure end-to-end quality or packet loss.
+      parameters:
+      - description: Inclusive start, epoch milliseconds (0 through 253402300799999)
+        in: query
+        name: since
+        required: true
+        type: integer
+      - description: Exclusive end, epoch milliseconds; at most 30 days after since
+        in: query
+        name: until
+        required: true
+        type: integer
+      - description: Comma-separated reception IATA codes
+        in: query
+        name: iatas
+        type: string
+      - description: Region ID, expands to member IATAs
+        in: query
+        name: regionId
+        type: integer
+      - description: Region slug, expands to member IATAs
+        in: query
+        name: region
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalStats'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/internal_api_handlers.APIError'
+      summary: Reception signal distributions and hourly trends
       tags:
       - Stats
   /stats/top-advertisers:
@@ -3485,6 +4382,12 @@ paths:
 schemes:
 - http
 - https
+securityDefinitions:
+  AdminKey:
+    description: Enter Bearer followed by the configured operator key. Use HTTPS.
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
 tags:
 - description: Airport/location codes that group observers and packets

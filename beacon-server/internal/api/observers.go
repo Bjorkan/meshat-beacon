@@ -51,11 +51,12 @@ type Observer struct {
 }
 
 // ObserverTelemetryPoint is a single telemetry snapshot for an observer.
+// Airtime is radio seconds: cumulative since boot on 1h points, per-bucket delta on 6h/24h.
 type ObserverTelemetryPoint struct {
 	T             int64    `json:"t" binding:"required"` // epoch ms
 	BatteryMV     *int32   `json:"batteryMv,omitempty"`
-	AirtimeTxPct  *float32 `json:"airtimeTxPct,omitempty"`
-	AirtimeRxPct  *float32 `json:"airtimeRxPct,omitempty"`
+	AirtimeTxSecs *float32 `json:"airtimeTxSecs,omitempty"`
+	AirtimeRxSecs *float32 `json:"airtimeRxSecs,omitempty"`
 	NoiseFloorDB  *float32 `json:"noiseFloorDb,omitempty"`
 	UptimeSeconds *int64   `json:"uptimeSeconds,omitempty"`
 	QueueLength   *int32   `json:"queueLength,omitempty"`
@@ -75,4 +76,32 @@ type ObserverOwnerNode struct {
 	ID        uuid.UUID `json:"id" binding:"required"`
 	Name      *string   `json:"name,omitempty"`
 	PublicKey string    `json:"publicKey" binding:"required"`
+}
+
+// ObserverActivityRadio echoes the observer's current radio params plus the preamble the airtime math assumes.
+type ObserverActivityRadio struct {
+	FreqMHz         *float32 `json:"freqMhz"`
+	SF              int16    `json:"sf"`
+	BWKHz           float32  `json:"bwKhz"`
+	CR              int16    `json:"cr"`
+	PreambleSymbols int      `json:"preambleSymbols"`
+}
+
+// ObserverActivityPoint is one bucket of what an observer heard.
+type ObserverActivityPoint struct {
+	T            int64    `json:"t"` // bucket start, epoch ms
+	Observations int64    `json:"observations"`
+	AirtimeMs    *float32 `json:"airtimeMs"`
+	SNRAvg       *float32 `json:"snrAvg"`
+	SNRMin       *float32 `json:"snrMin"`
+	RSSIAvg      *float32 `json:"rssiAvg"`
+}
+
+// ObserverActivity is the per-observer heard-activity response.
+type ObserverActivity struct {
+	Range        string                  `json:"range"`
+	Interval     string                  `json:"interval"`
+	Radio        *ObserverActivityRadio  `json:"radio"`
+	PayloadTypes []PayloadBreakdownItem  `json:"payloadTypes"`
+	Points       []ObserverActivityPoint `json:"points"`
 }

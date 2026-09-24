@@ -20,7 +20,7 @@ import (
 func TestHandlerConcurrentEventsAndReplies(t *testing.T) {
 	h := hub.New()
 	go h.Run()
-	server := httptest.NewServer(Handler(h, nil, 5))
+	server := httptest.NewServer(Handler(h, nil, 5, 60))
 	defer server.Close()
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

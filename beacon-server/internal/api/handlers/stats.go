@@ -4,7 +4,7 @@
 package handlers
 
 import (
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
@@ -30,6 +30,9 @@ func StatsRouter(reader api.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/overview", getStatsOverview(reader))
 	r.Get("/observations", getStatsObservations(reader))
+	r.Get("/signal", getSignalStats(reader))
+	r.Get("/paths", getPathStats(reader))
+	r.Get("/observer-comparison", getObserverComparison(reader))
 	r.Get("/payload-breakdown", getStatsPayloadBreakdown(reader))
 	r.Get("/top-nodes", getStatsTopNodes(reader))
 	r.Get("/top-observers", getStatsTopObservers(reader))
@@ -66,7 +69,7 @@ func getStatsOverview(reader api.Reader) http.HandlerFunc {
 		}
 		overview, err := reader.GetStatsOverview(r.Context(), iatas)
 		if err != nil {
-			log.Printf("api: GetStatsOverview failed: %v", err)
+			slog.Error("api: GetStatsOverview failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -108,7 +111,7 @@ func getStatsObservations(reader api.Reader) http.HandlerFunc {
 		}
 		points, err := reader.GetStatsObservations(r.Context(), iatas, since)
 		if err != nil {
-			log.Printf("api: GetStatsObservations failed: %v", err)
+			slog.Error("api: GetStatsObservations failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -150,7 +153,7 @@ func getStatsPayloadBreakdown(reader api.Reader) http.HandlerFunc {
 		}
 		breakdown, err := reader.GetStatsPayloadBreakdown(r.Context(), iatas, since)
 		if err != nil {
-			log.Printf("api: GetStatsPayloadBreakdown failed: %v", err)
+			slog.Error("api: GetStatsPayloadBreakdown failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -188,7 +191,7 @@ func getStatsTopNodes(reader api.Reader) http.HandlerFunc {
 		}
 		nodes, err := reader.GetStatsTopNodes(r.Context(), iatas, limit)
 		if err != nil {
-			log.Printf("api: GetStatsTopNodes failed: %v", err)
+			slog.Error("api: GetStatsTopNodes failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -236,7 +239,7 @@ func getStatsTopObservers(reader api.Reader) http.HandlerFunc {
 		}
 		observers, err := reader.GetStatsTopObservers(r.Context(), iatas, since, limit)
 		if err != nil {
-			log.Printf("api: GetStatsTopObservers failed: %v", err)
+			slog.Error("api: GetStatsTopObservers failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -284,7 +287,7 @@ func getStatsTopAdvertisers(reader api.Reader) http.HandlerFunc {
 		}
 		advertisers, err := reader.GetStatsTopAdvertisers(r.Context(), iatas, since, limit)
 		if err != nil {
-			log.Printf("api: GetStatsTopAdvertisers failed: %v", err)
+			slog.Error("api: GetStatsTopAdvertisers failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -322,7 +325,7 @@ func getStatsClockDrift(reader api.Reader) http.HandlerFunc {
 		}
 		entries, err := reader.GetStatsClockDrift(r.Context(), iatas, limit)
 		if err != nil {
-			log.Printf("api: GetStatsClockDrift failed: %v", err)
+			slog.Error("api: GetStatsClockDrift failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -370,7 +373,7 @@ func getStatsTopTalkers(reader api.Reader) http.HandlerFunc {
 		}
 		talkers, err := reader.GetStatsTopTalkers(r.Context(), iatas, since, limit)
 		if err != nil {
-			log.Printf("api: GetStatsTopTalkers failed: %v", err)
+			slog.Error("api: GetStatsTopTalkers failed", "component", "api", "error", err)
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
@@ -414,14 +417,33 @@ func getStatsRadioPresets(reader api.Reader) http.HandlerFunc {
 // getStatsScopes godoc
 //
 //	@Summary	Scope statistics
+//	@Description	Counts each packet, observer and node once per scope. IATA filters use retained observations for packets/observers and node IATA memberships for nodes. Without filters, returns global totals. Scopes with zero matching counts remain listed; an empty region returns an empty array.
 //	@Tags		Stats
 //	@Produce	json
+//	@Param		iatas		query	string	false	"Comma-separated IATA codes"
+//	@Param		iata		query	string	false	"Single IATA code; used when iatas is absent"
+//	@Param		regionId	query	int		false	"Filter by region ID, expands to member IATAs"
+//	@Param		region		query	string	false	"Filter by region slug, expands to member IATAs; combined with explicit IATAs"
 //	@Success	200	{object}	[]api.ScopeStats
+//	@Failure	400	{object}	handlers.APIError
 //	@Failure	500	{object}	handlers.APIError
 //	@Router		/stats/scopes [get]
 func getStatsScopes(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		stats, err := reader.GetScopeStats(r.Context())
+		iatas := parseIATAs(r)
+		if regionID := r.URL.Query().Get("regionId"); regionID != "" || r.URL.Query().Get("region") != "" {
+			regionIATAs, err := resolveRegionIATAs(r.Context(), regionID, r.URL.Query().Get("region"), reader)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+			iatas = append(iatas, regionIATAs...)
+			if len(iatas) == 0 {
+				respond(w, http.StatusOK, []api.ScopeStats{})
+				return
+			}
+		}
+		stats, err := reader.GetScopeStats(r.Context(), iatas)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return

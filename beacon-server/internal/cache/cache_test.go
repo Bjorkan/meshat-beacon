@@ -31,12 +31,37 @@ type stubReader struct {
 	calls int
 }
 
+func (s *stubReader) GetSignalStats(context.Context, time.Time, time.Time, []string) (*api.SignalStats, error) {
+	return nil, s.err
+}
+
+func (s *stubReader) GetPathStats(context.Context, time.Time, time.Time, []string) (*api.PathStats, error) {
+	return nil, s.err
+}
+
 func (s *stubReader) ListIATAs(_ context.Context) ([]api.IATA, error) {
 	s.calls++
 	return s.iatas, s.err
 }
 
 // implement remaining api.Reader methods as no-ops
+func (s *stubReader) GetObserverComparison(_ context.Context, _, _ uuid.UUID, _, _ time.Time, _ []string) (*api.ObserverComparison, error) {
+	s.calls++
+	return &api.ObserverComparison{TotalPackets: int64(s.calls)}, s.err
+}
+
+func TestObserverComparisonPassThrough(t *testing.T) {
+	inner := &stubReader{}
+	reader := &CachedReader{inner: inner}
+	a, b, since, until := uuid.New(), uuid.New(), time.Now().Add(-time.Hour), time.Now()
+	for i := int64(1); i <= 2; i++ {
+		got, err := reader.GetObserverComparison(context.Background(), a, b, since, until, nil)
+		if err != nil || got.TotalPackets != i {
+			t.Fatalf("comparison unexpectedly cached: %+v, %v", got, err)
+		}
+	}
+}
+
 func (s *stubReader) GetIATA(_ context.Context, _ string) (*api.IATA, error) { return nil, nil }
 
 func (s *stubReader) GetIATABorder(_ context.Context, _ string) (json.RawMessage, error) {
@@ -47,8 +72,10 @@ func (s *stubReader) GetRegion(_ context.Context, _ int32) (*api.Region, error) 
 func (s *stubReader) GetRegionBySlug(_ context.Context, _ string) (*api.Region, error) {
 	return nil, nil
 }
-func (s *stubReader) GetScopeNames(_ context.Context) ([]string, error)         { return nil, nil }
-func (s *stubReader) GetScopeStats(_ context.Context) ([]api.ScopeStats, error) { return nil, nil }
+func (s *stubReader) GetScopeNames(_ context.Context) ([]string, error) { return nil, nil }
+func (s *stubReader) GetScopeStats(_ context.Context, _ []string) ([]api.ScopeStats, error) {
+	return nil, nil
+}
 func (s *stubReader) GetScopesByIATAs(_ context.Context, _ []string) ([]api.ScopeSummary, error) {
 	return nil, nil
 }
@@ -129,6 +156,10 @@ func (s *stubReader) GetObserverTelemetryBucketed(_ context.Context, _ uuid.UUID
 	return nil, nil
 }
 
+func (s *stubReader) GetObserverActivity(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+	return nil, nil
+}
+
 func (s *stubReader) GetPacket(_ context.Context, _ []byte) (*api.Packet, error) { return nil, nil }
 
 func (s *stubReader) GetChannel(_ context.Context, _ int32) (*api.Channel, error) { return nil, nil }
@@ -145,7 +176,7 @@ func (s *stubReader) GetCrossIATANeighbors(_ context.Context, _ uuid.UUID, _ str
 	return nil, nil
 }
 
-func (s *stubReader) ListChannels(_ context.Context, _ int32, _ []byte, _ []string, _ int64, _ string) (api.ChannelPage, error) {
+func (s *stubReader) ListChannels(_ context.Context, _ int32, _ []byte, _ []string, _ int64, _ string, _ *api.ChannelCursor) (api.ChannelPage, error) {
 	return api.ChannelPage{}, nil
 }
 

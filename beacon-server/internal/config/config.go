@@ -7,6 +7,7 @@ package config
 
 import (
 	"fmt"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"time"
@@ -16,6 +17,10 @@ import (
 
 // Config is the top-level structure of the Beacon config file.
 type Config struct {
+	Auth        AuthConfig            `yaml:"auth"`
+	Backup      BackupConfig          `yaml:"backup"`
+	Log         LogConfig             `yaml:"log"`
+	Server      ServerConfig          `yaml:"server"`
 	IATAs       map[string]IATAConfig `yaml:"iatas"`
 	Regions     []RegionConfig        `yaml:"regions"`
 	ChannelKeys ChannelKeysConfig     `yaml:"channel_keys"`
@@ -30,13 +35,57 @@ type Config struct {
 	Scopes      []ScopeConfig         `yaml:"scopes"`
 	Cache       CacheConfig           `yaml:"cache"`
 	CORS        CORSConfig            `yaml:"cors"`
+	RateLimit   RateLimitConfig       `yaml:"ratelimit"`
 	Background  BackgroundConfig      `yaml:"background"`
 	Presence    PresenceConfig        `yaml:"presence"`
 	Nodes       NodesConfig           `yaml:"nodes"`
 }
 
+// BackupConfig enables protected downloads. Disabled by default.
+type BackupConfig struct {
+	Enabled bool `yaml:"enabled"`
+}
+
+// AuthConfig holds the operator key for the protected admin subtree.
+// The key is excluded from JSON; it must not be exposed by configuration APIs.
+type AuthConfig struct {
+	APIKey string `yaml:"api_key" json:"-"`
+}
+
+// LogConfig controls application verbosity and stderr output format.
+type LogConfig struct {
+	Level  string `yaml:"level"`
+	Format string `yaml:"format"`
+}
+
+// ServerConfig controls which direct peers may supply the client address.
+type ServerConfig struct {
+	// TrustedProxies accepts IPv4/IPv6 CIDRs; an empty list trusts no proxy.
+	// netip.Prefix validates each CIDR while the configuration is loaded.
+	TrustedProxies []netip.Prefix `yaml:"trusted_proxies"`
+}
+
+func (c *ServerConfig) UnmarshalYAML(node *yaml.Node) error {
+	// Pointers retain null list entries, which yaml would otherwise discard.
+	// Leave them as invalid prefixes for Load's validation below.
+	var raw struct {
+		TrustedProxies []*netip.Prefix `yaml:"trusted_proxies"`
+	}
+	if err := node.Decode(&raw); err != nil {
+		return err
+	}
+	c.TrustedProxies = make([]netip.Prefix, len(raw.TrustedProxies))
+	for i, prefix := range raw.TrustedProxies {
+		if prefix != nil {
+			c.TrustedProxies[i] = *prefix
+		}
+	}
+	return nil
+}
+
 // ResolvedConfig holds all runtime configuration with defaults applied.
 type ResolvedConfig struct {
+	RateLimit            ResolvedRateLimitConfig
 	TelemetryResolution  time.Duration
 	TelemetryRetention   time.Duration
 	PacketRetention      time.Duration
@@ -46,6 +95,7 @@ type ResolvedConfig struct {
 	RouteGrace           time.Duration
 	RouteMinObservations int
 	MaxConnsPerIP        int
+	MaxConnectsPerMinute int
 	ViewRefreshInterval  time.Duration
 	ReconfirmInterval    time.Duration
 	CleanupInterval      time.Duration
@@ -94,6 +144,20 @@ type ResolvedConfig struct {
 	RoutePlanDirectFreshness time.Duration
 	RoutePlanMaxHops         int
 	RoutePlanMaxAlternatives int
+}
+
+// RateLimitConfig controls the per-client REST API request budget.
+type RateLimitConfig struct {
+	Enabled           *bool `yaml:"enabled"` // Defaults to true; false disables both windows.
+	RequestsPerMinute int   `yaml:"requests_per_minute"`
+	Burst             int   `yaml:"burst"` // One-second window cap, not token-bucket capacity.
+}
+
+// ResolvedRateLimitConfig has defaults applied and no optional values.
+type ResolvedRateLimitConfig struct {
+	Enabled           bool
+	RequestsPerMinute int
+	Burst             int
 }
 
 // PresenceConfig controls coalescing of presence bookkeeping writes
@@ -209,6 +273,9 @@ type WebSocketConfig struct {
 	// MaxConnectionsPerIP is the maximum number of concurrent WebSocket
 	// connections allowed from a single IP address. Defaults to 5 if not set.
 	MaxConnectionsPerIP int `yaml:"max_connections_per_ip"`
+	// MaxConnectsPerMinute limits upgrade attempts, including failed handshakes.
+	// Zero/omitted defaults to 10; IPv6 addresses share a /64 attempt budget.
+	MaxConnectsPerMinute int `yaml:"max_connects_per_minute"`
 }
 
 // PacketsConfig controls packet retention behaviour.
@@ -351,6 +418,9 @@ type ObserversConfig struct {
 
 // NodesConfig controls node-derived signal thresholds.
 type NodesConfig struct {
+	// MarkForeign annotates repeaters outside the union of configured IATA border
+	// files. Disabled by default; enabling it requires at least one usable border.
+	MarkForeign bool `yaml:"mark_foreign"`
 	// ClockDriftThreshold is the |device clock - server clock| magnitude, measured from a
 	// repeater/room server's ADVERT timestamp, above which the node API reports
 	// clockOutOfSync=true for that node. Defaults to 5m if not set.
@@ -664,12 +734,27 @@ func Load(path string) (*Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
+			cfg.Auth.APIKey = os.Getenv("BEACON_API_KEY")
 			return cfg, nil
 		}
 		return nil, err
 	}
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
+	}
+	if value, set := os.LookupEnv("BEACON_API_KEY"); set {
+		cfg.Auth.APIKey = value
+	}
+	for i, prefix := range cfg.Server.TrustedProxies {
+		if !prefix.IsValid() {
+			return nil, fmt.Errorf("server.trusted_proxies[%d] must be a valid CIDR", i)
+		}
+	}
+	if cfg.RateLimit.RequestsPerMinute < 0 || cfg.RateLimit.Burst < 0 {
+		return nil, fmt.Errorf("ratelimit.requests_per_minute and ratelimit.burst must be positive or zero for defaults")
+	}
+	if cfg.WebSocket.MaxConnectsPerMinute < 0 {
+		return nil, fmt.Errorf("websocket.max_connects_per_minute must be positive or zero for the default")
 	}
 	if err := cfg.Validate(); err != nil {
 		return nil, err
@@ -694,6 +779,11 @@ func Load(path string) (*Config, error) {
 // on the result (Load already does).
 func Resolve(cfg *Config) ResolvedConfig {
 	r := ResolvedConfig{
+		RateLimit: ResolvedRateLimitConfig{
+			Enabled:           cfg.RateLimit.Enabled == nil || *cfg.RateLimit.Enabled,
+			RequestsPerMinute: cfg.RateLimit.RequestsPerMinute,
+			Burst:             cfg.RateLimit.Burst,
+		},
 		TelemetryResolution:  cfg.Telemetry.Resolution.Duration,
 		TelemetryRetention:   cfg.Telemetry.Retention.Duration,
 		PacketRetention:      cfg.Packets.Retention.Duration,
@@ -703,6 +793,7 @@ func Resolve(cfg *Config) ResolvedConfig {
 		RouteGrace:           cfg.Routes.Grace.Duration,
 		RouteMinObservations: cfg.Routes.MinObservations,
 		MaxConnsPerIP:        cfg.WebSocket.MaxConnectionsPerIP,
+		MaxConnectsPerMinute: cfg.WebSocket.MaxConnectsPerMinute,
 		ViewRefreshInterval:  cfg.Background.ViewRefresh.Duration,
 		ReconfirmInterval:    cfg.Background.Reconfirm.Duration,
 		CleanupInterval:      cfg.Background.Cleanup.Duration,
@@ -733,6 +824,12 @@ func Resolve(cfg *Config) ResolvedConfig {
 		RoutePlanMaxHops:              derefInt(cfg.RoutePlan.MaxHops, DefaultRoutePlanMaxHops),
 		RoutePlanMaxAlternatives:      derefInt(cfg.RoutePlan.MaxAlternatives, DefaultRoutePlanMaxAlternatives),
 	}
+	if r.RateLimit.RequestsPerMinute == 0 {
+		r.RateLimit.RequestsPerMinute = 300
+	}
+	if r.RateLimit.Burst == 0 {
+		r.RateLimit.Burst = r.RateLimit.RequestsPerMinute
+	}
 	if r.TelemetryResolution == 0 {
 		r.TelemetryResolution = time.Hour
 	}
@@ -759,6 +856,9 @@ func Resolve(cfg *Config) ResolvedConfig {
 	}
 	if r.MaxConnsPerIP == 0 {
 		r.MaxConnsPerIP = 5
+	}
+	if r.MaxConnectsPerMinute == 0 {
+		r.MaxConnectsPerMinute = 10
 	}
 	if r.ViewRefreshInterval == 0 {
 		r.ViewRefreshInterval = time.Hour

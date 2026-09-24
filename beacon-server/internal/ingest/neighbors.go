@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
@@ -43,13 +44,13 @@ type neighborReport struct {
 func (w *Worker) handleNeighbors(ctx context.Context, iata, pubkeyHex string, raw []byte) {
 	var report neighborReport
 	if err := json.Unmarshal(raw, &report); err != nil {
-		log.Printf("ingest[%s]: malformed neighbors envelope from %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Warn(fmt.Sprintf("malformed neighbors envelope from %s", pubkeyHex), "error", err)
 		return
 	}
 
 	pubkey, err := hex.DecodeString(pubkeyHex)
 	if err != nil {
-		log.Printf("ingest[%s]: invalid pubkey hex in neighbors from %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Warn(fmt.Sprintf("invalid pubkey hex in neighbors from %s", pubkeyHex), "error", err)
 		return
 	}
 
@@ -126,18 +127,18 @@ func (w *Worker) writeNeighbors(ctx context.Context, iata, pubkeyHex string, pub
 
 	observerID, _, err := w.db.UpsertObserver(ctx, pubkey)
 	if err != nil {
-		log.Printf("ingest[%s]: db: upsert observer failed in neighbors from %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: upsert observer failed in neighbors from %s", pubkeyHex), "error", err)
 		return
 	}
 	if err := w.db.UpsertObserverBroker(ctx, observerID, w.cfg.BrokerName); err != nil {
-		log.Printf("ingest[%s]: db: upsert observer broker failed in neighbors from %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: upsert observer broker failed in neighbors from %s", pubkeyHex), "error", err)
 	}
 
 	// self.scopes is always known (it's the observer's own config, not an OTA
 	// query), so this is an unconditional write -- unlike the per-neighbor
 	// scopes below, there's no "query failed" case to protect against here.
 	if err := w.db.UpdateObserverRegionScope(ctx, observerID, report.Self.Scopes); err != nil {
-		log.Printf("ingest[%s]: db: update observer region scope failed for %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: update observer region scope failed for %s", pubkeyHex), "error", err)
 	}
 
 	// The observer's own node row (as opposed to its observers row above) is
@@ -153,7 +154,7 @@ func (w *Worker) writeNeighbors(ctx context.Context, iata, pubkeyHex string, pub
 	for _, n := range report.Neighbors {
 		neighborPubkey, err := hex.DecodeString(n.PubKey)
 		if err != nil {
-			log.Printf("ingest[%s]: invalid neighbor pubkey hex %q from %s: %v", w.cfg.BrokerName, n.PubKey, pubkeyHex, err)
+			w.log.Warn(fmt.Sprintf("invalid neighbor pubkey hex %q from %s", n.PubKey, pubkeyHex), "error", err)
 			continue
 		}
 		neighborNodeID, err := w.db.GetNodeByPubkey(ctx, neighborPubkey)
@@ -179,7 +180,7 @@ func (w *Worker) writeNeighbors(ctx context.Context, iata, pubkeyHex string, pub
 		}
 
 		if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, neighborNodeID, iata, &snr, regionScope, true, hashWidthExact()); err != nil {
-			log.Printf("ingest[%s]: db: upsert neighbor failed for %s -> %s: %v", w.cfg.BrokerName, pubkeyHex, n.PubKey, err)
+			w.log.Error(fmt.Sprintf("db: upsert neighbor failed for %s -> %s", pubkeyHex, n.PubKey), "error", err)
 		}
 	}
 }

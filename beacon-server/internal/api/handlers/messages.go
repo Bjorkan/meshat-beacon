@@ -93,8 +93,8 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 			iatas = append(iatas, regionIATAs...)
 		}
 		scope := r.URL.Query().Get("scope")
-		var messages api.Page[api.ChannelMessage]
 		var err error
+		var messages api.Page[api.ChannelMessage]
 		if channelHashParam != "" {
 			hashHex, decodeErr := hex.DecodeString(channelHashParam)
 			if decodeErr != nil {
@@ -105,12 +105,12 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 				respondError(w, http.StatusBadRequest, "channel hash must be a single hex byte")
 				return
 			}
-			messages, err = reader.ListChannelMessagesByHash(r.Context(), hashHex, since, int32(limit), iatas, scope, cursor)
+			messages, err = reader.ListChannelMessagesByHash(r.Context(), hashHex, since, limit, iatas, scope, cursor)
 		} else if channelIDParam != "" {
 			chanID := int32(id)
-			messages, err = reader.ListChannelMessages(r.Context(), &chanID, since, int32(limit), iatas, scope, cursor)
+			messages, err = reader.ListChannelMessages(r.Context(), &chanID, since, limit, iatas, scope, cursor)
 		} else {
-			messages, err = reader.ListChannelMessages(r.Context(), nil, since, int32(limit), iatas, scope, cursor)
+			messages, err = reader.ListChannelMessages(r.Context(), nil, since, limit, iatas, scope, cursor)
 		}
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")

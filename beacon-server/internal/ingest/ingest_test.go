@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"testing"
 	"time"
 
@@ -177,6 +178,7 @@ type stubDB struct {
 
 	upsertNodeCalls            int
 	upsertNodeID               uuid.UUID
+	upsertNodeParams           UpsertNodeParams
 	nodeCoordinatesChanged     bool
 	upsertChannelCalls         int
 	upsertChannelKind          keystore.ChannelKind
@@ -226,8 +228,9 @@ func (s *stubDB) InsertObservation(_ context.Context, _ InsertObservationParams)
 	return s.observationInserted, nil
 }
 func (s *stubDB) SetNodeDefaultScope(_ context.Context, _ uuid.UUID, _ int32) error { return nil }
-func (s *stubDB) UpsertNode(_ context.Context, _ UpsertNodeParams, _ RadioSettings) (uuid.UUID, bool, error) {
+func (s *stubDB) UpsertNode(_ context.Context, params UpsertNodeParams, _ RadioSettings) (uuid.UUID, bool, error) {
 	s.upsertNodeCalls++
+	s.upsertNodeParams = params
 	return s.upsertNodeID, s.nodeCoordinatesChanged, nil
 }
 func (s *stubDB) UpsertNodeIATA(_ context.Context, _ uuid.UUID, _ string) error { return nil }
@@ -332,6 +335,7 @@ func (s *stubDB) UpdateObserverRegionScope(_ context.Context, _ uuid.UUID, scope
 func newTestWorker() (*Worker, *stubDB) {
 	db := &stubDB{}
 	w := &Worker{
+		log:    slog.Default().With("component", "ingest", "broker", "test"),
 		cfg:    Config{BrokerName: "test"},
 		db:     db,
 		hub:    hub.New(),
@@ -410,5 +414,9 @@ func (s *stubDB) UpsertObserverOwner(context.Context, uuid.UUID, []byte, string,
 	return true, nil
 }
 func (s *stubDB) ReconcileObserverOwners(context.Context, uuid.UUID) ([]uuid.UUID, error) {
+	return nil, nil
+}
+
+func (s *stubDB) ResolveEndpointHashes(_ context.Context, _ string, _ [][]byte) (map[string][]api.ResolvedPathEntry, error) {
 	return nil, nil
 }

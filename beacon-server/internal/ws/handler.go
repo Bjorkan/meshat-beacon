@@ -31,13 +31,15 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"net"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/go-chi/httprate"
 	"github.com/google/uuid"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
@@ -51,26 +53,34 @@ const (
 
 // Handler returns an http.HandlerFunc that requires the hub to be injected.
 // Wire it via router.New(h) so the hub is available at startup.
-func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc {
+func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute int) http.HandlerFunc {
 	limiter := newIPLimiter(maxConnsPerIP)
+	attempts := httprate.NewRateLimiter(maxConnectsPerMinute, time.Minute,
+		httprate.WithResponseHeaders(httprate.ResponseHeaders{RetryAfter: "Retry-After"}))
 	return func(w http.ResponseWriter, r *http.Request) {
 		ip := r.RemoteAddr
 		if host, _, err := net.SplitHostPort(ip); err == nil {
 			ip = host
 		}
+		// Count attempts before Accept, including failed handshakes. RemoteAddr
+		// was already resolved by TrustedProxyIP; never read forwarding headers here.
+		if attempts.RespondOnLimit(w, r, httprate.CanonicalizeIP(ip)) {
+			return
+		}
+		conn, err := websocket.Accept(w, r, nil)
+		if err != nil {
+			slog.Warn("ws: failed to accept connection", "component", "ws", "error", err)
+			return
+		}
+		defer conn.CloseNow()
 		if !limiter.acquire(ip) {
-			log.Printf("ws: connection limit reached for IP %s", ip)
-			http.Error(w, "too many connections from this IP", http.StatusTooManyRequests)
+			// This attempt passed the rate budget. Give the accepted socket a
+			// browser-visible backoff signal before allocating a hub client.
+			slog.Warn("ws: connection limit reached", "component", "ws", "client_ip", ip)
+			_ = conn.Close(websocket.StatusTryAgainLater, "connection limit reached")
 			return
 		}
 		defer limiter.release(ip)
-		conn, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			log.Printf("ws: failed to accept connection: %v", err)
-			return
-		}
-
-		defer conn.CloseNow()
 
 		connID := uuid.NewString()
 		client := h.NewClient()
@@ -87,10 +97,10 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 			"connectionId": connID,
 		}
 		helloBytes, _ := json.Marshal(hello)
-		log.Printf("ws[%s]: connected, hello: %s", connID, helloBytes)
+		slog.Debug("connected", "component", "ws", "connection_id", connID)
 		err = writeMessage(ctx, conn, helloBytes)
 		if err != nil {
-			log.Printf("ws[%s]: failed to send hello: %v", connID, err)
+			slog.Warn(fmt.Sprintf("ws[%s]: failed to send hello", connID), "component", "ws", "error", err)
 			return
 		}
 
@@ -110,7 +120,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 					}
 					msgBytes, _ := json.Marshal(msg)
 					if err := writeMessage(ctx, conn, msgBytes); err != nil {
-						log.Printf("ws[%s]: failed to write hub event: %v", connID, err)
+						slog.Warn(fmt.Sprintf("ws[%s]: failed to write hub event", connID), "component", "ws", "error", err)
 						cancel()
 						return
 					}
@@ -127,7 +137,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 					}
 					lagBytes, _ := json.Marshal(lagged)
 					if err := writeMessage(ctx, conn, lagBytes); err != nil {
-						log.Printf("ws[%s]: failed to write lagged notice: %v", connID, err)
+						slog.Warn(fmt.Sprintf("ws[%s]: failed to write lagged notice", connID), "component", "ws", "error", err)
 						cancel()
 						return
 					}
@@ -145,7 +155,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP int) http.HandlerFunc 
 			_, msgBytes, err := conn.Read(readCtx)
 			readCancel()
 			if err != nil {
-				log.Printf("ws[%s]: read error: %v", connID, err)
+				slog.Warn(fmt.Sprintf("ws[%s]: read error", connID), "component", "ws", "error", err)
 				return
 			}
 			handleClientMessage(ctx, client, reader, h, conn, connID, msgBytes)
@@ -183,7 +193,7 @@ type subscribeScope struct {
 func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Reader, h *hub.Hub, conn *websocket.Conn, connID string, raw []byte) {
 	var msg clientMessage
 	if err := json.Unmarshal(raw, &msg); err != nil {
-		log.Printf("ws[%s]: bad message: %v", connID, err)
+		slog.Warn("bad message", "component", "ws", "connection_id", connID, "error", err)
 		return
 	}
 
@@ -196,12 +206,12 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		for _, ridStr := range msg.Scope.RegionIDs {
 			rid, err := strconv.ParseInt(ridStr, 10, 32)
 			if err != nil {
-				log.Printf("ws[%s]: invalid regionId %q, skipping", connID, ridStr)
+				slog.Warn(fmt.Sprintf("ws[%s]: invalid regionId %q, skipping", connID, ridStr), "component", "ws")
 				continue
 			}
 			region, err := reader.GetRegion(ctx, int32(rid))
 			if err != nil {
-				log.Printf("ws[%s]: region %d not found, skipping: %v", connID, rid, err)
+				slog.Warn(fmt.Sprintf("ws[%s]: region %d not found, skipping", connID, rid), "component", "ws", "error", err)
 				continue
 			}
 			iatas = append(iatas, region.IATAs...)
@@ -209,7 +219,7 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		for _, slug := range msg.Scope.RegionSlugs {
 			region, err := reader.GetRegionBySlug(ctx, slug)
 			if err != nil {
-				log.Printf("ws[%s]: region slug %q not found, skipping: %v", connID, slug, err)
+				slog.Warn(fmt.Sprintf("ws[%s]: region slug %q not found, skipping", connID, slug), "component", "ws", "error", err)
 				continue
 			}
 			iatas = append(iatas, region.IATAs...)
@@ -225,10 +235,12 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		reply, _ := json.Marshal(map[string]any{
 			"v": 1, "type": "subscribed", "id": msg.ID, "subscriptionId": subID,
 		})
-		log.Printf("ws[%s]: subscribed %s → %s", connID, msg.ID, subID)
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			slog.Debug(fmt.Sprintf("ws[%s]: subscribed %s → %s", connID, msg.ID, subID), "component", "ws")
+		}
 		err := writeMessage(ctx, conn, reply)
 		if err != nil {
-			log.Printf("ws[%s]: failed to send subscribed reply: %v", connID, err)
+			slog.Warn("failed to send subscribed reply", "component", "ws", "connection_id", connID, "error", err)
 		}
 
 	case "unsubscribe":
@@ -239,9 +251,11 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		reply, _ := json.Marshal(map[string]any{
 			"v": 1, "type": "unsubscribed", "id": msg.ID, "subscriptionId": msg.SubscriptionID,
 		})
-		log.Printf("ws[%s]: unsubscribed %s", connID, msg.SubscriptionID)
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			slog.Debug(fmt.Sprintf("ws[%s]: unsubscribed %s", connID, msg.SubscriptionID), "component", "ws")
+		}
 		if err := writeMessage(ctx, conn, reply); err != nil {
-			log.Printf("ws[%s]: failed to send unsubscribed reply: %v", connID, err)
+			slog.Warn("failed to send unsubscribed reply", "component", "ws", "connection_id", connID, "error", err)
 		}
 
 	case "configure":
@@ -249,20 +263,22 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		reply, _ := json.Marshal(map[string]any{
 			"v": 1, "type": "configured", "id": msg.ID, "resolvePath": msg.ResolvePath,
 		})
-		log.Printf("ws[%s]: configured resolvePath=%t", connID, msg.ResolvePath)
+		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
+			slog.Debug(fmt.Sprintf("ws[%s]: configured resolvePath=%t", connID, msg.ResolvePath), "component", "ws")
+		}
 		if err := writeMessage(ctx, conn, reply); err != nil {
-			log.Printf("ws[%s]: failed to send configured reply: %v", connID, err)
+			slog.Warn(fmt.Sprintf("ws[%s]: failed to send configured reply", connID), "component", "ws", "error", err)
 		}
 
 	case "ping":
 		reply, _ := json.Marshal(map[string]any{"v": 1, "type": "pong", "id": msg.ID})
 		err := writeMessage(ctx, conn, reply)
 		if err != nil {
-			log.Printf("ws[%s]: failed to send pong: %v", connID, err)
+			slog.Warn(fmt.Sprintf("ws[%s]: failed to send pong", connID), "component", "ws", "error", err)
 		}
 
 	default:
-		log.Printf("ws[%s]: unknown message type %q", connID, msg.Type)
+		slog.Warn("unknown message type", "component", "ws", "connection_id", connID)
 	}
 }
 

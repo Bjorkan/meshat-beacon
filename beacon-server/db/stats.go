@@ -6,7 +6,7 @@ package db
 import (
 	"context"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 	"time"
@@ -192,7 +192,7 @@ func (s *Store) GetStatsClockDrift(ctx context.Context, iatas []string, limit in
 		}
 		if len(v.Iatas) > 0 {
 			if err := json.Unmarshal(v.Iatas, &entry.IATAs); err != nil {
-				log.Printf("store: failed to unmarshal clock drift node iatas: %v", err)
+				slog.Error("store: failed to unmarshal clock drift node iatas", "component", "db", "error", err)
 				entry.IATAs = []api.NodeIATA{}
 			}
 		}
@@ -285,8 +285,8 @@ func (s *Store) resolvePresetTitleTriple(freq, bw float64, sf int) string {
 	return s.presetCatalogue.Match(freq, bw, sf)
 }
 
-func (s *Store) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {
-	rows, err := s.q.GetScopeStats(ctx)
+func (s *Store) GetScopeStats(ctx context.Context, iatas []string) ([]api.ScopeStats, error) {
+	rows, err := s.q.GetScopeStats(ctx, iatas)
 	if err != nil {
 		return nil, err
 	}
@@ -347,4 +347,8 @@ func (s *Store) RefreshTopObservers(ctx context.Context) error {
 
 func (s *Store) RefreshRadioPresets(ctx context.Context) error {
 	return s.q.RefreshRadioPresets(ctx)
+}
+
+func (s *Store) RefreshObserverActivity(ctx context.Context) error {
+	return s.q.RefreshObserverActivity(ctx)
 }
