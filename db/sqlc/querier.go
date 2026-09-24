@@ -90,6 +90,9 @@ type Querier interface {
 	// whose observations have expired; the filtered aggregates are empty in that case.
 	GetScopeStats(ctx context.Context, iatas []string) ([]GetScopeStatsRow, error)
 	GetScopesByIATAs(ctx context.Context, dollar_1 []string) ([]GetScopesByIATAsRow, error)
+	// Read compact hourly snapshots, never observations on an HTTP request.
+	// Weight averages by sample counts instead of averaging regional/hourly means.
+	GetSignalStats(ctx context.Context, arg GetSignalStatsParams) ([]GetSignalStatsRow, error)
 	// Repeaters/room servers (node_type 2/3) whose current advert-derived clock drift exceeds
 	// the given threshold in magnitude, worst first. Not time-windowed -- reflects each node's
 	// latest measured drift, not an aggregate over a period.
@@ -214,6 +217,7 @@ type Querier interface {
 	RefreshObserverActivity(ctx context.Context) error
 	RefreshPayloadBreakdown(ctx context.Context) error
 	RefreshRadioPresets(ctx context.Context) error
+	RefreshSignalStats(ctx context.Context) error
 	RefreshTopAdvertisers(ctx context.Context) error
 	RefreshTopNodes(ctx context.Context) error
 	RefreshTopObservers(ctx context.Context) error
