@@ -9,14 +9,14 @@ import "github.com/google/uuid"
 // The three groups partition TotalPackets, the union heard by either observer.
 // Counts describe retained reported receptions, not radio packet loss.
 type ObserverComparison struct {
-	ObserverA    uuid.UUID `json:"observerA"`
-	ObserverB    uuid.UUID `json:"observerB"`
-	Since        int64     `json:"since"` // inclusive, epoch milliseconds
-	Until        int64     `json:"until"` // exclusive, epoch milliseconds
-	TotalPackets int64     `json:"totalPackets"`
-	OnlyA        int64     `json:"onlyA"`
-	OnlyB        int64     `json:"onlyB"`
-	Both         int64     `json:"both"`
+	ObserverA    uuid.UUID `json:"observerA" binding:"required"`
+	ObserverB    uuid.UUID `json:"observerB" binding:"required"`
+	Since        int64     `json:"since" binding:"required"` // inclusive, epoch milliseconds
+	Until        int64     `json:"until" binding:"required"` // exclusive, epoch milliseconds
+	TotalPackets int64     `json:"totalPackets" binding:"required"`
+	OnlyA        int64     `json:"onlyA" binding:"required"`
+	OnlyB        int64     `json:"onlyB" binding:"required"`
+	Both         int64     `json:"both" binding:"required"`
 }
 
 // RadioPreset represents a unique radio configuration observed in a given IATA,

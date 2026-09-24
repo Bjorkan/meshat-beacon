@@ -51,6 +51,7 @@ export interface WsPacketObservation {
       isFirstObservation: boolean;
       observationCount: number;
       scope?: string; // matched transport scope name; omitted when none matched
+      summary?: string;
     };
     observation: {
       observerId: string;
@@ -100,6 +101,8 @@ export interface WsNodeUpdate {
     name: string;
     nodeType: number;
     nodeTypeName: string;
+    // Omitted leaves the prior verdict unchanged; null clears an unknown/reset position.
+    possiblyForeign?: boolean | null;
     iata: string;
     // decimal degrees, same as REST /nodes (api/nodes.go serializes *float64 degrees to both)
     lat?: number;

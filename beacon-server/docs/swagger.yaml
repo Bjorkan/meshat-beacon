@@ -794,25 +794,44 @@ definitions:
           $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityPoint'
         type: array
       radio:
-        $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio'
+        allOf:
+        - $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio'
+        x-nullable: true
       range:
         type: string
+    required:
+    - interval
+    - payloadTypes
+    - points
+    - radio
+    - range
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityPoint:
     properties:
       airtimeMs:
         type: number
+        x-nullable: true
       observations:
         type: integer
       rssiAvg:
         type: number
+        x-nullable: true
       snrAvg:
         type: number
+        x-nullable: true
       snrMin:
         type: number
+        x-nullable: true
       t:
         description: bucket start, epoch ms
         type: integer
+    required:
+    - airtimeMs
+    - observations
+    - rssiAvg
+    - snrAvg
+    - snrMin
+    - t
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio:
     properties:
@@ -822,10 +841,17 @@ definitions:
         type: integer
       freqMhz:
         type: number
+        x-nullable: true
       preambleSymbols:
         type: integer
       sf:
         type: integer
+    required:
+    - bwKhz
+    - cr
+    - freqMhz
+    - preambleSymbols
+    - sf
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverBroker:
     properties:
@@ -863,6 +889,15 @@ definitions:
       until:
         description: exclusive, epoch milliseconds
         type: integer
+    required:
+    - both
+    - observerA
+    - observerB
+    - onlyA
+    - onlyB
+    - since
+    - totalPackets
+    - until
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverOwnerNode:
     properties:
@@ -1349,6 +1384,9 @@ definitions:
         type: integer
       receptions:
         type: integer
+    required:
+    - bytes
+    - receptions
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PathHour:
     properties:
@@ -1368,6 +1406,15 @@ definitions:
         type: integer
       unclassified:
         type: integer
+    required:
+    - empty
+    - hour
+    - oneByte
+    - receptions
+    - threeByte
+    - trace
+    - twoByte
+    - unclassified
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PathLengthBin:
     properties:
@@ -1375,6 +1422,9 @@ definitions:
         type: integer
       receptions:
         type: integer
+    required:
+    - entries
+    - receptions
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PathStats:
     properties:
@@ -1404,6 +1454,17 @@ definitions:
         type: integer
       until:
         type: integer
+    required:
+    - empty
+    - hashWidths
+    - hashed
+    - hourly
+    - pathLengths
+    - receptions
+    - since
+    - trace
+    - unclassified
+    - until
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.PayloadBreakdownItem:
     properties:
@@ -1737,8 +1798,14 @@ definitions:
         type: integer
       lower:
         type: number
+        x-nullable: true
       upper:
         type: number
+        x-nullable: true
+    required:
+    - count
+    - lower
+    - upper
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.SignalHour:
     properties:
@@ -1748,23 +1815,37 @@ definitions:
         type: integer
       rssiAverage:
         type: number
+        x-nullable: true
       rssiSamples:
         type: integer
       snrAverage:
         type: number
+        x-nullable: true
       snrSamples:
         type: integer
+    required:
+    - hour
+    - receptions
+    - rssiAverage
+    - rssiSamples
+    - snrAverage
+    - snrSamples
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric:
     properties:
       average:
         type: number
+        x-nullable: true
       histogram:
         items:
           $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalBin'
         type: array
       samples:
         type: integer
+    required:
+    - average
+    - histogram
+    - samples
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.SignalStats:
     properties:
@@ -1782,6 +1863,13 @@ definitions:
         $ref: '#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric'
       until:
         type: integer
+    required:
+    - hourly
+    - receptions
+    - rssi
+    - since
+    - snr
+    - until
     type: object
   github_com_MeshCore-Beacon_beacon-server_internal_api.StatsOverview:
     properties:

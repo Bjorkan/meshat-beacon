@@ -36,6 +36,10 @@ function nextNodeSummary(prev: NodeSummary, data: WsNodeUpdate['data']): NodeSum
     defaultScope: data.defaultScope ?? prev.defaultScope,
     iatas: data.iatas ?? prev.iatas,
     isObserver: data.isObserver ?? prev.isObserver,
+    possiblyForeign:
+      data.possiblyForeign === undefined
+        ? prev.possiblyForeign
+        : (data.possiblyForeign ?? undefined),
   };
 }
 
@@ -111,9 +115,19 @@ export function patchNodeSummary(
   const name = data.name || prev.name;
   const lat = data.lat ?? prev.lat;
   const lng = data.lng ?? prev.lng;
-  if (name === prev.name && lat === prev.lat && lng === prev.lng) return list;
+  const possiblyForeign =
+    data.possiblyForeign === undefined ? prev.possiblyForeign : (data.possiblyForeign ?? undefined);
+  // a re-advert that re-sends the same values must keep the SAME ref so patchInfinitePages no-ops
+  // (otherwise an unchanged node would trigger a full map FeatureCollection rebuild + setData)
+  if (
+    name === prev.name &&
+    lat === prev.lat &&
+    lng === prev.lng &&
+    possiblyForeign === prev.possiblyForeign
+  )
+    return list;
   const updated = [...list];
-  updated[idx] = { ...prev, name, lat, lng };
+  updated[idx] = { ...prev, name, lat, lng, possiblyForeign };
   return updated;
 }
 
@@ -139,6 +153,7 @@ export function patchNodeTableSummary(
     next.radio === prev.radio &&
     next.defaultScope === prev.defaultScope &&
     next.isObserver === prev.isObserver &&
+    next.possiblyForeign === prev.possiblyForeign &&
     sameIATAs(next.iatas, prev.iatas)
   )
     return list;
@@ -172,6 +187,7 @@ export function upsertNodePages(
     iatas: data.iatas,
     knownNeighborCount: 0,
     isObserver: data.isObserver,
+    possiblyForeign: data.possiblyForeign ?? undefined,
   };
   const pages = [...old.pages];
   const last = pages[pages.length - 1]!;

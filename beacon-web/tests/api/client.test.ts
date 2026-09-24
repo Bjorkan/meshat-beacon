@@ -705,7 +705,7 @@ describe('generated-model domain adapters', () => {
     mockFetchOnce({
       range: '24h',
       interval: '1h',
-      points: [{ t: 1, batteryMv: 0, airtimeRxPct: 0 }],
+      points: [{ t: 1, batteryMv: 0, airtimeRxSecs: 0 }],
     });
     expect(await getObserverTelemetry('observer', '24h')).toEqual({
       range: '24h',
@@ -714,8 +714,8 @@ describe('generated-model domain adapters', () => {
         {
           t: 1,
           batteryMv: 0,
-          airtimeRxPct: 0,
-          airtimeTxPct: null,
+          airtimeRxSecs: 0,
+          airtimeTxSecs: null,
           noiseFloorDb: null,
           uptimeSeconds: null,
           queueLength: null,
@@ -748,4 +748,24 @@ describe('generated-model domain adapters', () => {
     });
     await expect(getIataBorder('YVR')).rejects.toThrow('Invalid IATA border response');
   });
+});
+
+it('retains precise channel cursors and known/unknown filters together', async () => {
+  const getUrl = mockFetchOnce({
+    items: [],
+    unknownCount: 42,
+    hasMore: true,
+    nextCursor: 123,
+    nextPageCursor: 'next-precise',
+  });
+  const result = await getChannels({
+    iatas: ['STO', 'GOT'],
+    key: 'unknown',
+    pageCursor: 'previous-precise',
+  });
+  const url = new URL(getUrl());
+  expect(url.searchParams.get('pageCursor')).toBe('previous-precise');
+  expect(url.searchParams.get('key')).toBe('unknown');
+  expect(url.searchParams.get('iatas')).toBe('STO,GOT');
+  expect(result).toMatchObject({ unknownCount: 42, nextPageCursor: 'next-precise', hasMore: true });
 });

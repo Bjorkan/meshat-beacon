@@ -4535,6 +4535,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivity": {
             "type": "object",
+            "required": [
+                "interval",
+                "payloadTypes",
+                "points",
+                "radio",
+                "range"
+            ],
             "properties": {
                 "interval": {
                     "type": "string"
@@ -4552,7 +4559,12 @@ const docTemplate = `{
                     }
                 },
                 "radio": {
-                    "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio"
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio"
+                        }
+                    ],
+                    "x-nullable": true
                 },
                 "range": {
                     "type": "string"
@@ -4561,21 +4573,33 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityPoint": {
             "type": "object",
+            "required": [
+                "airtimeMs",
+                "observations",
+                "rssiAvg",
+                "snrAvg",
+                "snrMin",
+                "t"
+            ],
             "properties": {
                 "airtimeMs": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "observations": {
                     "type": "integer"
                 },
                 "rssiAvg": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "snrAvg": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "snrMin": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "t": {
                     "description": "bucket start, epoch ms",
@@ -4585,6 +4609,13 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverActivityRadio": {
             "type": "object",
+            "required": [
+                "bwKhz",
+                "cr",
+                "freqMhz",
+                "preambleSymbols",
+                "sf"
+            ],
             "properties": {
                 "bwKhz": {
                     "type": "number"
@@ -4593,7 +4624,8 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "freqMhz": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "preambleSymbols": {
                     "type": "integer"
@@ -4627,6 +4659,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.ObserverComparison": {
             "type": "object",
+            "required": [
+                "both",
+                "observerA",
+                "observerB",
+                "onlyA",
+                "onlyB",
+                "since",
+                "totalPackets",
+                "until"
+            ],
             "properties": {
                 "both": {
                     "type": "integer"
@@ -5325,6 +5367,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PathHashWidth": {
             "type": "object",
+            "required": [
+                "bytes",
+                "receptions"
+            ],
             "properties": {
                 "bytes": {
                     "type": "integer"
@@ -5336,6 +5382,16 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PathHour": {
             "type": "object",
+            "required": [
+                "empty",
+                "hour",
+                "oneByte",
+                "receptions",
+                "threeByte",
+                "trace",
+                "twoByte",
+                "unclassified"
+            ],
             "properties": {
                 "empty": {
                     "type": "integer"
@@ -5365,6 +5421,10 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PathLengthBin": {
             "type": "object",
+            "required": [
+                "entries",
+                "receptions"
+            ],
             "properties": {
                 "entries": {
                     "type": "integer"
@@ -5376,6 +5436,18 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.PathStats": {
             "type": "object",
+            "required": [
+                "empty",
+                "hashWidths",
+                "hashed",
+                "hourly",
+                "pathLengths",
+                "receptions",
+                "since",
+                "trace",
+                "unclassified",
+                "until"
+            ],
             "properties": {
                 "empty": {
                     "type": "integer"
@@ -5853,20 +5925,35 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.SignalBin": {
             "type": "object",
+            "required": [
+                "count",
+                "lower",
+                "upper"
+            ],
             "properties": {
                 "count": {
                     "type": "integer"
                 },
                 "lower": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "upper": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 }
             }
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.SignalHour": {
             "type": "object",
+            "required": [
+                "hour",
+                "receptions",
+                "rssiAverage",
+                "rssiSamples",
+                "snrAverage",
+                "snrSamples"
+            ],
             "properties": {
                 "hour": {
                     "type": "integer"
@@ -5875,13 +5962,15 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "rssiAverage": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "rssiSamples": {
                     "type": "integer"
                 },
                 "snrAverage": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "snrSamples": {
                     "type": "integer"
@@ -5890,9 +5979,15 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.SignalMetric": {
             "type": "object",
+            "required": [
+                "average",
+                "histogram",
+                "samples"
+            ],
             "properties": {
                 "average": {
-                    "type": "number"
+                    "type": "number",
+                    "x-nullable": true
                 },
                 "histogram": {
                     "type": "array",
@@ -5907,6 +6002,14 @@ const docTemplate = `{
         },
         "github_com_MeshCore-Beacon_beacon-server_internal_api.SignalStats": {
             "type": "object",
+            "required": [
+                "hourly",
+                "receptions",
+                "rssi",
+                "since",
+                "snr",
+                "until"
+            ],
             "properties": {
                 "hourly": {
                     "type": "array",

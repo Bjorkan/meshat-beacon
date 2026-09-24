@@ -449,13 +449,13 @@ export const channelQueries = {
       Error,
       InfiniteData<ChannelPage>,
       QueryKey,
-      number | undefined
+      string | undefined
     >({
       queryKey: ['channels', args.regionKey, { hash: args.hash, key: args.key }] as const,
       queryFn: ({ pageParam }) =>
-        getChannels({ iatas: args.iatas, hash: args.hash, key: args.key, cursor: pageParam }),
+        getChannels({ iatas: args.iatas, hash: args.hash, key: args.key, pageCursor: pageParam }),
       initialPageParam: undefined,
-      getNextPageParam: (page) => (page.hasMore ? (page.nextCursor ?? undefined) : undefined),
+      getNextPageParam: (page) => (page.hasMore ? (page.nextPageCursor ?? undefined) : undefined),
       staleTime: 60_000,
       refetchInterval: 30_000,
     }),
@@ -638,7 +638,7 @@ export const statsQueries = {
   observations: (regionKey: string, iatas: string[] | undefined, range: StatsRange) =>
     queryOptions({
       queryKey: ['stats-observations', regionKey, range] as const,
-      queryFn: () => getStatsObservations(iatas, sinceFor(range)),
+      queryFn: ({ signal }) => getStatsObservations(iatas, sinceFor(range), signal),
       ...statsCommon,
       // feeds the observations chart + sparklines and gets no WS bumps, so refetch to stay fresh
       refetchInterval: 60_000,
@@ -693,11 +693,12 @@ export const statsQueries = {
       queryFn: () => getClockDrift(iatas, limit),
       ...statsCommon,
     }),
-  // scopes are reported globally by the backend (no region filter), so the key is region-independent
-  scopes: () =>
+  // Scope snapshots follow the selected region.
+  scopes: (regionKey: string, iatas?: string[]) =>
     queryOptions({
-      queryKey: ['stats-scopes'] as const,
-      queryFn: getStatsScopes,
+      queryKey: ['stats-scopes', regionKey] as const,
+      queryFn: ({ signal }) => getStatsScopes(iatas, signal),
+      refetchInterval: 60_000,
       ...statsCommon,
     }),
   observerSearch: (args: { regionKey: string; iatas?: string[]; q: string }) =>

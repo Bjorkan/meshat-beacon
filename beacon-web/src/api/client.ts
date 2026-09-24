@@ -1,4 +1,5 @@
 import { API_BASE, DEFAULT_PAGE_SIZE } from '../lib/constants';
+import { noteRequestOk } from './rate-limit';
 import type {
   CursorPage,
   PacketSummary,
@@ -19,6 +20,9 @@ import type { ObserverSummary, Observer, AdvertObservation } from '../features/o
 import type { NodeSummary, Node, NodeObservation, NodeNeighbor } from '../features/nodes/types';
 import type {
   StatsOverview,
+  SignalStats,
+  PathStats,
+  ObserverComparison,
   ObservationPoint,
   PayloadBreakdownItem,
   TopNode,
@@ -28,6 +32,7 @@ import type {
   RadioPreset,
   ScopeStats,
   ObserverTelemetry,
+  ObserverActivity,
   NodeTypeCount,
   ClockDriftEntry,
 } from '../features/stats/types';
@@ -35,6 +40,11 @@ import type { Feature, Polygon, MultiPolygon } from 'geojson';
 import type * as Models from './generated/models';
 import {
   ApiError,
+  errorFrom,
+  rawGetStatsSignal,
+  rawGetStatsPaths,
+  rawGetStatsObserverComparison,
+  rawGetObserversObserverIdActivity,
   rawGetBrokers,
   rawGetChannels,
   rawGetChannelsChannelID,
@@ -81,6 +91,14 @@ export type IataBorder = Feature<Polygon | MultiPolygon>;
 // adapter boundary for app-specific CSV parameters, cursor wrappers, and GeoJSON 204 handling.
 
 // endpoint functions
+
+export function getObserverComparison(
+  iatas: string[] | undefined,
+  params: { observerA: string; observerB: string; since: number; until: number },
+  signal?: AbortSignal,
+): Promise<ObserverComparison> {
+  return rawGetStatsObserverComparison({ ...params, iatas: iatasParam(iatas) }, { signal });
+}
 
 // The region filter travels as the comma-separated `iatas` param; undefined/empty means all regions.
 function iatasParam(iatas?: string[]): string | undefined {
@@ -228,8 +246,9 @@ function isIataBorder(value: unknown): value is IataBorder {
 export async function getIataBorder(iata: string): Promise<IataBorder | null> {
   const url = new URL(`${API_BASE}/iatas/${iata}/border`, window.location.origin);
   const res = await fetch(url.toString());
+  if (!res.ok) throw await errorFrom(res);
+  noteRequestOk();
   if (res.status === 204) return null;
-  if (!res.ok) throw new ApiError(res.status, 'unknown', res.statusText);
   const body: unknown = await res.json();
   if (body == null) return null;
   if (!isIataBorder(body))
@@ -253,6 +272,7 @@ export async function getChannels(params?: {
   iatas?: string[];
   limit?: number;
   cursor?: number;
+  pageCursor?: string;
   hash?: string;
   key?: 'known' | 'unknown' | 'all';
 }): Promise<ChannelPage> {
@@ -262,6 +282,7 @@ export async function getChannels(params?: {
     iatas: iatas.length > 1 ? iatasParam(iatas) : undefined,
     limit: params?.limit,
     cursor: params?.cursor,
+    pageCursor: params?.pageCursor,
     hash: params?.hash,
     key: params?.key,
   });
@@ -270,6 +291,7 @@ export async function getChannels(params?: {
     nextCursor: page.nextCursor ?? null,
     hasMore: requiredField(page.hasMore, 'ChannelSummary page', 'hasMore'),
     unknownCount: requiredField(page.unknownCount, 'ChannelSummary page', 'unknownCount'),
+    nextPageCursor: page.nextPageCursor,
   };
 }
 
@@ -547,8 +569,9 @@ export function getStatsOverview(iatas?: string[]): Promise<StatsOverview> {
 export function getStatsObservations(
   iatas?: string[],
   since?: number,
+  signal?: AbortSignal,
 ): Promise<ObservationPoint[]> {
-  return rawGetStatsObservations({ iatas: iatasParam(iatas), since });
+  return rawGetStatsObservations({ iatas: iatasParam(iatas), since }, { signal });
 }
 
 export function getPayloadBreakdown(
@@ -611,9 +634,9 @@ export function getClockDrift(iatas?: string[], limit = 100): Promise<ClockDrift
 }
 
 // renamed from getScopes to avoid colliding with the /scopes name list; this is the /stats/scopes
-// aggregate (packet/observer/node counts), reported globally regardless of the active region.
-export function getStatsScopes(): Promise<ScopeStats[]> {
-  return rawGetStatsScopes();
+// aggregate (packet/observer/node counts), filtered by the selected region.
+export function getStatsScopes(iatas?: string[], signal?: AbortSignal): Promise<ScopeStats[]> {
+  return rawGetStatsScopes({ iatas: iatasParam(iatas) }, { signal });
 }
 
 export function getObserverTelemetry(
@@ -632,8 +655,8 @@ export function getObserverTelemetry(
     points: model.points.map((point) => ({
       ...point,
       batteryMv: point.batteryMv ?? null,
-      airtimeTxPct: point.airtimeTxPct ?? null,
-      airtimeRxPct: point.airtimeRxPct ?? null,
+      airtimeTxSecs: point.airtimeTxSecs ?? null,
+      airtimeRxSecs: point.airtimeRxSecs ?? null,
       noiseFloorDb: point.noiseFloorDb ?? null,
       uptimeSeconds: point.uptimeSeconds ?? null,
       queueLength: point.queueLength ?? null,
@@ -642,4 +665,34 @@ export function getObserverTelemetry(
   }));
 }
 
+export function getObserverActivity(
+  observerId: string,
+  range: string,
+  interval: string,
+): Promise<ObserverActivity> {
+  return rawGetObserversObserverIdActivity({ observerId, range, interval });
+}
+
+// Lets a caller hide a feature the server doesn't have rather than show it as failed.
+export function isNotFound(err: unknown): boolean {
+  return err instanceof ApiError && err.status === 404;
+}
+
 export { ApiError };
+
+export function getSignalStats(
+  since: number,
+  until: number,
+  iatas?: string[],
+  signal?: AbortSignal,
+): Promise<SignalStats> {
+  return rawGetStatsSignal({ since, until, iatas: iatasParam(iatas) }, { signal });
+}
+export function getPathStats(
+  since: number,
+  until: number,
+  iatas?: string[],
+  signal?: AbortSignal,
+): Promise<PathStats> {
+  return rawGetStatsPaths({ since, until, iatas: iatasParam(iatas) }, { signal });
+}

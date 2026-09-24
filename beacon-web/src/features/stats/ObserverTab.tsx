@@ -1,15 +1,21 @@
+import { isNotFound } from '../../api/client';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '../../components/Badge';
 import { EmptyState } from '../../components/EmptyState';
-import { formatBattery, formatCount, formatUptime } from '../../lib/formatters';
+import { formatBattery, formatCount, formatRadioParts, formatUptime } from '../../lib/formatters';
 import { statsQueries } from '../../api/queries';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { useRegion } from '../../hooks/useRegion';
 import { useChartColors } from './chartTheme';
 import { useTopObservers } from './useStats';
-import { useObserver, useObserverTelemetry } from './useTelemetry';
+import {
+  activityParamsFor,
+  useObserver,
+  useObserverActivity,
+  useObserverTelemetry,
+} from './useTelemetry';
 import { useTick } from '../../hooks/useTick';
 import { deriveObserverStatus } from '../observers/observer-status';
 import {
@@ -18,11 +24,36 @@ import {
   noiseFloorOption,
   queueOption,
   receiveErrorsOption,
+  busyOption,
+  heardOption,
+  snrHeardOption,
+  typeBarOption,
 } from './chartOptions';
 import { Card, ChartCard } from './cards';
-import { hasTelemetry } from './transforms';
+import {
+  fillActivity,
+  hasTelemetry,
+  intervalToMs,
+  latestAirtimePct,
+  payloadBarItems,
+} from './transforms';
 import type { Observer } from '../observers/types';
-import type { StatsRange } from './types';
+import { RANGE_MS, type StatsRange } from './types';
+
+// how the "Heard per …" title reads for each bucket the activity endpoint returns
+const PER_BUCKET: Record<string, string> = {
+  '5m': '5 min',
+  '15m': '15 min',
+  '1h': '1 h',
+  '6h': '6 h',
+  '24h': '24 h',
+};
+
+type AirtimePct = { rx: number | null; tx: number | null };
+
+function airtimeLabel(a: AirtimePct): string {
+  return [a.rx != null && `RX ${a.rx}%`, a.tx != null && `TX ${a.tx}%`].filter(Boolean).join(' · ');
+}
 
 function ObserverList({
   range,
@@ -146,16 +177,16 @@ function ObserverList({
   );
 }
 
-function ObserverHeader({ observer }: { observer: Observer }) {
+function ObserverHeader({ observer, airtime }: { observer: Observer; airtime: AirtimePct }) {
   const { t } = useTranslation();
   useTick(); // keep the recency-derived status badge fresh
   const status = deriveObserverStatus(observer);
-  const radio = [
-    observer.radioFreqMhz && `${observer.radioFreqMhz} MHz`,
-    observer.radioSf && `SF${observer.radioSf}`,
-    observer.radioBwKhz && `${observer.radioBwKhz} kHz`,
-    observer.radioCr && `CR 4/${observer.radioCr}`,
-  ].filter(Boolean) as string[];
+  const radio = formatRadioParts({
+    freqMhz: observer.radioFreqMhz,
+    sf: observer.radioSf,
+    bwKhz: observer.radioBwKhz,
+    cr: observer.radioCr,
+  });
 
   return (
     <Card
@@ -187,7 +218,10 @@ function ObserverHeader({ observer }: { observer: Observer }) {
           label={t('details.observations')}
           value={observer.observationCount.toLocaleString()}
         />
-        {radio.length > 0 && <Metric label={t('entities.radio')} value={radio.join(' · ')} />}
+        {(airtime.rx != null || airtime.tx != null) && (
+          <Metric label={t('stats.airtime')} value={airtimeLabel(airtime)} />
+        )}
+        {radio && <Metric label={t('entities.radio')} value={radio} />}
       </div>
     </Card>
   );
@@ -216,6 +250,7 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
   const topObservers = useTopObservers(range, 15);
   const observer = useObserver(selectedObserverId);
   const telemetry = useObserverTelemetry(selectedObserverId, range);
+  const activity = useObserverActivity(selectedObserverId, range);
 
   // default to the busiest observer once the list loads and nothing is selected
   useEffect(() => {
@@ -226,10 +261,14 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
 
   const points = useMemo(() => telemetry.data?.points ?? [], [telemetry.data]);
   // use the response's interval, not the range prop — keepPreviousData can briefly show the old range's points
-  const bucketed = telemetry.data != null && telemetry.data.interval !== '1h';
+  const bucketMs =
+    telemetry.data != null && telemetry.data.interval !== '1h'
+      ? intervalToMs(telemetry.data.interval)
+      : null;
+  const bucketed = bucketMs != null;
   const airtime = useMemo(
-    () => airtimeOption(points, colors, bucketed, range),
-    [points, colors, bucketed, range],
+    () => airtimeOption(points, colors, bucketMs, range),
+    [points, colors, bucketMs, range],
   );
   const battery = useMemo(
     () => batteryOption(points, colors, `${t('details.battery')} V`, range),
@@ -243,6 +282,14 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
     () => queueOption(points, colors, t('details.queue'), range),
     [points, colors, t, range],
   );
+  // bucketed values span less than their bucket, so only the hourly series gives an honest header number
+  const latestAirtime = useMemo(
+    () =>
+      bucketMs == null && hasTelemetry(points)
+        ? latestAirtimePct(points, null)
+        : { rx: null, tx: null },
+    [points, bucketMs],
+  );
   const recvErrors = useMemo(
     () => receiveErrorsOption(points, colors, bucketed, t('details.receiveErrors'), range),
     [points, colors, bucketed, t, range],
@@ -255,6 +302,43 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
   // a chart is empty when none of its metric(s) have a non-null value across the window
   const missing = (...accessors: ((p: (typeof points)[number]) => number | null)[]) =>
     ready && !points.some((p) => accessors.some((a) => a(p) != null));
+
+  // a 404 means this server has no activity endpoint yet: hide the heard group rather than show failed cards
+  const heardUnavailable = activity.isError && isNotFound(activity.error);
+  // a placeholder is the previous selection's data, so treat it as loading rather than read anything from it
+  const heardLoading = activity.isLoading || activity.isPlaceholderData;
+  const heardData = activity.isPlaceholderData ? undefined : activity.data;
+  const intervalMs = heardData ? intervalToMs(heardData.interval) : null;
+  // the window ends at the last fetch so the right edge follows now on every poll
+  const heardWindow = useMemo(() => {
+    const end = activity.dataUpdatedAt;
+    const span = (heardData && intervalToMs(heardData.range)) ?? RANGE_MS[range];
+    return { start: end - span, end };
+  }, [heardData, activity.dataUpdatedAt, range]);
+  const heard = useMemo(
+    () => (heardData && intervalMs ? fillActivity(heardData.points, intervalMs, heardWindow) : []),
+    [heardData, intervalMs, heardWindow],
+  );
+  const busy = useMemo(
+    () => busyOption(heard, colors, intervalMs, heardWindow),
+    [heard, colors, intervalMs, heardWindow],
+  );
+  const heardCount = useMemo(
+    () => heardOption(heard, colors, heardWindow),
+    [heard, colors, heardWindow],
+  );
+  const snr = useMemo(
+    () => snrHeardOption(heard, colors, heardWindow),
+    [heard, colors, heardWindow],
+  );
+  const payloadItems = useMemo(() => payloadBarItems(heardData?.payloadTypes ?? []), [heardData]);
+  const payload = useMemo(() => typeBarOption(payloadItems, colors), [payloadItems, colors]);
+  const nothingHeard = heardData != null && heardData.points.length === 0;
+  const costed = heardData?.points.some((p) => p.airtimeMs != null) ?? false;
+  const heardSnr = heard.some((p) => p.snrAvg != null);
+  const radioLabel = formatRadioParts(heardData?.radio ?? {});
+  const interval = heardData?.interval ?? activityParamsFor(range).interval;
+  const perBucket = PER_BUCKET[interval] ?? interval;
 
   return (
     <div className="mx-auto flex max-w-[1100px] flex-col gap-3.5 px-4 py-4 lg:flex-row">
@@ -295,7 +379,7 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
           </Card>
         ) : (
           <>
-            {observer.data && <ObserverHeader observer={observer.data} />}
+            {observer.data && <ObserverHeader observer={observer.data} airtime={latestAirtime} />}
             {noTelemetry ? (
               <Card title={t('stats.telemetry')}>
                 <EmptyState title={t('stats.noTelemetry')} subtitle={t('stats.noTelemetryHint')} />
@@ -309,8 +393,8 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
                   isLoading={telemetry.isLoading}
                   isError={telemetry.isError}
                   isEmpty={missing(
-                    (p) => p.airtimeTxPct,
-                    (p) => p.airtimeRxPct,
+                    (p) => p.airtimeTxSecs,
+                    (p) => p.airtimeRxSecs,
                   )}
                 />
                 <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
@@ -349,6 +433,56 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
                 </div>
               </>
             )}
+            {!heardUnavailable &&
+              (nothingHeard ? (
+                <Card title={t('stats.heard')}>
+                  <EmptyState
+                    title={t('stats.noPacketsHeard')}
+                    subtitle={t('stats.noPacketsHeardHint')}
+                  />
+                </Card>
+              ) : (
+                <>
+                  <ChartCard
+                    title={t('stats.channelBusy', { range })}
+                    right={
+                      radioLabel && (
+                        <span className="font-mono text-[11px] text-text-muted">{radioLabel}</span>
+                      )
+                    }
+                    height={180}
+                    option={busy}
+                    isLoading={heardLoading}
+                    isError={activity.isError}
+                    isEmpty={heardData != null && !costed}
+                  />
+                  <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
+                    <ChartCard
+                      title={t('stats.heardPer', { interval: perBucket })}
+                      height={168}
+                      option={heardCount}
+                      isLoading={heardLoading}
+                      isError={activity.isError}
+                    />
+                    <ChartCard
+                      title={t('stats.snrHeard')}
+                      height={168}
+                      option={snr}
+                      isLoading={heardLoading}
+                      isError={activity.isError}
+                      isEmpty={heardData != null && !heardSnr}
+                    />
+                  </div>
+                  <ChartCard
+                    title={t('stats.payloadTypesHeard')}
+                    height={180}
+                    option={payload}
+                    isLoading={heardLoading}
+                    isError={activity.isError}
+                    isEmpty={heardData != null && payloadItems.length === 0}
+                  />
+                </>
+              ))}
           </>
         )}
       </div>

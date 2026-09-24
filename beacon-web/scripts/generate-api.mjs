@@ -99,10 +99,11 @@ for (const [route, pathItem] of Object.entries(schema.paths ?? {})) {
   }
 }
 
-let client = `${banner}import { API_BASE } from "../../lib/constants";\nimport type * as Models from "./models";\n\n`;
-client += `export class ApiError extends Error {\n  status: number;\n  code: string;\n  constructor(status: number, code: string, message: string) {\n    super(message); this.name = "ApiError"; this.status = status; this.code = code;\n  }\n}\n\n`;
+let client = `${banner}import { API_BASE } from "../../lib/constants";\nimport type * as Models from "./models";\nimport { noteRateLimited, noteRequestOk, parseRetryAfter } from "../rate-limit";\n\n`;
+client += `export class ApiError extends Error {\n  status: number;\n  code: string;\n  retryAfterMs?: number;\n  constructor(status: number, code: string, message: string, retryAfterMs?: number) {\n    super(message); this.name = "ApiError"; this.status = status; this.code = code; this.retryAfterMs = retryAfterMs;\n  }\n}\n\n`;
+client += `export async function errorFrom(res: Response): Promise<ApiError> {\n  const retryAfterMs = res.status === 429 ? parseRetryAfter(res.headers.get("Retry-After")) : undefined;\n  if (res.status === 429) noteRateLimited(retryAfterMs);\n  const body = await res.json().catch(() => undefined);\n  return new ApiError(res.status, body?.error?.code ?? "unknown", body?.error?.message ?? res.statusText, retryAfterMs);\n}\n\n`;
 client += `type QueryValue = string | number | boolean | undefined;\n\n`;
-client += `async function request<T>(route: string, query?: Record<string, QueryValue>, init?: RequestInit): Promise<T> {\n  const url = new URL(\`\${API_BASE}\${route}\`, window.location.origin);\n  for (const [key, value] of Object.entries(query ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));\n  const res = await fetch(url.toString(), init);\n  if (!res.ok) {\n    const body = await res.json().catch(() => ({ error: { code: "unknown", message: res.statusText } }));\n    throw new ApiError(res.status, body?.error?.code ?? "unknown", body?.error?.message ?? res.statusText);\n  }\n  if (res.status === 204) return undefined as T;\n  return await res.json() as T;\n}\n\n`;
+client += `async function request<T>(route: string, query?: Record<string, QueryValue>, init?: RequestInit): Promise<T> {\n  const url = new URL(\`\${API_BASE}\${route}\`, window.location.origin);\n  for (const [key, value] of Object.entries(query ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));\n  const res = await fetch(url.toString(), init);\n  if (!res.ok) throw await errorFrom(res);\n  noteRequestOk();\n  if (res.status === 204) return undefined as T;\n  return await res.json() as T;\n}\n\n`;
 
 for (const { route, method, parameters, name, op } of operations) {
   const pathParams = parameters.filter((p) => p.in === 'path');

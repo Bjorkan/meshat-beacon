@@ -1,3 +1,4 @@
+import { noteRateLimited, noteRequestOk } from '../../src/api/rate-limit';
 import { StrictMode } from 'react';
 import { act, render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
@@ -93,4 +94,47 @@ describe('QueryWsBridge listener lifecycle', () => {
     view.unmount();
     expect(Object.values(listeners).map((set) => set.size)).toEqual([0, 0, 0, 0, 0]);
   });
+});
+
+it('coalesces lag recovery until Retry-After expires and cancels deferred work on unmount', () => {
+  vi.useFakeTimers();
+  const client = new QueryClient();
+  const reset = vi.spyOn(client, 'resetQueries');
+  const view = render(
+    <QueryClientProvider client={client}>
+      <QueryWsBridge />
+    </QueryClientProvider>,
+  );
+  try {
+    noteRateLimited(2000);
+    act(() => {
+      for (const listener of listeners.lagged) {
+        listener({ droppedCount: 1 });
+        listener({ droppedCount: 2 });
+      }
+    });
+    expect(reset).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1999);
+    });
+    expect(reset).not.toHaveBeenCalled();
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(reset).toHaveBeenCalledTimes(1);
+    noteRateLimited(2000);
+    act(() => {
+      for (const listener of listeners.lagged) listener({ droppedCount: 1 });
+    });
+    view.unmount();
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+    expect(reset).toHaveBeenCalledTimes(1);
+  } finally {
+    view.unmount();
+    client.clear();
+    noteRequestOk();
+    vi.useRealTimers();
+  }
 });

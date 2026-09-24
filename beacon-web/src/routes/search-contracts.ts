@@ -149,6 +149,10 @@ export function validateMapSearch(search: Record<string, unknown>): MapSearch {
 
 export interface AnalyticsSearch {
   statsTab?: StatsTab;
+  compareA?: string;
+  compareB?: string;
+  compareSince?: string;
+  compareUntil?: string;
   observerId?: string;
   range?: StatsRange;
 }
@@ -157,11 +161,24 @@ export function validateAnalyticsSearch(search: Record<string, unknown>): Analyt
   return {
     statsTab: oneOf(search.statsTab, [
       'mesh',
+      'traffic',
+      'signal',
+      'paths',
+      'scopes',
+      'compare',
       'talkers',
       'clockdrift',
       'observer',
       'graph',
     ] as const),
+    compareA: searchString(search.compareA),
+    compareB: searchString(search.compareB),
+    compareSince: searchString(
+      typeof search.compareSince === 'number' ? String(search.compareSince) : search.compareSince,
+    ),
+    compareUntil: searchString(
+      typeof search.compareUntil === 'number' ? String(search.compareUntil) : search.compareUntil,
+    ),
     observerId: searchString(search.observerId),
     range: oneOf(search.range, ['24h', '7d', '30d'] as const),
   };

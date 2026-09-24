@@ -64,14 +64,20 @@ describe('ChannelList server aggregate', () => {
     vi.mocked(getChannels).mockImplementation(async (params) => {
       if (params?.iatas?.[0] === 'YYJ')
         return { items: [], unknownCount: 1, hasMore: false, nextCursor: null };
-      return params?.cursor
+      return params?.pageCursor
         ? {
             items: [{ ...known, id: 3, name: 'Second' }],
             unknownCount: 80,
             hasMore: false,
             nextCursor: null,
           }
-        : { items: [known], unknownCount: 80, hasMore: true, nextCursor: 1000 };
+        : {
+            items: [known],
+            unknownCount: 80,
+            hasMore: true,
+            nextCursor: 1000,
+            nextPageCursor: 'precise-page-2',
+          };
     });
     const view = setup();
     expect(await screen.findByText('General')).toBeInTheDocument();

@@ -11,6 +11,7 @@ import {
   type RegionSelection,
 } from '../hooks/region-selection';
 import { useWsStatus } from '../hooks/useWsStatus';
+import { useRateLimit } from '../hooks/useRateLimit';
 import { useTheme } from '../hooks/useTheme';
 import { Dropdown } from './Dropdown';
 import { BottomNav } from './BottomNav';
@@ -90,6 +91,35 @@ function matchRegions(candidates: Region[], q: string): { region: Region; matche
   });
 }
 
+// Shown while the API is throttling us; the countdown tells users the blank tables are temporary.
+function RateLimitBadge() {
+  const { t } = useTranslation();
+  const until = useRateLimit();
+  const [remaining, setRemaining] = useState(0);
+
+  useEffect(() => {
+    if (until === null) return;
+    const end = until;
+    function update() {
+      setRemaining(Math.ceil((end - Date.now()) / 1000));
+    }
+    update();
+    const id = setInterval(update, 1000);
+    return () => clearInterval(id);
+  }, [until]);
+
+  if (until === null || remaining <= 0) return null;
+
+  return (
+    <div
+      role="status"
+      className="flex items-center gap-1.5 font-mono text-[11px] text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
+    >
+      {t('app.rateLimited', { seconds: remaining })}
+    </div>
+  );
+}
+
 // checkbox indicator, matching MultiSelectDropdown's style
 function CheckBox({ checked }: { checked: boolean }) {
   return (
@@ -149,6 +179,7 @@ function RegionSelector() {
 
   return (
     <Dropdown
+      align="right"
       width="w-60"
       className="min-w-0 max-w-[7.5rem] shrink-0 sm:max-w-none"
       mobileViewport
@@ -249,6 +280,7 @@ function RegionSelectorPanel() {
   return (
     <>
       <div className="sticky -top-1 z-10 -mt-1 bg-bg-raised px-2 pt-1 pb-1.5">
+        {/* Keep focused text at 16px so iOS Safari does not zoom the page. */}
         <input
           ref={inputRef}
           type="text"
@@ -491,6 +523,7 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
           <div className="hidden lg:block shrink-0">
             <LiveBadge wsManager={wsManager} />
           </div>
+          <RateLimitBadge />
           <a
             href={GITHUB_URL}
             target="_blank"

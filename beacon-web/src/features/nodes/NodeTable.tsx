@@ -1,3 +1,4 @@
+import { ForeignNodeBadge } from './ForeignNodeBadge';
 import { nodeSortId } from './node-sort';
 import { nodeTypeLabel } from '../../lib/node-types';
 import { useCallback, useMemo, useState } from 'react';
@@ -54,6 +55,7 @@ function nodeColumns(t: TFunction): Column<NodeSummary>[] {
       cell: (node) => (
         <span className={`truncate ${node.name ? 'text-text-normal' : 'text-text-dim italic'}`}>
           {node.name ?? formatHex(node.id)}
+          <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
         </span>
       ),
     },
@@ -146,6 +148,7 @@ function renderNodeCard(node: NodeSummary, t: TFunction) {
           className={`flex-1 min-w-0 truncate ${node.name ? 'text-text-normal' : 'text-text-dim italic'}`}
         >
           {node.name ?? formatHex(node.id)}
+          <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
         </span>
         <span className="shrink-0">
           <Badge variant="default">

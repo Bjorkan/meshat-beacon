@@ -36,6 +36,12 @@ export const SIGNAL_LEVEL_CLASSES: Record<SignalLevel, string> = {
 // LoRa link-budget semantics (shared with the map's SNR_STOPS): usable signal lives
 // roughly between -20 and +10 dB, so the old >=5/>=10 cutoffs painted healthy
 // positive links red. Aligned: green >= 5, yellow >= -5, red below.
+export const SIGNAL_LEVEL_BORDER_CLASSES: Record<SignalLevel, string> = {
+  good: 'border-l-green',
+  mid: 'border-l-warn',
+  bad: 'border-l-danger',
+};
+
 export function snrLevel(snr: number | null | undefined): SignalLevel | null {
   if (snr == null || !Number.isFinite(snr)) return null;
   if (snr >= SNR_STOPS.green) return 'good';
@@ -132,10 +138,25 @@ export function timeAgoMs(epochMs: number): string {
   return `${Math.floor(hours / 24)}d`;
 }
 
-// Node/observer summaries carry radio as a compact "freq,bw,sf" string (e.g. "915,250,11").
-// Formats freq/SF/bandwidth like the observer panel ("915 MHz · SF11 · 250 kHz"); the compact
-// string carries no coding rate, so there's no "CR 4/x" segment.
-// All-zero configs ("0,0,0" from bots/MQTT bridges with no radio hardware) are unknown, not data.
+// One radio config format for every panel ("915 MHz · SF11 · 250 kHz · CR 4/5"); unknown or zero parts drop out.
+export function formatRadioParts(r: {
+  freqMhz?: number | null;
+  sf?: number | null;
+  bwKhz?: number | null;
+  cr?: number | null;
+}): string | null {
+  const known = (v: number | null | undefined): v is number => v != null && v > 0;
+  const parts = [
+    known(r.freqMhz) && `${r.freqMhz} MHz`,
+    known(r.sf) && `SF${r.sf}`,
+    known(r.bwKhz) && `${r.bwKhz} kHz`,
+    known(r.cr) && `CR 4/${r.cr}`,
+  ].filter(Boolean) as string[];
+  return parts.length > 0 ? parts.join(' · ') : null;
+}
+
+// Node/observer summaries carry radio as a compact "freq,bw,sf" string (e.g. "915,250,11"); the
+// compact string carries no coding rate, so there's no "CR 4/x" segment.
 export function formatRadio(radio: string | null | undefined): string | null {
   if (!radio) return null;
   const [freq, bw, sf] = radio.split(',');
@@ -144,8 +165,7 @@ export function formatRadio(radio: string | null | undefined): string | null {
     b = Number(bw),
     s = Number(sf);
   if (Number.isNaN(f) || Number.isNaN(b) || Number.isNaN(s)) return radio; // non-numeric — show raw, not "NaN MHz"
-  if (f === 0 && b === 0 && s === 0) return null;
-  return `${f} MHz · SF${sf} · ${b} kHz`;
+  return formatRadioParts({ freqMhz: f, sf: s, bwKhz: b });
 }
 
 // Radio cell label: the MeshCore suggested-settings title when the backend resolved one

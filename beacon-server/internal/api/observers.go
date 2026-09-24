@@ -80,28 +80,28 @@ type ObserverOwnerNode struct {
 
 // ObserverActivityRadio echoes the observer's current radio params plus the preamble the airtime math assumes.
 type ObserverActivityRadio struct {
-	FreqMHz         *float32 `json:"freqMhz"`
-	SF              int16    `json:"sf"`
-	BWKHz           float32  `json:"bwKhz"`
-	CR              int16    `json:"cr"`
-	PreambleSymbols int      `json:"preambleSymbols"`
+	FreqMHz         *float32 `json:"freqMhz" binding:"required" extensions:"x-nullable"`
+	SF              int16    `json:"sf" binding:"required"`
+	BWKHz           float32  `json:"bwKhz" binding:"required"`
+	CR              int16    `json:"cr" binding:"required"`
+	PreambleSymbols int      `json:"preambleSymbols" binding:"required"`
 }
 
 // ObserverActivityPoint is one bucket of what an observer heard.
 type ObserverActivityPoint struct {
-	T            int64    `json:"t"` // bucket start, epoch ms
-	Observations int64    `json:"observations"`
-	AirtimeMs    *float32 `json:"airtimeMs"`
-	SNRAvg       *float32 `json:"snrAvg"`
-	SNRMin       *float32 `json:"snrMin"`
-	RSSIAvg      *float32 `json:"rssiAvg"`
+	T            int64    `json:"t" binding:"required"` // bucket start, epoch ms
+	Observations int64    `json:"observations" binding:"required"`
+	AirtimeMs    *float32 `json:"airtimeMs" binding:"required" extensions:"x-nullable"`
+	SNRAvg       *float32 `json:"snrAvg" binding:"required" extensions:"x-nullable"`
+	SNRMin       *float32 `json:"snrMin" binding:"required" extensions:"x-nullable"`
+	RSSIAvg      *float32 `json:"rssiAvg" binding:"required" extensions:"x-nullable"`
 }
 
 // ObserverActivity is the per-observer heard-activity response.
 type ObserverActivity struct {
-	Range        string                  `json:"range"`
-	Interval     string                  `json:"interval"`
-	Radio        *ObserverActivityRadio  `json:"radio"`
-	PayloadTypes []PayloadBreakdownItem  `json:"payloadTypes"`
-	Points       []ObserverActivityPoint `json:"points"`
+	Range        string                  `json:"range" binding:"required"`
+	Interval     string                  `json:"interval" binding:"required"`
+	Radio        *ObserverActivityRadio  `json:"radio" binding:"required" extensions:"x-nullable"`
+	PayloadTypes []PayloadBreakdownItem  `json:"payloadTypes" binding:"required"`
+	Points       []ObserverActivityPoint `json:"points" binding:"required"`
 }
