@@ -133,8 +133,7 @@ broker workers, not connection status or a tunable processing-worker pool).
 The CORS lists are the options supplied to the middleware; its normal matching
 normalization still applies. The response excludes
 credential fields, broker addresses, channel material, database settings and
-other configuration. Account operations are not implemented; unknown admin paths
-return 404 and unsupported
+other configuration. Unknown admin paths return 404 and unsupported
 methods on the config endpoint return 405 after authentication.
 Global CORS preflights remain public. Use a long, randomly generated key, keep
 it out of source control and logs, and send it only in the Authorization header,
@@ -157,6 +156,21 @@ fields are rejected. Requests must be JSON, at most 16 KiB. Other CORS options,
 auth/credential fields and broker count cannot be changed here; there is no
 configurable `ingest.worker_count`. Cross-origin admin clients need PUT allowed
 in the saved CORS methods. CORS controls browser access, not authentication.
+
+Operator accounts are available at `GET/POST /api/v1/admin/accounts` and
+`GET/DELETE /api/v1/admin/accounts/{id}`. POST accepts a JSON `name` field in a
+body up to 4 KiB; names are trimmed, case-sensitive and limited to 128 Unicode
+characters without control characters. Active names are unique. DELETE soft
+deactivates the record (204); missing IDs return 404 and an already inactive
+record returns 409. A deactivated name may be reused by a new account.
+Lists include active and inactive records, newest first, without pagination.
+These are operator-defined records; no login, session or API token is created.
+Cross-origin account clients need both `POST` and `DELETE` in the saved
+`cors.allowed_methods`; the default `GET, HEAD, OPTIONS` is read-only. For an
+admin UI that also updates configuration, use `[GET, HEAD, OPTIONS, POST, PUT,
+DELETE]`, restrict `cors.allowed_origins` to that UI, and allow `Authorization`
+and `Content-Type` headers. Otherwise browser preflight blocks these requests
+even when the same bearer-authenticated request works with curl.
 
 ### Environment variables (`.env`)
 
