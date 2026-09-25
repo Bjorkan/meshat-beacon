@@ -17,6 +17,8 @@ On Ubuntu runners without a display, run the suite with
 dependencies (`npx playwright install --with-deps chromium firefox`). Firefox
 needs the virtual X display to create a Mesa WebGL context even in headless mode;
 without it, the route map shows its error fallback and map interaction tests fail.
+The Firefox test profile also sets `webgl.force-enabled` so software rendering is
+allowed on runners without a GPU (see [Mozilla bug 1970486](https://bugzilla.mozilla.org/show_bug.cgi?id=1970486)).
 CI uses this wrapper and uploads failure screenshots and traces as the
 `browser-test-results` artifact.
 
