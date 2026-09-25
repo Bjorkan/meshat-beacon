@@ -39,7 +39,16 @@ jobs:
       - name: Install browser dependencies
         run: npx playwright install --with-deps chromium firefox
       - name: Production build and browser regressions
-        run: npm run test:browser --workspace=beacon-web
+        # Firefox needs an X display for Mesa WebGL on Ubuntu, even in headless mode.
+        run: xvfb-run --auto-servernum npm run test:browser --workspace=beacon-web
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          path: beacon-web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   server:
     name: Server
@@ -60,6 +69,7 @@ jobs:
           --health-retries 10
     env:
       BEACON_TEST_DATABASE_URL: postgres://beacon:beacontest@localhost:5432/beacon_test?sslmode=disable
+      BEACON_TEST_POSTGRES_DSN: postgres://beacon:beacontest@localhost:5432/beacon_test?sslmode=disable
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -76,8 +86,45 @@ jobs:
           fi
       - name: Vet
         run: go -C beacon-server vet ./...
+      - name: Initialize upstream integration schema
+        run: |
+          cat > "$RUNNER_TEMP/beacon-test-migrate.go" <<'GO'
+          package main
+          import (
+            "context"
+            "log"
+            "os"
+            "github.com/MeshCore-Beacon/beacon-server/db"
+            "github.com/jackc/pgx/v5/pgxpool"
+          )
+          func main() {
+            ctx := context.Background()
+            pool, err := pgxpool.New(ctx, os.Getenv("BEACON_TEST_POSTGRES_DSN"))
+            if err != nil { log.Fatal(err) }
+            defer pool.Close()
+            if err := db.RunMigrations(ctx, pool); err != nil { log.Fatal(err) }
+          }
+          GO
+          go -C beacon-server run "$RUNNER_TEMP/beacon-test-migrate.go"
       - name: Test
         run: go -C beacon-server test ./...
+      - name: Verify backup export and download against PostgreSQL 18
+        run: |
+          CGO_ENABLED=0 go -C beacon-server build -o "$RUNNER_TEMP/beacon-backup" ./cmd/beacon-backup
+          CGO_ENABLED=0 go -C beacon-server test -c -o "$RUNNER_TEMP/backup.test" ./internal/backup
+          CGO_ENABLED=0 go -C beacon-server test -c -o "$RUNNER_TEMP/backup-http.test" ./internal/api/router
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGUSER=beacon -e PGDATABASE=beacon_test \
+            -e PGPASSWORD=beacontest -e PGSSLMODE=disable \
+            -e BEACON_BACKUP_TEST_POSTGRES=1 -e BEACON_BACKUP_TEST_BINARY=/beacon-backup \
+            -v "$RUNNER_TEMP/beacon-backup:/beacon-backup:ro" \
+            -v "$RUNNER_TEMP/backup.test:/backup.test:ro" \
+            postgres:18-alpine /backup.test -test.run '^TestExportPostgres$' -test.v
+          docker run --rm --network host \
+            -e PGHOST=127.0.0.1 -e PGUSER=beacon -e PGDATABASE=beacon_test \
+            -e PGPASSWORD=beacontest -e PGSSLMODE=disable -e BEACON_BACKUP_TEST_POSTGRES=1 \
+            -v "$RUNNER_TEMP/backup-http.test:/backup-http.test:ro" \
+            postgres:18-alpine /backup-http.test -test.run '^TestBackupDownloadPostgres$' -test.v
       - name: Build
         run: go -C beacon-server build ./...
       - name: Install swag

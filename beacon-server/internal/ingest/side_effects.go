@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -63,6 +62,9 @@ type nodeUpdateEvent struct {
 	IATAs        []api.NodeIATA `json:"iatas"`
 	DefaultScope *string        `json:"defaultScope,omitempty"`
 	Radio        *string        `json:"radio,omitempty"`
+	// Omission retains the previous classification (no advertised position).
+	// The outer pointer allows explicit null to clear an unknown/reset position.
+	PossiblyForeign **bool `json:"possiblyForeign,omitempty"`
 }
 
 // handlePayloadTypeSideEffects runs payload-type-specific processing after a
@@ -73,15 +75,16 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 	if packet.PayloadType() == meshcore.PayloadTypeAdvert {
 		advert, err := meshcore.AdvertFromBytes(packet.Payload)
 		if err != nil {
-			log.Printf("ingest[%s]: error decoding advert payload: %v", w.cfg.BrokerName, err)
+			w.log.Warn("error decoding advert payload", "error", err)
 			return
 		}
 		if !advert.Verify() {
-			log.Printf("ingest[%s]: dropped advert with invalid signature from pubkey %s", w.cfg.BrokerName, hex.EncodeToString(advert.PublicKey.PublicKeyBytes()))
+			w.log.Warn(fmt.Sprintf("dropped advert with invalid signature from pubkey %s", hex.EncodeToString(advert.PublicKey.PublicKeyBytes())))
 			return
 		}
 		var lat, lon *float64
-		if advert.AppData().Lat != 0 || advert.AppData().Lon != 0 {
+		// Presence, not value: an explicit 0/0 advert resets the stored location.
+		if advert.Flags()&meshcore.AdvertLatLonMask != 0 {
 			la := float64(advert.AppData().Lat) / 1e6
 			lo := float64(advert.AppData().Lon) / 1e6
 			lat = &la
@@ -101,7 +104,7 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		}
 		nodeID, coordinatesChanged, err := w.db.UpsertNode(ctx, params, nodeRadio)
 		if err != nil {
-			log.Printf("ingest[%s]: db: upsert node failed: %v", w.cfg.BrokerName, err)
+			w.log.Error("db: upsert node failed", "error", err)
 			return
 		}
 		// The signed advert identifies its origin exactly. Its configured path hash width
@@ -111,7 +114,7 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		// existing relationships too because this advert may rename the owner node.
 		ownerObservers, ownerErr := w.db.ReconcileObserverOwners(ctx, nodeID)
 		if ownerErr != nil {
-			log.Printf("ingest[%s]: owner reconciliation failed: %v", w.cfg.BrokerName, ownerErr)
+			w.log.Error("owner reconciliation failed", "error", ownerErr)
 		} else if w.onObserverUpsert != nil {
 			for _, id := range ownerObservers {
 				w.onObserverUpsert(ctx, id)
@@ -137,21 +140,21 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 			if oErr == nil && observerNodeID != nodeID {
 				snr := rxSNR
 				if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, nodeID, iata, &snr, nil, true, hashWidthExact()); err != nil {
-					log.Printf("ingest[%s]: failed to upsert observer-advert neighbor: %v", w.cfg.BrokerName, err)
+					w.log.Error("failed to upsert observer-advert neighbor", "error", err)
 				}
 			}
 		}
 		if err := w.db.UpsertNodeIATA(ctx, nodeID, iata); err != nil {
-			log.Printf("ingest[%s]: db: upsert node IATA failed: %v", w.cfg.BrokerName, err)
+			w.log.Error("db: upsert node IATA failed", "error", err)
 		}
 		if scopeID != nil && (packet.RouteType() == meshcore.RouteTypeTransportFlood || packet.RouteType() == meshcore.RouteTypeTransportDirect) {
 			if err := w.db.SetNodeDefaultScope(ctx, nodeID, *scopeID); err != nil {
-				log.Printf("ingest[%s]: failed to set default scope for node %s: %v", w.cfg.BrokerName, hex.EncodeToString(advert.PublicKey.PublicKeyBytes()), err)
+				w.log.Error(fmt.Sprintf("failed to set default scope for node %s", hex.EncodeToString(advert.PublicKey.PublicKeyBytes())), "error", err)
 			}
 		}
 		prefix4 := advert.PublicKey.PublicKeyBytes()[:4]
 		if err := w.db.UpsertNodeShortID(ctx, nodeID, iata, prefix4); err != nil {
-			log.Printf("ingest[%s]: failed to upsert node short ID for %s: %v", w.cfg.BrokerName, hex.EncodeToString(prefix4), err)
+			w.log.Error(fmt.Sprintf("failed to upsert node short ID for %s", hex.EncodeToString(prefix4)), "error", err)
 		}
 		pubkeyHex := hex.EncodeToString(advert.PublicKey.PublicKeyBytes())
 		isObserver := w.db.IsObserverByPubkey(ctx, advert.PublicKey.PublicKeyBytes())
@@ -178,20 +181,24 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 			DefaultScope: defaultScope,
 			Radio:        radioStr,
 		}
+		if w.cfg.LocalBorders != nil && (lat != nil || advert.Type() != meshcore.AdvertTypeRepeater) {
+			foreign := w.cfg.LocalBorders.PossiblyForeign(int16(advert.Type()), lat, lon)
+			evt.PossiblyForeign = &foreign
+		}
 		w.broadcast(hub.EventNodeUpdate, iata, meshcore.PayloadTypeAdvert, "", evt)
 		return
 	}
 	if packet.PayloadType() == meshcore.PayloadTypeGrpTxt {
 		grpTxt, err := meshcore.GroupTextFromBytes(packet.Payload)
 		if err != nil {
-			log.Printf("ingest[%s]: error decoding group text payload: %v", w.cfg.BrokerName, err)
+			w.log.Warn("error decoding group text payload", "error", err)
 			return
 		}
 		channelHashBytes := []byte{grpTxt.ChannelHash}
 
 		result, err := DecryptGroupText(ctx, w.db, w.keys, packetHash, packet.Payload)
 		if err != nil {
-			log.Printf("ingest[%s]: decrypt group text failed: %v", w.cfg.BrokerName, err)
+			w.log.Error("decrypt group text failed", "error", err)
 			return
 		}
 		if result == nil {

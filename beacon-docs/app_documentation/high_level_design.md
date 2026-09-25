@@ -398,8 +398,8 @@ CREATE TABLE observer_telemetry (
   observer_id         UUID NOT NULL REFERENCES observers(id) ON DELETE CASCADE,
   reported_at         TIMESTAMPTZ NOT NULL,
   battery_voltage_mv  INT,
-  airtime_tx_pct      REAL,
-  airtime_rx_pct      REAL,
+  airtime_tx_secs      REAL,
+  airtime_rx_secs      REAL,
   noise_floor_db      REAL,
   uptime_seconds      BIGINT,
   queue_length        INT,
@@ -591,6 +591,28 @@ CREATE TABLE channels (
 );
 
 CREATE INDEX idx_channels_last_seen ON channels(last_seen DESC);
+
+-- Which IATAs each channel has been heard in, maintained at ingest and
+-- pruned on the packet retention cutoff. Backs the channel list IATA
+-- filter without touching packet_observations. trace_iatas does the
+-- same for trace tags.
+CREATE TABLE channel_iatas (
+  channel_hash BYTEA NOT NULL,
+  iata         CHAR(3) NOT NULL REFERENCES iata_codes(iata) ON DELETE CASCADE,
+  last_heard   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (channel_hash, iata)
+);
+
+CREATE INDEX idx_channel_iatas_iata ON channel_iatas(iata, last_heard DESC);
+
+CREATE TABLE trace_iatas (
+  trace_tag  BYTEA NOT NULL,
+  iata       CHAR(3) NOT NULL REFERENCES iata_codes(iata) ON DELETE CASCADE,
+  last_heard TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (trace_tag, iata)
+);
+
+CREATE INDEX idx_trace_iatas_iata ON trace_iatas(iata, last_heard DESC);
 
 -- Channel decryption keys, loaded from the server config file on startup.
 -- Adding or rotating a key requires updating the config and restarting (or SIGHUP).

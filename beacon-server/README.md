@@ -22,6 +22,10 @@ in PostgreSQL, and streams live events to WebSocket clients.
 
 For deployment instructions including the frontend app, see the deployment docs.
 
+For a bounded private database and saved-config bundle, see
+[backup export](docs/backup-export.md). A standalone export tool is available; the
+protected download API is opt-in; browser login and import remain separate follow-ups.
+
 ---
 
 ## Stack
@@ -107,6 +111,60 @@ matching a now-known channel and decrypts them. Watch the startup log for
 ---
 
 ## Configuration
+
+### Admin authentication
+
+The `/api/v1/admin` subtree requires `Authorization: Bearer <key>`. Set the
+operator key with `BEACON_API_KEY` or `auth.api_key` in YAML. A set environment
+variable overrides YAML; an explicitly empty value disables admin access.
+With no key, admin requests return JSON 503 while public reads and WebSockets
+continue normally. With a key, missing, incorrect or duplicate Authorization
+headers return JSON 401 with `WWW-Authenticate: Bearer`.
+
+`GET /api/v1/admin/config` returns selected running settings: CORS options with
+Beacon defaults applied, `auth.configured`, and `ingest.broker_count` (configured
+broker workers, not connection status or a tunable processing-worker pool).
+The CORS lists are the options supplied to the middleware; its normal matching
+normalization still applies. The response excludes
+credential fields, broker addresses, channel material, database settings and
+other configuration. Unknown admin paths return 404 and unsupported
+methods on the config endpoint return 405 after authentication.
+Global CORS preflights remain public. Use a long, randomly generated key, keep
+it out of source control and logs, and send it only in the Authorization header,
+never the URL or request body. Require HTTPS at the reverse proxy and restrict
+direct access to Beacon's HTTP listener to that proxy or a private connection.
+Changing the key requires a restart. No API key is issued automatically.
+
+`PUT /api/v1/admin/config` accepts only
+`{"cors":{"allowed_origins":["https://example.org"]}}`. It replaces the entire
+origin list immediately and updates the reported configuration with the same
+policy. Requests already in progress may use the previous policy. Concurrent
+valid updates are serialized; updates take effect one at a time. The response
+contains `config`, `persisted: false` and `requires_restart: false`.
+
+Updates are **runtime-only**: no file or database is written, and restarting
+reloads the saved configuration. Keep 1–32 ASCII HTTP(S) origins, at most 512 bytes
+each, with an optional single hostname wildcard; a sole `*` permits all origins.
+Empty/null lists, URL paths/queries/credentials, control characters and unknown
+fields are rejected. Requests must be JSON, at most 16 KiB. Other CORS options,
+auth/credential fields and broker count cannot be changed here; there is no
+configurable `ingest.worker_count`. Cross-origin admin clients need PUT allowed
+in the saved CORS methods. CORS controls browser access, not authentication.
+
+Operator accounts are available at `GET/POST /api/v1/admin/accounts` and
+`GET/DELETE /api/v1/admin/accounts/{id}`. POST accepts a JSON `name` field in a
+body up to 4 KiB; names are trimmed, case-sensitive and limited to 128 Unicode
+characters without control characters. Active names are unique. DELETE soft
+deactivates the record (204); missing IDs return 404 and an already inactive
+record returns 409. A deactivated name may be reused by a new account.
+Lists include active and inactive records, newest first, without pagination.
+These are operator-defined records; no login, session or API token is created.
+Cross-origin account clients need both `POST` and `DELETE` in the saved
+`cors.allowed_methods`; the default `GET, HEAD, OPTIONS` is read-only. For an
+admin UI that also updates configuration, use `[GET, HEAD, OPTIONS, POST, PUT,
+DELETE]`, restrict `cors.allowed_origins` to that UI, and allow `Authorization`
+and `Content-Type` headers. Otherwise browser preflight blocks these requests
+even when the same bearer-authenticated request works with curl.
 
 ### Environment variables (`.env`)
 
@@ -195,10 +253,16 @@ websocket:
 
 # Node staleness, deletion, and clock-drift thresholds.
 nodes:
+  mark_foreign: false # optional indication for repeaters outside configured IATA borders
   stale_threshold: 24h # mark a node "stale" in the API after this long unseen (default: 24h)
   delete_after: 720h # delete a node entirely after this long unseen (default: 30 days, same default as packets.retention)
   clock_drift_threshold: 5m # |device clock - server clock| above which clockOutOfSync=true for a repeater/room server (default: 5m)
   iata_membership_ttl: 168h # drop an IATA badge from a node not heard on that IATA for this long (default: 7 days)
+
+# Observer retention preserves packet history and captured observer identity.
+# Presence bookkeeping is flushed before deletion; cached details are invalidated.
+observers:
+  delete_after: 336h # default: 14 days without traffic
 
 # Redis caching layer (optional).
 # Caches read-heavy, slow-changing responses to reduce PostgreSQL load.
@@ -234,7 +298,7 @@ must be defined here — they are not auto-created.
 
 Set `ingest.owner_metadata: true` in `config.yaml` and provide `MQTT_OWNER_USERNAME`
 and `MQTT_OWNER_PASSWORD` for a separate Role 1 subscriber on the same
-`MQTT_BROKER_URL`. The connection uses client ID `beacon-meshat.se-owners` and
+`MQTT_BROKER_URL`. Each connection uses a unique client ID to avoid collisions between deployments and
 subscribes only to `meshcore/+/+/internal`. Normal packet/status ingest continues
 with its existing credentials. Missing owner credentials disable this optional
 connection with a log message; a denied or unavailable feed does not stop normal ingest.
@@ -255,6 +319,33 @@ The detail view opens that node through the existing overlay. Owner changes and
 node adverts invalidate the server cache; open details refresh within 30 seconds.
 The feed is not retained: newly enabled installations learn ownership on the next
 broker publication, and unavailable feeds leave the last stored mapping in place.
+
+### Foreign repeater indication
+
+Set `nodes.mark_foreign: true` to expose `possiblyForeign` on repeater nodes.
+The local operating area is the union of **all configured**
+`iatas.<code>.borderFile` GeoJSON Polygon/MultiPolygon features. IATAs without
+border files do not add an area; airport coordinates and the current API region
+filter are not boundaries. Enabling this with no borders, missing files or
+invalid geometry fails startup. Border changes require a restart.
+
+Inside any polygon (including its edges) means `false`; outside the entire union
+means `true`. Hole interiors are outside; hole edges are local. Other node roles,
+missing/invalid positions and the 0/0 location reset have no classification.
+This is a hint based on reported position, not proof of a repeater's origin.
+Packet ingestion, heard-in IATAs and route matching remain unchanged.
+
+Node list/detail reads apply the current geometry after cache reads, so existing
+historical nodes need no backfill. A `nodeUpdate` includes `possiblyForeign`
+when its advert provides a position: a boolean for known positions, `null` to
+clear an unknown/reset position. Omission retains the previous value when a
+repeater's advert omits its position. A change to another role also sends `null`.
+The field is omitted everywhere when the feature is disabled (the default).
+
+Use longitude/latitude coordinate order and split antimeridian-crossing borders
+into MultiPolygons as described in [RFC 7946 section 3.1.9](https://www.rfc-editor.org/rfc/rfc7946#section-3.1.9).
+Classification rejects unsplit edges spanning more than 180 degrees rather than
+silently treating them as the complementary global area.
 
 ## Authentication
 
@@ -485,3 +576,17 @@ containing only its slug. Newly discovered IATAs therefore remain visible.
 Ordinary regions still expand to their configured membership. Without explicit
 root metadata the selector retains the generic **All Regions** choice; names,
 slugs and the number of configured regions never designate a root automatically.
+
+## Application logging
+
+Beacon writes application logs to stderr. Configure the minimum level and output format in `config.yaml`:
+
+```yaml
+log:
+  level: info   # debug, info, warn, error
+  format: text  # text or json
+```
+
+`LOG_LEVEL` and `LOG_FORMAT` override file settings; empty settings use `info` and `text`. Invalid values prevent startup. Configuration-loading failures can use the bootstrap text logger before file settings are available; failures after initialization retain error severity at every supported level.
+
+Records include a component field. Ingest workers also include their broker name, and HTTP completion records include the validated client address, route, status and duration. Query strings and protocol hello payloads are excluded. Expected ingest skips and routine WebSocket lifecycle details are debug-level. Changing the application's format does not change Caddy/Apache access logs or their fail2ban configuration. Collect/rotate stderr through Docker or systemd.

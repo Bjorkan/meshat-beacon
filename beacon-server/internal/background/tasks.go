@@ -5,42 +5,54 @@ package background
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"log"
 	"time"
 
 	"github.com/MeshCore-Beacon/beacon-server/db"
 	"github.com/google/uuid"
 )
 
+type viewRefresher interface {
+	RefreshHourlyStats(context.Context) error
+	RefreshTopNodes(context.Context) error
+	RefreshTopObservers(context.Context) error
+	RefreshPayloadBreakdown(context.Context) error
+	RefreshTopTalkers(context.Context) error
+	RefreshTopAdvertisers(context.Context) error
+	RefreshRadioPresets(context.Context) error
+	RefreshObserverActivity(context.Context) error
+	RefreshSignalStats(context.Context) error
+	RefreshPathStats(context.Context) error
+}
+
 // ViewRefreshTask returns a Task that refreshes all materialized views.
-func ViewRefreshTask(store *db.Store, interval time.Duration) Task {
+func ViewRefreshTask(store viewRefresher, interval time.Duration) Task {
 	return Task{
 		Name:     "view_refresh",
 		Interval: interval,
 		Run: func(ctx context.Context) error {
-			if err := store.RefreshHourlyStats(ctx); err != nil {
-				log.Printf("background[view_refresh]: hourly stats: %v", err)
+			var errs []error
+			for _, view := range []struct {
+				name    string
+				refresh func(context.Context) error
+			}{
+				{"hourly stats", store.RefreshHourlyStats},
+				{"top nodes", store.RefreshTopNodes},
+				{"top observers", store.RefreshTopObservers},
+				{"payload breakdown", store.RefreshPayloadBreakdown},
+				{"top talkers", store.RefreshTopTalkers},
+				{"top advertisers", store.RefreshTopAdvertisers},
+				{"radio presets", store.RefreshRadioPresets},
+				{"observer activity", store.RefreshObserverActivity},
+				{"signal stats", store.RefreshSignalStats},
+				{"path stats", store.RefreshPathStats},
+			} {
+				if err := view.refresh(ctx); err != nil {
+					errs = append(errs, fmt.Errorf("%s: %w", view.name, err))
+				}
 			}
-			if err := store.RefreshTopNodes(ctx); err != nil {
-				log.Printf("background[view_refresh]: top nodes: %v", err)
-			}
-			if err := store.RefreshTopObservers(ctx); err != nil {
-				log.Printf("background[view_refresh]: top observers: %v", err)
-			}
-			if err := store.RefreshPayloadBreakdown(ctx); err != nil {
-				log.Printf("background[view_refresh]: payload breakdown: %v", err)
-			}
-			if err := store.RefreshTopTalkers(ctx); err != nil {
-				log.Printf("background[view_refresh]: top talkers: %v", err)
-			}
-			if err := store.RefreshTopAdvertisers(ctx); err != nil {
-				log.Printf("background[view_refresh]: top advertisers: %v", err)
-			}
-			if err := store.RefreshRadioPresets(ctx); err != nil {
-				log.Printf("background[view_refresh]: radio presets: %v", err)
-			}
-			return nil
+			return errors.Join(errs...)
 		},
 	}
 }
@@ -51,7 +63,7 @@ func ViewRefreshTask(store *db.Store, interval time.Duration) Task {
 // plus observers not heard from within the observer retention window.
 // invalidateObserver (optional) is called for every deleted observer so cached
 // observer detail/list entries do not outlive the row.
-func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDeleteAfter, neighborRetention, nodeIATATTL, observerDeleteAfter, interval time.Duration, invalidateObserver func(context.Context, uuid.UUID)) Task {
+func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDeleteAfter, neighborRetention, nodeIATATTL, interval time.Duration) Task {
 	return Task{
 		Name:     "cleanup",
 		Interval: interval,
@@ -80,15 +92,6 @@ func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDelet
 			if err := store.DeleteOldNodes(ctx, time.Now().Add(-nodeDeleteAfter)); err != nil {
 				return err
 			}
-			deleted, err := store.DeleteOldObservers(ctx, time.Now().Add(-observerDeleteAfter))
-			if err != nil {
-				return err
-			}
-			for _, id := range deleted {
-				if invalidateObserver != nil {
-					invalidateObserver(ctx, id)
-				}
-			}
 			return nil
 		},
 	}
@@ -97,6 +100,33 @@ func CleanupTask(store *db.Store, telemetryRetention, packetRetention, nodeDelet
 // reconfirmBatchSize bounds per-tick reconfirm work; at hourly ticks a 16M-row
 // table gets fully re-checked roughly daily.
 const reconfirmBatchSize = 750_000
+
+type observerCleaner interface {
+	DeleteOldObservers(context.Context, time.Time) ([]uuid.UUID, error)
+}
+
+// ObserverCleanupTask ages out unreferenced observers through the presence
+// coalescer, then invalidates any cached details for the deleted IDs.
+func ObserverCleanupTask(store observerCleaner, deleteAfter, interval time.Duration, onDelete func(context.Context, uuid.UUID)) Task {
+	return Task{
+		Name: "observer_cleanup", Interval: interval,
+		Run: func(ctx context.Context) error {
+			if deleteAfter <= 0 {
+				return nil
+			}
+			ids, err := store.DeleteOldObservers(ctx, time.Now().Add(-deleteAfter))
+			if err != nil {
+				return err
+			}
+			if onDelete != nil {
+				for _, id := range ids {
+					onDelete(ctx, id)
+				}
+			}
+			return nil
+		},
+	}
+}
 
 // ReconfirmTask returns a Task that prunes aged routes first, then reconfirms
 // stale and ambiguous resolved paths and neighbors, so known_routes only ever

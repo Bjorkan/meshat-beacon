@@ -49,6 +49,36 @@ function detail(observations: Observation[], over: Partial<PacketDetail> = {}): 
 }
 
 describe('buildPacketPaths', () => {
+  it('excludes location resets and invalid candidates from observation and trace paths', () => {
+    const candidates: ResolvedHop = {
+      confidence: 'ambiguous',
+      nodes: [
+        ...hop('reset', 0, 0).nodes,
+        ...hop('invalid', 181, 10).nodes,
+        ...hop('valid', 0, 45).nodes,
+      ],
+    };
+    const hops = [hop('unknown', 0, 0), candidates, hop('end', 0.1, 45.1)];
+    const ordinary = buildPacketPaths(
+      detail([obs(1, hops, { pathLength: { raw: '83', hashSize: 3, hopCount: 3 } })]),
+    );
+    const trace = buildPacketPaths(
+      detail([], {
+        header: { payloadType: PayloadType.TRACE, routeType: 1 },
+        resolvedRoute: hops,
+      } as Partial<PacketDetail>),
+    );
+    for (const paths of [ordinary, trace]) {
+      expect(paths[0]!.points.map((p) => [p.lng, p.lat])).toEqual([
+        [0, 45],
+        [0.1, 45.1],
+      ]);
+    }
+    expect(buildPacketPaths(detail([obs(1, [hop('unknown', 0, 0), hop('one', -75, 45)])]))).toEqual(
+      [],
+    );
+  });
+
   it('keys each path by observerId and carries propagation, fastest first', () => {
     const d = detail([
       obs(1, [hop('a', ...A), hop('b', ...B)], {

@@ -42,7 +42,9 @@ it.each([true, false])(
     const { result } = renderHook(() => useRegion(), { wrapper });
     await waitFor(() =>
       expect(result.current).toEqual(
-        isRoot ? { iatas: undefined, regionKey: '*' } : { iatas: ['STO'], regionKey: 'STO' },
+        isRoot
+          ? { iatas: undefined, regionKey: '*', isResolved: true }
+          : { iatas: ['STO'], regionKey: 'STO', isResolved: true },
       ),
     );
   },

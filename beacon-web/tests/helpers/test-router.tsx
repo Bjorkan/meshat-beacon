@@ -29,14 +29,16 @@ function validateSearch(search: Record<string, unknown>) {
 export function TestRouter({
   children,
   initialEntry = '/',
+  routePath = '$',
 }: {
   children: ReactNode;
   initialEntry?: string;
+  routePath?: string;
 }) {
   const rootRoute = createRootRoute({ component: () => <Outlet />, validateSearch });
   const splatRoute = createRoute({
     getParentRoute: () => rootRoute,
-    path: '$',
+    path: routePath,
     component: () => children,
   });
   const indexRoute = createRoute({

@@ -59,7 +59,7 @@ func TestChannelListingIntegration(t *testing.T) {
 	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
 	list := func(limit int32, hash []byte, iatas []string, cursor int64, key string) api.ChannelPage {
 		t.Helper()
-		page, err := store.ListChannels(ctx, limit, hash, iatas, cursor, key)
+		page, err := store.ListChannels(ctx, limit, hash, iatas, cursor, key, nil)
 		if err != nil {
 			t.Fatal(err)
 		}

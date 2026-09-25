@@ -178,6 +178,7 @@ func TestGetTraceByTag_WithPacket(t *testing.T) {
 				FirstHeardAt:  firstHeard,
 				LastHeardAt:   lastHeard,
 				ParsedPayload: parsedPayload,
+				Iatas:         []string{"YVR"},
 			},
 		}, nil)
 

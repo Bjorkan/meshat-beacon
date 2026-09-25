@@ -11,11 +11,11 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/lora"
 	"github.com/google/uuid"
 	"github.com/meshcore-go/meshcore-go"
 )
@@ -55,6 +55,8 @@ type InsertObservationParams struct {
 	CodingRate        int16
 	SourceBroker      string
 	PayloadType       int16
+	ResolvedEndpoints json.RawMessage
+	AirtimeMs         *float32 // nil when the observer never reported costable radio settings
 }
 
 // RadioSettings holds the radio configuration for an observer, populated from
@@ -78,6 +80,7 @@ type packetObservationEvent struct {
 		IsFirstObservation bool    `json:"isFirstObservation"`
 		ObservationCount   int64   `json:"observationCount"`
 		Scope              *string `json:"scope,omitempty"`
+		Summary            *string `json:"summary,omitempty"` // same advert name as REST list/backfill rows
 	} `json:"packet"`
 	Observation struct {
 		ObserverID   string  `json:"observerId"`
@@ -286,46 +289,46 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	}
 	err := json.Unmarshal(raw, &envelope)
 	if err != nil {
-		log.Printf("ingest[%s]: malformed packet envelope from %s/%s", w.cfg.BrokerName, iata, pubkeyHex)
+		w.log.Warn(fmt.Sprintf("malformed packet envelope from %s/%s", iata, pubkeyHex))
 		return
 	}
 	if envelope.Raw == "" {
 		if envelope.Len == "0" || envelope.Len == "" {
 			return // observer keepalive with no packet data
 		}
-		log.Printf("ingest[%s]: malformed packet envelope from %s/%s", w.cfg.BrokerName, iata, pubkeyHex)
+		w.log.Warn(fmt.Sprintf("malformed packet envelope from %s/%s", iata, pubkeyHex))
 		return
 	}
 	hexBytes, err := hex.DecodeString(strings.ReplaceAll(envelope.Raw, " ", ""))
 	if err != nil {
-		log.Printf("ingest[%s]: invalid hex from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Warn(fmt.Sprintf("invalid hex from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 	packet, err := meshcore.PacketFromBytes(hexBytes)
 	if err != nil {
-		log.Printf("ingest[%s]: error decoding packet from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Warn(fmt.Sprintf("error decoding packet from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 
 	pubkeyBytes, err := hex.DecodeString(pubkeyHex)
 	if err != nil {
-		log.Printf("ingest[%s]: invalid pubkey hex from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Warn(fmt.Sprintf("invalid pubkey hex from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 
 	id, observerName, err := w.db.UpsertObserver(ctx, pubkeyBytes)
 	if err != nil {
-		log.Printf("ingest[%s]: db: upsert observer failed with packet from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: upsert observer failed with packet from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 	err = w.db.UpsertObserverBroker(ctx, id, w.cfg.BrokerName)
 	if err != nil {
-		log.Printf("ingest[%s]: db: update observer broker failed with packet from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: update observer broker failed with packet from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 	err = w.db.UpsertIATA(ctx, iata)
 	if err != nil {
-		log.Printf("ingest[%s]: db: upsert IATA failed with packet from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: upsert IATA failed with packet from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 	packetHash := packet.PacketHash()
@@ -340,6 +343,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	var channelHash []byte
 	originPubkey := []byte(nil)
 	var parsedPayload json.RawMessage
+	var summary *string
 	var traceTag []byte
 	// For PayloadTypeTrace, packet.Path holds one SNR byte per hop (not hashes -- see
 	// below), so the "physical route" hashes for resolvedPath/known-route purposes come
@@ -413,6 +417,9 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 			if hasName {
 				n := strings.ToValidUTF8(appData.Name, "\uFFFD")
 				name = &n
+				if n != "" {
+					summary = name
+				}
 			}
 
 			deviceRole := int(flags & 0x0F)
@@ -559,6 +566,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 				SNRValues:  snrValues,
 			}
 			parsedPayload, _ = json.Marshal(pt)
+			summary = new(traceType + " " + pt.TraceTag)
 
 			// Each consecutive hop pair becomes a node_neighbors edge:
 			// hop[i]'s measured SNR of receiving from hop[i-1]. hop[0]'s
@@ -578,7 +586,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 						if len(prevEntries) == 1 && len(currEntries) == 1 {
 							snr := snrValues[i]
 							if err := w.db.UpsertNodeNeighbor(ctx, currEntries[0].NodeID, prevEntries[0].NodeID, iata, &snr, nil, false, hashWidthFor(traceHashSize)); err != nil {
-								log.Printf("ingest[%s]: failed to upsert trace neighbor: %v", w.cfg.BrokerName, err)
+								w.log.Error("failed to upsert trace neighbor", "error", err)
 							}
 						}
 					}
@@ -595,6 +603,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 				Checksum: hex.EncodeToString(uint32ToBytes(ack.CRC())),
 			}
 			parsedPayload, _ = json.Marshal(pa)
+			summary = new("ACK " + pa.Checksum)
 		}
 
 	case meshcore.PayloadTypeMultiPart:
@@ -658,7 +667,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 						if oErr == nil && rErr == nil && observerNodeID != responderNodeID {
 							rxSNR := float32(parseNumber(envelope.SNR))
 							if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, responderNodeID, iata, &rxSNR, nil, true, hashWidthExact()); err != nil {
-								log.Printf("ingest[%s]: failed to upsert observer-discover neighbor: %v", w.cfg.BrokerName, err)
+								w.log.Error("failed to upsert observer-discover neighbor", "error", err)
 							}
 						}
 					}
@@ -697,7 +706,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	if matchedScope != nil {
 		id, err := w.db.GetTransportScopeByName(ctx, *matchedScope)
 		if err != nil {
-			log.Printf("ingest[%s]: failed to get scope ID for %s: %v", w.cfg.BrokerName, *matchedScope, err)
+			w.log.Error(fmt.Sprintf("failed to get scope ID for %s", *matchedScope), "error", err)
 		} else {
 			scopeID = &id
 		}
@@ -722,7 +731,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	}
 	isNew, err := w.db.UpsertPacket(ctx, pParams)
 	if err != nil {
-		log.Printf("ingest[%s]: db: upsert packet failed from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: upsert packet failed from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 	// Try parsing with timezone offset first
@@ -740,21 +749,60 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		heardAt, err = time.Parse("2006-01-02T15:04:05Z", envelope.Timestamp)
 	}
 	if err != nil {
-		log.Printf("ingest[%s]: failed to parse timestamp %q: %v", w.cfg.BrokerName, envelope.Timestamp, err)
+		w.log.Warn(fmt.Sprintf("failed to parse timestamp %q", envelope.Timestamp), "error", err)
 		heardAt = time.Now().UTC()
 	} else {
 		// clamp to server time if offset is suspicious (> 30 min drift)
 		now := time.Now().UTC()
 		diff := heardAt.UTC().Sub(now)
 		if diff > 30*time.Minute || diff < -30*time.Minute {
-			log.Printf("ingest[%s]: clamping suspicious timestamp %s (diff %v) for pubkey %s", w.cfg.BrokerName, envelope.Timestamp, diff, pubkeyHex[:8])
+			w.log.Warn(fmt.Sprintf("clamping suspicious timestamp %s (diff %v) for pubkey %s", envelope.Timestamp, diff, pubkeyHex[:8]))
 			heardAt = now
 		}
 	}
 
 	radio, err := w.db.GetObserverRadio(ctx, id)
 	if err != nil {
-		log.Printf("ingest[%s]: db: get observer radio failed for %s: %v", w.cfg.BrokerName, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: get observer radio failed for %s", pubkeyHex), "error", err)
+	}
+	// Save the same endpoint resolution used by the live event in the observation INSERT.
+	var resolvedSource, resolvedDestination *api.ResolvedHop
+	if packet.PayloadType() == meshcore.PayloadTypeAdvert && originPubkey != nil {
+		// Exact match: ADVERT carries the sender's real identity pubkey, not a
+		// short ambiguous hash prefix like the other resolvable payload types.
+		if nodeID, err := w.db.GetNodeByPubkey(ctx, originPubkey); err == nil {
+			if nodes, err := w.db.GetNodesByIDs(ctx, []uuid.UUID{nodeID}); err == nil {
+				hop := api.ResolveExactNode(nodes[nodeID])
+				resolvedSource = &hop
+			}
+		}
+	} else if len(sourceHashByte) == 1 {
+		if r, err := w.db.ResolveEndpointHashes(ctx, iata, [][]byte{sourceHashByte}); err == nil {
+			hop := api.BuildResolvedPath([][]byte{sourceHashByte}, r)[0]
+			resolvedSource = &hop
+		}
+	}
+	if len(destHashByte) == 1 {
+		if r, err := w.db.ResolveEndpointHashes(ctx, iata, [][]byte{destHashByte}); err == nil {
+			hop := api.BuildResolvedPath([][]byte{destHashByte}, r)[0]
+			resolvedDestination = &hop
+		}
+	}
+	var resolvedEndpoints json.RawMessage
+	snapshot := api.PacketEndpointSnapshot{Source: resolvedSource, Destination: resolvedDestination}
+	if snapshot.HasResolvedNodes() {
+		resolvedEndpoints, err = json.Marshal(snapshot)
+		if err != nil {
+			w.log.Error("endpoint snapshot encoding failed", "error", err)
+			resolvedEndpoints = nil // optional enrichment must not discard the observation
+		}
+	}
+	// Airtime is costed from the frame as received; zero radio columns mean the
+	// observer never reported its settings, so there is nothing to cost.
+	var airtimeMs *float32
+	if ms, ok := lora.TimeOnAirMs(len(hexBytes), int(radio.SF), float64(radio.BWKHz), int(radio.CR)); ok {
+		cost := float32(ms)
+		airtimeMs = &cost
 	}
 	oParams := InsertObservationParams{
 		PacketHash:        packetHash[:],
@@ -774,30 +822,32 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		CodingRate:        radio.CR,
 		SourceBroker:      w.cfg.BrokerName,
 		PayloadType:       int16(packet.PayloadType()),
+		ResolvedEndpoints: resolvedEndpoints,
+		AirtimeMs:         airtimeMs,
 	}
 	inserted, err := w.db.InsertObservation(ctx, oParams)
 	if err != nil {
-		log.Printf("ingest[%s]: db: insert observation failed from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+		w.log.Error(fmt.Sprintf("db: insert observation failed from %s/%s", iata, pubkeyHex), "error", err)
 		return
 	}
 
 	if scopeID != nil && inserted {
 		if err := w.db.UpsertObserverScope(ctx, id, *scopeID); err != nil {
-			log.Printf("ingest[%s]: failed to upsert observer scope for %s: %v", w.cfg.BrokerName, id, err)
+			w.log.Error(fmt.Sprintf("failed to upsert observer scope for %s", id), "error", err)
 		}
 	}
 
 	// Runs on duplicate observations too; the upsert only writes when the row is >1h stale.
 	if channelHash != nil {
 		if err := w.db.UpsertChannelIATA(ctx, channelHash, iata, heardAt); err != nil {
-			log.Printf("ingest[%s]: db: upsert channel IATA failed from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+			w.log.Error(fmt.Sprintf("db: upsert channel IATA failed from %s/%s", iata, pubkeyHex), "error", err)
 		}
 	}
 
 	// Runs on duplicate observations too; the upsert only writes when the row is >1h stale.
 	if traceTag != nil {
 		if err := w.db.UpsertTraceIATA(ctx, traceTag, iata, heardAt); err != nil {
-			log.Printf("ingest[%s]: db: upsert trace IATA failed from %s/%s: %v", w.cfg.BrokerName, iata, pubkeyHex, err)
+			w.log.Error(fmt.Sprintf("db: upsert trace IATA failed from %s/%s", iata, pubkeyHex), "error", err)
 		}
 	}
 
@@ -811,7 +861,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	}
 	resolved, err := w.db.ResolvePathHashes(ctx, hashes)
 	if err != nil {
-		log.Printf("ingest[%s]: path resolution failed: %v", w.cfg.BrokerName, err)
+		w.log.Error("path resolution failed", "error", err)
 	}
 	var resolvedIDs []uuid.UUID
 	seenCapabilityHashes := make(map[string]struct{}, len(hashes))
@@ -841,7 +891,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		}
 		if allHigh && len(nodeIDs) > 1 {
 			if err := w.db.UpsertKnownRoute(ctx, nodeIDs, hashPrefixes, iata, int32(len(nodeIDs))); err != nil {
-				log.Printf("ingest[%s]: failed to upsert known route: %v", w.cfg.BrokerName, err)
+				w.log.Error("failed to upsert known route", "error", err)
 			}
 		}
 	}
@@ -868,7 +918,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 				return
 			}
 			if err := w.db.UpsertNodeNeighbor(ctx, from, to, iata, nil, nil, false, hashWidthFor(packet.PathHashSize())); err != nil {
-				log.Printf("ingest[%s]: failed to upsert path neighbor: %v", w.cfg.BrokerName, err)
+				w.log.Error("failed to upsert path neighbor", "error", err)
 			}
 		}
 		prevID, prevOK := nodeIDFor(hashes[0])
@@ -894,29 +944,6 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 	}
 	w.runCapabilityDetection(ctx, packet.PayloadType(), capabilityHashSize, resolvedIDs)
 
-	var resolvedSource, resolvedDestination *api.ResolvedHop
-	if packet.PayloadType() == meshcore.PayloadTypeAdvert && originPubkey != nil {
-		// Exact match: ADVERT carries the sender's real identity pubkey, not a
-		// short ambiguous hash prefix like the other resolvable payload types.
-		if nodeID, err := w.db.GetNodeByPubkey(ctx, originPubkey); err == nil {
-			if nodes, err := w.db.GetNodesByIDs(ctx, []uuid.UUID{nodeID}); err == nil {
-				hop := api.ResolveExactNode(nodes[nodeID])
-				resolvedSource = &hop
-			}
-		}
-	} else if len(sourceHashByte) == 1 {
-		if r, err := w.db.ResolvePathHashes(ctx, [][]byte{sourceHashByte}); err == nil {
-			hop := api.BuildResolvedPath([][]byte{sourceHashByte}, r)[0]
-			resolvedSource = &hop
-		}
-	}
-	if len(destHashByte) == 1 {
-		if r, err := w.db.ResolvePathHashes(ctx, [][]byte{destHashByte}); err == nil {
-			hop := api.BuildResolvedPath([][]byte{destHashByte}, r)[0]
-			resolvedDestination = &hop
-		}
-	}
-
 	if inserted {
 		w.handlePayloadTypeSideEffects(ctx, packet, iata, packetHash[:], radio, scopeID, matchedScope, pubkeyBytes, float32(parseNumber(envelope.SNR)))
 		evt := packetObservationEvent{}
@@ -926,6 +953,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		evt.Packet.RouteType = packet.RouteType()
 		evt.Packet.RouteTypeName = api.RouteTypeName(int16(packet.RouteType()))
 		evt.Packet.IsFirstObservation = isNew
+		evt.Packet.Summary = summary
 		evt.Observation.ObserverID = id.String()
 		evt.Observation.ObserverName = observerName
 		evt.Observation.IATA = iata
@@ -959,7 +987,7 @@ func (w *Worker) handlePacket(ctx context.Context, iata, pubkeyHex string, raw [
 		evt.Observation.PropagationTimeMs = 0 // not yet calculated
 		count, err := w.db.GetPacketObservationCount(ctx, packetHash[:])
 		if err != nil {
-			log.Printf("ingest[%s]: failed to get observation count: %v", w.cfg.BrokerName, err)
+			w.log.Error("failed to get observation count", "error", err)
 			count = 0
 		}
 		evt.Packet.ObservationCount = count

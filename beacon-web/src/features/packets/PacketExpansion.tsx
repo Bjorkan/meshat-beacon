@@ -13,7 +13,7 @@ import { PacketChannelMessage } from './PacketChannelMessage';
 const SKELETON_ROW_CAP = 12;
 
 const ACTION_BUTTON_CLASS =
-  'border border-border rounded-sm px-2 py-0.5 bg-bg-raised text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors';
+  'border border-border rounded-sm px-3 py-2.5 min-h-11 lg:min-h-0 lg:px-2 lg:py-0.5 bg-bg-raised text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors';
 
 interface Props {
   packet: PacketSummary;
@@ -68,10 +68,10 @@ export function PacketExpansion({
     <div
       data-testid="packet-expansion"
       id={`packet-expansion-${packet.packetHash}`}
-      className={`bg-bg-surface border-l-2 border-primary ${PACKET_TABLE_X_PADDING} py-2`}
+      className={`bg-bg-surface border border-t-0 border-primary/40 rounded-b-lg lg:rounded-none lg:border-0 lg:border-l-2 lg:border-primary ${PACKET_TABLE_X_PADDING} py-3 lg:py-2`}
     >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 pb-2 text-[11px] whitespace-nowrap">
-        <span className="text-text-muted">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2 pb-3 text-xs lg:gap-y-1 lg:pb-2 lg:text-[11px] whitespace-nowrap">
+        <span className="hidden lg:inline text-text-muted">
           {t('entities.observer')}{' '}
           {observer ? (
             <span className="text-text-normal">
@@ -109,15 +109,11 @@ export function PacketExpansion({
 
       {data && <PacketChannelMessage packet={data} />}
 
-      <div className="max-h-[360px] overflow-y-auto">
+      <div data-testid="observation-scroller" className="lg:max-h-[360px] lg:overflow-y-auto">
         {isError ? (
           <div className="flex items-center gap-3 text-[10px] text-danger py-2">
             <span>{t('packets.failedObservations')}</span>
-            <button
-              type="button"
-              onClick={() => refetch()}
-              className="border border-border rounded-sm px-2 py-0.5 bg-bg-raised cursor-pointer"
-            >
+            <button type="button" onClick={() => refetch()} className={ACTION_BUTTON_CLASS}>
               {t('packets.retry')}
             </button>
           </div>
@@ -139,6 +135,7 @@ export function PacketExpansion({
           emptyState
         ) : data ? (
           <ObservationTable
+            isTrace={packet.payloadType === 9}
             observations={data.observations}
             selectedId={selectedObservationId}
             onSelect={handleSelectObservation}

@@ -3,13 +3,22 @@
 
 import { API_BASE } from "../../lib/constants";
 import type * as Models from "./models";
+import { noteRateLimited, noteRequestOk, parseRetryAfter } from "../rate-limit";
 
 export class ApiError extends Error {
   status: number;
   code: string;
-  constructor(status: number, code: string, message: string) {
-    super(message); this.name = "ApiError"; this.status = status; this.code = code;
+  retryAfterMs?: number;
+  constructor(status: number, code: string, message: string, retryAfterMs?: number) {
+    super(message); this.name = "ApiError"; this.status = status; this.code = code; this.retryAfterMs = retryAfterMs;
   }
+}
+
+export async function errorFrom(res: Response): Promise<ApiError> {
+  const retryAfterMs = res.status === 429 ? parseRetryAfter(res.headers.get("Retry-After")) : undefined;
+  if (res.status === 429) noteRateLimited(retryAfterMs);
+  const body = await res.json().catch(() => undefined);
+  return new ApiError(res.status, body?.error?.code ?? "unknown", body?.error?.message ?? res.statusText, retryAfterMs);
 }
 
 type QueryValue = string | number | boolean | undefined;
@@ -18,20 +27,46 @@ async function request<T>(route: string, query?: Record<string, QueryValue>, ini
   const url = new URL(`${API_BASE}${route}`, window.location.origin);
   for (const [key, value] of Object.entries(query ?? {})) if (value !== undefined) url.searchParams.set(key, String(value));
   const res = await fetch(url.toString(), init);
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: { code: "unknown", message: res.statusText } }));
-    throw new ApiError(res.status, body?.error?.code ?? "unknown", body?.error?.message ?? res.statusText);
-  }
+  if (!res.ok) throw await errorFrom(res);
+  noteRequestOk();
   if (res.status === 204) return undefined as T;
   return await res.json() as T;
+}
+
+export async function rawGetAdminAccounts(init?: RequestInit): Promise<Models.AccountList> {
+  return request<Models.AccountList>("/admin/accounts", undefined, init);
+}
+
+export async function rawPostAdminAccounts(params: { account: Models.CreateAccountRequest; }, init?: RequestInit): Promise<Models.Account> {
+  return request<Models.Account>("/admin/accounts", undefined, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params.account), ...init });
+}
+
+export async function rawGetAdminAccountsId(params: { id: string; }, init?: RequestInit): Promise<Models.Account> {
+  return request<Models.Account>(`/admin/accounts/${encodeURIComponent(String(params.id))}`, undefined, init);
+}
+
+export async function rawDeleteAdminAccountsId(params: { id: string; }, init?: RequestInit): Promise<unknown> {
+  return request<unknown>(`/admin/accounts/${encodeURIComponent(String(params.id))}`, undefined, { method: "DELETE", ...init });
+}
+
+export async function rawGetAdminBackup(init?: RequestInit): Promise<unknown> {
+  return request<unknown>("/admin/backup", undefined, init);
+}
+
+export async function rawGetAdminConfig(init?: RequestInit): Promise<Models.AdminConfig> {
+  return request<Models.AdminConfig>("/admin/config", undefined, init);
+}
+
+export async function rawPutAdminConfig(params: { config: Models.UpdateAdminConfigRequest; }, init?: RequestInit): Promise<Models.UpdateAdminConfigResponse> {
+  return request<Models.UpdateAdminConfigResponse>("/admin/config", undefined, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params.config), ...init });
 }
 
 export async function rawGetBrokers(init?: RequestInit): Promise<Array<Models.BrokerStatus>> {
   return request<Array<Models.BrokerStatus>>("/brokers", undefined, init);
 }
 
-export async function rawGetChannels(params: { key?: "known" | "unknown" | "all"; hash?: string; iata?: string; iatas?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.ChannelPage> {
-  return request<Models.ChannelPage>("/channels", { "key": params.key, "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "cursor": params.cursor, "limit": params.limit }, init);
+export async function rawGetChannels(params: { key?: "known" | "unknown" | "all"; hash?: string; iata?: string; iatas?: string; pageCursor?: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.ChannelPage> {
+  return request<Models.ChannelPage>("/channels", { "key": params.key, "hash": params.hash, "iata": params.iata, "iatas": params.iatas, "pageCursor": params.pageCursor, "cursor": params.cursor, "limit": params.limit }, init);
 }
 
 export async function rawGetChannelsChannelID(params: { channelID: number; }, init?: RequestInit): Promise<Models.Channel> {
@@ -98,6 +133,10 @@ export async function rawGetObserversObserverId(params: { observerId: string; },
   return request<Models.Observer>(`/observers/${encodeURIComponent(String(params.observerId))}`, undefined, init);
 }
 
+export async function rawGetObserversObserverIdActivity(params: { observerId: string; range?: string; interval?: string; }, init?: RequestInit): Promise<Models.ObserverActivity> {
+  return request<Models.ObserverActivity>(`/observers/${encodeURIComponent(String(params.observerId))}/activity`, { "range": params.range, "interval": params.interval }, init);
+}
+
 export async function rawGetObserversObserverIdAdverts(params: { observerId: string; cursor?: number; limit?: number; }, init?: RequestInit): Promise<Models.PageAdvertObservation> {
   return request<Models.PageAdvertObservation>(`/observers/${encodeURIComponent(String(params.observerId))}/adverts`, { "cursor": params.cursor, "limit": params.limit }, init);
 }
@@ -162,8 +201,16 @@ export async function rawGetStatsObservations(params: { iatas?: string; regionId
   return request<Array<Models.ObservationPoint>>("/stats/observations", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region, "since": params.since }, init);
 }
 
+export async function rawGetStatsObserverComparison(params: { observerA: string; observerB: string; since: number; until: number; iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Models.ObserverComparison> {
+  return request<Models.ObserverComparison>("/stats/observer-comparison", { "observerA": params.observerA, "observerB": params.observerB, "since": params.since, "until": params.until, "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
+}
+
 export async function rawGetStatsOverview(params: { iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Models.StatsOverview> {
   return request<Models.StatsOverview>("/stats/overview", { "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
+}
+
+export async function rawGetStatsPaths(params: { since: number; until: number; iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Models.PathStats> {
+  return request<Models.PathStats>("/stats/paths", { "since": params.since, "until": params.until, "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
 export async function rawGetStatsPayloadBreakdown(params: { iatas?: string; regionId?: number; region?: string; since?: number; }, init?: RequestInit): Promise<Array<Models.PayloadBreakdownItem>> {
@@ -174,8 +221,12 @@ export async function rawGetStatsRadioPresets(params: { preset?: string; iatas?:
   return request<Array<Models.RadioPreset>>("/stats/radio-presets", { "preset": params.preset, "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
-export async function rawGetStatsScopes(init?: RequestInit): Promise<Array<Models.ScopeStats>> {
-  return request<Array<Models.ScopeStats>>("/stats/scopes", undefined, init);
+export async function rawGetStatsScopes(params: { iatas?: string; iata?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Array<Models.ScopeStats>> {
+  return request<Array<Models.ScopeStats>>("/stats/scopes", { "iatas": params.iatas, "iata": params.iata, "regionId": params.regionId, "region": params.region }, init);
+}
+
+export async function rawGetStatsSignal(params: { since: number; until: number; iatas?: string; regionId?: number; region?: string; }, init?: RequestInit): Promise<Models.SignalStats> {
+  return request<Models.SignalStats>("/stats/signal", { "since": params.since, "until": params.until, "iatas": params.iatas, "regionId": params.regionId, "region": params.region }, init);
 }
 
 export async function rawGetStatsTopAdvertisers(params: { iatas?: string; regionId?: number; region?: string; since?: number; limit?: number; }, init?: RequestInit): Promise<Array<Models.TopAdvertiser>> {
