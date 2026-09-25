@@ -12,6 +12,14 @@ WebSockets are intercepted with fixtures; a backend is not required. Browser tes
 run one worker at a time so concurrent test pages do not distort responsiveness
 measurements. CI installs both browsers and runs the same suite.
 
+On Ubuntu runners without a display, run the suite with
+`xvfb-run --auto-servernum npm run test:browser` after installing browser system
+dependencies (`npx playwright install --with-deps chromium firefox`). Firefox
+needs the virtual X display to create a Mesa WebGL context even in headless mode;
+without it, the route map shows its error fallback and map interaction tests fail.
+CI uses this wrapper and uploads failure screenshots and traces as the
+`browser-test-results` artifact.
+
 `trace-detail.spec.ts` covers layout, path containment and nested interactions.
 `trace-filter.spec.ts` uses 200 summaries per filter, eight realistic path hops and
 two timestamps per desktop row. It checks repeated All/Trace/Ping changes, a held

@@ -39,7 +39,16 @@ jobs:
       - name: Install browser dependencies
         run: npx playwright install --with-deps chromium firefox
       - name: Production build and browser regressions
-        run: npm run test:browser --workspace=beacon-web
+        # Firefox needs an X display for Mesa WebGL on Ubuntu, even in headless mode.
+        run: xvfb-run --auto-servernum npm run test:browser --workspace=beacon-web
+      - name: Upload browser failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: browser-test-results
+          path: beacon-web/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
 
   server:
     name: Server
