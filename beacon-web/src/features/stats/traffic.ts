@@ -1,6 +1,6 @@
 import { t as defaultT, type TFunction } from 'i18next';
 import type { EChartsOption } from './echarts-setup';
-import { tooltipStyle, type ChartColors } from './chartTheme';
+import { blend, tooltipStyle, type ChartColors } from './chartTheme';
 import { RANGE_MS, type ObservationPoint, type StatsRange } from './types';
 
 const HOUR = 3_600_000;
@@ -201,7 +201,9 @@ export function trafficHeatmapOption(
       itemHeight: 130,
       text: ['More', 'Fewer'],
       textStyle: { color: c.textMuted, fontSize: 10 },
-      inRange: { color: [c.primaryDim, c.primary, c.secondary, c.green, c.warn] },
+      inRange: {
+        color: [blend(c.bgSurface, c.primary, 0.12), blend(c.bgSurface, c.primary), c.primary],
+      },
     },
     series: [
       {

@@ -48,6 +48,8 @@ const COLORS: ChartColors = {
   primary: '#3b82f6',
   primaryDim: '#1e40af',
   secondary: '#a78bfa',
+  cyan: '#0891b2',
+  orange: '#ea580c',
   green: '#22c55e',
   warn: '#f59e0b',
   danger: '#ef4444',

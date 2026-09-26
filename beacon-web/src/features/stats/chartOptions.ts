@@ -103,8 +103,8 @@ export function observationsAreaOption(
         smooth: true,
         symbol: 'none',
         data: uniq,
-        lineStyle: { color: c.secondary, width: 1.3, type: 'dashed' },
-        itemStyle: { color: c.secondary },
+        lineStyle: { color: c.cyan, width: 1.3, type: 'dashed' },
+        itemStyle: { color: c.cyan },
       },
     ],
   };
@@ -433,9 +433,9 @@ export function airtimeOption(
         symbol: 'none',
         connectNulls: true,
         data: airtimePctSeries(points, 'airtimeRxSecs', bucketMs),
-        lineStyle: { width: 1, color: c.green },
-        areaStyle: { color: withAlpha(c.green, 0.35) },
-        itemStyle: { color: c.green },
+        lineStyle: { width: 1, color: c.primary },
+        areaStyle: { color: withAlpha(c.primary, 0.35) },
+        itemStyle: { color: c.primary },
       },
       {
         name: 'TX',
@@ -445,9 +445,9 @@ export function airtimeOption(
         symbol: 'none',
         connectNulls: true,
         data: airtimePctSeries(points, 'airtimeTxSecs', bucketMs),
-        lineStyle: { width: 1, color: c.primary },
-        areaStyle: { color: withAlpha(c.primary, 0.35) },
-        itemStyle: { color: c.primary },
+        lineStyle: { width: 1, color: c.orange },
+        areaStyle: { color: withAlpha(c.orange, 0.35) },
+        itemStyle: { color: c.orange },
       },
     ],
   };
@@ -534,7 +534,7 @@ export const batteryOption = (
 ) =>
   metricLineOption(p, c, {
     name,
-    color: c.primary,
+    color: c.green,
     voltage: true,
     accessor: (x) => (x.batteryMv == null ? null : +(x.batteryMv / 1000).toFixed(3)),
     range,
@@ -555,7 +555,7 @@ export const queueOption = (
 ) =>
   metricLineOption(p, c, {
     name,
-    color: c.secondary,
+    color: c.orange,
     accessor: (x) => x.queueLength,
     area: true,
     range,
@@ -617,9 +617,9 @@ export function busyOption(
         symbol: 'none',
         connectNulls: false,
         data: points.map((p) => [p.t, pct(p)]),
-        lineStyle: { width: 1.5, color: c.green },
-        areaStyle: { color: withAlpha(c.green, 0.28) },
-        itemStyle: { color: c.green },
+        lineStyle: { width: 1.5, color: c.warn },
+        areaStyle: { color: withAlpha(c.warn, 0.28) },
+        itemStyle: { color: c.warn },
       },
     ],
   };

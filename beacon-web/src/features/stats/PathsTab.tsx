@@ -28,10 +28,10 @@ export function PathsTab({ range }: { range: StatsRange }) {
   );
   const charts = useMemo(() => {
     const width = donutOption(
-      (data?.hashWidths ?? []).map((bin, i) => ({
+      (data?.hashWidths ?? []).map((bin) => ({
         name: `${bin.bytes}-byte`,
         value: bin.receptions,
-        color: c.series[i],
+        color: c.series[bin.bytes - 1],
       })),
       c,
       formatCount(data?.hashed ?? 0),

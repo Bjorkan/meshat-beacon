@@ -82,7 +82,7 @@ export function SignalTab({ range }: { range: StatsRange }) {
               {average(data?.rssi.average, 'dBm')}
             </span>
           }
-          accent={c.green}
+          accent={c.cyan}
         />
         <StatCard
           label={t('upstream.hours_with_records')}

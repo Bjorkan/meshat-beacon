@@ -6,6 +6,7 @@ import { useSearch, useNavigate } from '@tanstack/react-router';
 import { getObserver, getObserverComparison, getObserversPage } from '../../api/client';
 import { useRegion } from '../../hooks/useRegion';
 import { Card } from './cards';
+import { useChartColors } from './chartTheme';
 
 type Selection = { observerA: string; observerB: string; since: number; until: number };
 const uuid =
@@ -192,6 +193,7 @@ function ComparisonForm({
 
 export function CompareObserversTab() {
   const { t } = useTranslation();
+  const colors = useChartColors();
   const { iatas, regionKey, isResolved } = useRegion();
   const search = useSearch({ from: '/analytics' });
   const navigate = useNavigate({ from: '/analytics' });
@@ -254,9 +256,9 @@ export function CompareObserversTab() {
   const data = result.data;
   const groups = data
     ? [
-        { name: t('upstream.only_a'), count: data.onlyA, color: 'var(--color-primary)' },
-        { name: t('upstream.both'), count: data.both, color: 'var(--color-green)' },
-        { name: t('upstream.only_b'), count: data.onlyB, color: 'var(--color-secondary)' },
+        { name: t('upstream.only_a'), count: data.onlyA, color: colors.primary },
+        { name: t('upstream.both'), count: data.both, color: colors.green },
+        { name: t('upstream.only_b'), count: data.onlyB, color: colors.secondary },
       ]
     : [];
   return (

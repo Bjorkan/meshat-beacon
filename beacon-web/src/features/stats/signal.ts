@@ -1,7 +1,7 @@
 import { t as defaultT, type TFunction } from 'i18next';
 import type { EChartsOption } from 'echarts';
 import type { SignalBin, SignalMetric, SignalStats } from './types';
-import { blend, tooltipStyle, withAlpha, type ChartColors } from './chartTheme';
+import { tooltipStyle, withAlpha, type ChartColors } from './chartTheme';
 
 const HOUR = 3_600_000;
 export function signalHours(data: SignalStats | undefined) {
@@ -61,14 +61,10 @@ export function signalHistogramOption(
         name: t('charts.samples', { name }),
         type: 'bar',
         barMaxWidth: 28,
-        data: bins.map((bin, i) => ({
+        data: bins.map((bin) => ({
           value: bin.count,
           itemStyle: {
-            color: blend(
-              name === 'SNR' ? c.secondary : c.green,
-              c.primary,
-              i / Math.max(1, bins.length - 1),
-            ),
+            color: name === 'SNR' ? c.secondary : c.cyan,
             borderRadius: [3, 3, 0, 0],
           },
         })),
@@ -83,7 +79,7 @@ export function signalTrendOption(
   c: ChartColors,
   t: TFunction = defaultT,
 ): EChartsOption {
-  const color = metric === 'snr' ? c.secondary : c.green;
+  const color = metric === 'snr' ? c.secondary : c.cyan;
   const unit = metric === 'snr' ? 'dB' : 'dBm';
   return {
     animation: false,
@@ -167,14 +163,14 @@ export function signalCoverageOption(
         type: 'bar',
         stack: 'samples',
         barMaxWidth: 22,
-        itemStyle: { color: c.primary },
+        itemStyle: { color: c.green },
         data: [data?.snr.samples ?? 0, data?.rssi.samples ?? 0],
       },
       {
         name: t('charts.unavailable'),
         type: 'bar',
         stack: 'samples',
-        itemStyle: { color: c.warn },
+        itemStyle: { color: c.textDim },
         data: [
           data ? data.receptions - data.snr.samples : 0,
           data ? data.receptions - data.rssi.samples : 0,

@@ -250,21 +250,21 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
         <StatCard
           label={t('stats.totalPackets')}
           sublabel={ovWindow}
-          accent="var(--color-primary)"
+          accent={colors.cyan}
           value={kpiLoading ? '—' : formatCount(ov?.totalPackets)}
           spark={packetSpark}
         />
         <StatCard
           label={t('stats.observations')}
           sublabel={ovWindow}
-          accent="var(--color-green)"
+          accent={colors.primary}
           value={kpiLoading ? '—' : formatCount(ov?.totalObservations)}
           spark={obsSpark}
         />
         <StatCard
           label={t('stats.activeObservers')}
           sublabel={ovWindow}
-          accent="var(--color-secondary)"
+          accent={colors.secondary}
           value={kpiLoading ? '—' : (ov?.activeObservers ?? '—')}
           spark={observerSpark}
         />
@@ -272,7 +272,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
           label={t('stats.activeIatas')}
           variant="snapshot"
           sublabel={ovWindow}
-          accent="var(--color-warn)"
+          accent={colors.warn}
           value={kpiLoading ? '—' : (ov?.activeIatas ?? '—')}
         />
       </div>

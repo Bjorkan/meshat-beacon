@@ -2,15 +2,16 @@ import { useMemo } from 'react';
 import { useTheme } from '../../hooks/useTheme';
 import { nodeTypeColor as semanticNodeTypeColor } from '../node-type-colors';
 
-// ECharts paints to a canvas and can't inherit our CSS variables, so we read the active palette's
-// resolved `--color-*` tokens (defined in index.css `@theme`, which always resolve — palette value or
-// fallback) and hand them to the option builders. `useChartColors()` re-reads whenever a palette is
-// applied (initial saved-theme load and every switch), so charts always match the active theme.
+// Data colors keep their meaning across themes, including monochrome brand palettes.
+// Axes, labels, surfaces and tooltips still follow the active theme. ECharts paints to canvas,
+// so useChartColors re-reads those CSS tokens whenever a palette is applied.
 
 export interface ChartColors {
   primary: string;
   primaryDim: string;
   secondary: string;
+  cyan: string;
+  orange: string;
   green: string;
   warn: string;
   danger: string;
@@ -23,7 +24,7 @@ export interface ChartColors {
   bgRaised: string;
   border: string;
   borderSubtle: string;
-  // categorical palette for donuts / multi-series, derived from the theme so it stays on-brand.
+  // Distinct categorical hues for donuts and multi-series charts.
   series: string[];
 }
 
@@ -67,12 +68,14 @@ export function blend(a: string, b: string, t = 0.5): string {
 
 export function readChartColors(): ChartColors {
   const c = {
-    primary: readVar('--color-primary') || '#3B82F6',
-    primaryDim: readVar('--color-primary-dim') || '#1D4ED8',
-    secondary: readVar('--color-secondary') || '#A78BFA',
-    green: readVar('--color-green') || '#22C55E',
-    warn: readVar('--color-warn') || '#EAB308',
-    danger: readVar('--color-danger') || '#EF4444',
+    primary: '#3B82F6', // received traffic / nodes
+    primaryDim: '#1D4ED8',
+    secondary: '#8B5CF6', // SNR / observers
+    cyan: '#0891B2', // RSSI / unique packets
+    orange: '#EA580C', // transmitted traffic / queues
+    green: '#16A34A', // battery / available samples / shared reception
+    warn: '#D97706', // noise / channel load
+    danger: '#EF4444', // errors
     textBright: readVar('--color-text-bright') || '#FAFAFA',
     textNormal: readVar('--color-text-normal') || '#A1A1AA',
     textMuted: readVar('--color-text-muted') || '#73737B',
@@ -83,17 +86,8 @@ export function readChartColors(): ChartColors {
     border: readVar('--color-border') || '#27272A',
     borderSubtle: readVar('--color-border-subtle') || '#1E1E22',
   };
-  // 8 categorical colors blended from the palette so any theme stays cohesive.
-  const series = [
-    c.primary,
-    c.green,
-    c.secondary,
-    c.warn,
-    c.danger,
-    c.primaryDim,
-    blend(c.primary, c.secondary),
-    blend(c.green, c.warn),
-  ];
+  // Do not derive categories from brand colors: primary, secondary and green can all be green.
+  const series = [c.primary, c.secondary, c.cyan, c.warn, c.green, c.orange, '#DB2777', '#64748B'];
   return { ...c, series };
 }
 
