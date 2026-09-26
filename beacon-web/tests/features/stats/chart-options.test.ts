@@ -164,8 +164,8 @@ describe('leaderboardOption', () => {
 const point = (t: number, p: Partial<TelemetryPoint>): TelemetryPoint => ({
   t,
   batteryMv: null,
-  airtimeTxPct: null,
-  airtimeRxPct: null,
+  airtimeTxSecs: null,
+  airtimeRxSecs: null,
   noiseFloorDb: null,
   uptimeSeconds: null,
   queueLength: null,
@@ -175,25 +175,25 @@ const point = (t: number, p: Partial<TelemetryPoint>): TelemetryPoint => ({
 
 describe('airtimeOption', () => {
   const points = [
-    point(1000, { airtimeRxPct: 10, airtimeTxPct: 4 }),
-    point(2000, { airtimeRxPct: 12, airtimeTxPct: 4 }),
-    point(3000, { airtimeRxPct: 11, airtimeTxPct: 7 }),
+    point(1000, { airtimeRxSecs: 10, airtimeTxSecs: 4 }),
+    point(2000, { airtimeRxSecs: 12, airtimeTxSecs: 4 }),
+    point(3000, { airtimeRxSecs: 11, airtimeTxSecs: 7 }),
   ];
 
   it('charts raw counters as clamped per-report deltas', () => {
-    const opt = airtimeOption(points, colors, false) as Record<string, any>;
+    const opt = airtimeOption(points, colors, null) as Record<string, any>;
     expect(opt.series[0].data).toEqual([
-      [2000, 2],
+      [2000, 200],
       [3000, 0],
     ]); // RX dips → clamp at 0
     expect(opt.series[1].data).toEqual([
       [2000, 0],
-      [3000, 3],
+      [3000, 300],
     ]); // TX
   });
 
-  it('charts bucketed points as-is', () => {
-    const opt = airtimeOption(points, colors, true) as Record<string, any>;
+  it('normalizes bucket seconds to percent', () => {
+    const opt = airtimeOption(points, colors, 100_000) as Record<string, any>;
     expect(opt.series[0].data).toEqual([
       [1000, 10],
       [2000, 12],

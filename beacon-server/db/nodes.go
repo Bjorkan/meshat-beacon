@@ -9,7 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"time"
 
@@ -191,13 +191,13 @@ func (s *Store) ListNodes(ctx context.Context, params api.NodeListParams) (api.P
 		}
 		if len(v.NeighborLinks) > 0 {
 			if err := json.Unmarshal(v.NeighborLinks, &node.NeighborLinks); err != nil {
-				log.Printf("store: failed to unmarshal node link metrics: %v", err)
+				slog.Error("failed to unmarshal node link metrics", "component", "db", "error", err)
 				node.NeighborLinks = []api.NodeLinkMetric{}
 			}
 		}
 		if len(v.Iatas) > 0 {
 			if err := json.Unmarshal(v.Iatas, &node.IATAs); err != nil {
-				log.Printf("store: failed to unmarshal node iatas: %v", err)
+				slog.Error("store: failed to unmarshal node iatas", "component", "db", "error", err)
 				node.IATAs = []api.NodeIATA{}
 			}
 		}
@@ -264,13 +264,13 @@ func (s *Store) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error
 	}
 	neighbors, err := s.GetNodeNeighbors(ctx, nodeID)
 	if err != nil {
-		log.Printf("store: GetNodeNeighbors failed for %s: %v", nodeID, err)
+		slog.Error(fmt.Sprintf("store: GetNodeNeighbors failed for %s", nodeID), "component", "db", "error", err)
 		neighbors = []api.NodeNeighbor{}
 	}
 	node.Neighbors = neighbors
 	if len(row.Iatas) > 0 {
 		if err := json.Unmarshal(row.Iatas, &node.IATAs); err != nil {
-			log.Printf("store: failed to unmarshal node iatas: %v", err)
+			slog.Error("store: failed to unmarshal node iatas", "component", "db", "error", err)
 			node.IATAs = []api.NodeIATA{}
 		}
 	}

@@ -5,8 +5,8 @@ import type { TelemetryPoint } from '../../../src/features/stats/types';
 const empty = (t: number): TelemetryPoint => ({
   t,
   batteryMv: null,
-  airtimeTxPct: null,
-  airtimeRxPct: null,
+  airtimeTxSecs: null,
+  airtimeRxSecs: null,
   noiseFloorDb: null,
   uptimeSeconds: null,
   queueLength: null,
@@ -30,8 +30,8 @@ describe('hasTelemetry', () => {
     const allZero: TelemetryPoint = {
       t: 1,
       batteryMv: 0,
-      airtimeTxPct: 0,
-      airtimeRxPct: 0,
+      airtimeTxSecs: 0,
+      airtimeRxSecs: 0,
       noiseFloorDb: 0,
       uptimeSeconds: 0,
       queueLength: 0,

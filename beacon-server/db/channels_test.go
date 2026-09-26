@@ -33,7 +33,7 @@ func TestListChannels_Empty(t *testing.T) {
 
 	mock.EXPECT().CountUnknownChannels(gomock.Any(), gomock.Any()).Return(int64(0), nil)
 	store := &Store{q: mock}
-	page, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known")
+	page, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -77,7 +77,7 @@ func TestListChannels_Pagination(t *testing.T) {
 
 	mock.EXPECT().CountUnknownChannels(gomock.Any(), gomock.Any()).Return(int64(0), nil)
 	store := &Store{q: mock}
-	page, err := store.ListChannels(context.Background(), 2, nil, nil, 0, "known")
+	page, err := store.ListChannels(context.Background(), 2, nil, nil, 0, "known", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -101,7 +101,7 @@ func TestListChannels_DBError(t *testing.T) {
 		Return(nil, errors.New("db error"))
 
 	store := &Store{q: mock}
-	_, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known")
+	_, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known", nil)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -123,7 +123,7 @@ func TestListChannels_IATAFilter(t *testing.T) {
 
 	mock.EXPECT().CountUnknownChannels(gomock.Any(), gomock.Any()).Return(int64(0), nil)
 	store := &Store{q: mock}
-	_, err := store.ListChannels(context.Background(), 10, nil, []string{"YOW", "YYZ"}, 0, "known")
+	_, err := store.ListChannels(context.Background(), 10, nil, []string{"YOW", "YYZ"}, 0, "known", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -355,7 +355,7 @@ func TestChannelKinds_ListAndDetail(t *testing.T) {
 			mock.EXPECT().GetChannelByID(gomock.Any(), int32(1)).Return(row, nil)
 			mock.EXPECT().CountUnknownChannels(gomock.Any(), gomock.Any()).Return(int64(0), nil)
 			store := &Store{q: mock}
-			page, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known")
+			page, err := store.ListChannels(context.Background(), 10, nil, nil, 0, "known", nil)
 			if err != nil {
 				t.Fatal(err)
 			}

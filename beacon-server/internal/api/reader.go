@@ -59,7 +59,7 @@ type Reader interface {
 	// IATAs must be uppercase.
 	// cursor is last_seen epoch ms of the last item; pass 0 to start from the beginning.
 	// keyFilter is known, unknown or all. UnknownCount ignores keyFilter and pagination.
-	ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (ChannelPage, error)
+	ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *ChannelCursor) (ChannelPage, error)
 
 	// GetChannel returns full detail for a single channel by its integer ID.
 	// Returns nil, pgx.ErrNoRows if the channel is not found.
@@ -99,6 +99,11 @@ type Reader interface {
 
 	// GetObserverTelemetryBucketed returns telemetry points for an observer bucketed into N-hour intervals.
 	GetObserverTelemetryBucketed(ctx context.Context, observerID uuid.UUID, since, until time.Time, bucketHours int32) ([]ObserverTelemetryPoint, error)
+
+	// GetObserverActivity returns bucketed heard-activity for an observer over the trailing window.
+	// interval >= 1h is served from the hourly rollup. Returns pgx.ErrNoRows for an unknown observer.
+	// Range and Interval on the result are left empty for the handler to fill.
+	GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*ObserverActivity, error)
 
 	// GetObserverScopes returns the names of all transport scopes an observer has
 	// been seen forwarding packets for, ordered alphabetically.
@@ -156,6 +161,10 @@ type Reader interface {
 	// Pass empty string for preset or nil iatas to skip those filters.
 	GetRadioPresets(ctx context.Context, preset string, iatas []string) ([]RadioPreset, error)
 
+	// GetObserverComparison compares distinct flood packets reported by two observers
+	// during [since, until), optionally restricted to reception IATAs.
+	GetObserverComparison(ctx context.Context, observerA, observerB uuid.UUID, since, until time.Time, iatas []string) (*ObserverComparison, error)
+
 	// GetStatsOverview returns top-line network figures for the last 24 hours.
 	// Pass nil iatas to return stats across all IATAs.
 	GetStatsOverview(ctx context.Context, iatas []string) (*StatsOverview, error)
@@ -164,6 +173,12 @@ type Reader interface {
 	// Pass nil for iatas to return stats across all IATAs.
 	// since defines the start of the window; pass zero time for default (last 7 days).
 	GetStatsObservations(ctx context.Context, iatas []string, since time.Time) ([]ObservationPoint, error)
+
+	// GetSignalStats aggregates retained reception readings in [since, until).
+	GetSignalStats(ctx context.Context, since, until time.Time, iatas []string) (*SignalStats, error)
+
+	// GetPathStats counts received path entries and validated ordinary hash widths.
+	GetPathStats(ctx context.Context, since, until time.Time, iatas []string) (*PathStats, error)
 
 	// GetStatsPayloadBreakdown returns observation counts grouped by payload type.
 	// Pass nil for iatas to return stats across all IATAs.
@@ -196,7 +211,8 @@ type Reader interface {
 	GetStatsTopTalkers(ctx context.Context, iatas []string, since time.Time, limit int32) ([]TopTalker, error)
 
 	// GetScopeStats returns aggregate packet, observer and node counts per transport scope.
-	GetScopeStats(ctx context.Context) ([]ScopeStats, error)
+	// Pass empty iatas for global totals. IATAs must be uppercase.
+	GetScopeStats(ctx context.Context, iatas []string) ([]ScopeStats, error)
 
 	// GetStatsNodeTypes returns node counts grouped by type, optionally filtered by IATA.
 	GetStatsNodeTypes(ctx context.Context, iatas []string) ([]NodeTypeCount, error)

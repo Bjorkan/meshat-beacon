@@ -42,7 +42,7 @@ type PacketSummary struct {
 	LastHeardAt      int64                 `json:"lastHeardAt" binding:"required"`  // epoch ms
 	ObservationCount int32                 `json:"observationCount" binding:"required"`
 	LatestObserver   *PacketLatestObserver `json:"latestObserver,omitempty"`
-	Summary          *string               `json:"summary,omitempty"` // human-readable payload summary
+	Summary          *string               `json:"summary,omitempty"` // advert name from this packet; omitted when unavailable or unsupported
 }
 
 // PacketPathLength is the decoded path_length byte from a packet observation.
@@ -69,7 +69,9 @@ type PacketObservationDetail struct {
 	SourceBroker      string           `json:"sourceBroker" binding:"required"`
 	ResolvedPath      []ResolvedHop    `json:"resolvedPath" binding:"required"` // per-observation resolved path hashes
 	// ResolvedSource/ResolvedDestination are the packet's endpoints, when the payload type
-	// carries a resolvable one: an exact match for ADVERT's full pubkey, an ambiguous
+	// carries one. Prefer the snapshot captured at ingest; legacy observations without a
+	// snapshot use the current node registry. Endpoint matching itself is unchanged:
+	// an exact match for ADVERT's full pubkey, an ambiguous
 	// hash-prefix match (like intermediate hops) for TEXT_MESSAGE/PATH/ANON_REQ's 1-byte
 	// source/destination hashes. Nil when the payload type doesn't carry one at all (e.g.
 	// GRP_TXT/GRP_DATA/TRACE aren't node-to-node addressed) -- see BuildResolvedPath and
@@ -92,6 +94,21 @@ type ResolvedHop struct {
 	Confidence string         `json:"confidence" enums:"high,ambiguous,none" binding:"required"` // "high", "ambiguous", or "none"
 	SNR        *float32       `json:"snr,omitempty"`
 	Nodes      []ResolvedNode `json:"nodes" binding:"required"` // empty for "none", one for "high", multiple for "ambiguous"
+}
+
+// PacketEndpointSnapshot is the internal storage shape for an observation's
+// endpoint resolution at ingest. Names and confidence are preserved even when
+// the current node registry changes. REST/WS expose the existing per-endpoint fields.
+type PacketEndpointSnapshot struct {
+	Source      *ResolvedHop `json:"source,omitempty"`
+	Destination *ResolvedHop `json:"destination,omitempty"`
+}
+
+// HasResolvedNodes distinguishes a historical capture from an unresolved lookup
+// that should be retried when a node becomes known (including a first advert).
+func (s PacketEndpointSnapshot) HasResolvedNodes() bool {
+	return (s.Source != nil && len(s.Source.Nodes) > 0) ||
+		(s.Destination != nil && len(s.Destination.Nodes) > 0)
 }
 
 // ResolvedNode is a node reference within a resolved path hop.

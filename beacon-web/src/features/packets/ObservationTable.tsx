@@ -9,11 +9,12 @@ import { PathData } from './PathData';
 
 interface Props {
   observations: Observation[];
+  isTrace?: boolean;
   selectedId: number | null;
   onSelect: (id: number) => void;
 }
 
-function observationColumns(t: TFunction): Column<Observation>[] {
+function observationColumns(t: TFunction, isTrace: boolean): Column<Observation>[] {
   return [
     {
       header: 'Observer',
@@ -68,15 +69,19 @@ function observationColumns(t: TFunction): Column<Observation>[] {
     },
     {
       header: 'Path',
-      label: t('fields.path'),
+      label: isTrace ? t('packets.pathSnr') : t('fields.path'),
       cell: (observation) =>
         observation.pathBytes ? (
-          <PathData
-            pathBytes={observation.pathBytes}
-            hashSize={observation.pathLength.hashSize}
-            resolvedPath={observation.resolvedPath}
-            size="sm"
-          />
+          isTrace ? (
+            <span className="font-mono break-all">{observation.pathBytes.toUpperCase()}</span>
+          ) : (
+            <PathData
+              pathBytes={observation.pathBytes}
+              hashSize={observation.pathLength.hashSize}
+              resolvedPath={observation.resolvedPath}
+              size="sm"
+            />
+          )
         ) : (
           <span className="text-text-dim">—</span>
         ),
@@ -85,9 +90,9 @@ function observationColumns(t: TFunction): Column<Observation>[] {
 }
 
 // The compact observation list now uses the same TanStack row/column pipeline as every other table.
-export function ObservationTable({ observations, selectedId, onSelect }: Props) {
+export function ObservationTable({ observations, selectedId, onSelect, isTrace = false }: Props) {
   const { t } = useTranslation();
-  const columns = useMemo(() => observationColumns(t), [t]);
+  const columns = useMemo(() => observationColumns(t, isTrace), [t, isTrace]);
 
   return (
     <DataTable

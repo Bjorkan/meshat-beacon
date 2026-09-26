@@ -71,10 +71,9 @@ describe('nodesToFeatureCollection', () => {
     expect(fc.features.map((f) => f.properties.id)).toEqual(['c']);
   });
 
-  it('keeps nodes at the 0/0 coordinate (0 is a valid coordinate)', () => {
+  it('omits explicit 0/0 location resets', () => {
     const fc = nodesToFeatureCollection([node({ id: 'z', lat: 0, lng: 0 })]);
-    expect(fc.features).toHaveLength(1);
-    expect(fc.features[0]!.geometry.coordinates).toEqual([0, 0]);
+    expect(fc.features).toHaveLength(0);
   });
 
   it('passes decimal coordinates through untouched (api/nodes.go sends *float64 degrees)', () => {

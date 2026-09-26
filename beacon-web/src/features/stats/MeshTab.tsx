@@ -1,3 +1,4 @@
+import { payloadBarItems } from './transforms';
 import { Segmented } from './Segmented';
 import { RANGE_OPTIONS } from './ranges';
 import { nodeTypeLabel } from '../../lib/node-types';
@@ -157,13 +158,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
   );
   const nodesOption = useMemo(() => leaderboardOption(nodeRows, colors), [nodeRows, colors]);
 
-  const payloadItems = useMemo(
-    () =>
-      (payload.data ?? [])
-        .map((p) => ({ name: p.payloadTypeName.toLowerCase(), value: p.count }))
-        .sort((a, b) => b.value - a.value),
-    [payload.data],
-  );
+  const payloadItems = useMemo(() => payloadBarItems(payload.data ?? []), [payload.data]);
   const payloadTotal = useMemo(() => payloadItems.reduce((a, p) => a + p.value, 0), [payloadItems]);
   const payloadOption = useMemo(
     () => typeBarOption(payloadItems, colors, t('stats.other')),

@@ -77,6 +77,7 @@ export function useRegions(): RegionsData {
 export interface RegionFilter {
   iatas: string[] | undefined; // resolved member IATAs to query; undefined = all regions
   regionKey: string; // stable query-key fragment ("*" = all)
+  isResolved?: boolean; // false while a selected region's member IATAs are unavailable
 }
 
 // The resolved geographic filter consumers pass to queries: the flattened IATA list plus a stable key.
@@ -87,6 +88,12 @@ export function useRegion(): RegionFilter {
 
   return useMemo(() => {
     const iatas = resolveIatas(normalizeSelection(selection, rootSlug), regionIatas);
-    return { iatas, regionKey: toRegionKey(iatas) };
+    return {
+      iatas,
+      regionKey: toRegionKey(iatas),
+      isResolved: normalizeSelection(selection, rootSlug).regions.every((slug) =>
+        regionIatas.has(slug),
+      ),
+    };
   }, [selection, rootSlug, regionIatas]);
 }

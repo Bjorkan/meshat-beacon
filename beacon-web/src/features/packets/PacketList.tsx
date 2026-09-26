@@ -102,6 +102,7 @@ export function PacketList({
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     isLoading,
     isError,
     observersByHash,
@@ -282,7 +283,7 @@ export function PacketList({
             key={listResetKey}
             packets={packets}
             hasNextPage={hasNextPage}
-            isFetchingNextPage={isFetchingNextPage}
+            isFetching={isFetching}
             fetchNextPage={fetchNextPage}
             onScrollAwayFromTop={setIsScrolledAway}
             onAtTopChange={setIsAtTop}

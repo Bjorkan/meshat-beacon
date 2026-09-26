@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -18,6 +19,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/db"
 	_ "github.com/MeshCore-Beacon/beacon-server/docs"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/api/handlers"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api/router"
 	"github.com/MeshCore-Beacon/beacon-server/internal/background"
@@ -27,6 +29,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/iatadb"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
+	"github.com/MeshCore-Beacon/beacon-server/internal/logging"
 	"github.com/MeshCore-Beacon/beacon-server/internal/presence"
 	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
@@ -43,6 +46,8 @@ var version = "dev"
 //	@title			MeshCore Beacon API
 //	@version		1.6.0
 //	@description	MeshCore network observation backend. Ingests LoRa packets from MQTT brokers, stores in PostgreSQL, and streams live events via WebSocket.
+//	@description	REST requests share a configurable per-client rate limit (default 300/minute and a 300-request one-second burst cap). Exceeded limits return HTTP 429 with error.code=rate_limited and a Retry-After header in seconds. CORS preflights and WebSocket upgrades do not consume this API budget.
+//	@description	WebSocket upgrade attempts at /ws have a configurable per-client limit (default 10/minute, including failed handshakes). Rate exhaustion returns HTTP 429 with Retry-After before upgrade. An accepted socket exceeding the concurrent cap closes with code 1013 before hello; established connections remain open.
 //	@termsOfService	https://github.com/MeshCore-Beacon/beacon-server
 
 //	@contact.name	MeshCore Beacon
@@ -54,6 +59,11 @@ var version = "dev"
 //	@BasePath	/api/v1
 
 //	@schemes	http https
+
+// @securityDefinitions.apikey AdminKey
+// @in header
+// @name Authorization
+// @description Enter Bearer followed by the configured operator key. Use HTTPS.
 
 // @tag.name			IATAs
 // @tag.description	Airport/location codes that group observers and packets
@@ -74,7 +84,6 @@ var version = "dev"
 // @tag.name			Stats
 // @tag.description	Network statistics and time series
 func main() {
-	log.Printf("beacon version %s", version)
 	_ = godotenv.Load()
 	addr := os.Getenv("LISTEN_ADDR")
 	if addr == "" {
@@ -88,12 +97,28 @@ func main() {
 
 	cfg, err := config.Load(configPath)
 	if err != nil {
-		log.Fatalf("failed to load config: %v", err)
+		slog.Error("failed to load config", "component", "startup", "error", err)
+		os.Exit(1)
+	}
+	logger, err := logging.New(os.Stderr, cfg.Log)
+	if err != nil {
+		slog.Error("invalid logging configuration", "component", "startup", "error", err)
+		os.Exit(1)
+	}
+	slog.SetDefault(logger)
+	slog.Info("beacon starting", "component", "startup", "version", version)
+	if len(cfg.Server.TrustedProxies) == 0 {
+		slog.Warn("warning: server.trusted_proxies is empty; client IP headers are ignored and proxied clients share a WebSocket connection limit", "component", "startup")
 	}
 
 	resolved := config.Resolve(cfg)
+	localBorders, err := config.LoadLocalBorders(cfg)
+	if err != nil {
+		slog.Error("invalid local border configuration", "component", "startup", "error", err)
+		os.Exit(1)
+	}
 
-	log.Printf("config: loaded — %s", resolved)
+	slog.Info(fmt.Sprintf("config: loaded — %s", resolved), "component", "startup")
 
 	// ── Hub ──────────────────────────────────────────────────────────────────
 	h := hub.New()
@@ -103,14 +128,19 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	pool, err := pgxpool.New(ctx, getEnv("POSTGRES_DSN"))
+	dsn := getEnv("POSTGRES_DSN")
+	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
-		log.Fatalf("failed to connect to postgres at %s: %v", os.Getenv("POSTGRES_DSN_HOST"), err)
+		// Parse errors can embed the complete DSN, including its password.
+		slog.Error("invalid PostgreSQL connection configuration; check POSTGRES_DSN", "component", "startup")
+		os.Exit(1)
 	}
 	defer pool.Close()
+	backupOpts := configureBackup(ctx, cfg, pool, dsn, configPath)
 
 	if err := db.RunMigrations(ctx, pool); err != nil {
-		log.Fatalf("migrations failed: %v", err)
+		slog.Error("migrations failed", "component", "startup", "error", err)
+		os.Exit(1)
 	}
 
 	store := db.New(pool, resolved.ClockDriftThreshold, resolved.NodeStaleThreshold, resolved.NeighborMaxKm, resolved.NodeIATAMembershipTTL, resolved.MeshCoreRegionFreshness)
@@ -169,29 +199,30 @@ func main() {
 			}(),
 		)
 		if err := redisClient.Ping(ctx); err != nil {
-			log.Printf("warning: redis unavailable at %s, caching disabled: %v", redisAddr, err)
+			slog.Warn(fmt.Sprintf("warning: redis unavailable at %s, caching disabled", redisAddr), "component", "startup", "error", err)
 		} else {
 			ttls := cache.ResolveTTLs(cfg.Cache)
 			reader = cache.NewCachedReader(store, redisClient, ttls)
 			defer redisClient.Close()
-			log.Printf("cache: Redis connected at %s (stats=%s reference=%s nodes=%s observers=%s)",
-				redisAddr, ttls.Stats, ttls.Reference, ttls.Nodes, ttls.Observers)
+			slog.Info(fmt.Sprintf("cache: Redis connected at %s (stats=%s reference=%s nodes=%s observers=%s)", redisAddr, ttls.Stats, ttls.Reference, ttls.Nodes, ttls.Observers), "component", "startup")
 		}
 	}
 
 	// ── Seed config data ─────────────────────────────────────────────────────
 	if err := config.Seed(ctx, cfg, store); err != nil {
-		log.Fatalf("failed to seed config: %v", err)
+		slog.Error("failed to seed config", "component", "startup", "error", err)
+		os.Exit(1)
 	}
 
 	// ── Build transport scope keystore ───────────────────────────────────────
 	scopes := scopestore.New()
 	scopeEntries, err := store.GetTransportScopes(ctx)
 	if err != nil {
-		log.Fatalf("failed to load transport scopes: %v", err)
+		slog.Error("failed to load transport scopes", "component", "startup", "error", err)
+		os.Exit(1)
 	}
 	scopes.Load(scopeEntries)
-	log.Printf("loaded %d transport scopes", len(scopeEntries))
+	slog.Info(fmt.Sprintf("loaded %d transport scopes", len(scopeEntries)), "component", "startup")
 
 	// ── Build channel keystore ──────────────────────────────────────────────
 	entries := make(map[string][]keystore.Entry)
@@ -209,7 +240,7 @@ func main() {
 		}
 		if !keystore.EntryExists(entries[hashHex], entry) {
 			entries[hashHex] = append(entries[hashHex], entry)
-			log.Printf("config: loaded hashtag channel #%s (hash=%s)", tag, hashHex)
+			slog.Info(fmt.Sprintf("config: loaded hashtag channel #%s (hash=%s)", tag, hashHex), "component", "startup")
 		}
 	}
 
@@ -217,7 +248,7 @@ func main() {
 	for hashHex, keyCfg := range cfg.ChannelKeys.Keys {
 		key, err := hex.DecodeString(keyCfg.Key)
 		if err != nil {
-			log.Printf("warning: invalid channel key for hash %s, skipping: %v", hashHex, err)
+			slog.Warn(fmt.Sprintf("warning: invalid channel key for hash %s, skipping", hashHex), "component", "startup", "error", err)
 			continue
 		}
 		kind := keystore.ChannelKindPrivate
@@ -232,7 +263,7 @@ func main() {
 		}
 		if !keystore.EntryExists(entries[hashHex], entry) {
 			entries[hashHex] = append(entries[hashHex], entry)
-			log.Printf("config: loaded explicit channel key for hash %s name=%q", hashHex, keyCfg.Name)
+			slog.Info(fmt.Sprintf("config: loaded explicit channel key for hash %s name=%q", hashHex, keyCfg.Name), "component", "startup")
 		}
 	}
 
@@ -259,18 +290,17 @@ func main() {
 	// built, so adding a channel key to the config surfaces its history on the next boot
 	// instead of leaving it stranded in the DB indefinitely.
 	if n, err := ingest.BackfillChannelMessages(ctx, store, keys); err != nil {
-		log.Printf("config: channel message backfill failed: %v", err)
+		slog.Error("config: channel message backfill failed", "component", "startup", "error", err)
 	} else if n > 0 {
-		log.Printf("config: backfilled %d previously-undecrypted channel message(s)", n)
+		slog.Info(fmt.Sprintf("config: backfilled %d previously-undecrypted channel message(s)", n), "component", "startup")
 	}
 
 	// ── Build geographic ingest filter ───────────────────────────────────────────────────────────
 	allowedIATAs := iatadb.BuildAllowedSet(cfg.Ingest.AllowCountries, cfg.Ingest.AllowContinents)
 	if allowedIATAs != nil {
-		log.Printf("config: ingest filter active — %d allowed IATAs (countries=%v continents=%v)",
-			len(allowedIATAs), cfg.Ingest.AllowCountries, cfg.Ingest.AllowContinents)
+		slog.Info(fmt.Sprintf("config: ingest filter active — %d allowed IATAs (countries=%v continents=%v)", len(allowedIATAs), cfg.Ingest.AllowCountries, cfg.Ingest.AllowContinents), "component", "startup")
 	} else {
-		log.Printf("config: ingest filter inactive — accepting all IATAs")
+		slog.Info("config: ingest filter inactive — accepting all IATAs", "component", "startup")
 	}
 
 	broker := ingest.New(
@@ -279,6 +309,7 @@ func main() {
 			URL:                 brokerCredential("MQTT_BROKER_URL", "MQTT_BROKER_1_URL"),
 			Username:            brokerCredential("MQTT_BROKER_USERNAME", "MQTT_BROKER_1_USERNAME"),
 			Password:            brokerCredential("MQTT_BROKER_PASSWORD", "MQTT_BROKER_1_PASSWORD"),
+			LocalBorders:        localBorders,
 			TelemetryResolution: resolved.TelemetryResolution,
 			NeighborMaxKm:       resolved.NeighborMaxKm,
 			AllowedIATAs:        allowedIATAs,
@@ -291,13 +322,6 @@ func main() {
 
 	if cr, ok := reader.(*cache.CachedReader); ok {
 		broker.SetCacheInvalidators(cr.InvalidateNode, cr.InvalidateAllNodes, cr.InvalidateObserver)
-	}
-
-	// The cleanup task deletes stale observers and must invalidate their cached
-	// detail/list entries so a deleted observer cannot remain visible from cache.
-	var invalidateObserver func(context.Context, uuid.UUID)
-	if cr, ok := reader.(*cache.CachedReader); ok {
-		invalidateObserver = cr.InvalidateObserver
 	}
 
 	go broker.Start(ctx)
@@ -317,25 +341,46 @@ func main() {
 		}
 	}
 
-	scheduler := background.New([]background.Task{
+	tasks := []background.Task{
 		background.ViewRefreshTask(store, resolved.ViewRefreshInterval),
-		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.NodeIATAMembershipTTL, resolved.ObserverDeleteAfter, resolved.CleanupInterval, invalidateObserver),
+		background.CleanupTask(store, resolved.TelemetryRetention, resolved.PacketRetention, resolved.NodeDeleteAfter, resolved.NeighborRetention, resolved.NodeIATAMembershipTTL, resolved.CleanupInterval),
 		background.ReconfirmTask(store, resolved.RouteRetention, resolved.RouteGrace, int64(resolved.RouteMinObservations), resolved.ReconfirmInterval),
-	})
+	}
+	if resolved.ObserverDeleteAfter > 0 {
+		var onDelete func(context.Context, uuid.UUID)
+		if cr, ok := reader.(*cache.CachedReader); ok {
+			onDelete = cr.InvalidateObserver
+		}
+		tasks = append(tasks, background.ObserverCleanupTask(coalescer, resolved.ObserverDeleteAfter, resolved.CleanupInterval, onDelete))
+	}
+	scheduler := background.New(tasks)
 	go scheduler.Start(ctx)
 
 	// ── HTTP server ──────────────────────────────────────────────────────────
-	r := router.New(h, reader, []*ingest.Worker{broker}, resolved.MaxConnsPerIP, cfg.CORS)
+	// Wrap after wiring cache invalidators and cleanup callbacks to the actual
+	// CachedReader. Only response projections receive the geographic annotation.
+	reader = api.WithLocalBorders(reader, localBorders)
+	r := router.New(h, reader, []*ingest.Worker{broker}, router.Options{
+		MaxConnsPerIP:        resolved.MaxConnsPerIP,
+		MaxConnectsPerMinute: resolved.MaxConnectsPerMinute,
+		CORS:                 cfg.CORS, Server: cfg.Server, Auth: cfg.Auth, RateLimit: resolved.RateLimit,
+		AdminRoutes: map[string]http.Handler{
+			"/accounts": handlers.AccountsRouter(store),
+			"/backup":   handlers.BackupRouter(backupOpts),
+		},
+	})
 
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: r,
+		Addr:     addr,
+		Handler:  r,
+		ErrorLog: slog.NewLogLogger(slog.Default().With("component", "http").Handler(), slog.LevelError),
 	}
 
 	go func() {
-		fmt.Printf("Beacon listening on %s\n", addr)
+		slog.Info(fmt.Sprintf("Beacon listening on %s", addr), "component", "startup")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("server error: %v", err)
+			slog.Error("server error", "component", "startup", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -344,12 +389,12 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("shutting down...")
+	slog.Info("shutting down...", "component", "startup")
 	cancel() // stops ingest workers
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Printf("server shutdown error: %v", err)
+		slog.Error("server shutdown error", "component", "startup", "error", err)
 	}
 	coalescer.Flush(shutdownCtx)
 }
@@ -360,7 +405,7 @@ func main() {
 func getEnv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
-		log.Printf("warning: %s is not set", key)
+		slog.Warn(fmt.Sprintf("warning: %s is not set", key), "component", "startup")
 	}
 	return v
 }

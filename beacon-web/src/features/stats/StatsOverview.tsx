@@ -1,9 +1,14 @@
 import { useCallback } from 'react';
 import { StatsSubHeader } from './StatsSubHeader';
 import { MeshTab } from './MeshTab';
+import { TrafficTab } from './TrafficTab';
+import { SignalTab } from './SignalTab';
+import { PathsTab } from './PathsTab';
+import { ScopesTab } from './ScopesTab';
 import { TalkersTab } from './TalkersTab';
 import { ClockDriftTab } from './ClockDriftTab';
 import { ObserverTab } from './ObserverTab';
+import { CompareObserversTab } from './CompareObserversTab';
 import { NeighbourGraphTab } from './NeighbourGraphTab';
 import type { StatsRange, StatsTab } from './types';
 
@@ -28,7 +33,7 @@ export function StatsOverview({ statsTab: tab, range, observerId, onPatch }: Sta
   );
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       <StatsSubHeader tab={tab} onTabChange={handleTab} range={range} onRangeChange={handleRange} />
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === 'mesh' && (
@@ -38,6 +43,10 @@ export function StatsOverview({ statsTab: tab, range, observerId, onPatch }: Sta
             onSelectObserver={handleSelectObserver}
           />
         )}
+        {tab === 'traffic' && <TrafficTab range={range} />}
+        {tab === 'signal' && <SignalTab range={range} />}
+        {tab === 'paths' && <PathsTab range={range} />}
+        {tab === 'scopes' && <ScopesTab />}
         {tab === 'talkers' && <TalkersTab range={range} />}
         {tab === 'clockdrift' && <ClockDriftTab />}
         {tab === 'observer' && (
@@ -48,6 +57,7 @@ export function StatsOverview({ statsTab: tab, range, observerId, onPatch }: Sta
           />
         )}
         {tab === 'graph' && <NeighbourGraphTab />}
+        {tab === 'compare' && <CompareObserversTab />}
       </div>
     </div>
   );

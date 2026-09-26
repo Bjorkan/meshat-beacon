@@ -3,6 +3,14 @@
 
 package api
 
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+	"time"
+)
+
 type ChannelKind string
 
 const (
@@ -23,6 +31,42 @@ func ClassifyChannel(keyKnown, isHashtag, isPublic bool) ChannelKind {
 	default:
 		return ChannelKindPrivate
 	}
+}
+
+// ChannelCursor identifies a boundary in (last_seen DESC, id DESC) order.
+type ChannelCursor struct {
+	LastSeen time.Time
+	ID       int32
+}
+
+func (c ChannelCursor) String() string {
+	return fmt.Sprintf("v1:%d:%d", c.LastSeen.UnixMicro(), c.ID)
+}
+
+var errChannelCursor = errors.New("invalid channel page cursor")
+
+// ParseChannelCursor parses the opaque, versioned cursor returned by ChannelPage.
+func ParseChannelCursor(raw string) (*ChannelCursor, error) {
+	if len(raw) > 64 {
+		return nil, errChannelCursor
+	}
+	parts := strings.Split(raw, ":")
+	if len(parts) != 3 || parts[0] != "v1" {
+		return nil, errChannelCursor
+	}
+	micros, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return nil, errChannelCursor
+	}
+	id, err := strconv.ParseInt(parts[2], 10, 32)
+	if err != nil || id <= 0 {
+		return nil, errChannelCursor
+	}
+	at := time.UnixMicro(micros).UTC()
+	if at.Year() < 1 || at.Year() > 9999 {
+		return nil, errChannelCursor
+	}
+	return &ChannelCursor{LastSeen: at, ID: int32(id)}, nil
 }
 
 // ChannelMessage represents a single decrypted channel message.
@@ -61,8 +105,9 @@ type Channel struct {
 // ChannelPage contains a page of channels and the total undecryptable population
 // matching the hash/IATA filters, independent of the page cursor and key filter.
 type ChannelPage struct {
-	Items        []ChannelSummary `json:"items" binding:"required"`
-	NextCursor   *int64           `json:"nextCursor" binding:"required" extensions:"x-nullable"`
-	HasMore      bool             `json:"hasMore" binding:"required"`
-	UnknownCount int64            `json:"unknownCount" binding:"required"`
+	NextPageCursor *string          `json:"nextPageCursor,omitempty"`
+	Items          []ChannelSummary `json:"items" binding:"required"`
+	NextCursor     *int64           `json:"nextCursor" binding:"required" extensions:"x-nullable"`
+	HasMore        bool             `json:"hasMore" binding:"required"`
+	UnknownCount   int64            `json:"unknownCount" binding:"required"`
 }

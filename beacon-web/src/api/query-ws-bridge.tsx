@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { getRateLimitedUntil, isRateLimited } from './rate-limit';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRegion } from '../hooks/useRegion';
 import { statsQueries } from './queries';
@@ -50,7 +51,19 @@ export function QueryWsBridge() {
     const offChannel = wsManager.onChannelMessage((data) =>
       syncChannelMessage(queryClient, data, regionKey),
     );
-    const offLagged = wsManager.onLagged(() => healLiveQueryCaches(queryClient));
+    let healTimer: ReturnType<typeof setTimeout> | undefined;
+    const healAfterBackoff = () => {
+      clearTimeout(healTimer);
+      if (isRateLimited()) {
+        healTimer = setTimeout(
+          healAfterBackoff,
+          Math.max(1, (getRateLimitedUntil() ?? 0) - Date.now()),
+        );
+      } else {
+        healLiveQueryCaches(queryClient);
+      }
+    };
+    const offLagged = wsManager.onLagged(healAfterBackoff);
 
     return () => {
       offPacket();
@@ -58,6 +71,7 @@ export function QueryWsBridge() {
       offObserver();
       offChannel();
       offLagged();
+      clearTimeout(healTimer);
       if (pending.raf != null) cancelAnimationFrame(pending.raf);
     };
   }, [queryClient, regionKey]);

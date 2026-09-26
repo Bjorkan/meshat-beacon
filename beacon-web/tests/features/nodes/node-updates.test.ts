@@ -189,3 +189,18 @@ describe('upsertNodePages', () => {
     expect(upsertNodePages(undefined, update({}))).toBeUndefined();
   });
 });
+
+it('preserves an omitted foreign flag and applies false/null reclassifications', () => {
+  const original = [node({ possiblyForeign: true })];
+  expect(patchNodeSummary(original, update({}))?.[0]?.possiblyForeign).toBe(true);
+  expect(patchNodeSummary(original, update({ possiblyForeign: false }))?.[0]?.possiblyForeign).toBe(
+    false,
+  );
+  expect(
+    patchNodeSummary(original, update({ possiblyForeign: null }))?.[0]?.possiblyForeign,
+  ).toBeUndefined();
+  expect(
+    patchNodeTableSummary(original, update({ possiblyForeign: false }))?.[0]?.possiblyForeign,
+  ).toBe(false);
+  expect(original[0]?.possiblyForeign).toBe(true);
+});

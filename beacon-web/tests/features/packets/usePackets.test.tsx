@@ -6,6 +6,7 @@ import { usePackets } from '../../../src/features/packets/usePackets';
 import type { PacketServerFilter } from '../../../src/features/packets/types';
 import type { PacketSummary } from '../../../src/types/api';
 import type { WsPacketObservation } from '../../../src/types/ws';
+import { noteRateLimited, noteRequestOk } from '../../../src/api/rate-limit';
 
 vi.mock('../../../src/hooks/useRegion', () => ({
   useRegion: () => ({ iatas: ['YOW'], regionKey: 'YOW' }),
@@ -78,6 +79,29 @@ describe('usePackets cache ownership', () => {
     );
 
     await act(async () => {});
+    expect(getPackets).not.toHaveBeenCalled();
+    expect(qc.getQueryData<{ pages: unknown[] }>(['packets', 'YOW'])?.pages).toHaveLength(3);
+    expect(result.current.laggedCount).toBe(5);
+  });
+
+  it('skips the lag reset while the API is rate-limiting us, but still counts the drop', async () => {
+    const { result } = renderHook(() => usePackets(), { wrapper });
+    await waitFor(() => expect(getPackets).toHaveBeenCalledTimes(1));
+
+    seedThreePages(qc);
+    getPackets.mockClear();
+    noteRateLimited(10_000);
+    act(() => {
+      result.current.handleLagged({
+        v: 1,
+        type: 'lagged',
+        droppedCount: 5,
+        since: 0,
+        lastObservationId: 0,
+      });
+    });
+    noteRequestOk();
+
     expect(getPackets).not.toHaveBeenCalled();
     expect(qc.getQueryData<{ pages: unknown[] }>(['packets', 'YOW'])?.pages).toHaveLength(3);
     expect(result.current.laggedCount).toBe(5);
@@ -250,8 +274,19 @@ describe('usePackets path and endpoint fields', () => {
     <QueryClientProvider client={qc}>{children}</QueryClientProvider>
   );
 
-  it('carries path and endpoint fields from the WS observation into latestObserver', () => {
+  it('carries path and endpoint fields from the WS observation into latestObserver', async () => {
+    const history: PacketSummary = {
+      ...packet('history'),
+      latestObserver: {
+        id: 'obs-rest',
+        iata: 'YVR',
+        pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
+        pathBytes: '7fa4',
+      },
+    };
+    getPackets.mockResolvedValue({ items: [history], nextCursor: null });
     const { result } = renderHook(() => usePackets(false, undefined), { wrapper });
+    await waitFor(() => expect(result.current.allPackets).toHaveLength(1));
 
     act(() => {
       result.current.handlePacketObservation({
@@ -349,6 +384,31 @@ describe('usePackets live heard window', () => {
   );
 
   const flushRaf = () => rafCallbacks.splice(0).forEach((cb) => cb(0));
+
+  it('keeps summaries from history and passes summaries through live observations', async () => {
+    getPackets.mockResolvedValue({
+      items: [{ ...packet('history'), summary: 'Historical advert' }],
+      nextCursor: null,
+    });
+    const { result } = renderHook(() => usePackets(), { wrapper });
+    await waitFor(() =>
+      expect(result.current.allPackets.find((p) => p.packetHash === 'history')?.summary).toBe(
+        'Historical advert',
+      ),
+    );
+    const event = observation('live');
+    event.packet.summary = 'Live advert 📡';
+    act(() => {
+      result.current.handlePacketObservation(event);
+      flushRaf();
+    });
+    expect(result.current.allPackets.find((p) => p.packetHash === 'live')?.summary).toBe(
+      'Live advert 📡',
+    );
+    expect(result.current.allPackets.find((p) => p.packetHash === 'history')?.summary).toBe(
+      'Historical advert',
+    );
+  });
 
   // Each WS message carries only its own heardAt, so a second observation of the same packet used to
   // collapse the window to a single instant — the expanded row then read "spread 0.000s".

@@ -17,7 +17,8 @@ package hub
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"slices"
 )
 
@@ -214,7 +215,7 @@ func (h *Hub) Broadcast(e Event) {
 	select {
 	case h.broadcast <- e:
 	default:
-		log.Println("hub: broadcast channel full, dropping event")
+		slog.Warn("hub: broadcast channel full, dropping event", "component", "hub")
 	}
 }
 
@@ -286,7 +287,7 @@ func (h *Hub) Run() {
 					default:
 						// laggedCh itself full; write pump will catch up on next drain
 					}
-					log.Printf("hub: client send buffer full, dropped event type=%s", evt.Type)
+					slog.Warn(fmt.Sprintf("hub: client send buffer full, dropped event type=%s", evt.Type), "component", "hub")
 				}
 			}
 		}

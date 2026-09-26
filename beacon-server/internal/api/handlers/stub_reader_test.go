@@ -16,6 +16,7 @@ import (
 // Unset fields return zero values. Use it for both validation tests
 // (leave all fields nil) and happy path tests (set only what you need).
 type stubReader struct {
+	getObserverComparison        func(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time, []string) (*api.ObserverComparison, error)
 	listNodePathPackets          func(context.Context, uuid.UUID, []string, *api.PageToken, int32) (api.Page[api.PacketSummary], error)
 	listIATAs                    func(ctx context.Context) ([]api.IATA, error)
 	getIATA                      func(ctx context.Context, iata string) (*api.IATA, error)
@@ -23,7 +24,7 @@ type stubReader struct {
 	listRegions                  func(ctx context.Context) ([]api.RegionSummary, error)
 	getRegion                    func(ctx context.Context, regionID int32) (*api.Region, error)
 	getRegionBySlug              func(ctx context.Context, slug string) (*api.Region, error)
-	listChannels                 func(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (api.ChannelPage, error)
+	listChannels                 func(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error)
 	getChannel                   func(ctx context.Context, channelID int32) (*api.Channel, error)
 	listChannelMessages          func(ctx context.Context, channelID *int32, since time.Time, limit int32, iatas []string, scope string, cursor int64) (api.Page[api.ChannelMessage], error)
 	listChannelMessagesByHash    func(ctx context.Context, hash []byte, since time.Time, limit int32, iatas []string, scope string, cursor int64) (api.Page[api.ChannelMessage], error)
@@ -32,6 +33,7 @@ type stubReader struct {
 	getObserver                  func(ctx context.Context, observerID uuid.UUID) (*api.Observer, error)
 	getObserverTelemetry         func(ctx context.Context, observerID uuid.UUID, since, until time.Time, afterID int64) (*api.ObserverTelemetry, error)
 	getObserverTelemetryBucketed func(ctx context.Context, observerID uuid.UUID, since, until time.Time, bucketHours int32) ([]api.ObserverTelemetryPoint, error)
+	getObserverActivity          func(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error)
 	getObserverScopes            func(ctx context.Context, observerID uuid.UUID) ([]string, error)
 	listObserverAdverts          func(ctx context.Context, observerID uuid.UUID, cursor int64, limit int32) (api.Page[api.AdvertObservation], error)
 	listNodes                    func(ctx context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error)
@@ -51,7 +53,7 @@ type stubReader struct {
 	getStatsTopAdvertisers       func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopAdvertiser, error)
 	getStatsClockDrift           func(ctx context.Context, iatas []string, limit int32) ([]api.ClockDriftEntry, error)
 	getStatsTopTalkers           func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopTalker, error)
-	getScopeStats                func(ctx context.Context) ([]api.ScopeStats, error)
+	getScopeStats                func(ctx context.Context, iatas []string) ([]api.ScopeStats, error)
 	getStatsNodeTypes            func(ctx context.Context, iatas []string) ([]api.NodeTypeCount, error)
 	getScopeNames                func(ctx context.Context) ([]string, error)
 	getScopesByIATAs             func(ctx context.Context, iatas []string) ([]api.ScopeSummary, error)
@@ -67,6 +69,21 @@ type stubReader struct {
 	getNodeIDByPubkey            func(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
 	getNodeTypeByPubkey          func(ctx context.Context, pubkey []byte) (*int16, error)
 	planBestRoute                func(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error)
+}
+
+func (s stubReader) GetSignalStats(context.Context, time.Time, time.Time, []string) (*api.SignalStats, error) {
+	return nil, nil
+}
+
+func (s stubReader) GetPathStats(context.Context, time.Time, time.Time, []string) (*api.PathStats, error) {
+	return nil, nil
+}
+
+func (s stubReader) GetObserverComparison(ctx context.Context, a, b uuid.UUID, since, until time.Time, iatas []string) (*api.ObserverComparison, error) {
+	if s.getObserverComparison != nil {
+		return s.getObserverComparison(ctx, a, b, since, until, iatas)
+	}
+	return nil, nil
 }
 
 func (s stubReader) ListIATAs(ctx context.Context) ([]api.IATA, error) {
@@ -111,9 +128,9 @@ func (s stubReader) GetRegionBySlug(ctx context.Context, slug string) (*api.Regi
 	return nil, nil
 }
 
-func (s stubReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (api.ChannelPage, error) {
+func (s stubReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
 	if s.listChannels != nil {
-		return s.listChannels(ctx, limit, hash, iatas, cursor, keyFilter)
+		return s.listChannels(ctx, limit, hash, iatas, cursor, keyFilter, pageCursor)
 	}
 	return api.ChannelPage{}, nil
 }
@@ -170,6 +187,13 @@ func (s stubReader) GetObserverTelemetry(ctx context.Context, observerID uuid.UU
 func (s stubReader) GetObserverTelemetryBucketed(ctx context.Context, observerID uuid.UUID, since, until time.Time, bucketHours int32) ([]api.ObserverTelemetryPoint, error) {
 	if s.getObserverTelemetryBucketed != nil {
 		return s.getObserverTelemetryBucketed(ctx, observerID, since, until, bucketHours)
+	}
+	return nil, nil
+}
+
+func (s stubReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+	if s.getObserverActivity != nil {
+		return s.getObserverActivity(ctx, observerID, window, interval)
 	}
 	return nil, nil
 }
@@ -311,9 +335,9 @@ func (s stubReader) GetStatsTopTalkers(ctx context.Context, iatas []string, sinc
 	return nil, nil
 }
 
-func (s stubReader) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {
+func (s stubReader) GetScopeStats(ctx context.Context, iatas []string) ([]api.ScopeStats, error) {
 	if s.getScopeStats != nil {
-		return s.getScopeStats(ctx)
+		return s.getScopeStats(ctx, iatas)
 	}
 	return nil, nil
 }

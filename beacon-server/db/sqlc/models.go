@@ -9,6 +9,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Account struct {
+	ID            uuid.UUID          `json:"id"`
+	Name          string             `json:"name"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	DeactivatedAt pgtype.Timestamptz `json:"deactivated_at"`
+}
+
 type Channel struct {
 	ID             int32              `json:"id"`
 	ChannelHash    []byte             `json:"channel_hash"`
@@ -77,6 +84,29 @@ type MvHourlyIataStat struct {
 	ActiveObservers  int64              `json:"active_observers"`
 }
 
+type MvObserverActivityHourly struct {
+	ObserverID   pgtype.UUID        `json:"observer_id"`
+	PayloadType  *int16             `json:"payload_type"`
+	Bucket       pgtype.Timestamptz `json:"bucket"`
+	Observations int64              `json:"observations"`
+	AirtimeMs    float32            `json:"airtime_ms"`
+	AirtimeN     int64              `json:"airtime_n"`
+	SnrSum       float32            `json:"snr_sum"`
+	SnrN         int64              `json:"snr_n"`
+	SnrMin       float32            `json:"snr_min"`
+	RssiSum      int64              `json:"rssi_sum"`
+	RssiN        int64              `json:"rssi_n"`
+}
+
+type MvPathStatsHourly struct {
+	Iata       string      `json:"iata"`
+	Hour       interface{} `json:"hour"`
+	Category   int32       `json:"category"`
+	HashBytes  int32       `json:"hash_bytes"`
+	Entries    int32       `json:"entries"`
+	Receptions int64       `json:"receptions"`
+}
+
 type MvPayloadBreakdownByIatum struct {
 	Iata        string             `json:"iata"`
 	PayloadType *int16             `json:"payload_type"`
@@ -89,6 +119,19 @@ type MvRadioPreset struct {
 	Iata       string `json:"iata"`
 	SourceType string `json:"source_type"`
 	Count      int64  `json:"count"`
+}
+
+type MvSignalStatsHourly struct {
+	Iata        string      `json:"iata"`
+	Hour        interface{} `json:"hour"`
+	Kind        int32       `json:"kind"`
+	SnrBin      int32       `json:"snr_bin"`
+	RssiBin     int32       `json:"rssi_bin"`
+	Receptions  int64       `json:"receptions"`
+	SnrSamples  int64       `json:"snr_samples"`
+	SnrSum      float64     `json:"snr_sum"`
+	RssiSamples int64       `json:"rssi_samples"`
+	RssiSum     float64     `json:"rssi_sum"`
 }
 
 type MvTopAdvertisersByIatum struct {
@@ -252,8 +295,8 @@ type ObserverTelemetry struct {
 	ObserverID       uuid.UUID          `json:"observer_id"`
 	ReportedAt       pgtype.Timestamptz `json:"reported_at"`
 	BatteryVoltageMv *int32             `json:"battery_voltage_mv"`
-	AirtimeTxPct     *float32           `json:"airtime_tx_pct"`
-	AirtimeRxPct     *float32           `json:"airtime_rx_pct"`
+	AirtimeTxSecs    *float32           `json:"airtime_tx_secs"`
+	AirtimeRxSecs    *float32           `json:"airtime_rx_secs"`
 	NoiseFloorDb     *float32           `json:"noise_floor_db"`
 	UptimeSeconds    *int64             `json:"uptime_seconds"`
 	QueueLength      *int32             `json:"queue_length"`
@@ -303,6 +346,8 @@ type PacketObservation struct {
 	ObserverPublicKey   []byte             `json:"observer_public_key"`
 	ObserverDisplayName *string            `json:"observer_display_name"`
 	ObserverType        *string            `json:"observer_type"`
+	ResolvedEndpoints   []byte             `json:"resolved_endpoints"`
+	AirtimeMs           *float32           `json:"airtime_ms"`
 }
 
 type Region struct {

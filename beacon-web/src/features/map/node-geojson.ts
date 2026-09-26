@@ -1,6 +1,7 @@
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import type { NodeSummary, NodeNeighbor, NodeLinkMetric } from '../nodes/types';
 import type { NeighborLinesMode } from './types';
+import { hasMapLocation } from './location';
 
 // Build the maplibre GeoJSON source from the nodes API response. Properties stay primitive because
 // clustering serializes them, and there's no maplibre import, so this stays unit-testable.
@@ -17,8 +18,7 @@ export function nodesToFeatureCollection(
 ): FeatureCollection<Point, NodeFeatureProps> {
   const features: Feature<Point, NodeFeatureProps>[] = [];
   for (const n of nodes) {
-    // != null keeps 0 (a valid coordinate) while dropping null/undefined
-    if (n.lat == null || n.lng == null) continue;
+    if (!hasMapLocation(n)) continue;
     features.push({
       type: 'Feature',
       // GeoJSON/maplibre order is [lng, lat]; the API sends decimal degrees as-is
@@ -79,12 +79,12 @@ export function buildNeighborEdges(
 ): FeatureCollection<LineString, NeighborEdgeProps> {
   const located = new Map<string, NodeSummary>();
   for (const n of nodes) {
-    if (n.lat != null && n.lng != null) located.set(n.id, n);
+    if (hasMapLocation(n)) located.set(n.id, n);
   }
 
   const features = new Map<string, Feature<LineString, NeighborEdgeProps>>();
   for (const n of nodes) {
-    if (n.lat == null || n.lng == null) continue;
+    if (!hasMapLocation(n)) continue;
     const links: NodeLinkMetric[] =
       n.neighborLinks ?? n.neighborIds?.map((nodeId) => ({ nodeId, snrSampleCount: 0 })) ?? [];
     for (const link of links) {
@@ -157,7 +157,7 @@ export function buildFocusedNeighborEdges(
     type: 'FeatureCollection',
     features: [],
   };
-  if (!selected || selected.lat == null || selected.lng == null) return empty;
+  if (!hasMapLocation(selected)) return empty;
   const from: [number, number] = [selected.lng, selected.lat];
 
   const byId = new Map<
@@ -173,7 +173,7 @@ export function buildFocusedNeighborEdges(
     }
   >();
   for (const nb of neighbors) {
-    if (nb.id === selected.id || nb.lat == null || nb.lng == null) continue;
+    if (nb.id === selected.id || !hasMapLocation(nb)) continue;
     const samples = nb.snr != null ? Math.max(0, nb.snrSampleCount ?? 1) : 0;
     const total = samples > 0 ? nb.snr! * samples : 0;
     const snrLastSeen = samples > 0 ? (nb.snrLastSeen ?? 0) : 0;
@@ -223,13 +223,7 @@ export function buildFocusedNeighborPoints(
 ): FeatureCollection<Point, FocusedNeighborPointProps> {
   const byId = new Map<string, Feature<Point, FocusedNeighborPointProps>>();
   for (const neighbor of neighbors) {
-    if (
-      neighbor.id === selectedId ||
-      neighbor.lat == null ||
-      neighbor.lng == null ||
-      byId.has(neighbor.id)
-    )
-      continue;
+    if (neighbor.id === selectedId || !hasMapLocation(neighbor) || byId.has(neighbor.id)) continue;
     byId.set(neighbor.id, {
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [neighbor.lng, neighbor.lat] },
@@ -246,8 +240,7 @@ export function buildFocusedNeighborPoints(
 export function buildFocusedSelectedPoint(
   selected: Pick<NodeSummary, 'id' | 'name' | 'nodeTypeName' | 'lat' | 'lng'> | undefined,
 ): FeatureCollection<Point, FocusedNeighborPointProps> {
-  if (!selected || selected.lat == null || selected.lng == null)
-    return { type: 'FeatureCollection', features: [] };
+  if (!hasMapLocation(selected)) return { type: 'FeatureCollection', features: [] };
   return {
     type: 'FeatureCollection',
     features: [

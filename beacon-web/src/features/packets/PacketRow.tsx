@@ -24,7 +24,8 @@ export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProp
       type="button"
       className={`w-full text-left group bg-bg-surface border rounded-md px-3.5 py-2.5 cursor-pointer ${
         expanded
-          ? 'border-primary bg-primary/10'
+          ? // squared bottom joins the expansion below into one unfolded card
+            'border-primary bg-primary/10 rounded-b-none'
           : isFresh
             ? 'packet-fresh'
             : 'border-border hover:border-text-dim/30 hover:bg-bg-raised/50'
@@ -48,6 +49,12 @@ export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProp
           ×{packet.observationCount}
         </span>
       </span>
+
+      {packet.summary && (
+        <div className="mt-1 truncate text-[11px] text-text-bright" title={packet.summary}>
+          {packet.summary}
+        </div>
+      )}
 
       <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px] text-text-dim">
         <span className="font-mono text-[11px] text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">

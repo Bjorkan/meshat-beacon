@@ -175,6 +175,7 @@ export function usePackets(
         lastHeardAt: data.observation.heardAt,
         observationCount: data.packet.observationCount,
         scope: data.packet.scope,
+        summary: data.packet.summary,
         latestObserver: {
           id: data.observation.observerId,
           displayName: data.observation.observerName,
@@ -206,6 +207,7 @@ export function usePackets(
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    isFetching,
     isLoading,
     isError,
   } = useInfiniteQuery({
@@ -252,6 +254,7 @@ export function usePackets(
     fetchNextPage,
     hasNextPage: hasNextPage ?? false,
     isFetchingNextPage,
+    isFetching,
     isLoading,
     isError,
     observersByHash,

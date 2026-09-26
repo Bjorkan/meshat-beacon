@@ -1,3 +1,5 @@
+import { hasMapLocation } from '../map/location';
+import { ForeignNodeBadge } from './ForeignNodeBadge';
 import { nodeTypeLabel } from '../../lib/node-types';
 import { ApiError } from '../../api/generated/client';
 import { NodePathPackets } from './NodePathPackets';
@@ -105,7 +107,7 @@ export function NodeDetailPanel({
 
   const { data: neighbors } = useQuery(nodeQueries.neighbors(nodeId));
 
-  const hasLocation = node != null && node.lat != null && node.lng != null;
+  const hasLocation = hasMapLocation(node);
 
   return (
     <DetailPanel
@@ -137,6 +139,7 @@ export function NodeDetailPanel({
                         className={`font-mono text-xs font-semibold tracking-wider ${node.name ? 'text-primary' : 'text-text-dim italic'}`}
                       >
                         {node.name ?? formatHex(node.id)}
+                        <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
                       </span>
                       <Badge variant="default">
                         {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}

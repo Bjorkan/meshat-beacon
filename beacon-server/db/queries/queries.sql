@@ -273,14 +273,14 @@ WHERE id = $1;
 -- Inserts a telemetry snapshot for an observer. The reported_at timestamp should
 -- be truncated to the configured resolution before calling to ensure deduplication.
 INSERT INTO observer_telemetry (
-    observer_id, reported_at, battery_voltage_mv, airtime_tx_pct,
-    airtime_rx_pct, noise_floor_db, uptime_seconds, queue_length,
+    observer_id, reported_at, battery_voltage_mv, airtime_tx_secs,
+    airtime_rx_secs, noise_floor_db, uptime_seconds, queue_length,
     debug_flags, receive_errors
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 ON CONFLICT (observer_id, reported_at) DO NOTHING;
 
 -- name: GetObserverTelemetry :many
-SELECT id, reported_at, battery_voltage_mv, airtime_tx_pct, airtime_rx_pct,
+SELECT id, reported_at, battery_voltage_mv, airtime_tx_secs, airtime_rx_secs,
        noise_floor_db, uptime_seconds, queue_length, debug_flags, receive_errors
 FROM observer_telemetry
 WHERE observer_id = $1
@@ -294,8 +294,8 @@ SELECT
   (date_trunc('day', reported_at) +
     (EXTRACT(HOUR FROM reported_at)::int / $4::int) * ($4::int * interval '1 hour'))::timestamptz AS bucket,
   AVG(battery_voltage_mv)::int   AS battery_voltage_mv,
-  GREATEST(MAX(airtime_tx_pct) - MIN(airtime_tx_pct), 0)::real AS airtime_tx_pct,
-  GREATEST(MAX(airtime_rx_pct) - MIN(airtime_rx_pct), 0)::real AS airtime_rx_pct,
+  GREATEST(MAX(airtime_tx_secs) - MIN(airtime_tx_secs), 0)::real AS airtime_tx_secs,
+  GREATEST(MAX(airtime_rx_secs) - MIN(airtime_rx_secs), 0)::real AS airtime_rx_secs,
   AVG(noise_floor_db)::real      AS noise_floor_db,
   MAX(uptime_seconds)::bigint    AS uptime_seconds,
   AVG(queue_length)::int         AS queue_length,
@@ -306,6 +306,56 @@ WHERE observer_id = $1
   AND ($3::timestamptz IS NULL OR reported_at <= $3)
 GROUP BY bucket
 ORDER BY bucket ASC;
+
+-- name: GetObserverActivityRaw :many
+-- Sub-hour activity buckets straight off idx_observations_observer; no join to packets.
+-- Aggregates are COALESCEd and paired with a count column: sqlc types a cast expression as
+-- NOT NULL, so the counts are what tell the store a bucket had no costed or no signal rows.
+SELECT
+  date_bin($3::interval, heard_at, TIMESTAMPTZ 'epoch')::timestamptz AS bucket,
+  COUNT(*)::bigint AS observations,
+  COALESCE(SUM(airtime_ms), 0)::real AS airtime_ms,
+  COUNT(airtime_ms)::bigint AS airtime_n,
+  COALESCE(AVG(snr)  FILTER (WHERE NOT (COALESCE(rssi, 0) = 0 AND COALESCE(snr, 0) = 0)), 0)::real AS snr_avg,
+  COALESCE(MIN(snr)  FILTER (WHERE NOT (COALESCE(rssi, 0) = 0 AND COALESCE(snr, 0) = 0)), 0)::real AS snr_min,
+  COUNT(snr)         FILTER (WHERE NOT (COALESCE(rssi, 0) = 0 AND COALESCE(snr, 0) = 0))::bigint AS snr_n,
+  COALESCE(AVG(rssi) FILTER (WHERE NOT (COALESCE(rssi, 0) = 0 AND COALESCE(snr, 0) = 0)), 0)::real AS rssi_avg,
+  COUNT(rssi)        FILTER (WHERE NOT (COALESCE(rssi, 0) = 0 AND COALESCE(snr, 0) = 0))::bigint AS rssi_n
+FROM packet_observations
+WHERE observer_id = $1 AND heard_at >= $2::timestamptz
+GROUP BY bucket
+ORDER BY bucket;
+
+-- name: GetObserverActivityRawPayloadTypes :many
+SELECT payload_type, COUNT(*)::bigint AS count
+FROM packet_observations
+WHERE observer_id = $1 AND heard_at >= $2::timestamptz AND payload_type IS NOT NULL
+GROUP BY payload_type
+ORDER BY count DESC;
+
+-- name: GetObserverActivityHourly :many
+-- Hour-or-coarser buckets summed from the hourly rollup; same COALESCE-plus-count shape as the raw query.
+SELECT
+  date_bin($3::interval, bucket, TIMESTAMPTZ 'epoch')::timestamptz AS bucket,
+  SUM(observations)::bigint AS observations,
+  COALESCE(SUM(airtime_ms), 0)::real AS airtime_ms,
+  SUM(airtime_n)::bigint AS airtime_n,
+  COALESCE(SUM(snr_sum), 0)::real AS snr_sum,
+  SUM(snr_n)::bigint AS snr_n,
+  COALESCE(MIN(snr_min), 0)::real AS snr_min,
+  COALESCE(SUM(rssi_sum), 0)::bigint AS rssi_sum,
+  SUM(rssi_n)::bigint AS rssi_n
+FROM mv_observer_activity_hourly
+WHERE observer_id = $1 AND bucket >= $2::timestamptz
+GROUP BY 1
+ORDER BY 1;
+
+-- name: GetObserverActivityHourlyPayloadTypes :many
+SELECT payload_type, SUM(observations)::bigint AS count
+FROM mv_observer_activity_hourly
+WHERE observer_id = $1 AND bucket >= $2::timestamptz
+GROUP BY payload_type
+ORDER BY count DESC;
 
 -- name: ListObserverAdverts :many
 -- Returns advert packets (payload_type=4) heard by a specific observer.
@@ -320,7 +370,7 @@ SELECT
   po.snr,
   po.hop_count,
   n.name AS node_name,
-  encode(p.origin_pubkey, 'hex') AS node_public_key
+  COALESCE(encode(p.origin_pubkey, 'hex'), '')::text AS node_public_key
 FROM packet_observations po
 JOIN packets p ON p.packet_hash = po.packet_hash
 LEFT JOIN nodes n ON n.public_key = p.origin_pubkey
@@ -410,14 +460,22 @@ LEFT JOIN channel_messages cm ON cm.packet_hash = p.packet_hash
 WHERE p.packet_hash = $1;
 
 -- name: GetPacketsByTraceTag :many
--- Returns all packets for a given trace tag with observations.
+-- Return distinct observation IATAs in first-heard order for path resolution,
+-- without fetching full observations separately for every trace packet.
 SELECT encode(p.packet_hash, 'hex') AS packet_hash_hex,
     p.route_type,
     p.first_heard_at,
     p.last_heard_at,
     p.parsed_payload,
     p.scope_id,
-    ts.name AS scope_name
+    ts.name AS scope_name,
+    ARRAY(
+        SELECT po.iata
+        FROM packet_observations po
+        WHERE po.packet_hash = p.packet_hash
+        GROUP BY po.iata
+        ORDER BY MIN(po.heard_at), po.iata
+    )::bpchar[] AS iatas
 FROM packets p
 LEFT JOIN transport_scopes ts ON ts.id = p.scope_id
 WHERE p.trace_tag = decode($1, 'hex')
@@ -433,22 +491,36 @@ SELECT COUNT(*) FROM packet_observations WHERE packet_hash = $1;
 SELECT
   p.packet_hash,
   p.payload_type,
+  COALESCE(CASE
+    WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+      THEN p.parsed_payload #>> '{appData,name}'
+    WHEN p.payload_type = 3 AND p.parsed_payload ->> 'type' = 'ACK'
+      AND jsonb_typeof(p.parsed_payload -> 'checksum') = 'string'
+      AND p.parsed_payload ->> 'checksum' ~ '^[0-9a-fA-F]{8}$'
+      THEN 'ACK ' || lower(p.parsed_payload ->> 'checksum')
+    WHEN p.payload_type = 9 AND p.parsed_payload ->> 'type' IN ('TRACE', 'PING')
+      AND jsonb_typeof(p.parsed_payload -> 'traceTag') = 'string'
+      AND p.parsed_payload ->> 'traceTag' ~ '^[0-9a-fA-F]{8}$'
+      THEN (p.parsed_payload ->> 'type') || ' ' || lower(p.parsed_payload ->> 'traceTag')
+    END, '')::text AS summary,
   p.route_type,
   p.first_heard_at,
   p.last_heard_at,
   p.scope_id,
   ts.name AS scope_name,
   (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
+  -- sqlc loses LATERAL nullability; these scalar defaults are ignored when observer_id is NULL.
   po.observer_id AS latest_observer_id,
   COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
-  po.iata AS latest_observer_iata,
-  po.path_length_byte AS latest_observer_path_length_byte,
-  po.hash_size AS latest_observer_hash_size,
-  po.hop_count AS latest_observer_hop_count,
-  po.path_bytes AS latest_observer_path_bytes
+  COALESCE(po.iata, ''::bpchar) AS latest_observer_iata,
+  COALESCE(po.path_length_byte, 0::smallint) AS latest_observer_path_length_byte,
+  COALESCE(po.hash_size, 0::smallint) AS latest_observer_hash_size,
+  COALESCE(po.hop_count, 0::smallint) AS latest_observer_hop_count,
+  po.path_bytes AS latest_observer_path_bytes,
+  po.resolved_endpoints AS latest_observer_resolved_endpoints
 FROM packets p
 LEFT JOIN LATERAL (
-  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes
+  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes, resolved_endpoints
   FROM packet_observations
   WHERE packet_hash = p.packet_hash
   ORDER BY heard_at DESC
@@ -490,29 +562,14 @@ LIMIT $6;
 -- to fill a page for a quiet site; walking the site's own observation log is
 -- proportional to the page size instead. Results are ordered by when the
 -- requested sites heard the packet (site-local recency) and the cursor
--- follows that ordering. scan_depth is a multiple of the page size to
--- absorb per-observer duplicates; if duplication exceeds it across a
--- page, pagination ends early (hasMore=false) rather than returning a
--- short page, even though deeper matches exist.
-SELECT
-  p.packet_hash,
-  p.payload_type,
-  p.route_type,
-  p.first_heard_at,
-  p.last_heard_at,
-  p.scope_id,
-  ts.name AS scope_name,
-  sh.site_heard_at,
-  (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
-  po.observer_id AS latest_observer_id,
-  COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
-  po.iata AS latest_observer_iata,
-  po.path_length_byte AS latest_observer_path_length_byte,
-  po.hash_size AS latest_observer_hash_size,
-  po.hop_count AS latest_observer_hop_count,
-  po.path_bytes AS latest_observer_path_bytes
-FROM (
-  SELECT hits.packet_hash, MAX(hits.heard_at)::timestamptz AS site_heard_at
+-- follows that ordering. scan_depth caps how deep each site's observation
+-- log is walked. A packet repeats once per observer that heard it, so a
+-- page can collapse to fewer distinct packets than were asked for without
+-- the site being exhausted. scan_saturated reports whether any site hit
+-- that cap and scan_floor the oldest heard_at they all cover, so a short
+-- page can keep paging instead of reading as the end of the data.
+WITH scanned AS (
+  SELECT req.iata AS req_iata, hits.packet_hash, hits.heard_at
   FROM unnest(@iatas::bpchar[]) AS req(iata)
   CROSS JOIN LATERAL (
     SELECT po3.packet_hash, po3.heard_at
@@ -546,18 +603,70 @@ FROM (
     ORDER BY po3.heard_at DESC
     LIMIT @scan_depth
   ) hits
-  GROUP BY hits.packet_hash
+),
+-- A site that filled scan_depth still has unread history below its floor.
+-- The newest such floor is the point above which every site is covered.
+saturation AS (
+  SELECT
+    COUNT(*) > 0 AS scan_saturated,
+    MAX(floor_ts)::timestamptz AS scan_floor
+  FROM (
+    SELECT MIN(heard_at) AS floor_ts
+    FROM scanned
+    GROUP BY req_iata
+    HAVING COUNT(*) >= @scan_depth
+  ) filled
+),
+page AS (
+  SELECT scanned.packet_hash, MAX(scanned.heard_at)::timestamptz AS site_heard_at
+  FROM scanned
+  GROUP BY scanned.packet_hash
   HAVING (@cursor_ts::timestamptz IS NULL OR NOT EXISTS (
     SELECT 1 FROM packet_observations px
-    WHERE px.packet_hash = hits.packet_hash
+    WHERE px.packet_hash = scanned.packet_hash
       AND px.iata = ANY(@iatas::bpchar[])
       AND px.heard_at >= @cursor_ts))
   ORDER BY site_heard_at DESC
   LIMIT @page_limit
-) sh
+)
+SELECT
+  p.packet_hash,
+  p.payload_type,
+  COALESCE(CASE
+    WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+      THEN p.parsed_payload #>> '{appData,name}'
+    WHEN p.payload_type = 3 AND p.parsed_payload ->> 'type' = 'ACK'
+      AND jsonb_typeof(p.parsed_payload -> 'checksum') = 'string'
+      AND p.parsed_payload ->> 'checksum' ~ '^[0-9a-fA-F]{8}$'
+      THEN 'ACK ' || lower(p.parsed_payload ->> 'checksum')
+    WHEN p.payload_type = 9 AND p.parsed_payload ->> 'type' IN ('TRACE', 'PING')
+      AND jsonb_typeof(p.parsed_payload -> 'traceTag') = 'string'
+      AND p.parsed_payload ->> 'traceTag' ~ '^[0-9a-fA-F]{8}$'
+      THEN (p.parsed_payload ->> 'type') || ' ' || lower(p.parsed_payload ->> 'traceTag')
+    END, '')::text AS summary,
+  p.route_type,
+  p.first_heard_at,
+  p.last_heard_at,
+  p.scope_id,
+  ts.name AS scope_name,
+  sh.site_heard_at,
+  sat.scan_saturated,
+  sat.scan_floor,
+  (SELECT COUNT(*) FROM packet_observations po2 WHERE po2.packet_hash = p.packet_hash) AS observation_count,
+  -- sqlc loses LATERAL nullability; these scalar defaults are ignored when observer_id is NULL.
+  po.observer_id AS latest_observer_id,
+  COALESCE(o.display_name, po.observer_display_name) AS latest_observer_name,
+  COALESCE(po.iata, ''::bpchar) AS latest_observer_iata,
+  COALESCE(po.path_length_byte, 0::smallint) AS latest_observer_path_length_byte,
+  COALESCE(po.hash_size, 0::smallint) AS latest_observer_hash_size,
+  COALESCE(po.hop_count, 0::smallint) AS latest_observer_hop_count,
+  po.path_bytes AS latest_observer_path_bytes,
+  po.resolved_endpoints AS latest_observer_resolved_endpoints
+FROM page sh
+CROSS JOIN saturation sat
 JOIN packets p ON p.packet_hash = sh.packet_hash
 LEFT JOIN LATERAL (
-  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes
+  SELECT observer_id, observer_display_name, iata, path_length_byte, hash_size, hop_count, path_bytes, resolved_endpoints
   FROM packet_observations
   WHERE packet_hash = p.packet_hash
   ORDER BY heard_at DESC
@@ -573,6 +682,18 @@ ORDER BY sh.site_heard_at DESC;
 SELECT
   p.packet_hash,
   p.payload_type,
+  COALESCE(CASE
+    WHEN p.payload_type = 4 AND jsonb_typeof(p.parsed_payload #> '{appData,name}') = 'string'
+      THEN p.parsed_payload #>> '{appData,name}'
+    WHEN p.payload_type = 3 AND p.parsed_payload ->> 'type' = 'ACK'
+      AND jsonb_typeof(p.parsed_payload -> 'checksum') = 'string'
+      AND p.parsed_payload ->> 'checksum' ~ '^[0-9a-fA-F]{8}$'
+      THEN 'ACK ' || lower(p.parsed_payload ->> 'checksum')
+    WHEN p.payload_type = 9 AND p.parsed_payload ->> 'type' IN ('TRACE', 'PING')
+      AND jsonb_typeof(p.parsed_payload -> 'traceTag') = 'string'
+      AND p.parsed_payload ->> 'traceTag' ~ '^[0-9a-fA-F]{8}$'
+      THEN (p.parsed_payload ->> 'type') || ' ' || lower(p.parsed_payload ->> 'traceTag')
+    END, '')::text AS summary,
   p.route_type,
   p.first_heard_at,
   p.last_heard_at,
@@ -584,6 +705,7 @@ SELECT
   po.hash_size AS latest_observer_hash_size,
   po.hop_count AS latest_observer_hop_count,
   po.path_bytes AS latest_observer_path_bytes,
+  po.resolved_endpoints AS latest_observer_resolved_endpoints,
   ts.name AS scope_name
 FROM packets p
 JOIN packet_observations po ON po.packet_hash = p.packet_hash
@@ -673,13 +795,15 @@ INSERT INTO packet_observations (
   bandwidth_khz,
   coding_rate,
   source_broker,
-  payload_type
+  payload_type,
+  resolved_endpoints,
+  airtime_ms
 ) VALUES (
   $1, $2,
   (SELECT public_key FROM observers WHERE id = $2),
   (SELECT display_name FROM observers WHERE id = $2),
   (SELECT observer_type FROM observers WHERE id = $2),
-  $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+  $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
 )
 ON CONFLICT (packet_hash, observer_id) DO NOTHING
 RETURNING *;
@@ -1005,7 +1129,30 @@ WHERE (@channel_hash::bytea IS NULL OR c.channel_hash = @channel_hash)
        (@key_filter = 'unknown' AND c.key_known IS NOT TRUE) OR
        (@key_filter = 'known' AND c.key_known IS TRUE))
   AND (@cursor_ts::timestamptz IS NULL OR c.last_seen < @cursor_ts)
-ORDER BY c.last_seen DESC
+ORDER BY c.last_seen DESC, c.id DESC
+LIMIT @page_limit;
+
+-- name: ListChannelsAfter :many
+-- Keep the non-null tuple boundary separate from the legacy optional cursor so
+-- generic prepared plans can seek directly into the composite ordered index.
+SELECT c.* FROM channels c
+WHERE (c.last_seen, c.id) < (@cursor_ts::timestamptz, @cursor_id::integer)
+  AND (@channel_hash::bytea IS NULL OR c.channel_hash = @channel_hash)
+  AND (COALESCE(cardinality(@iatas::bpchar[]), 0) = 0 OR c.channel_hash IN (
+    SELECT ci.channel_hash FROM channel_iatas ci WHERE ci.iata = ANY(@iatas::bpchar[])
+  ))
+  -- Hide historical hash-only placeholders once fully decrypted. Preserve unresolved
+  -- collisions with a configured channel sharing the same one-byte hash.
+  AND (c.key_known IS TRUE OR NOT EXISTS (
+    SELECT 1 FROM channels known WHERE known.channel_hash = c.channel_hash AND known.key_known IS TRUE
+  ) OR EXISTS (
+    SELECT 1 FROM packets p WHERE p.channel_hash = c.channel_hash
+      AND p.payload_type = 5 AND p.decrypted IS NOT TRUE
+  ))
+  AND (@key_filter::text = 'all' OR
+       (@key_filter = 'unknown' AND c.key_known IS NOT TRUE) OR
+       (@key_filter = 'known' AND c.key_known IS TRUE))
+ORDER BY c.last_seen DESC, c.id DESC
 LIMIT @page_limit;
 
 -- name: CountUnknownChannels :one
@@ -1241,14 +1388,38 @@ WHERE ($1::text = '' OR preset = $1::text)
 ORDER BY preset, iata, source_type;
 
 -- name: GetScopeStats :many
--- Count each table on its own; the old cross-join blew up to millions of rows
--- before COUNT(DISTINCT) (~10s).
+-- Aggregate matching observations once, separately from node memberships to avoid
+-- a cross-join. Empty IATAs keep the original global counts, including associations
+-- whose observations have expired; the filtered aggregates are empty in that case.
+WITH observation_counts AS (
+    SELECT p.scope_id,
+        COUNT(DISTINCT p.packet_hash) AS packet_count,
+        COUNT(DISTINCT os.observer_id) AS observer_count
+    FROM packet_observations po
+    JOIN packets p ON p.packet_hash = po.packet_hash
+    LEFT JOIN observer_scopes os ON os.scope_id = p.scope_id AND os.observer_id = po.observer_id
+    WHERE po.iata = ANY(sqlc.arg(iatas)::bpchar[]) AND p.scope_id IS NOT NULL
+    GROUP BY p.scope_id
+), node_counts AS (
+    SELECT n.default_scope_id AS scope_id, COUNT(*) AS node_count
+    FROM nodes n
+    WHERE n.id IN (SELECT node_id FROM node_iatas WHERE iata = ANY(sqlc.arg(iatas)::bpchar[]))
+    GROUP BY n.default_scope_id
+)
 SELECT
     ts.name,
-    (SELECT COUNT(*) FROM packets p WHERE p.scope_id = ts.id) AS packet_count,
-    (SELECT COUNT(*) FROM observer_scopes os WHERE os.scope_id = ts.id) AS observer_count,
-    (SELECT COUNT(*) FROM nodes n WHERE n.default_scope_id = ts.id) AS node_count
+    CASE WHEN COALESCE(cardinality(sqlc.arg(iatas)::bpchar[]), 0) = 0
+        THEN (SELECT COUNT(*) FROM packets p WHERE p.scope_id = ts.id)
+        ELSE COALESCE(oc.packet_count, 0) END::bigint AS packet_count,
+    CASE WHEN COALESCE(cardinality(sqlc.arg(iatas)::bpchar[]), 0) = 0
+        THEN (SELECT COUNT(*) FROM observer_scopes os WHERE os.scope_id = ts.id)
+        ELSE COALESCE(oc.observer_count, 0) END::bigint AS observer_count,
+    CASE WHEN COALESCE(cardinality(sqlc.arg(iatas)::bpchar[]), 0) = 0
+        THEN (SELECT COUNT(*) FROM nodes n WHERE n.default_scope_id = ts.id)
+        ELSE COALESCE(nc.node_count, 0) END::bigint AS node_count
 FROM transport_scopes ts
+LEFT JOIN observation_counts oc ON oc.scope_id = ts.id
+LEFT JOIN node_counts nc ON nc.scope_id = ts.id
 ORDER BY ts.name;
 
 -- ============================================================
@@ -1322,9 +1493,9 @@ WITH tags AS (
       AND ($2::text = '' OR p.scope_id = (SELECT id FROM transport_scopes WHERE name = $2))
       AND ($3::timestamptz IS NULL OR p.first_heard_at >= $3)
       AND ($4::timestamptz IS NULL OR p.first_heard_at <= $4)
-      AND ($5::timestamptz IS NULL OR p.last_heard_at < $5)
       AND ($7::text = '' OR p.parsed_payload->>'type' = $7)
     GROUP BY p.trace_tag
+    HAVING ($5::timestamptz IS NULL OR MAX(p.last_heard_at) < $5)
     ORDER BY MAX(p.last_heard_at) DESC
     LIMIT $6
 )
@@ -1534,6 +1705,21 @@ JOIN nodes n ON n.id = ns.node_id
 WHERE n.node_type IN (2, 3)
   AND ns.prefix_1 = ANY($1::bytea[]);
 
+-- name: ResolveEndpointHashes :many
+-- Logical endpoints can be any advertised role, unlike intermediate relay hops.
+-- Endpoint hashes are always one byte; use the existing (iata, prefix_1) index.
+-- LIMIT 1 keeps generic plans on a node PK lookup per candidate instead of
+-- flattening the join into a scan of all nodes. The PK already guarantees one row.
+SELECT ns.prefix_1 AS hash, n.id AS node_id, n.name, n.latitude, n.longitude, n.public_key
+FROM node_short_ids ns
+CROSS JOIN LATERAL (
+  SELECT id, name, latitude, longitude, public_key
+  FROM nodes WHERE id = ns.node_id
+  LIMIT 1
+) n
+WHERE ns.iata = $1
+  AND ns.prefix_1 = ANY($2::bytea[]);
+
 -- name: ResolvePathHashesP2 :many
 SELECT DISTINCT ns.prefix_4 AS hash, n.id AS node_id, n.name, n.latitude, n.longitude, n.public_key
 FROM node_short_ids ns
@@ -1610,6 +1796,9 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY mv_top_advertisers_by_iata;
 
 -- name: RefreshRadioPresets :exec
 REFRESH MATERIALIZED VIEW CONCURRENTLY mv_radio_presets;
+
+-- name: RefreshObserverActivity :exec
+REFRESH MATERIALIZED VIEW CONCURRENTLY mv_observer_activity_hourly;
 
 -- name: ReconfirmRoutes :exec
 -- Checks the $1 least-recently-reconfirmed routes: deletes those with a departed
@@ -1761,3 +1950,27 @@ GROUP BY nn.node_id, nn.neighbor_id,
     nf.supports_multibyte_paths,
     nt.public_key, nt.name, nt.node_type, nt.latitude, nt.longitude,
     nt.supports_multibyte_paths;
+-- name: CreateAccount :one
+INSERT INTO accounts (name) VALUES (sqlc.arg(name))
+ON CONFLICT (name) WHERE deactivated_at IS NULL DO NOTHING
+RETURNING id, name, created_at, deactivated_at;
+
+-- name: ListAccounts :many
+SELECT id, name, created_at, deactivated_at FROM accounts
+ORDER BY created_at DESC, id DESC;
+
+-- name: GetAccount :one
+SELECT id, name, created_at, deactivated_at FROM accounts WHERE id = $1;
+
+-- name: DeactivateAccount :one
+-- Lock the current row before deciding the outcome, including when another
+-- deactivation commits while this statement is waiting for its row lock.
+WITH target AS MATERIALIZED (
+    SELECT a.id, a.deactivated_at FROM accounts a WHERE a.id = $1 FOR UPDATE
+), changed AS (
+    UPDATE accounts a SET deactivated_at = NOW()
+    FROM target t WHERE a.id = t.id AND t.deactivated_at IS NULL
+    RETURNING a.id
+)
+SELECT EXISTS(SELECT 1 FROM target) AS found,
+       EXISTS(SELECT 1 FROM changed) AS deactivated;

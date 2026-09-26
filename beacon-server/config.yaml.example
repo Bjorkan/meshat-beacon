@@ -1,6 +1,46 @@
 # Beacon configuration file
 # Copy to config.yaml and adjust as needed.
 
+# Public reads stay available. No key means admin routes return 503.
+# Prefer BEACON_API_KEY in the service environment; never commit a real key.
+auth:
+  api_key: ""
+
+log:
+  # Environment LOG_LEVEL / LOG_FORMAT override these values.
+  level: info  # debug, info, warn, error
+  format: text # text or json
+
+server:
+  # Only these direct proxy peers may set the client IP through X-Real-IP.
+  # The proxy must overwrite that header, not pass through client input.
+  # Leave empty for direct access (logs a startup warning). Invalid/empty CIDR
+  # entries prevent startup. A single host needs /32 for IPv4 or /128 for IPv6;
+  # bare IP addresses are not accepted.
+  # For Docker, list the actual proxy/compose network CIDR (e.g. 172.20.0.0/24).
+  # For a local host proxy, use ["127.0.0.1/32", "::1/128"].
+  # Direct-client proxy examples; X-Forwarded-For alone is not used:
+  # Apache 2.4.10+ (mod_headers, in the proxy virtual host):
+  #   RequestHeader set X-Real-IP "expr=%{REMOTE_ADDR}"
+  # nginx (in the proxy location):
+  #   proxy_set_header X-Real-IP $remote_addr;
+  # Caddy (inside the reverse_proxy block):
+  #   header_up X-Real-IP {http.request.remote.host}
+  # With additional proxy hops, first configure their trust at the edge proxy
+  # and pass its validated client address rather than a client-supplied header.
+  trusted_proxies: []
+
+# Applies to /api/v1/* only. Both counters are local to this Beacon instance.
+# Set trusted_proxies correctly before using a reverse proxy, or clients share
+# the proxy's budget. IPv6 clients share a /64 budget to prevent address rotation.
+ratelimit:
+  enabled: true
+  requests_per_minute: 300
+  # Maximum requests in a one-second sliding window, not token-bucket capacity.
+  # Omitted/zero defaults to requests_per_minute. Negative limits prevent startup.
+  # A 429 returns error.code=rate_limited and Retry-After (1 or 60 seconds).
+  burst: 300
+
 iatas:
   YVR:
     name: Vancouver International
@@ -73,6 +113,12 @@ scopes:
 telemetry:
   retention: 672h   # 4 weeks
   resolution: 1h    # store one snapshot per observer per hour
+
+# Optional authenticated database/config downloads. Disabled unless explicitly enabled.
+# Requires auth.api_key, a supported PostgreSQL URL and a compatible pg_dump client.
+# A failed prerequisite leaves this feature unavailable; ingest and other APIs continue.
+#backup:
+#  enabled: false
 
 packets:
   retention: 720h   # 30 days
@@ -173,9 +219,18 @@ routes:
 
 websocket:
   max_connections_per_ip: 5 # default: 5
+  # Upgrade attempts, including failed handshakes; zero/omitted defaults to 10.
+  # IPv6 clients share a /64 attempt budget. Negative values prevent startup.
+  # Rate exhaustion rejects the handshake with 429 and Retry-After: 60.
+  # Within this rate budget, a full concurrent cap accepts then closes with 1013
+  # before hello, allowing browsers to back off without evicting existing clients.
+  max_connects_per_minute: 10
 
 # Node staleness, deletion, and clock-drift thresholds.
 #nodes:
+#  mark_foreign: false           # opt in to possiblyForeign on repeater nodes
+#                                # uses the union of configured iatas.*.borderFile polygons;
+#                                # requires at least one valid border; no packet filtering
 #  stale_threshold: 24h          # default: 24h
 #  delete_after: 720h            # default: 30 days, same default as packets.retention
 #  clock_drift_threshold: 5m     # default: 5m
@@ -191,6 +246,8 @@ websocket:
 #observers:
 #  delete_after: 336h            # default: 14 days
 
+
+
 # CORS configuration.
 # Controls which origins, methods and headers are allowed for cross-origin requests.
 # Defaults to allowing all origins with GET/HEAD/OPTIONS if omitted — appropriate
@@ -198,7 +255,7 @@ websocket:
 #cors:
 #  allowed_origins:
 #    - "https://app.example.com"
-#  allowed_methods: [GET, HEAD, OPTIONS, POST]
+#  allowed_methods: [GET, HEAD, OPTIONS, POST, PUT, DELETE] # admin UI writes
 #  allowed_headers: [Accept, Authorization, Content-Type]
 #  allow_credentials: false
 #  max_age: 300

@@ -414,6 +414,12 @@ for (const viewport of [
       const result = structuredClone(best);
       result.paths[1].nodes[1].longitude = 16.47;
       await mockApi(page, result);
+      // A visible canvas does not mean MapLibre has loaded its style or route data.
+      // Exercise the slower startup seen on hosted Firefox runners.
+      await page.route('https://tiles.openfreemap.org/styles/**', async (route) => {
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        await route.fallback();
+      });
       await page.goto(`/routes?from=${FROM}&to=${TO}`);
       await expect(page.getByRole('article')).toHaveCount(2);
       await expect(page.getByTestId('meshat-splash-icon')).toBeHidden();
@@ -444,9 +450,19 @@ for (const viewport of [
       const length = Math.hypot(dx, dy);
       const x = (from.x + mid.x) / 2 - (9 * dy) / length;
       const y = (from.y + mid.y) / 2 + (9 * dx) / length;
-      // Allow the initial camera animation to settle, then tap 9px off the
-      // 2px visible line: inside its touch target but outside its paint.
-      await page.waitForTimeout(1000);
+      // Probe the real hit target until style loading, camera fitting and the
+      // GeoJSON worker have all caught up. Canvas visibility alone is too early.
+      // Keep the same 9px offset: inside the touch target, outside the 2px paint.
+      await expect
+        .poll(
+          async () => {
+            await page.mouse.move(0, 0);
+            await page.mouse.move(x, y);
+            return page.locator('.maplibregl-canvas').evaluate((canvas) => canvas.style.cursor);
+          },
+          { message: 'The fitted alternative route must be interactive before clicking' },
+        )
+        .toBe('pointer');
       if (viewport.hasTouch) await page.touchscreen.tap(x, y);
       else await page.mouse.click(x, y);
       await expect(page).toHaveURL(/alt=1/);

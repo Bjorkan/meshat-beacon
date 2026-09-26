@@ -1,3 +1,4 @@
+import { hasMapLocation } from './location';
 import { useMapNeighborHighlight } from './useMapNeighborHighlight';
 import { readPreference, writePreference } from '../../lib/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -245,7 +246,7 @@ export function MapView({
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isReady || !selectedNodeId || !selectedNodeForFocus) return;
-    if (selectedNodeForFocus.lng == null || selectedNodeForFocus.lat == null) return;
+    if (!hasMapLocation(selectedNodeForFocus)) return;
     if (lastFocusedNodeRef.current === selectedNodeId) return;
     lastFocusedNodeRef.current = selectedNodeId;
     map.flyTo({

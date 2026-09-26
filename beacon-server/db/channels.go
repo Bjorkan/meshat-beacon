@@ -100,18 +100,23 @@ func (s *Store) DeleteOldChannelIATAs(ctx context.Context, cutoff time.Time) err
 	return s.q.DeleteOldChannelIATAs(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
 
-func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (api.ChannelPage, error) {
+func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
 	var cursorTS pgtype.Timestamptz
 	if cursor > 0 {
 		cursorTS = pgtype.Timestamptz{Time: time.UnixMilli(cursor), Valid: true}
 	}
-	rows, err := s.q.ListChannels(ctx, sqlc.ListChannelsParams{
-		KeyFilter:   keyFilter,
-		ChannelHash: hash,
-		Iatas:       iatas,
-		CursorTs:    cursorTS,
-		PageLimit:   limit + 1,
-	})
+	var rows []sqlc.Channel
+	var err error
+	if pageCursor != nil {
+		rows, err = s.q.ListChannelsAfter(ctx, sqlc.ListChannelsAfterParams{
+			KeyFilter: keyFilter, ChannelHash: hash, Iatas: iatas, PageLimit: limit + 1,
+			CursorTs: pgtype.Timestamptz{Time: pageCursor.LastSeen, Valid: true}, CursorID: pageCursor.ID,
+		})
+	} else {
+		rows, err = s.q.ListChannels(ctx, sqlc.ListChannelsParams{
+			KeyFilter: keyFilter, ChannelHash: hash, Iatas: iatas, CursorTs: cursorTS, PageLimit: limit + 1,
+		})
+	}
 	if err != nil {
 		return api.ChannelPage{}, err
 	}
@@ -139,15 +144,20 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 		})
 	}
 	var nextCursor *int64
+	var nextPageCursor *string
 	if hasMore {
 		last := items[len(items)-1].LastSeen
 		nextCursor = &last
+		row := rows[len(rows)-1]
+		precise := (api.ChannelCursor{LastSeen: row.LastSeen.Time, ID: row.ID}).String()
+		nextPageCursor = &precise
 	}
 	return api.ChannelPage{
-		UnknownCount: unknownCount,
-		Items:        items,
-		NextCursor:   nextCursor,
-		HasMore:      hasMore,
+		UnknownCount:   unknownCount,
+		NextPageCursor: nextPageCursor,
+		Items:          items,
+		NextCursor:     nextCursor,
+		HasMore:        hasMore,
 	}, nil
 }
 

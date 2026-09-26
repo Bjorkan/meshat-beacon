@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -28,6 +29,8 @@ const (
 	keyScopeByNamePrefix       = "beacon:scope:name:"
 	keyStatsOverviewPrefix     = "beacon:stats:overview:"
 	keyStatsObservationsPrefix = "beacon:stats:observations:"
+	keySignalStatsPrefix       = "beacon:stats:signal:"
+	keyPathStatsPrefix         = "beacon:stats:paths:"
 	keyStatsBreakdownPrefix    = "beacon:stats:breakdown:"
 	keyStatsTopNodesPrefix     = "beacon:stats:top-nodes:"
 	keyStatsTopObsPrefix       = "beacon:stats:top-observers:"
@@ -43,7 +46,11 @@ const (
 	keyMeshCoreRegions         = "beacon:nodes:meshcore-regions"
 	keyObserverPrefix          = "beacon:observer:"
 	keyObserverScopesPrefix    = "beacon:observer:scopes:"
+	keyObserverActivityPrefix  = "beacon:observer:activity:"
 )
+
+// observerActivityTTL is deliberately short: activity is a live chart, not reference data.
+const observerActivityTTL = 60 * time.Second
 
 // CachedReader wraps an api.Reader with a Redis caching layer.
 // It implements api.Reader and is a drop-in replacement for db.Store
@@ -145,10 +152,22 @@ func (cr *CachedReader) GetScopeNames(ctx context.Context) ([]string, error) {
 	})
 }
 
+// GetObserverComparison passes arbitrary observer/time combinations through;
+// these explicit queries should not fill the shared statistics cache.
+func (cr *CachedReader) GetObserverComparison(ctx context.Context, a, b uuid.UUID, since, until time.Time, iatas []string) (*api.ObserverComparison, error) {
+	return cr.inner.GetObserverComparison(ctx, a, b, since, until, iatas)
+}
+
 // GetScopeStats implements [api.Reader].
-func (cr *CachedReader) GetScopeStats(ctx context.Context) ([]api.ScopeStats, error) {
-	return getOrSet(ctx, cr.c, keyScopeStats, cr.ttl.Reference, func() ([]api.ScopeStats, error) {
-		return cr.inner.GetScopeStats(ctx)
+func (cr *CachedReader) GetScopeStats(ctx context.Context, iatas []string) ([]api.ScopeStats, error) {
+	segment := "all"
+	if len(iatas) > 0 {
+		sorted := append([]string(nil), iatas...)
+		sort.Strings(sorted)
+		segment = strings.Join(slices.Compact(sorted), ",")
+	}
+	return getOrSet(ctx, cr.c, keyScopeStats+":"+segment, cr.ttl.Reference, func() ([]api.ScopeStats, error) {
+		return cr.inner.GetScopeStats(ctx, iatas)
 	})
 }
 
@@ -380,6 +399,14 @@ func (cr *CachedReader) GetObserverTelemetryBucketed(ctx context.Context, observ
 	return cr.inner.GetObserverTelemetryBucketed(ctx, observerID, since, until, bucketHours)
 }
 
+// GetObserverActivity implements [api.Reader].
+func (cr *CachedReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+	key := keyObserverActivityPrefix + observerID.String() + ":" + window.String() + ":" + interval.String()
+	return getOrSet(ctx, cr.c, key, observerActivityTTL, func() (*api.ObserverActivity, error) {
+		return cr.inner.GetObserverActivity(ctx, observerID, window, interval)
+	})
+}
+
 // GetPacket implements [api.Reader].
 func (cr *CachedReader) GetPacket(ctx context.Context, packetHash []byte) (*api.Packet, error) {
 	return cr.inner.GetPacket(ctx, packetHash)
@@ -406,8 +433,8 @@ func (cr *CachedReader) GetCrossIATANeighbors(ctx context.Context, nodeID uuid.U
 }
 
 // ListChannels implements [api.Reader].
-func (cr *CachedReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string) (api.ChannelPage, error) {
-	return cr.inner.ListChannels(ctx, limit, hash, iatas, cursor, keyFilter)
+func (cr *CachedReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
+	return cr.inner.ListChannels(ctx, limit, hash, iatas, cursor, keyFilter, pageCursor)
 }
 
 // ListChannelMessages implements [api.Reader].

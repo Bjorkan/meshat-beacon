@@ -67,8 +67,15 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
             />
           </svg>
         </span>
-        <span className="font-mono text-xs font-semibold text-primary tracking-wider">
-          {formatHex(packet.packetHash)}
+        <span className="min-w-0">
+          <span className="font-mono text-xs font-semibold text-primary tracking-wider">
+            {formatHex(packet.packetHash)}
+          </span>
+          {packet.summary && (
+            <span className="block truncate text-text-muted" title={packet.summary}>
+              {packet.summary}
+            </span>
+          )}
         </span>
         <span>
           <Badge variant={payloadTypeVariant(packet.payloadType)}>

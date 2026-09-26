@@ -38,6 +38,7 @@ func ChannelsRouter(reader api.Reader) http.Handler {
 //	@Param		hash	query		string	false	"Single-byte channel hash (hex)"
 //	@Param		iata	query		string	false	"Filter by IATA code"
 //	@Param		iatas	query		string	false	"Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ"
+//	@Param		pageCursor	query	string	false	"Opaque nextPageCursor; preserves timestamp ties and precision. Cannot be combined with a positive cursor."
 //	@Param		cursor	query		int		false	"last_seen epoch ms of last item for pagination"
 //	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
 //	@Success	200		{object}	api.ChannelPage
@@ -60,6 +61,19 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 				return
 			}
 			cursor = c
+		}
+		var err error
+		var pageCursor *api.ChannelCursor
+		if raw := r.URL.Query().Get("pageCursor"); raw != "" {
+			if cursor > 0 {
+				respondError(w, http.StatusBadRequest, "pageCursor and a positive cursor cannot be combined")
+				return
+			}
+			pageCursor, err = api.ParseChannelCursor(raw)
+			if err != nil {
+				respondError(w, http.StatusBadRequest, "invalid pageCursor")
+				return
+			}
 		}
 		var hashHex []byte
 		if hash := strings.ToLower(r.URL.Query().Get("hash")); hash != "" {
@@ -85,7 +99,7 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 			respondError(w, http.StatusBadRequest, "key must be known, unknown or all")
 			return
 		}
-		channels, err := reader.ListChannels(r.Context(), int32(limit), hashHex, iatas, cursor, keyFilter)
+		channels, err := reader.ListChannels(r.Context(), int32(limit), hashHex, iatas, cursor, keyFilter, pageCursor)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
@@ -186,7 +200,7 @@ func listChannelMessages(reader api.Reader) http.HandlerFunc {
 		}
 		scope := r.URL.Query().Get("scope")
 		chanID := int32(id)
-		messages, err := reader.ListChannelMessages(r.Context(), &chanID, since, int32(limit), iatas, scope, cursor)
+		messages, err := reader.ListChannelMessages(r.Context(), &chanID, since, limit, iatas, scope, cursor)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
