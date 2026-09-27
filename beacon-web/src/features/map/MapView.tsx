@@ -151,7 +151,7 @@ export function MapView({
   const { data: iatas } = useQuery(iataQueries.list());
 
   // nodes for the selected region (its own key, independent of the Nodes-table filters/page cap).
-  // Pages in 50 at a time so the map fills batch by batch.
+  // Uses large pages so loading a deployment-wide map does not exhaust the REST request budget.
   const {
     nodes,
     loadedCount,

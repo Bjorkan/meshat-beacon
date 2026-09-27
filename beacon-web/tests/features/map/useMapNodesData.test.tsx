@@ -58,6 +58,7 @@ describe('useMapNodesData', () => {
     expect(mockGetNodesPage).toHaveBeenLastCalledWith(['YYZ'], {
       cursor: undefined,
       pageToken: 'page-2',
+      limit: 1_000,
       sort: 'last_seen',
       direction: 'desc',
       neighbors: true,

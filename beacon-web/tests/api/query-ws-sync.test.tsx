@@ -154,7 +154,25 @@ describe('global WebSocket to Query cache policy', () => {
     ).toBe('online');
   });
 
-  it('marks packet detail stale on an observation and heals every inactive live family after a gap', async () => {
+  it('marks an active uncertain node list stale without turning a WS event into a REST fetch', async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const options = nodeQueries.list({ regionKey: 'YOW', iatas: ['YOW'] });
+    client.setQueryData(options.queryKey, page([node]));
+    const fetchPage = vi.fn().mockResolvedValue({ items: [], nextCursor: null });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useInfiniteQuery({ ...options, queryFn: fetchPage }), { wrapper });
+
+    syncNodeUpdate(client, nodeUpdate({ nodeId: 'node-not-loaded', publicKey: 'bb22' }));
+    await Promise.resolve();
+
+    expect(client.getQueryState(options.queryKey)?.isInvalidated).toBe(true);
+    expect(fetchPage).not.toHaveBeenCalled();
+    expect(client.isFetching({ queryKey: options.queryKey, exact: true })).toBe(0);
+  });
+
+  it('drops inactive packet history on an observation and heals every live family after a gap', async () => {
     const client = new QueryClient();
     const nodeKey = nodeQueries.list({ regionKey: 'YOW' }).queryKey;
     const observerKey = observerQueries.list({ regionKey: 'YOW' }).queryKey;
@@ -173,7 +191,7 @@ describe('global WebSocket to Query cache policy', () => {
       observation: { observerId: 'obs-1' },
     } as WsPacketObservation['data']);
     expect(client.getQueryState(packetDetailKey)?.isInvalidated).toBe(true);
-    expect(client.getQueryState(packetKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryData(packetKey)).toBeUndefined();
 
     healLiveQueryCaches(client);
     await Promise.resolve();
@@ -182,6 +200,30 @@ describe('global WebSocket to Query cache policy', () => {
     expect(client.getQueryState(nodeKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(observerKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(channelKey)?.isInvalidated).toBe(true);
+  });
+
+  it('keeps mounted packet history stable because the route-local live buffer owns new events', () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const options = packetQueries.list({ regionKey: 'YOW' });
+    const cached = page<PacketSummary>([]);
+    client.setQueryData(options.queryKey, cached);
+    const fetchPage = vi.fn().mockResolvedValue({ items: [], nextCursor: null });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={client}>{children}</QueryClientProvider>
+    );
+    renderHook(() => useInfiniteQuery({ ...options, queryFn: fetchPage, staleTime: Infinity }), {
+      wrapper,
+    });
+
+    syncPacketObservation(client, {
+      packetHash: 'BB22',
+      packet: { payloadType: 5 },
+      observation: { observerId: 'obs-1' },
+    } as WsPacketObservation['data']);
+
+    expect(client.getQueryData(options.queryKey)).toEqual(cached);
+    expect(client.getQueryState(options.queryKey)?.isInvalidated).toBe(false);
+    expect(fetchPage).not.toHaveBeenCalled();
   });
 
   it('refreshes only the receiving observer adverts and heals them after a gap', () => {

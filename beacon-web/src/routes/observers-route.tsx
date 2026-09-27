@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Outlet, useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router';
+import { Outlet, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { ObserverTable, type ObserverTableViewState } from '../features/observers/ObserverTable';
 import { ObserverDetailPanel } from '../features/observers/ObserverDetailPanel';
 import { observerSortId } from '../features/observers/observer-sort';
@@ -24,7 +24,6 @@ export function ObserversRoute() {
   const params = useParams({ strict: false }) as { observerId?: string };
   const search = useSearch({ from: '/observers' });
   const navigate = useNavigate({ from: '/observers' });
-  const router = useRouter();
   const viewState = useMemo(() => observerViewState(search as Record<string, unknown>), [search]);
 
   const onViewStateChange = useCallback(
@@ -67,17 +66,6 @@ export function ObserversRoute() {
     [navigate, search],
   );
 
-  const preloadObserver = useCallback(
-    (id: string) => {
-      void router.preloadRoute({
-        to: '/observers/$observerId',
-        params: { observerId: id },
-        search,
-      });
-    },
-    [router, search],
-  );
-
   return (
     <>
       <ObserverTable
@@ -85,7 +73,6 @@ export function ObserversRoute() {
         onSelectObserver={selectObserver}
         viewState={viewState}
         onViewStateChange={onViewStateChange}
-        onRowIntent={preloadObserver}
       />
       <Outlet />
     </>

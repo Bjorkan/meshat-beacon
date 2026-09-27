@@ -95,7 +95,6 @@ export function MessagePanel({
   } = useInfiniteQuery({
     ...channelQueries.messages({ channelId: channel?.id, regionKey, iatas }),
     enabled: channel !== null,
-    staleTime: 30_000,
   });
 
   // flatten order is irrelevant — the ascending sort below restores chat order from newest-first pages

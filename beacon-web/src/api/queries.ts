@@ -110,6 +110,9 @@ export const iataQueries = {
     queryOptions({
       queryKey: ['iata-border', iata] as const,
       queryFn: () => getIataBorder(iata),
+      // Deployment borders are configuration, not live data. A map remount must not fan out one
+      // request per IATA again; a full page reload is the natural refresh boundary.
+      staleTime: Infinity,
     }),
 };
 
@@ -212,6 +215,9 @@ export const nodeQueries = {
         getNodesPage(args.iatas, {
           cursor: typeof pageParam === 'number' ? pageParam : undefined,
           pageToken: typeof pageParam === 'string' ? pageParam : undefined,
+          // The map needs the complete population and auto-pages until it has it. Use the endpoint's
+          // supported maximum so a large deployment costs tens of requests rather than hundreds.
+          limit: 1_000,
           sort: 'last_seen',
           direction: 'desc',
           neighbors: true,
@@ -219,7 +225,9 @@ export const nodeQueries = {
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
       initialPageParam: undefined,
-      staleTime: 60_000,
+      // WebSocket node updates patch this cache, and reconnect/region changes explicitly invalidate
+      // it. Keep it fresh across ordinary route changes to avoid replaying every cached page.
+      staleTime: Infinity,
     }),
   list: (f: NodeListFilters): PagedOptions<NodeSummary, SortablePageParam> =>
     infiniteQueryOptions<
@@ -245,7 +253,9 @@ export const nodeQueries = {
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
       initialPageParam: undefined,
-      staleTime: 60_000,
+      // WebSocket updates maintain cached lists and mark uncertain membership stale. Ordinary route
+      // changes can therefore reuse the list without refetching all previously loaded pages.
+      staleTime: Infinity,
     }),
   detail: (id: string) =>
     queryOptions({
@@ -335,7 +345,9 @@ export const observerQueries = {
         }),
       getNextPageParam: (last) => last.nextPageToken ?? last.nextCursor ?? undefined,
       initialPageParam: undefined,
-      staleTime: 60_000,
+      // Status events patch cached rows and explicitly mark uncertain ordering/membership stale.
+      // Route changes can reuse the list instead of replaying every page after one minute.
+      staleTime: Infinity,
     }),
   detail: (id: string) =>
     queryOptions({
@@ -412,7 +424,10 @@ export const packetQueries = {
         }),
       getNextPageParam: (last) => last.nextCursor ?? undefined,
       initialPageParam: undefined,
-      staleTime: 15_000,
+      // The mounted view receives new packets through its live buffer; inactive histories are
+      // discarded by the WS bridge when an event arrives. This prevents a tab return from
+      // refetching every cached infinite-query page.
+      staleTime: Infinity,
       maxPages: 20,
     }),
   detail: (hash: string | null) =>
@@ -456,7 +471,9 @@ export const channelQueries = {
         getChannels({ iatas: args.iatas, hash: args.hash, key: args.key, pageCursor: pageParam }),
       initialPageParam: undefined,
       getNextPageParam: (page) => (page.hasMore ? (page.nextPageCursor ?? undefined) : undefined),
-      staleTime: 60_000,
+      // Incoming channel events patch the cached rows and mark uncertain aggregate metadata stale.
+      // Keeping the list fresh here prevents routine tab switches from immediately refetching it.
+      staleTime: Infinity,
       refetchInterval: 30_000,
     }),
   messages: (args: {
@@ -488,6 +505,9 @@ export const channelQueries = {
       getNextPageParam: (last) => last.nextCursor ?? undefined,
       initialPageParam: undefined,
       enabled: args.channelId !== undefined,
+      // New messages are inserted by the global WS bridge. Reopening a thread should reuse those
+      // pages instead of refetching its entire scrollback after a short timeout.
+      staleTime: Infinity,
     }),
 };
 
@@ -608,11 +628,12 @@ export const traceQueries = {
 };
 
 // ── stats ────────────────────────────────────────────────────────────────────────────────────
-// Shared cache policy: 30s stale, keep previous data so region/range switches don't flash.
+// Shared cache policy: keep snapshots across ordinary tab switches. The live overview, observations,
+// and scopes queries still self-correct on their explicit one-minute intervals while mounted.
 // `since` is computed inside queryFn so refetches use a fresh window without churning the key.
 
 const statsCommon = {
-  staleTime: 30_000,
+  staleTime: 5 * 60_000,
   refetchOnWindowFocus: false,
   placeholderData: keepPreviousData,
 } as const;

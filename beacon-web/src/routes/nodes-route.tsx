@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from 'react';
-import { Outlet, useNavigate, useParams, useRouter, useSearch } from '@tanstack/react-router';
+import { Outlet, useNavigate, useParams, useSearch } from '@tanstack/react-router';
 import { NodeTable, type NodeTableViewState } from '../features/nodes/NodeTable';
 import { NodeDetailPanel } from '../features/nodes/NodeDetailPanel';
 import type { MultibyteFilter } from '../features/nodes/NodeFilterBar';
@@ -29,7 +29,6 @@ export function NodesRoute() {
   const params = useParams({ strict: false }) as { nodeId?: string };
   const search = useSearch({ from: '/nodes' });
   const navigate = useNavigate({ from: '/nodes' });
-  const router = useRouter();
   const viewState = useMemo(() => nodeViewState(search as Record<string, unknown>), [search]);
 
   const onViewStateChange = useCallback(
@@ -76,17 +75,6 @@ export function NodesRoute() {
     [navigate, search],
   );
 
-  const preloadNode = useCallback(
-    (id: string) => {
-      void router.preloadRoute({
-        to: '/nodes/$nodeId',
-        params: { nodeId: id },
-        search,
-      });
-    },
-    [router, search],
-  );
-
   return (
     <>
       <NodeTable
@@ -94,7 +82,6 @@ export function NodesRoute() {
         onSelectNode={selectNode}
         viewState={viewState}
         onViewStateChange={onViewStateChange}
-        onRowIntent={preloadNode}
       />
       <Outlet />
     </>

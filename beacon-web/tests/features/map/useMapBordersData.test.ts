@@ -61,6 +61,7 @@ it('clears cached borders when switched off and restores them when enabled', asy
   expect(result.current.features).toEqual([]);
   rerender({ enabled: true });
   expect(result.current.features).toHaveLength(1);
+  expect(getIataBorder).toHaveBeenCalledTimes(1);
 });
 
 it('does not reveal a late response after the borders were switched off', async () => {

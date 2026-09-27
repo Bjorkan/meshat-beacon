@@ -36,6 +36,12 @@ function invalidateExact(queryClient: QueryClient, queryKey: QueryKey) {
   void queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'active' });
 }
 
+// High-volume list events should not turn the WebSocket into a REST polling trigger. Mark an
+// uncertain list stale so the next mount heals it, while detail queries can still refetch live.
+function markExactStale(queryClient: QueryClient, queryKey: QueryKey) {
+  void queryClient.invalidateQueries({ queryKey, exact: true, refetchType: 'none' });
+}
+
 function nodeCoordinatesChanged(
   previous: { lat?: number | null; lng?: number | null } | undefined,
   data: WsNodeUpdate['data'],
@@ -74,7 +80,10 @@ export function syncNodeUpdate(queryClient: QueryClient, data: WsNodeUpdate['dat
       data.iatas.map((entry) => entry.iata),
     );
     if (old && !belongs) {
-      invalidateExact(queryClient, queryKey);
+      queryClient.setQueryData<InfiniteData<CursorPage<NodeSummary>>>(queryKey, (current) =>
+        patchInfinitePages(current, (items) => items.filter((node) => node.id !== data.nodeId)),
+      );
+      markExactStale(queryClient, queryKey);
     } else if (belongs) {
       queryClient.setQueryData<InfiniteData<CursorPage<NodeSummary>>>(queryKey, (current) =>
         upsertNodePages(current, data),
@@ -98,7 +107,7 @@ export function syncNodeUpdate(queryClient: QueryClient, data: WsNodeUpdate['dat
           data.iatas.map((entry) => entry.iata),
         )
       )
-        invalidateExact(queryClient, queryKey);
+        markExactStale(queryClient, queryKey);
       continue;
     }
     const context = {
@@ -112,7 +121,7 @@ export function syncNodeUpdate(queryClient: QueryClient, data: WsNodeUpdate['dat
     };
     const hasUnsupportedCapabilityFilter = Boolean(queryKey[3] || queryKey[4]);
     if (hasUnsupportedCapabilityFilter || nodeListUpdateRequiresRefetch(previous, data, context)) {
-      invalidateExact(queryClient, queryKey);
+      markExactStale(queryClient, queryKey);
     } else {
       queryClient.setQueryData<InfiniteData<CursorPage<NodeSummary>>>(queryKey, (current) =>
         patchInfinitePages(current, (items) => patchNodeTableSummary(items, data) ?? items),
@@ -140,7 +149,7 @@ export function syncObserverStatus(queryClient: QueryClient, data: WsObserverSta
       .find((observer) => observer.id === data.observerId);
     const regionIatas = iatasFromRegionKey(queryKey[1]);
     if (!previous) {
-      if (intersects(regionIatas, [data.iata])) invalidateExact(queryClient, queryKey);
+      if (intersects(regionIatas, [data.iata])) markExactStale(queryClient, queryKey);
       continue;
     }
     const context = {
@@ -153,7 +162,7 @@ export function syncObserverStatus(queryClient: QueryClient, data: WsObserverSta
       iatas: regionIatas,
     };
     if (observerListUpdateRequiresRefetch(previous, data, context)) {
-      invalidateExact(queryClient, queryKey);
+      markExactStale(queryClient, queryKey);
     } else {
       queryClient.setQueryData<InfiniteData<CursorPage<ObserverSummary>>>(queryKey, (current) =>
         patchInfinitePages(current, (items) => patchObserverSummary(items, data) ?? items),
@@ -196,7 +205,7 @@ export function syncChannelMessage(
     }
     // Decryption may resolve an unknown placeholder, including hash collisions.
     // Refresh aggregate metadata together with the channel rows.
-    invalidateExact(queryClient, queryKey);
+    markExactStale(queryClient, queryKey);
   }
 
   if (channelId === undefined) return;
@@ -221,10 +230,14 @@ export function syncPacketObservation(
   if (data.packet.payloadType === 4) {
     invalidateExact(queryClient, observerQueries.adverts(data.observation.observerId).queryKey);
   }
-  // The mounted packet route keeps its high-volume live buffer locally, so refetching history for
-  // every event would be wasteful. Mark every history variant stale without refetching instead:
-  // inactive routes then self-heal immediately on remount, while the mounted route stays responsive.
-  void queryClient.invalidateQueries({ queryKey: packetQueries.all(), refetchType: 'none' });
+  // The mounted packet route keeps its high-volume live buffer locally, so its REST history remains
+  // valid and must not be marked stale on every event. Drop inactive history variants instead: on
+  // return they fetch one fresh first page rather than replaying as many as 20 cached cursors.
+  for (const query of queryClient.getQueryCache().findAll({ queryKey: packetQueries.all() })) {
+    if (query.getObserversCount() === 0) {
+      queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
+    }
+  }
   invalidateExact(queryClient, packetQueries.detail(data.packetHash).queryKey);
 }
 
