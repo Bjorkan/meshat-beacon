@@ -309,7 +309,7 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
         <ChartCard
           title={t('stats.payloadTypes', { range })}
           right={
-            <span className="font-mono text-[10px] text-text-muted">
+            <span className="font-mono text-size-10 text-text-muted">
               {formatCount(payloadTotal)} obs
             </span>
           }
@@ -347,15 +347,15 @@ export function MeshTab({ range, onRangeChange, onSelectObserver }: MeshTabProps
 
         <Card title={t('stats.scopesAllTime')}>
           {scopes.isError ? (
-            <div className="py-4 text-center font-mono text-[11px] text-text-dim">
+            <div className="py-4 text-center font-mono text-size-11 text-text-dim">
               {t('common.failedToLoad')}
             </div>
           ) : scopes.isLoading ? (
-            <div className="py-4 text-center font-mono text-[11px] text-text-dim">
+            <div className="py-4 text-center font-mono text-size-11 text-text-dim">
               {t('common.loading')}
             </div>
           ) : scopeRows.length === 0 ? (
-            <div className="py-4 text-center font-mono text-[11px] text-text-dim">
+            <div className="py-4 text-center font-mono text-size-11 text-text-dim">
               {t('common.noData')}
             </div>
           ) : (

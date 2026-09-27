@@ -27,8 +27,8 @@ export function MapLegend({
             <li key={type.name} className="flex items-center gap-1.5">
               <span
                 aria-hidden
-                className="size-2.5 shrink-0 rounded-full"
-                style={{ backgroundColor: NODE_TYPE_COLORS[type.name] }}
+                className="size-2.5 shrink-0 rounded-full bg-(--legend-color)"
+                style={{ '--legend-color': NODE_TYPE_COLORS[type.name] } as React.CSSProperties}
               />
               {type.label}
             </li>
@@ -36,8 +36,8 @@ export function MapLegend({
           <li className="col-span-2 flex items-center gap-1.5">
             <span
               aria-hidden
-              className="size-3 rounded-full border-2"
-              style={{ borderColor: CLUSTER_ROLE_COLORS.observer }}
+              className="size-3 rounded-full border-2 border-(--legend-color)"
+              style={{ '--legend-color': CLUSTER_ROLE_COLORS.observer } as React.CSSProperties}
             />
             {t('entities.observer')}
           </li>
@@ -61,7 +61,11 @@ export function MapLegend({
         )}
         {live && (
           <p>
-            <span aria-hidden style={{ color: PACKET_FLOW_COLOR }}>
+            <span
+              aria-hidden
+              className="text-(--legend-color)"
+              style={{ '--legend-color': PACKET_FLOW_COLOR } as React.CSSProperties}
+            >
               →{' '}
             </span>
             {t('map.legendLive')}

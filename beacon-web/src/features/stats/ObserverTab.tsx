@@ -111,21 +111,21 @@ function ObserverList({
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={t('stats.searchObservers')}
-        className="mb-2 w-full rounded border border-border bg-bg-base px-2 py-1 font-mono text-[12px] text-text-normal placeholder:text-text-dim"
+        className="mb-2 w-full rounded border border-border bg-bg-base px-2 py-1 font-mono text-size-12 text-text-normal placeholder:text-text-dim"
       />
       <div className="flex flex-col gap-0.5">
         {loading && (
-          <div className="py-6 text-center font-mono text-[11px] text-text-dim">
+          <div className="py-6 text-center font-mono text-size-11 text-text-dim">
             {t('common.loading')}
           </div>
         )}
         {searching && search.isError && (
-          <div className="py-6 text-center font-mono text-[11px] text-danger">
+          <div className="py-6 text-center font-mono text-size-11 text-danger">
             {t('stats.searchFailed')}
           </div>
         )}
         {!loading && !(searching && search.isError) && rows.length === 0 && (
-          <div className="py-6 text-center font-mono text-[11px] text-text-dim">
+          <div className="py-6 text-center font-mono text-size-11 text-text-dim">
             {t(searching ? 'common.noMatches' : 'entities.noObservers')}
           </div>
         )}
@@ -144,23 +144,23 @@ function ObserverList({
             >
               {r.count != null && (
                 <div
-                  className="absolute inset-y-0 left-0 bg-secondary/10"
-                  style={{ width: `${(r.count / max) * 100}%` }}
+                  className="absolute inset-y-0 left-0 w-(--observer-share) bg-secondary/10"
+                  style={{ '--observer-share': `${(r.count / max) * 100}%` } as React.CSSProperties}
                   aria-hidden
                 />
               )}
               <div className="relative flex items-center justify-between gap-2">
                 <span
-                  className={`truncate font-mono text-[12px] ${active ? 'text-text-bright' : 'text-text-normal'}`}
+                  className={`truncate font-mono text-size-12 ${active ? 'text-text-bright' : 'text-text-normal'}`}
                 >
                   {r.name}
                 </span>
                 {r.count != null ? (
-                  <span className="shrink-0 font-mono text-[11px] tabular-nums text-text-muted">
+                  <span className="shrink-0 font-mono text-size-11 tabular-nums text-text-muted">
                     {formatCount(r.count)}
                   </span>
                 ) : (
-                  <span className="flex shrink-0 items-center gap-1.5 font-mono text-[11px] text-text-muted">
+                  <span className="flex shrink-0 items-center gap-1.5 font-mono text-size-11 text-text-muted">
                     {r.iata}
                     <span
                       className={`h-1.5 w-1.5 rounded-full ${r.online ? 'bg-green' : 'bg-text-dim/30'}`}
@@ -200,12 +200,12 @@ function ObserverHeader({ observer, airtime }: { observer: Observer; airtime: Ai
         </span>
       }
       right={
-        <span className="rounded-sm bg-primary/6 px-1.5 py-px font-mono text-[12px] font-semibold text-primary">
+        <span className="rounded-sm bg-primary/6 px-1.5 py-px font-mono text-size-12 font-semibold text-primary">
           {observer.iata}
         </span>
       }
     >
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 font-mono text-[12px]">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1.5 font-mono text-size-12">
         <Metric
           label={t('details.battery')}
           value={observer.batteryLevel != null ? formatBattery(observer.batteryLevel) : '—'}
@@ -447,7 +447,7 @@ export function ObserverTab({ range, selectedObserverId, onSelectObserver }: Obs
                     title={t('stats.channelBusy', { range })}
                     right={
                       radioLabel && (
-                        <span className="font-mono text-[11px] text-text-muted">{radioLabel}</span>
+                        <span className="font-mono text-size-11 text-text-muted">{radioLabel}</span>
                       )
                     }
                     height={180}

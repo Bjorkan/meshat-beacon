@@ -140,9 +140,23 @@ export function PacketVirtualList({
           The scroll region itself stays edge-to-edge (no dead gutter — see #76); the deliberate
           content gutter lives inside header/rows via PACKET_TABLE_X_PADDING, matching the
           toolbar above, so backgrounds and separators terminate at the true surface edge. */}
-      <div style={isMobile ? undefined : { minWidth: GRID_MIN_WIDTH }}>
+      <div
+        className={isMobile ? undefined : 'min-w-(--packet-grid-min-width)'}
+        style={
+          isMobile
+            ? undefined
+            : ({ '--packet-grid-min-width': GRID_MIN_WIDTH } as React.CSSProperties)
+        }
+      >
         <PacketTableHeader />
-        <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        <div
+          className="relative h-(--packet-list-height)"
+          style={
+            {
+              '--packet-list-height': `${virtualizer.getTotalSize()}px`,
+            } as React.CSSProperties
+          }
+        >
           {virtualizer.getVirtualItems().map((virtualRow) => {
             const packet = packets[virtualRow.index];
             if (!packet) return null;
@@ -153,13 +167,12 @@ export function PacketVirtualList({
                 data-index={virtualRow.index}
                 data-testid={`packet-item-${packet.packetHash}`}
                 ref={virtualizer.measureElement}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: 0,
-                  width: '100%',
-                  transform: `translateY(${virtualRow.start}px)`,
-                }}
+                className="absolute left-0 top-0 w-full translate-y-(--packet-row-start)"
+                style={
+                  {
+                    '--packet-row-start': `${virtualRow.start}px`,
+                  } as React.CSSProperties
+                }
               >
                 {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
                 <div className={isMobile ? 'pt-1.5' : ''}>

@@ -89,7 +89,7 @@ export function PacketAnalyzerDrawer({
       className="absolute inset-0 z-30 w-full lg:static lg:inset-auto lg:z-auto lg:shrink-0 lg:w-[400px] lg:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden"
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
-        <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
+        <span className="text-size-13 font-mono font-medium text-text-dim uppercase tracking-wider">
           {t('packets.analyzer')}
         </span>
         <div className="flex items-center gap-1.5">
@@ -120,7 +120,7 @@ export function PacketAnalyzerDrawer({
               <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="1.2" />
               <line x1="8" y1="9" x2="8" y2="19" stroke="currentColor" strokeWidth="1.2" />
             </svg>
-            <span className="text-[13px] font-mono">
+            <span className="text-size-13 font-mono">
               {loading ? t('common.loading') : t('packets.selectToAnalyze')}
             </span>
           </div>
@@ -141,26 +141,26 @@ export function PacketAnalyzerDrawer({
                   className="ml-auto"
                 >
                   <span
-                    className="font-mono text-[13px] text-primary font-semibold bg-primary/6 px-1.5 rounded-sm"
+                    className="font-mono text-size-13 text-primary font-semibold bg-primary/6 px-1.5 rounded-sm"
                     aria-label={t('packets.heardBy', { count: detail.observations.length })}
                   >
                     ×{detail.observations.length}
                   </span>
                 </Tooltip>
               </div>
-              <div className="flex items-center gap-3 text-[13px] font-mono">
+              <div className="flex items-center gap-3 text-size-13 font-mono">
                 <span>
                   <span className="text-text-dim">{t('common.first')} </span>
                   <Timestamp value={detail.firstHeardAt} className="text-text-normal" />
                 </span>
-                <span className="text-[6px] text-border" aria-hidden>
+                <span className="text-size-6 text-border" aria-hidden>
                   ·
                 </span>
                 <span>
                   <span className="text-text-dim">{t('common.last')} </span>
                   <Timestamp value={detail.lastHeardAt} className="text-text-normal" />
                 </span>
-                <span className="text-[6px] text-border" aria-hidden>
+                <span className="text-size-6 text-border" aria-hidden>
                   ·
                 </span>
                 <span>
@@ -184,7 +184,7 @@ export function PacketAnalyzerDrawer({
                       ? t('packets.noVerifiablePath')
                       : t('packets.noResolvedPath')
                 }
-                className="w-full flex items-center justify-center gap-1.5 rounded border border-border bg-bg-base px-3 py-1.5 text-[13px] font-mono text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                className="w-full flex items-center justify-center gap-1.5 rounded border border-border bg-bg-base px-3 py-1.5 text-size-13 font-mono text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
@@ -235,7 +235,7 @@ export function PacketAnalyzerDrawer({
             )}
 
             <DrawerSection title={t('packets.structure')}>
-              <div className="flex flex-col gap-2.5 font-mono text-[13px]">
+              <div className="flex flex-col gap-2.5 font-mono text-size-13">
                 {/* Header byte */}
                 <ColorAccentField field="header">
                   <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">
@@ -317,7 +317,7 @@ export function PacketAnalyzerDrawer({
                     <span className="text-text-dim text-xs font-medium uppercase tracking-wider">
                       {t('packets.originPublicKey')}
                     </span>
-                    <div className="text-text-normal break-all text-[13px]">
+                    <div className="text-text-normal break-all text-size-13">
                       {detail.originPubkey}
                     </div>
                   </ColorAccentField>
@@ -329,7 +329,7 @@ export function PacketAnalyzerDrawer({
               typeof detail.parsedPayload === 'object' &&
               Object.keys(detail.parsedPayload).length > 0 && (
                 <DrawerSection title={t('packets.payloadBreakdown')}>
-                  <div className="font-mono text-[13px]">
+                  <div className="font-mono text-size-13">
                     <PayloadBreakdown
                       payload={detail.parsedPayload}
                       resolvedRoute={detail.resolvedRoute}
@@ -349,14 +349,14 @@ export function PacketAnalyzerDrawer({
                 return (
                   <DrawerSection title={t('packets.payloadData')}>
                     <div className="bg-bg-base border border-border rounded p-2 max-h-40 overflow-y-auto">
-                      <pre className="text-[13px] font-mono text-text-muted leading-relaxed whitespace-pre-wrap">
+                      <pre className="text-size-13 font-mono text-text-muted leading-relaxed whitespace-pre-wrap">
                         {(hex.match(/.{1,2}/g) ?? []).reduce((acc, b, i) => {
                           const sep = i > 0 ? ' ' : '';
                           return acc + sep + b.toUpperCase();
                         }, '')}
                       </pre>
                     </div>
-                    <div className="text-[11px] text-text-dim mt-1">{hex.length / 2} bytes</div>
+                    <div className="text-size-11 text-text-dim mt-1">{hex.length / 2} bytes</div>
                   </DrawerSection>
                 );
               })()}

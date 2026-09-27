@@ -96,7 +96,7 @@ export function TrafficTab({ range }: { range: StatsRange }) {
       <ChartCard
         title={t('upstream.reception_trend_by_iata')}
         right={
-          <span className="text-[10px] text-text-muted">
+          <span className="text-size-10 text-text-muted">
             {t('upstream.available_hourly_records')}
           </span>
         }
@@ -157,8 +157,12 @@ export function TrafficTab({ range }: { range: StatsRange }) {
                       <th scope="row" className="py-2 font-normal text-text-normal">
                         <span
                           aria-hidden
-                          className="mr-2 inline-block h-2 w-2 rounded-full"
-                          style={{ background: colors.series[Math.min(i, 7)] }}
+                          className="mr-2 inline-block h-2 w-2 rounded-full bg-(--traffic-area-color)"
+                          style={
+                            {
+                              '--traffic-area-color': colors.series[Math.min(i, 7)],
+                            } as React.CSSProperties
+                          }
                         />
                         {area.name}
                       </th>
@@ -174,7 +178,7 @@ export function TrafficTab({ range }: { range: StatsRange }) {
               </table>
             </div>
           )}
-          <p className="mt-2 text-[11px] text-text-muted">
+          <p className="mt-2 text-size-11 text-text-muted">
             {t('upstream.charts_group_smaller_areas_into_other_iatas_this_table')}
           </p>
         </Card>

@@ -167,7 +167,7 @@ export function FilterBar({
       {hasFilters && (
         <button
           type="button"
-          className="text-[11px] font-mono text-text-dim hover:text-danger px-1.5 py-0.5 cursor-pointer transition-colors"
+          className="text-size-11 font-mono text-text-dim hover:text-danger px-1.5 py-0.5 cursor-pointer transition-colors"
           onClick={onClear}
         >
           {t('common.clear')}

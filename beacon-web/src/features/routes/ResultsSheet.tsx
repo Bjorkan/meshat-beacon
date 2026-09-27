@@ -46,10 +46,10 @@ export function ResultsSheet({
       data-snap={sheet.snap}
       style={
         isMobile
-          ? { height: sheet.sheetHeightPx, transition: sheet.isDragging ? 'none' : undefined }
+          ? ({ '--sheet-height': `${sheet.sheetHeightPx}px` } as React.CSSProperties)
           : undefined
       }
-      className="pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex min-h-0 flex-col overflow-hidden rounded-t-3xl border-t border-border bg-bg-base shadow-[0_-4px_24px_#0002] transition-[height] duration-200 ease-out motion-reduce:transition-none lg:relative lg:inset-auto lg:flex-1 lg:rounded-none lg:border-0 lg:shadow-none"
+      className={`pointer-events-auto absolute inset-x-0 bottom-0 z-20 flex min-h-0 flex-col overflow-hidden rounded-t-3xl border-t border-border bg-bg-base shadow-sheet transition-[height] duration-200 ease-out motion-reduce:transition-none lg:relative lg:inset-auto lg:flex-1 lg:rounded-none lg:border-0 lg:shadow-none ${isMobile ? 'h-(--sheet-height)' : ''} ${isMobile && sheet.isDragging ? 'transition-none!' : ''}`}
     >
       <button
         type="button"

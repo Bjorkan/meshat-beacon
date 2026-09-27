@@ -43,7 +43,7 @@ export function SelectDropdown({
     >
       <Select.Trigger
         aria-label={label}
-        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
+        className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
           fullWidth ? 'w-full justify-between' : ''
         } ${
           active
@@ -57,7 +57,7 @@ export function SelectDropdown({
             {active ? selectedLabel : visibleAllLabel}
           </span>
         </Select.Value>
-        <Select.Icon className="text-text-dim text-[9px]">▾</Select.Icon>
+        <Select.Icon className="text-text-dim text-size-9">▾</Select.Icon>
       </Select.Trigger>
       <Select.Portal>
         <Select.Content

@@ -32,7 +32,7 @@ function TraceLegList({
 }) {
   const { t } = useTranslation();
   if (pkt.rawPath.length === 0)
-    return <span className="text-text-dim text-[11px] font-mono">{t('traces.noPath')}</span>;
+    return <span className="text-text-dim text-size-11 font-mono">{t('traces.noPath')}</span>;
   return (
     <ol className="flex min-w-0 flex-col">
       {pkt.rawPath.map((raw, i) => {
@@ -44,7 +44,7 @@ function TraceLegList({
         return (
           <li
             key={`${pkt.packetHash}-${i}`}
-            className="flex min-w-0 items-baseline gap-2 border-b border-border-subtle/60 py-1 font-mono text-[12px] last:border-b-0"
+            className="flex min-w-0 items-baseline gap-2 border-b border-border-subtle/60 py-1 font-mono text-size-12 last:border-b-0"
           >
             <span className="w-6 shrink-0 text-text-dim" aria-hidden>
               #{i + 1}
@@ -147,7 +147,7 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
                   type="button"
                   onClick={() => setSelectedKey(null)}
                   aria-pressed={activeKey === null}
-                  className={`flex min-h-9 items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[11px] transition-colors ${
+                  className={`flex min-h-9 items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-size-11 transition-colors ${
                     activeKey === null
                       ? 'border-primary-dim bg-primary/10 text-text-normal'
                       : 'border-border text-text-muted hover:border-primary-dim hover:text-text-normal'
@@ -163,32 +163,32 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
                     onClick={() => setSelectedKey((cur) => (cur === p.key ? null : p.key))}
                     aria-pressed={activeKey === p.key}
                     title={p.key.toUpperCase()}
-                    className={`flex min-h-9 items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-[11px] transition-colors ${
+                    className={`flex min-h-9 items-center gap-1.5 rounded-sm border px-2 py-1 font-mono text-size-11 transition-colors ${
                       activeKey === p.key
                         ? 'border-primary-dim bg-primary/10 text-text-normal'
                         : 'border-border text-text-muted hover:border-primary-dim hover:text-text-normal'
                     }`}
                   >
                     <span
-                      className="size-2 shrink-0 rounded-full"
-                      style={{ backgroundColor: p.color }}
+                      className="size-2 shrink-0 rounded-full bg-(--trace-path-color)"
+                      style={{ '--trace-path-color': p.color } as React.CSSProperties}
                       aria-hidden
                     />
                     {p.label}
                   </button>
                 ))}
               </div>
-              <p className="mt-2 font-mono text-[11px] text-text-dim">{t('traces.mapSnrHint')}</p>
+              <p className="mt-2 font-mono text-size-11 text-text-dim">{t('traces.mapSnrHint')}</p>
               {blockedMessage != null && (
-                <p role="note" className="mt-1 font-mono text-[11px] text-text-muted">
+                <p role="note" className="mt-1 font-mono text-size-11 text-text-muted">
                   {blockedMessage}
                 </p>
               )}
             </>
           ) : (
             <>
-              <p className="font-mono text-[12px] text-text-normal">{t('map.noDrawablePaths')}</p>
-              <p role="note" className="mt-1 font-mono text-[11px] text-text-muted">
+              <p className="font-mono text-size-12 text-text-normal">{t('map.noDrawablePaths')}</p>
+              <p role="note" className="mt-1 font-mono text-size-11 text-text-muted">
                 {blockedMessage ?? t('map.noDrawablePathsHint')}
               </p>
             </>
@@ -205,7 +205,7 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
                 aria-label={pkt.packetHash.slice(0, 8).toUpperCase()}
                 className="border-b border-border py-2 first:pt-0 last:border-b-0"
               >
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px]">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-size-11">
                   <span
                     title={pkt.packetHash.toUpperCase()}
                     className="font-semibold tracking-wider text-primary"
@@ -236,7 +236,7 @@ export function TraceDetailPanel({ tag, onClose, onAnalyze, onViewNode }: TraceD
           </div>
         ) : (
           !isLoading && (
-            <span className="text-text-dim text-[11px] font-mono">{t('traces.noPackets')}</span>
+            <span className="text-text-dim text-size-11 font-mono">{t('traces.noPackets')}</span>
           )
         )}
       </Section>

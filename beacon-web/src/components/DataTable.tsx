@@ -225,7 +225,7 @@ export function DataTable<T>({
       <div className="flex min-h-0 flex-1 flex-col bg-bg-base">
         {mobileSortOptions && mobileSortOptions.length > 0 ? (
           <div
-            className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-bg-surface px-3 py-2 font-mono text-[10px] uppercase tracking-wider"
+            className="flex shrink-0 flex-wrap items-center gap-1.5 border-b border-border bg-bg-surface px-3 py-2 font-mono text-size-10 uppercase tracking-wider"
             aria-label={t('common.sort')}
           >
             {mobileSortOptions.map((option) => {
@@ -259,8 +259,18 @@ export function DataTable<T>({
         >
           {modelRows.length > 0 ? (
             <div
-              className={virtualize ? 'relative' : 'flex flex-col divide-y divide-border/50'}
-              style={virtualize ? { height: virtualizer.getTotalSize() } : undefined}
+              className={
+                virtualize
+                  ? 'relative h-(--virtual-total-height)'
+                  : 'flex flex-col divide-y divide-border/50'
+              }
+              style={
+                virtualize
+                  ? ({
+                      '--virtual-total-height': `${virtualizer.getTotalSize()}px`,
+                    } as React.CSSProperties)
+                  : undefined
+              }
             >
               {renderedRows.map(({ row, item }) => {
                 const isSelected = row.id === selectedKey;
@@ -270,19 +280,16 @@ export function DataTable<T>({
                     ref={item ? virtualizer.measureElement : undefined}
                     data-index={item?.index}
                     type="button"
-                    className={`w-full cursor-pointer border-l-2 px-3 py-3 text-left transition-colors ${virtualize ? 'border-b border-b-border/50' : ''} ${
+                    className={`w-full cursor-pointer border-l-2 px-3 py-3 text-left transition-colors ${item ? 'absolute left-0 top-0 translate-y-(--virtual-row-start)' : ''} ${virtualize ? 'border-b border-b-border/50' : ''} ${
                       isSelected
                         ? 'border-l-primary bg-primary/10'
                         : 'border-l-transparent hover:border-l-primary/50 hover:bg-primary/5'
                     }`}
                     style={
                       item
-                        ? {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            transform: `translateY(${item.start}px)`,
-                          }
+                        ? ({
+                            '--virtual-row-start': `${item.start}px`,
+                          } as React.CSSProperties)
                         : undefined
                     }
                     onMouseEnter={() => onRowIntent?.(row.id)}
@@ -303,7 +310,7 @@ export function DataTable<T>({
                               key={cell.id}
                               className={index === 0 ? 'col-span-2 min-w-0' : 'min-w-0'}
                             >
-                              <dt className="mb-0.5 text-[9px] uppercase tracking-wider text-text-dim">
+                              <dt className="mb-0.5 text-size-9 uppercase tracking-wider text-text-dim">
                                 {header
                                   ? flexRender(cell.column.columnDef.header, header.getContext())
                                   : cell.column.id}
@@ -357,7 +364,7 @@ export function DataTable<T>({
             {table.getHeaderGroups().map((headerGroup) => (
               <tr
                 key={headerGroup.id}
-                className="h-9 border-b border-border text-[11px] uppercase tracking-wider text-text-muted"
+                className="h-9 border-b border-border text-size-11 uppercase tracking-wider text-text-muted"
               >
                 {headerGroup.headers.map((header) => {
                   const direction = header.column.getIsSorted();
@@ -365,8 +372,12 @@ export function DataTable<T>({
                   return (
                     <th
                       key={header.id}
-                      className="whitespace-nowrap px-4 py-2 text-left font-medium"
-                      style={sourceColumn?.size ? { width: `${sourceColumn.size}%` } : undefined}
+                      className={`whitespace-nowrap px-4 py-2 text-left font-medium ${sourceColumn?.size ? 'w-(--column-width)' : ''}`}
+                      style={
+                        sourceColumn?.size
+                          ? ({ '--column-width': `${sourceColumn.size}%` } as React.CSSProperties)
+                          : undefined
+                      }
                       aria-sort={
                         direction === 'asc'
                           ? 'ascending'
@@ -418,7 +429,8 @@ export function DataTable<T>({
               <tr aria-hidden>
                 <td
                   colSpan={visibleColumnCount}
-                  style={{ height: topPadding, padding: 0, border: 0 }}
+                  className="h-(--virtual-spacer-height) border-0 p-0"
+                  style={{ '--virtual-spacer-height': `${topPadding}px` } as React.CSSProperties}
                 />
               </tr>
             )}
@@ -463,7 +475,8 @@ export function DataTable<T>({
               <tr aria-hidden>
                 <td
                   colSpan={visibleColumnCount}
-                  style={{ height: bottomPadding, padding: 0, border: 0 }}
+                  className="h-(--virtual-spacer-height) border-0 p-0"
+                  style={{ '--virtual-spacer-height': `${bottomPadding}px` } as React.CSSProperties}
                 />
               </tr>
             )}

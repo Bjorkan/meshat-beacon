@@ -35,14 +35,14 @@ function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: 
       className={`w-full text-left focus-visible:outline-2 focus-visible:outline-primary bg-bg-base border border-border rounded px-3 py-2 border-l-2 border-l-primary ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 text-[11px] mb-1.5">
+      <div className="flex items-center gap-2 text-size-11 mb-1.5">
         <Badge variant="default">{obs.payloadTypeName}</Badge>
         <IataChip>{obs.iata}</IataChip>
-        <Timestamp value={obs.heardAt} className="text-text-dim ml-auto font-mono text-[11px]" />
+        <Timestamp value={obs.heardAt} className="text-text-dim ml-auto font-mono text-size-11" />
       </div>
       <div className="flex gap-5 font-mono text-xs">
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             SNR
           </span>
           <span
@@ -52,7 +52,7 @@ function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: 
           </span>
         </div>
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             RSSI
           </span>
           <span
@@ -62,7 +62,7 @@ function NodeObservationRow({ obs, onClick }: { obs: NodeObservation; onClick?: 
           </span>
         </div>
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             {t('packets.hops')}
           </span>
           <span className="font-medium text-text-normal">{obs.hopCount ?? '—'}</span>
@@ -147,7 +147,7 @@ export function NodeDetailPanel({
                     </div>
                     <div className="flex items-center gap-2">
                       <div
-                        className="font-mono text-[13px] text-text-muted truncate min-w-0 flex-1"
+                        className="font-mono text-size-13 text-text-muted truncate min-w-0 flex-1"
                         title={node.publicKey}
                       >
                         {node.publicKey}
@@ -164,7 +164,7 @@ export function NodeDetailPanel({
                       <MeshcoreContactQr uri={contactUri} label={t('nodes.contactQrLabel')} />
                       <a
                         href={contactUri}
-                        className="font-mono text-[11px] text-primary hover:underline"
+                        className="font-mono text-size-11 text-primary hover:underline"
                       >
                         {t('nodes.addAsContact')}
                       </a>
@@ -177,7 +177,7 @@ export function NodeDetailPanel({
               <button
                 type="button"
                 onClick={() => onViewObserver(node.observerId!)}
-                className="mt-2 block font-mono text-[11px] text-primary hover:underline"
+                className="mt-2 block font-mono text-size-11 text-primary hover:underline"
               >
                 {t('nodes.viewObserver')}
               </button>
@@ -189,7 +189,7 @@ export function NodeDetailPanel({
               {hasLocation ? (
                 <div className="flex flex-col gap-1.5">
                   <NodeLocationMapLazy node={node} />
-                  <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-[13px]">
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-0.5 font-mono text-size-13">
                     {node.locationSource && (
                       <Field label={t('details.source')} value={node.locationSource} />
                     )}
@@ -197,7 +197,7 @@ export function NodeDetailPanel({
                       <button
                         type="button"
                         onClick={() => onViewOnMap(node.id)}
-                        className="font-mono text-[11px] text-primary hover:underline"
+                        className="font-mono text-size-11 text-primary hover:underline"
                       >
                         {t('nodes.viewOnMap')}
                       </button>
@@ -205,7 +205,7 @@ export function NodeDetailPanel({
                   </div>
                 </div>
               ) : (
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-size-13">
                   {node.locationSource && (
                     <Field label={t('details.source')} value={node.locationSource} />
                   )}
@@ -215,7 +215,7 @@ export function NodeDetailPanel({
           )}
 
           <Section title={t('details.capabilities')}>
-            <div className="flex flex-col gap-0.5 font-mono text-[13px]">
+            <div className="flex flex-col gap-0.5 font-mono text-size-13">
               {node.minFirmwareVersion && (
                 <Field label={t('details.minFirmware')} value={node.minFirmwareVersion} />
               )}
@@ -243,7 +243,7 @@ export function NodeDetailPanel({
           </Section>
 
           <Section title={t('details.timestamps')}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-[13px]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 font-mono text-size-13">
               <Field label={t('common.first')} value={<Timestamp value={node.firstSeen} />} />
               <Field label={t('common.last')} value={<Timestamp value={node.lastSeen} />} />
               {node.lastAdvertAt != null && (
@@ -286,7 +286,7 @@ export function NodeDetailPanel({
                 ))}
               </div>
             ) : (
-              <div className="font-mono text-[13px] text-text-dim">
+              <div className="font-mono text-size-13 text-text-dim">
                 {t('nodes.noKnownNeighbors')}
               </div>
             )}
@@ -308,7 +308,7 @@ export function NodeDetailPanel({
                 ))}
               </div>
             ) : (
-              <div className="font-mono text-[13px] text-text-dim">
+              <div className="font-mono text-size-13 text-text-dim">
                 {t('nodes.noRecentObservations')}
               </div>
             )}

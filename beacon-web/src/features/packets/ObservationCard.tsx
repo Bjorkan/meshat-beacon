@@ -41,18 +41,18 @@ export function ObservationCard({
       } ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 text-[11px] mb-1.5">
+      <div className="flex items-center gap-2 text-size-11 mb-1.5">
         <span className="flex-1 min-w-0 truncate text-text-bright font-semibold">
           {obs.observerName ?? obs.observerId.slice(0, 8)}
         </span>
         <IataChip>{obs.iata}</IataChip>
-        <Timestamp value={obs.heardAt} className="text-text-dim shrink-0 font-mono text-[11px]" />
+        <Timestamp value={obs.heardAt} className="text-text-dim shrink-0 font-mono text-size-11" />
       </div>
 
       {/* equal columns keep stats aligned across stacked cards and fitting any card width */}
       <div className="grid grid-cols-4 gap-2 font-mono text-xs">
         <div className="flex flex-col min-w-0">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             SNR
           </span>
           <span
@@ -62,7 +62,7 @@ export function ObservationCard({
           </span>
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             RSSI
           </span>
           <span
@@ -72,7 +72,7 @@ export function ObservationCard({
           </span>
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             Prop
           </span>
           <span className="font-medium text-text-normal">
@@ -80,7 +80,7 @@ export function ObservationCard({
           </span>
         </div>
         <div className="flex flex-col min-w-0">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             {t('packets.hops')}
           </span>
           <span className="font-medium text-text-normal">{obs.pathLength.hopCount}</span>
@@ -88,18 +88,18 @@ export function ObservationCard({
       </div>
 
       {obs.pathBytes && (
-        <div className="flex items-center gap-1 mt-2 font-mono text-[11px] pt-1.5 border-t border-border-subtle">
+        <div className="flex items-center gap-1 mt-2 font-mono text-size-11 pt-1.5 border-t border-border-subtle">
           {isTrace ? (
             // TRACE path bytes are per-hop SNR samples, not hop hashes — show them raw, never as a resolvable path.
             <>
-              <span className="text-text-dim uppercase text-[10px] font-medium tracking-wider mr-1">
+              <span className="text-text-dim uppercase text-size-10 font-medium tracking-wider mr-1">
                 Path SNR
               </span>
               <span className="text-text-normal break-all">{obs.pathBytes.toUpperCase()}</span>
             </>
           ) : (
             <>
-              <span className="text-text-dim uppercase text-[10px] font-medium tracking-wider mr-1">
+              <span className="text-text-dim uppercase text-size-10 font-medium tracking-wider mr-1">
                 {t('fields.path')}
               </span>
               <PathData

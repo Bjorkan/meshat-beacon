@@ -1,6 +1,6 @@
 // Meshat.se wordmark: rounded logo tile + wordmark, inlined from the original SVG so the text can
 // follow the active theme — an <img> can't inherit CSS, which made the mark vanish in light mode.
-// The tile keeps the fixed brand green (#1f7a3d) with the white glyph in both themes; only the
+// The tile keeps the fixed Meshat brand color with the white glyph in both themes; only the
 // wordmark text recolors (currentColor).
 export function MeshatWordmark({ className }: { className?: string }) {
   return (
@@ -12,11 +12,11 @@ export function MeshatWordmark({ className }: { className?: string }) {
         aria-label="Meshat.se"
       >
         <g transform="translate(12 12) scale(4)">
-          <rect width="24" height="24" rx="5" fill="#1f7a3d" />
+          <rect width="24" height="24" rx="5" fill="var(--color-meshat-brand)" />
           <g
             transform="translate(2 2) scale(0.8333333333)"
             fill="none"
-            stroke="#FFFFFF"
+            stroke="var(--color-white)"
             strokeWidth="2.35"
             strokeLinecap="round"
             strokeLinejoin="round"

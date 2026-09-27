@@ -33,15 +33,15 @@ function Row({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] font-mono border-l-2 transition-colors ${
+      className={`w-full flex items-center gap-2 px-3 py-2 text-left text-size-13 font-mono border-l-2 transition-colors ${
         active
           ? 'border-l-secondary bg-secondary/5 text-text-bright'
           : 'border-l-transparent text-text-normal hover:bg-text-normal/3'
       }`}
     >
       <span
-        className="w-2.5 h-2.5 rounded-full shrink-0"
-        style={color ? { backgroundColor: color } : undefined}
+        className="w-2.5 h-2.5 rounded-full shrink-0 bg-(--path-color)"
+        style={color ? ({ '--path-color': color } as React.CSSProperties) : undefined}
       />
       <span className="truncate">{label}</span>
       {meta != null && <span className="ml-auto text-text-dim">{meta}</span>}
@@ -79,7 +79,7 @@ function ObserverPathRow({
           : 'border-l-transparent text-text-normal hover:bg-text-normal/3'
       }`}
     >
-      <span className="flex w-full items-center gap-2 text-[13px]">
+      <span className="flex w-full items-center gap-2 text-size-13">
         <span className="truncate">
           {observation.observerName ?? observation.observerId.slice(0, 8)}
         </span>
@@ -89,7 +89,7 @@ function ObserverPathRow({
       </span>
       {hops.length > 0 ? (
         <span
-          className="flex flex-wrap items-center gap-1 text-[11px]"
+          className="flex flex-wrap items-center gap-1 text-size-11"
           aria-label={t('map.unverifiedPathHashes')}
         >
           <PathData
@@ -100,7 +100,7 @@ function ObserverPathRow({
           />
         </span>
       ) : (
-        <span className="text-[11px] text-text-dim">{t('map.directHop')}</span>
+        <span className="text-size-11 text-text-dim">{t('map.directHop')}</span>
       )}
     </button>
   );
@@ -161,7 +161,7 @@ export function PacketPathMapModal({
     <ModalOverlay label={t('map.packetPathLabel')} onClose={onClose}>
       <div className="h-full lg:w-[860px] w-full lg:max-w-[92vw] bg-bg-surface flex flex-col overflow-y-auto">
         <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
-          <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
+          <span className="text-size-13 font-mono font-medium text-text-dim uppercase tracking-wider">
             {t('map.packetPath')}
           </span>
           <div className="flex items-center gap-1.5">
@@ -181,7 +181,7 @@ export function PacketPathMapModal({
         {hasDrawableRoute && blockedMessage != null && (
           <div
             role="note"
-            className="shrink-0 px-3 py-2 border-b border-warn/20 bg-warn/5 text-[12px] font-mono text-text-normal"
+            className="shrink-0 px-3 py-2 border-b border-warn/20 bg-warn/5 text-size-12 font-mono text-text-normal"
           >
             {blockedMessage}
           </div>

@@ -217,7 +217,7 @@ export function NodeCombobox({
         )}
       </div>
       {notice && (
-        <div role="status" className="mt-1 font-mono text-[11px] text-warn">
+        <div role="status" className="mt-1 font-mono text-size-11 text-warn">
           {notice}
         </div>
       )}
@@ -263,7 +263,7 @@ export function NodeCombobox({
                     <span className="min-w-0 flex-1">
                       <NodeLabel name={n.name} publicKey={n.publicKey} />
                     </span>
-                    <span className="min-w-0 max-w-[40%] shrink-0 text-right font-mono text-[11px] break-words whitespace-normal text-text-muted">
+                    <span className="min-w-0 max-w-[40%] shrink-0 text-right font-mono text-size-11 break-words whitespace-normal text-text-muted">
                       {n.iatas?.length ? n.iatas.map((entry) => entry.iata).join(', ') : '—'}
                     </span>
                   </button>

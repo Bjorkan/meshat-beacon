@@ -100,7 +100,7 @@ const scroller = (container: HTMLElement) => container.firstElementChild as HTML
 const gridWrapper = (container: HTMLElement) => scroller(container).lastElementChild as HTMLElement;
 function totalSize(container: HTMLElement) {
   const spacer = gridWrapper(container).lastElementChild as HTMLElement;
-  const height = parseFloat(spacer.style.height);
+  const height = parseFloat(spacer.style.getPropertyValue('--packet-list-height'));
   expect(Number.isFinite(height)).toBe(true);
   return height;
 }
@@ -250,7 +250,8 @@ describe('PacketVirtualList horizontal containment', () => {
     );
 
     const wrapper = gridWrapper(container);
-    expect(wrapper.style.minWidth).toBe(GRID_MIN_WIDTH);
+    expect(wrapper).toHaveClass('min-w-(--packet-grid-min-width)');
+    expect(wrapper.style.getPropertyValue('--packet-grid-min-width')).toBe(GRID_MIN_WIDTH);
     // both the sticky header and the virtualized spacer live inside the wrapper
     const header = screen.getAllByText('Hash')[0]!.parentElement as HTMLElement;
     const spacer = wrapper.lastElementChild as HTMLElement;
@@ -272,7 +273,8 @@ describe('PacketVirtualList horizontal containment', () => {
       expect(root).toHaveClass('px-4');
       expect(root).not.toHaveClass('overflow-x-auto');
       const wrapper = gridWrapper(container);
-      expect(wrapper.style.minWidth).toBe('');
+      expect(wrapper).not.toHaveClass('min-w-(--packet-grid-min-width)');
+      expect(wrapper.style.getPropertyValue('--packet-grid-min-width')).toBe('');
     } finally {
       setMobile(false);
     }

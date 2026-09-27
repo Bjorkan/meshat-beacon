@@ -87,7 +87,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
                 {a.nodeName ?? a.nodeId.slice(0, 8)}
               </div>
               {a.nodeName && (
-                <div className="text-[10px] text-text-dim" title={a.nodeId}>
+                <div className="text-size-10 text-text-dim" title={a.nodeId}>
                   {a.nodeId.slice(0, 8)}
                 </div>
               )}
@@ -130,9 +130,16 @@ export function TalkersTab({ range }: TalkersTabProps) {
     <div className="mx-auto grid max-w-[1100px] grid-cols-1 items-start gap-3.5 px-4 py-4 lg:grid-cols-2">
       <Card
         title={t('stats.topAdvertisers', { range })}
-        right={<span className="font-mono text-[10px] text-text-muted">flood · direct</span>}
+        right={<span className="font-mono text-size-10 text-text-muted">flood · direct</span>}
       >
-        <div className="flex flex-col" style={{ height: leaderboardHeight(advertisers.length) }}>
+        <div
+          className="flex h-(--leaderboard-height) flex-col"
+          style={
+            {
+              '--leaderboard-height': `${leaderboardHeight(advertisers.length)}px`,
+            } as React.CSSProperties
+          }
+        >
           <DataTable
             columns={advertiserColumns}
             rows={advertisers}
@@ -150,7 +157,7 @@ export function TalkersTab({ range }: TalkersTabProps) {
       </Card>
       <ChartCard
         title={t('stats.topTalkers', { range })}
-        right={<span className="font-mono text-[10px] text-text-muted">{t('stats.byCount')}</span>}
+        right={<span className="font-mono text-size-10 text-text-muted">{t('stats.byCount')}</span>}
         height={leaderboardHeight(talkerRows.length)}
         option={talkersOption}
         isLoading={topTalkers.isLoading}

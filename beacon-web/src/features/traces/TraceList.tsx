@@ -115,7 +115,7 @@ function TracePathPreview({
               <span className="shrink-0 text-text-dim" aria-hidden>
                 →
               </span>
-              <span className={`shrink-0 text-[10px] ${sigClass}`} title={title}>
+              <span className={`shrink-0 text-size-10 ${sigClass}`} title={title}>
                 {formatSnr(snr)} dB
               </span>
               <span className="shrink-0 text-text-dim" aria-hidden>
@@ -238,7 +238,7 @@ function renderTraceCard(tag: TraceTagSummary, t: TFunction) {
         {tag.traceType && (
           <Badge variant={tag.traceType === 'PING' ? 'text' : 'trace'}>{tag.traceType}</Badge>
         )}
-        <Timestamp value={tag.lastHeardAt} className="ml-auto text-[11px] text-text-dim" static />
+        <Timestamp value={tag.lastHeardAt} className="ml-auto text-size-11 text-text-dim" static />
       </div>
       {tag.pathHashes?.length ? (
         <TracePathPreview
@@ -247,7 +247,7 @@ function renderTraceCard(tag: TraceTagSummary, t: TFunction) {
           resolved={tag.resolvedPath}
         />
       ) : null}
-      <div className="text-[11px] text-text-dim">
+      <div className="text-size-11 text-text-dim">
         {t('traces.summary', { packets: tag.packetCount, iatas: tag.iataCount })}
       </div>
     </div>
@@ -290,7 +290,7 @@ export function TraceList({
     <div className="relative flex flex-1 min-h-0">
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
-          <span className="font-mono text-[11px] text-text-dim">
+          <span className="font-mono text-size-11 text-text-dim">
             {tags ? t('stats.traceCount', { count: tags.length }) : ''}
           </span>
           <Segmented

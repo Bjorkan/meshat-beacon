@@ -17,15 +17,8 @@ const OPEN_STORAGE_KEY = 'beacon-map-settings-open';
 function BorderLegend() {
   const { t } = useTranslation();
   return (
-    <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-text-dim">
-      <span
-        className="inline-block h-2.5 w-4 rounded-sm border"
-        style={{
-          borderColor: 'var(--palette-secondary)',
-          backgroundColor: 'var(--palette-secondary)',
-          opacity: 0.5,
-        }}
-      />
+    <div className="mt-2.5 flex items-center gap-1.5 text-size-10 text-text-dim">
+      <span className="inline-block h-2.5 w-4 rounded-sm border border-secondary bg-secondary opacity-50" />
       {t('map.iataOutline')}
     </div>
   );
@@ -37,24 +30,16 @@ function NeighborLegend() {
   const { t } = useTranslation();
   return (
     <div className="mt-2.5">
-      <div className="text-[10px] text-text-dim uppercase tracking-wider mb-1">
+      <div className="text-size-10 text-text-dim uppercase tracking-wider mb-1">
         {t('map.observations')}
       </div>
-      <div
-        className="h-2 rounded-sm border border-border-subtle"
-        style={{
-          background:
-            'linear-gradient(to right, var(--palette-danger) 0%, var(--palette-warn) 60%, var(--palette-green) 100%)',
-        }}
-      />
-      <div className="relative h-3 mt-0.5 text-[9px] text-text-dim tabular-nums">
+      <div className="h-2 rounded-sm border border-border-subtle bg-observation-age" />
+      <div className="relative h-3 mt-0.5 text-size-9 text-text-dim tabular-nums">
         <span className="absolute left-0">1</span>
-        <span className="absolute -translate-x-1/2" style={{ left: '60%' }}>
-          20
-        </span>
+        <span className="absolute left-3/5 -translate-x-1/2">20</span>
         <span className="absolute right-0">150+</span>
       </div>
-      <div className="text-[9px] text-text-dim mt-1">{t('map.fainterOlder')}</div>
+      <div className="text-size-9 text-text-dim mt-1">{t('map.fainterOlder')}</div>
     </div>
   );
 }
@@ -128,7 +113,7 @@ export function MapSettingsPanel({
         type="button"
         onClick={toggle}
         aria-expanded={open}
-        className="flex items-center justify-between w-full px-3 py-2 text-[11px] uppercase tracking-wider text-text-dim hover:text-text-normal transition-colors cursor-pointer"
+        className="flex items-center justify-between w-full px-3 py-2 text-size-11 uppercase tracking-wider text-text-dim hover:text-text-normal transition-colors cursor-pointer"
       >
         <span className="flex items-center gap-1.5">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
@@ -149,7 +134,7 @@ export function MapSettingsPanel({
           </svg>
           {t('map.settings')}
         </span>
-        <span aria-hidden className="text-text-dim text-[9px]">
+        <span aria-hidden className="text-text-dim text-size-9">
           {open ? '▾' : '▸'}
         </span>
       </button>
@@ -176,7 +161,7 @@ export function MapSettingsPanel({
               align="left"
               fullWidth
             />
-            <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+            <div className="mt-1.5 text-size-9 leading-relaxed text-text-dim">
               {t('map.meshcoreRegionHint')}
             </div>
           </div>
@@ -189,7 +174,7 @@ export function MapSettingsPanel({
               className="w-full"
             />
             {liveMode && (
-              <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+              <div className="mt-1.5 text-size-9 leading-relaxed text-text-dim">
                 {t('map.liveUnclusteredHint')}
               </div>
             )}
@@ -203,7 +188,7 @@ export function MapSettingsPanel({
               className="w-full"
             />
             {liveMode && neighborLines !== 'off' && (
-              <div className="mt-1.5 text-[9px] leading-relaxed text-text-dim">
+              <div className="mt-1.5 text-size-9 leading-relaxed text-text-dim">
                 {t('map.liveNeighborHint')}
               </div>
             )}

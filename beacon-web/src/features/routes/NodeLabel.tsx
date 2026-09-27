@@ -25,7 +25,7 @@ export function NodeLabel({
     >
       <span className="min-w-0 truncate font-semibold">{shown}</span>
       {name && (
-        <span className="shrink-0 font-mono text-[11px] text-text-muted" aria-hidden="true">
+        <span className="shrink-0 font-mono text-size-11 text-text-muted" aria-hidden="true">
           {prefix}
         </span>
       )}

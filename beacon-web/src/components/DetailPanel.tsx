@@ -111,7 +111,7 @@ export function DetailPanel({
       className={`${minimized ? 'absolute inset-x-0 bottom-0' : 'absolute inset-0'} z-30 w-full ${desktopClass} lg:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden`}
     >
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
-        <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
+        <span className="text-size-13 font-mono font-medium text-text-dim uppercase tracking-wider">
           {title}
         </span>
         <div className="flex items-center gap-1.5 -mr-1">
@@ -146,12 +146,12 @@ export function DetailPanel({
         )}
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-2.5 text-text-dim">
-            <span className="text-[13px] font-mono">{t('common.loading')}</span>
+            <span className="text-size-13 font-mono">{t('common.loading')}</span>
           </div>
         ) : notFound ? (
           <div className="flex flex-col items-center justify-center h-full gap-2.5 text-text-dim">
             {notFoundIcon}
-            <span className="text-[13px] font-mono">{notFoundLabel ?? t('common.notFound')}</span>
+            <span className="text-size-13 font-mono">{notFoundLabel ?? t('common.notFound')}</span>
           </div>
         ) : (
           children

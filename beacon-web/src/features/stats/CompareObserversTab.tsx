@@ -322,10 +322,13 @@ export function CompareObserversTab() {
                     {groups.map((g) => (
                       <div
                         key={g.name}
-                        style={{
-                          width: `${(g.count / data.totalPackets) * 100}%`,
-                          background: g.color,
-                        }}
+                        className="w-(--comparison-width) bg-(--comparison-color)"
+                        style={
+                          {
+                            '--comparison-width': `${(g.count / data.totalPackets) * 100}%`,
+                            '--comparison-color': g.color,
+                          } as React.CSSProperties
+                        }
                       />
                     ))}
                   </div>
@@ -350,8 +353,8 @@ export function CompareObserversTab() {
                           <th scope="row" className="py-2 font-normal text-text-normal">
                             <span
                               aria-hidden
-                              className="mr-2 inline-block h-2 w-2 rounded-full"
-                              style={{ background: g.color }}
+                              className="mr-2 inline-block h-2 w-2 rounded-full bg-(--comparison-color)"
+                              style={{ '--comparison-color': g.color } as React.CSSProperties}
                             />
                             {g.name}
                           </th>

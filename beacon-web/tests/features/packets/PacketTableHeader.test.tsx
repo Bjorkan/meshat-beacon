@@ -27,7 +27,8 @@ describe('PacketTableHeader', () => {
     const el = container.firstElementChild as HTMLElement;
     expect(el.className).toContain('hidden');
     expect(el.className).toContain('lg:grid');
-    expect(el.style.gridTemplateColumns).toBe(GRID_TEMPLATE);
+    expect(el).toHaveClass('grid-cols-(--packet-grid-template)');
+    expect(el.style.getPropertyValue('--packet-grid-template')).toBe(GRID_TEMPLATE);
     expect(el.children).toHaveLength(9);
   });
 

@@ -27,7 +27,7 @@ async function renderSuggestions(nodes: NodeSummary[]) {
   const onPick = vi.fn();
   render(
     <QueryClientProvider client={client}>
-      <div style={{ width: 180 }}>
+      <div className="w-45">
         <NodeCombobox label="From" value={null} onPick={onPick} onClear={vi.fn()} />
       </div>
     </QueryClientProvider>,

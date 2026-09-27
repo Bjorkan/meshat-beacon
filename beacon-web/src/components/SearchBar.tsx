@@ -64,11 +64,11 @@ export function SearchBar({ value, onChange, fields, field, onFieldChange }: Sea
         renderTrigger={({ toggle }) => (
           <button
             type="button"
-            className="flex items-center gap-1 text-[11px] font-mono px-2 py-1 rounded-l-sm border border-r-0 border-border bg-bg-surface text-text-muted hover:text-text-normal transition-colors cursor-pointer"
+            className="flex items-center gap-1 text-size-11 font-mono px-2 py-1 rounded-l-sm border border-r-0 border-border bg-bg-surface text-text-muted hover:text-text-normal transition-colors cursor-pointer"
             onClick={toggle}
           >
             {currentField?.label ?? ''}
-            <span className="text-text-dim text-[9px]">▾</span>
+            <span className="text-text-dim text-size-9">▾</span>
           </button>
         )}
       >
@@ -122,12 +122,12 @@ export function SearchBar({ value, onChange, fields, field, onFieldChange }: Sea
           value={localValue}
           onChange={(e) => handleChange(e.target.value)}
           placeholder={t('common.searchBy', { field: (currentField?.label ?? '').toLowerCase() })}
-          className="w-full text-[11px] font-mono bg-bg-surface border border-border rounded-r-sm pl-7 pr-7 py-1 text-text-bright placeholder:text-text-dim transition-colors"
+          className="w-full text-size-11 font-mono bg-bg-surface border border-border rounded-r-sm pl-7 pr-7 py-1 text-text-bright placeholder:text-text-dim transition-colors"
         />
         {localValue && (
           <button
             type="button"
-            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-normal text-[11px] cursor-pointer"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 text-text-dim hover:text-text-normal text-size-11 cursor-pointer"
             onClick={() => handleChange('')}
           >
             ×

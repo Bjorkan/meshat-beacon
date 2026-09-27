@@ -41,7 +41,7 @@ export function ChannelSidebar({
                 </span>
                 <Timestamp
                   value={ch.lastSeen}
-                  className="text-[11px] text-text-dim ml-2 shrink-0"
+                  className="text-size-11 text-text-dim ml-2 shrink-0"
                 />
               </div>
               <div className="flex gap-1 mt-1">

@@ -64,7 +64,7 @@ function observerColumns(t: TFunction): Column<ObserverSummary>[] {
               {obs.displayName ?? formatHex(obs.id)}
             </div>
             {obs.displayName && (
-              <div className="text-[10px] text-text-dim" title={obs.id}>
+              <div className="text-size-10 text-text-dim" title={obs.id}>
                 {obs.id.slice(0, 8)}
               </div>
             )}
@@ -134,7 +134,7 @@ function renderObserverCard(obs: ObserverSummary, t: TFunction) {
               {obs.displayName ?? formatHex(obs.id)}
             </div>
             {obs.displayName && (
-              <div className="text-[10px] text-text-dim" title={obs.id}>
+              <div className="text-size-10 text-text-dim" title={obs.id}>
                 {obs.id.slice(0, 8)}
               </div>
             )}

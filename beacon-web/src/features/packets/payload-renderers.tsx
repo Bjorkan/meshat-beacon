@@ -358,7 +358,7 @@ function TracePayload({
           <div className="text-text-dim text-xs font-medium uppercase tracking-wider mb-1">
             {t('packets.tracePath')}
           </div>
-          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-[13px]">
+          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-2 text-size-13">
             {pathHashes.map((hash, i) => {
               // SNR[i] is hop i's reading of the inbound link from hop i-1: SNR[0] has
               // no upstream link and is never shown. Render the reading on the edge
@@ -409,7 +409,7 @@ function TracePayload({
                     <span className="text-text-dim" aria-hidden>
                       →
                     </span>
-                    <span className={`text-[11px] ${sigClass}`}>{formatSnr(snr)} dB</span>
+                    <span className={`text-size-11 ${sigClass}`}>{formatSnr(snr)} dB</span>
                     <span className="text-text-dim" aria-hidden>
                       →
                     </span>

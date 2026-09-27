@@ -22,8 +22,7 @@ export function BeaconWordmark({
     <span className={`inline-flex items-center gap-2 text-primary ${className ?? ''}`}>
       <BeaconLogo size={iconSize} pulse={pulse} className="shrink-0" />
       <span
-        className={`min-w-0 font-medium tracking-[0.18em] leading-none ${textClassName}`}
-        style={{ fontFamily: "'Chakra Petch', sans-serif" }}
+        className={`min-w-0 font-display font-medium tracking-[0.18em] leading-none ${textClassName}`}
         title={APP_NAME}
       >
         {APP_NAME}

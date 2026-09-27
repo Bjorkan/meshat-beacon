@@ -22,7 +22,7 @@ export function RouteSearchForm({
   return (
     <div className="flex items-center gap-3">
       <div aria-hidden className="flex w-4 shrink-0 flex-col items-center gap-1.5">
-        <span className="h-3 w-3 rounded-full border-[3px] border-primary" />
+        <span className="h-3 w-3 rounded-full border-3 border-primary" />
         <span className="h-7 border-l-2 border-dotted border-text-muted/50" />
         <svg
           width="18"

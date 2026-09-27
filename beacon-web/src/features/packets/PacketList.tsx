@@ -254,7 +254,7 @@ export function PacketList({
         {bannerCount > 0 && (
           <button
             type="button"
-            className="mx-4 flex items-center justify-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/15 border border-primary/20 border-t-0 text-primary text-[11px] font-medium tracking-wide cursor-pointer font-mono rounded-b transition-colors"
+            className="mx-4 flex items-center justify-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/15 border border-primary/20 border-t-0 text-primary text-size-11 font-medium tracking-wide cursor-pointer font-mono rounded-b transition-colors"
             onClick={handleScrollToTop}
           >
             <span aria-hidden>▲</span>

@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 export function ScopeTag({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span
-      className={`font-mono text-[11px] text-secondary tracking-wide bg-secondary/8 px-1.5 py-px rounded-sm${className ? ` ${className}` : ''}`}
+      className={`font-mono text-size-11 text-secondary tracking-wide bg-secondary/8 px-1.5 py-px rounded-sm${className ? ` ${className}` : ''}`}
     >
       {children}
     </span>

@@ -9,8 +9,8 @@ export function PacketTableHeader() {
   const { t } = useTranslation();
   return (
     <div
-      className={`hidden lg:grid sticky top-0 z-10 gap-x-2 ${PACKET_TABLE_X_PADDING} py-1 bg-bg-surface border-b border-border text-[9px] uppercase tracking-wider text-text-muted`}
-      style={{ gridTemplateColumns: GRID_TEMPLATE }}
+      className={`hidden lg:grid grid-cols-(--packet-grid-template) sticky top-0 z-10 gap-x-2 ${PACKET_TABLE_X_PADDING} py-1 bg-bg-surface border-b border-border text-size-9 uppercase tracking-wider text-text-muted`}
+      style={{ '--packet-grid-template': GRID_TEMPLATE } as React.CSSProperties}
     >
       <span aria-hidden />
       <span>Hash</span>

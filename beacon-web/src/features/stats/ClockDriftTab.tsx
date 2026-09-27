@@ -104,7 +104,7 @@ export function ClockDriftTab() {
   const columns = clockColumns(t);
   return (
     <div className="flex h-full flex-col">
-      <div className="shrink-0 border-b border-border bg-bg-surface px-4 py-2 font-mono text-[11px] uppercase tracking-wider text-text-muted">
+      <div className="shrink-0 border-b border-border bg-bg-surface px-4 py-2 font-mono text-size-11 uppercase tracking-wider text-text-muted">
         {t('stats.repeatersOutOfSync')}
       </div>
       <DataTable

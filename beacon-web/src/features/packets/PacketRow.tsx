@@ -42,7 +42,7 @@ export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProp
           {PAYLOAD_TYPE_NAMES[packet.payloadType as PayloadTypeValue] ?? packet.payloadTypeName}
         </Badge>
         <span
-          className="font-mono text-[11px] text-primary font-semibold whitespace-nowrap bg-primary/6 px-1.5 rounded-sm"
+          className="font-mono text-size-11 text-primary font-semibold whitespace-nowrap bg-primary/6 px-1.5 rounded-sm"
           aria-label={heardBy}
           title={heardBy}
         >
@@ -51,39 +51,39 @@ export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProp
       </span>
 
       {packet.summary && (
-        <div className="mt-1 truncate text-[11px] text-text-bright" title={packet.summary}>
+        <div className="mt-1 truncate text-size-11 text-text-bright" title={packet.summary}>
           {packet.summary}
         </div>
       )}
 
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px] text-text-dim">
-        <span className="font-mono text-[11px] text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">
+      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-size-11 text-text-dim">
+        <span className="font-mono text-size-11 text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">
           {packet.routeTypeName || t('packets.unknown')}
         </span>
         {packet.scope && (
           <>
-            <span className="text-[6px] text-border" aria-hidden>
+            <span className="text-size-6 text-border" aria-hidden>
               ·
             </span>
             <ScopeTag>{packet.scope}</ScopeTag>
           </>
         )}
-        <span className="text-[6px] text-border" aria-hidden>
+        <span className="text-size-6 text-border" aria-hidden>
           ·
         </span>
         <Timestamp value={packet.lastHeardAt} insideButton />
         {packet.latestObserver && (
           <>
-            <span className="text-[6px] text-border" aria-hidden>
+            <span className="text-size-6 text-border" aria-hidden>
               ·
             </span>
             <span className="text-text-normal">
               {packet.latestObserver.displayName ?? packet.latestObserver.id.slice(0, 8)}
             </span>
-            <span className="text-[6px] text-border" aria-hidden>
+            <span className="text-size-6 text-border" aria-hidden>
               ·
             </span>
-            <span className="font-mono font-bold text-primary text-[11px] tracking-wider">
+            <span className="font-mono font-bold text-primary text-size-11 tracking-wider">
               {packet.latestObserver.iata}
             </span>
           </>

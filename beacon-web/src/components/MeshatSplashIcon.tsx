@@ -15,11 +15,11 @@ export function MeshatSplashIcon({ size = 160, className }: MeshatSplashIconProp
       data-testid="meshat-splash-icon"
       className={className}
     >
-      <rect x="12" y="12" width="96" height="96" rx="20" fill="#1f7a3d" />
+      <rect x="12" y="12" width="96" height="96" rx="20" fill="var(--color-meshat-brand)" />
       <g
         transform="translate(20 20) scale(3.3333333332)"
         fill="none"
-        stroke="#FFFFFF"
+        stroke="var(--color-white)"
         strokeWidth="2.35"
         strokeLinecap="round"
         strokeLinejoin="round"

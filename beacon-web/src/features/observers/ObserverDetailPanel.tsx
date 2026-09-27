@@ -32,7 +32,7 @@ function AdvertRow({ advert, onClick }: { advert: AdvertObservation; onClick?: (
       className={`bg-bg-base border border-border rounded px-3 py-2 border-l-2 border-l-primary ${onClick ? 'cursor-pointer hover:bg-text-normal/3' : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 text-[11px] mb-1.5">
+      <div className="flex items-center gap-2 text-size-11 mb-1.5">
         <span
           className={`font-mono font-semibold tracking-wider truncate ${advert.nodeName ? 'text-primary' : 'text-text-dim italic'}`}
         >
@@ -40,11 +40,14 @@ function AdvertRow({ advert, onClick }: { advert: AdvertObservation; onClick?: (
             (advert.nodePublicKey ? formatHex(advert.nodePublicKey) : t('packets.unknown'))}
         </span>
         <IataChip>{advert.iata}</IataChip>
-        <Timestamp value={advert.heardAt} className="text-text-dim ml-auto font-mono text-[11px]" />
+        <Timestamp
+          value={advert.heardAt}
+          className="text-text-dim ml-auto font-mono text-size-11"
+        />
       </div>
       <div className="flex gap-5 font-mono text-xs">
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             SNR
           </span>
           <span
@@ -54,7 +57,7 @@ function AdvertRow({ advert, onClick }: { advert: AdvertObservation; onClick?: (
           </span>
         </div>
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             RSSI
           </span>
           <span
@@ -64,7 +67,7 @@ function AdvertRow({ advert, onClick }: { advert: AdvertObservation; onClick?: (
           </span>
         </div>
         <div className="flex flex-col">
-          <span className="text-text-dim text-[10px] font-medium uppercase tracking-wider">
+          <span className="text-text-dim text-size-10 font-medium uppercase tracking-wider">
             {t('packets.hops')}
           </span>
           <span className="font-medium text-text-normal">{advert.hopCount ?? '—'}</span>
@@ -127,11 +130,14 @@ function RadioSection({
 
   return (
     <Section title={t('entities.radio')}>
-      <div className="font-mono text-[13px] text-text-muted" title={parts.join(' · ') || undefined}>
+      <div
+        className="font-mono text-size-13 text-text-muted"
+        title={parts.join(' · ') || undefined}
+      >
         {title}
       </div>
       {noiseFloor != null && (
-        <div className="font-mono text-[13px] mt-1">
+        <div className="font-mono text-size-13 mt-1">
           <Field label={t('details.noiseFloor')} value={`${noiseFloor} dBm`} />
         </div>
       )}
@@ -212,7 +218,7 @@ export function ObserverDetailPanel({
             </div>
             <div className="flex items-center gap-2 mb-1.5">
               <div
-                className="font-mono text-[13px] text-text-muted truncate min-w-0 flex-1"
+                className="font-mono text-size-13 text-text-muted truncate min-w-0 flex-1"
                 title={observer.publicKey}
               >
                 {observer.publicKey}
@@ -223,7 +229,7 @@ export function ObserverDetailPanel({
                 className="shrink-0"
               />
             </div>
-            <div className="flex items-center gap-3 font-mono text-[13px]">
+            <div className="flex items-center gap-3 font-mono text-size-13">
               <Field
                 label={t('details.observations')}
                 value={observer.observationCount.toLocaleString()}
@@ -257,7 +263,7 @@ export function ObserverDetailPanel({
               <button
                 type="button"
                 onClick={() => onViewStats(observer.id)}
-                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded border border-border bg-bg-base px-2.5 py-1.5 font-mono text-[11px] font-semibold uppercase tracking-wider text-text-normal transition-colors cursor-pointer hover:border-primary hover:text-primary"
+                className="mt-2.5 flex w-full items-center justify-center gap-1.5 rounded border border-border bg-bg-base px-2.5 py-1.5 font-mono text-size-11 font-semibold uppercase tracking-wider text-text-normal transition-colors cursor-pointer hover:border-primary hover:text-primary"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
                   <path
@@ -288,7 +294,7 @@ export function ObserverDetailPanel({
               {observer.observerType && (
                 <Field label={t('details.clientIdentifier')} value={observer.observerType} />
               )}
-              <div className="flex flex-col gap-0.5 font-mono text-[13px]">
+              <div className="flex flex-col gap-0.5 font-mono text-size-13">
                 {observer.firmwareVersion && (
                   <Field label={t('details.version')} value={observer.firmwareVersion} />
                 )}
@@ -303,7 +309,7 @@ export function ObserverDetailPanel({
           )}
 
           <Section title={t('entities.status')}>
-            <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">
+            <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-size-13">
               {observer.batteryLevel != null && (
                 <Field label={t('details.battery')} value={formatBattery(observer.batteryLevel)} />
               )}
@@ -315,7 +321,7 @@ export function ObserverDetailPanel({
               )}
             </div>
             {observer.lastStatusAt && (
-              <div className="font-mono text-[13px] mt-1">
+              <div className="font-mono text-size-13 mt-1">
                 <Field
                   label={t('details.lastStatus')}
                   value={<Timestamp value={observer.lastStatusAt} />}
@@ -329,7 +335,7 @@ export function ObserverDetailPanel({
               stats.tx_air_secs != null ||
               stats.recv_errors != null) && (
               <Section title={t('details.airtime')}>
-                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px]">
+                <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-size-13">
                   {stats.rx_air_secs != null && (
                     <Field label="RX" value={formatAirtime(stats.rx_air_secs)} />
                   )}
@@ -338,7 +344,7 @@ export function ObserverDetailPanel({
                   )}
                 </div>
                 {(stats.recv_errors != null || stats.errors != null) && (
-                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-[13px] mt-1">
+                  <div className="flex flex-wrap gap-x-4 gap-y-0.5 font-mono text-size-13 mt-1">
                     {stats.recv_errors != null && (
                       <Field
                         label={t('details.receiveErrors')}
@@ -363,7 +369,7 @@ export function ObserverDetailPanel({
                     return (
                       <div key={b.name} className="flex items-center gap-3">
                         <Badge variant={variant}>{b.name}</Badge>
-                        <div className="flex items-center gap-3 font-mono text-[13px]">
+                        <div className="flex items-center gap-3 font-mono text-size-13">
                           <Field
                             label={t('details.seen')}
                             value={<Timestamp value={b.lastSeenAt} />}
@@ -392,16 +398,16 @@ export function ObserverDetailPanel({
                 ))}
               </div>
             ) : (
-              <div className="font-mono text-[13px] text-text-dim">
+              <div className="font-mono text-size-13 text-text-dim">
                 {t('observers.noAdvertsHeard')}
               </div>
             )}
           </Section>
 
           <Section title={t('details.timestamps')}>
-            <div className="flex items-center gap-3 font-mono text-[13px]">
+            <div className="flex items-center gap-3 font-mono text-size-13">
               <Field label={t('common.first')} value={<Timestamp value={observer.firstSeen} />} />
-              <span className="text-[6px] text-border" aria-hidden>
+              <span className="text-size-6 text-border" aria-hidden>
                 ·
               </span>
               <Field label={t('common.last')} value={<Timestamp value={observer.lastSeen} />} />

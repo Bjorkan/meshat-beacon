@@ -26,7 +26,7 @@ export function Segmented({
   size = 'sm',
   className,
 }: SegmentedProps) {
-  const pad = size === 'md' ? 'px-3 py-1.5 text-xs' : 'px-2.5 py-1 text-[11px]';
+  const pad = size === 'md' ? 'px-3 py-1.5 text-xs' : 'px-2.5 py-1 text-size-11';
   return (
     <div
       role="group"

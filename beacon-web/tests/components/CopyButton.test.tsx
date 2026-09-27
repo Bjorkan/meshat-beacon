@@ -50,6 +50,20 @@ describe('CopyButton', async () => {
     render(<CopyButton value="deadbeef" ariaLabel="Copy public key" />);
     expect(screen.getByRole('button', { name: 'Copy public key' })).toBeInTheDocument();
   });
+
+  it('applies the action variant', async () => {
+    render(<CopyButton value="deadbeef" variant="action" />);
+    expect(screen.getByRole('button')).toHaveClass(
+      'rounded-full',
+      'px-3',
+      'font-sans',
+      'text-xs',
+      'tracking-normal',
+      'normal-case',
+      'focus-visible:outline-2',
+      'focus-visible:outline-primary',
+    );
+  });
 });
 
 it('reports clipboard denial and can retry successfully', async () => {

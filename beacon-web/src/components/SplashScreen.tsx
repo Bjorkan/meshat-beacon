@@ -56,16 +56,10 @@ export function SplashScreen() {
       <span className="inline-flex flex-col items-center gap-7">
         <MeshatSplashIcon size={160} />
         <span className="inline-flex flex-col items-center gap-2.5">
-          <span
-            className="text-text-bright text-5xl font-bold leading-none"
-            style={{ fontFamily: 'Inter, system-ui, sans-serif' }}
-          >
+          <span className="font-sans text-text-bright text-5xl font-bold leading-none">
             {APP_NAME}
           </span>
-          <span
-            className="text-text-muted text-xs tracking-[0.12em]"
-            style={{ fontFamily: "'Chakra Petch', sans-serif" }}
-          >
+          <span className="font-display text-text-muted text-xs tracking-[0.12em]">
             {t('app.tagline')}
           </span>
         </span>

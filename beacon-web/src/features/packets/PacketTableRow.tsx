@@ -45,8 +45,8 @@ export function PacketTableRow({ packet, expanded, isFresh, onToggle }: PacketTa
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
-        className={`grid w-full items-center gap-x-2 ${PACKET_TABLE_X_PADDING} py-1 text-left text-[11px] cursor-pointer`}
-        style={{ gridTemplateColumns: GRID_TEMPLATE }}
+        className={`grid w-full grid-cols-(--packet-grid-template) items-center gap-x-2 ${PACKET_TABLE_X_PADDING} py-1 text-left text-size-11 cursor-pointer`}
+        style={{ '--packet-grid-template': GRID_TEMPLATE } as React.CSSProperties}
       >
         {/* Fixed square cell so the chevron spins in place: as a grid item a bare
             text span stretches to the full column and rotating that oblong box

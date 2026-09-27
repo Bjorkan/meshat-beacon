@@ -4,7 +4,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useHasHover } from '../hooks/useMediaQuery';
 
 const contentClass =
-  'z-50 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg';
+  'z-50 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-size-11 text-text-normal shadow-lg';
 
 const SharedTooltipContext = createContext(false);
 

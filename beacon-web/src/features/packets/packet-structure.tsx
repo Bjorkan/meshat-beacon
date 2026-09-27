@@ -273,7 +273,7 @@ export function DrawerSection({
         aria-expanded={open}
       >
         <span
-          className="text-text-muted group-hover:text-text-normal text-[11px] w-3.5 font-mono transition-colors"
+          className="text-text-muted group-hover:text-text-normal text-size-11 w-3.5 font-mono transition-colors"
           aria-hidden
         >
           {open ? '▾' : '▸'}
@@ -302,7 +302,7 @@ export function ColoredHexDump({
   }
 
   return (
-    <pre className="text-[13px] font-mono leading-relaxed whitespace-pre-wrap">
+    <pre className="text-size-13 font-mono leading-relaxed whitespace-pre-wrap">
       {bytes.map((byte, i) => {
         const field = byteFieldMap.get(i) ?? null;
         const colorClass = field ? FIELD_COLORS[field].hex : 'text-text-muted';
@@ -333,17 +333,17 @@ export function HeaderBitBreakdown({ headerHex }: { headerHex: string }) {
         <span className="text-text-dim leading-none pt-px">0x{headerHex.toUpperCase()} = [</span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-secondary">{ver}</span>
-          <span className="text-secondary text-[11px] mt-0.5">ver</span>
+          <span className="text-secondary text-size-11 mt-0.5">ver</span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-warn">{typ}</span>
-          <span className="text-warn text-[11px] mt-0.5">type</span>
+          <span className="text-warn text-size-11 mt-0.5">type</span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-green">{route}</span>
-          <span className="text-green text-[11px] mt-0.5">route</span>
+          <span className="text-green text-size-11 mt-0.5">route</span>
         </span>
         <span className="text-text-dim leading-none pt-px">]</span>
       </div>
@@ -368,12 +368,12 @@ export function PathLengthBitBreakdown({ pathLengthByte }: { pathLengthByte: num
         </span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-secondary">{hashBits}</span>
-          <span className="text-secondary text-[11px] mt-0.5">hash={hashSize + 1}B</span>
+          <span className="text-secondary text-size-11 mt-0.5">hash={hashSize + 1}B</span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-green">{hopBits}</span>
-          <span className="text-green text-[11px] mt-0.5">hops={hopCount}</span>
+          <span className="text-green text-size-11 mt-0.5">hops={hopCount}</span>
         </span>
         <span className="text-text-dim leading-none pt-px">]</span>
       </div>
@@ -400,33 +400,33 @@ export function AdvertFlagsBitBreakdown({ flagsByte }: { flagsByte: number }) {
         </span>
         <span className="flex flex-col items-center leading-none">
           <span className="text-warn">{roleBits}</span>
-          <span className="text-warn text-[11px] mt-0.5">{roleName}</span>
+          <span className="text-warn text-size-11 mt-0.5">{roleName}</span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className={loc === '1' ? 'text-green' : 'text-text-dim'}>{loc}</span>
-          <span className={`text-[11px] mt-0.5 ${loc === '1' ? 'text-green' : 'text-text-dim'}`}>
+          <span className={`text-size-11 mt-0.5 ${loc === '1' ? 'text-green' : 'text-text-dim'}`}>
             loc
           </span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className={f1 === '1' ? 'text-green' : 'text-text-dim'}>{f1}</span>
-          <span className={`text-[11px] mt-0.5 ${f1 === '1' ? 'text-green' : 'text-text-dim'}`}>
+          <span className={`text-size-11 mt-0.5 ${f1 === '1' ? 'text-green' : 'text-text-dim'}`}>
             f1
           </span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className={f2 === '1' ? 'text-green' : 'text-text-dim'}>{f2}</span>
-          <span className={`text-[11px] mt-0.5 ${f2 === '1' ? 'text-green' : 'text-text-dim'}`}>
+          <span className={`text-size-11 mt-0.5 ${f2 === '1' ? 'text-green' : 'text-text-dim'}`}>
             f2
           </span>
         </span>
         <span className="text-text-dim leading-none pt-px">|</span>
         <span className="flex flex-col items-center leading-none">
           <span className={nm === '1' ? 'text-green' : 'text-text-dim'}>{nm}</span>
-          <span className={`text-[11px] mt-0.5 ${nm === '1' ? 'text-green' : 'text-text-dim'}`}>
+          <span className={`text-size-11 mt-0.5 ${nm === '1' ? 'text-green' : 'text-text-dim'}`}>
             name
           </span>
         </span>
@@ -460,16 +460,16 @@ export function ObservationDetail({ observation }: { observation: Observation })
   const sigClass = level ? SIGNAL_LEVEL_CLASSES[level] : 'text-text-normal';
 
   return (
-    <div className="flex flex-col gap-1.5 font-mono text-[13px]">
+    <div className="flex flex-col gap-1.5 font-mono text-size-13">
       <div className="flex items-center gap-2">
         <span className="text-text-normal font-semibold">
           {observation.observerName ?? observation.observerId.slice(0, 8)}
         </span>
         <IataChip>{observation.iata}</IataChip>
-        <Timestamp value={observation.heardAt} className="text-text-dim ml-auto text-[13px]" />
+        <Timestamp value={observation.heardAt} className="text-text-dim ml-auto text-size-13" />
       </div>
 
-      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[13px]">
+      <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-size-13">
         <span>
           <span className="text-text-dim">SNR </span>
           <span className={sigClass}>{formatSnr(observation.snr)}</span>
@@ -491,14 +491,14 @@ export function ObservationDetail({ observation }: { observation: Observation })
       </div>
 
       {observation.radio && (
-        <div className="flex items-center gap-1.5 text-[13px] text-text-muted">
+        <div className="flex items-center gap-1.5 text-size-13 text-text-muted">
           <span className="text-text-dim text-xs font-medium uppercase tracking-wider mr-0.5">
             Radio
           </span>
           {observation.radio.freqMhz != null && <span>{observation.radio.freqMhz} MHz</span>}
           {observation.radio.spreadFactor != null && (
             <>
-              <span className="text-[6px] text-border" aria-hidden>
+              <span className="text-size-6 text-border" aria-hidden>
                 ·
               </span>
               <span>SF{observation.radio.spreadFactor}</span>
@@ -506,7 +506,7 @@ export function ObservationDetail({ observation }: { observation: Observation })
           )}
           {observation.radio.bandwidthKhz != null && (
             <>
-              <span className="text-[6px] text-border" aria-hidden>
+              <span className="text-size-6 text-border" aria-hidden>
                 ·
               </span>
               <span>{observation.radio.bandwidthKhz} kHz</span>
@@ -514,7 +514,7 @@ export function ObservationDetail({ observation }: { observation: Observation })
           )}
           {observation.radio.codingRate != null && (
             <>
-              <span className="text-[6px] text-border" aria-hidden>
+              <span className="text-size-6 text-border" aria-hidden>
                 ·
               </span>
               <span>CR 4/{observation.radio.codingRate}</span>

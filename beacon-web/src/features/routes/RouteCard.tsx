@@ -46,7 +46,7 @@ export function LegRow({ leg }: { leg: PlannedRouteLeg }) {
       <div className="flex items-start gap-2.5">
         <LegIcon kind="signal" />
         <div className="min-w-0">
-          <p className="mb-0.5 text-[11px]">{t('routes.signalSnr')}</p>
+          <p className="mb-0.5 text-size-11">{t('routes.signalSnr')}</p>
           <p className="text-sm font-medium tabular-nums text-text-bright">
             {leg.unmeasured
               ? t('routes.unmeasuredLeg')
@@ -132,7 +132,7 @@ export function RouteCard({
           return;
         if (!active) onSelect();
       }}
-      className={`w-full cursor-pointer border-b border-border-subtle border-l-[3px] px-5 py-4 text-left transition-colors ${
+      className={`w-full cursor-pointer border-b border-border-subtle border-l-3 px-5 py-4 text-left transition-colors ${
         active
           ? 'border-l-primary bg-primary/5'
           : 'border-l-transparent bg-bg-base hover:bg-bg-surface'
@@ -195,7 +195,7 @@ export function RouteCard({
                   >
                     <span className="w-full break-words font-semibold">{nodeName(node)}</span>
                     {node.name && (
-                      <span className="font-mono text-[11px] font-normal tracking-wide text-text-muted">
+                      <span className="font-mono text-size-11 font-normal tracking-wide text-text-muted">
                         {node.publicKey.slice(0, 6).toUpperCase()}
                       </span>
                     )}
@@ -234,7 +234,8 @@ export function RouteCard({
             label={t('routes.copyMeshcoreRoute')}
             copiedLabel={t('routes.meshcoreRouteCopied')}
             ariaLabel={t('routes.copyMeshcoreRoute')}
-            className="min-h-11 max-w-full scroll-my-2 rounded-full! px-3! font-sans! text-xs! tracking-normal! normal-case! focus-visible:outline-2 focus-visible:outline-primary"
+            variant="action"
+            className="min-h-11 max-w-full scroll-my-2"
           />
         )}
       </div>

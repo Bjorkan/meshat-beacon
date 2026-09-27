@@ -89,7 +89,7 @@ function NavButton({
       aria-haspopup={ariaHasPopup}
       aria-expanded={ariaExpanded}
       onClick={onClick}
-      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 text-[10px] font-medium tracking-wide cursor-pointer transition-colors ${
+      className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-1.5 text-size-10 font-medium tracking-wide cursor-pointer transition-colors ${
         active ? 'text-primary' : 'text-text-muted hover:text-text-normal'
       }`}
     >

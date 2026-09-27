@@ -29,12 +29,12 @@ export function SegmentedControl({
 
   const buttonCls = (active: boolean) =>
     wrap
-      ? `px-2 py-0.5 font-mono text-[11px] rounded-sm border transition-colors cursor-pointer ${
+      ? `px-2 py-0.5 font-mono text-size-11 rounded-sm border transition-colors cursor-pointer ${
           active
             ? 'border-primary-dim bg-primary/10 text-text-bright'
             : 'border-border text-text-muted hover:text-text-normal hover:border-text-dim'
         }`
-      : `flex-1 px-2.5 py-1 font-mono text-[11px] transition-colors cursor-pointer ${
+      : `flex-1 px-2.5 py-1 font-mono text-size-11 transition-colors cursor-pointer ${
           active
             ? 'text-text-bright bg-primary/10'
             : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'

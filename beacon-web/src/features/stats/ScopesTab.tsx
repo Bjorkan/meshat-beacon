@@ -122,7 +122,7 @@ export function ScopesTab() {
         <Card
           title={t('upstream.scope_counts')}
           right={
-            <span className="text-[10px] text-text-muted">
+            <span className="text-size-10 text-text-muted">
               {unavailable ? '—' : `${rows.length} of ${all.length} scopes`}
             </span>
           }
@@ -141,7 +141,7 @@ export function ScopesTab() {
             <div className="max-h-[390px] overflow-auto">
               <table
                 aria-label={t('upstream.scope_counts')}
-                className="w-full text-left font-mono text-[11px]"
+                className="w-full text-left font-mono text-size-11"
               >
                 <thead className="text-text-muted">
                   <tr>
@@ -183,7 +183,7 @@ export function ScopesTab() {
               </table>
             </div>
           )}
-          <p className="mt-2 text-[11px] text-text-muted">
+          <p className="mt-2 text-size-11 text-text-muted">
             {t('upstream.charts_show_the_largest_12_scopes_plus_any_remainder')}
           </p>
         </Card>

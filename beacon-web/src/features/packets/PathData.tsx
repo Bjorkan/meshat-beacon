@@ -128,10 +128,15 @@ function HopPopover({
           <span
             ref={tipRef}
             role="tooltip"
-            style={{ left: pos.left, top: pos.top }}
+            style={
+              {
+                '--tooltip-left': `${pos.left}px`,
+                '--tooltip-top': `${pos.top}px`,
+              } as React.CSSProperties
+            }
             onMouseEnter={hasHover && clickable ? open : undefined}
             onMouseLeave={hasHover && clickable ? scheduleClose : undefined}
-            className={`fixed z-50 flex flex-col gap-0.5 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg ${clickable ? '' : 'pointer-events-none'}`}
+            className={`fixed left-(--tooltip-left) top-(--tooltip-top) z-50 flex flex-col gap-0.5 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-size-11 text-text-normal shadow-lg ${clickable ? '' : 'pointer-events-none'}`}
           >
             {nodes.length === 0
               ? t('packets.noPathResolutions')
@@ -226,7 +231,7 @@ export function PathData({
   const chars = hashSize * 2;
   if (chars <= 0) return null; // splitter would be an invalid `.{1,0}` RegExp, and there's nothing to show anyway
   const hops = pathBytes.match(new RegExp(`.{1,${chars}}`, 'g')) ?? [];
-  const textClass = size === 'sm' ? 'text-[11px]' : 'text-[13px]';
+  const textClass = size === 'sm' ? 'text-size-11' : 'text-size-13';
 
   return (
     <div className={`flex flex-wrap items-center gap-1 font-mono ${textClass}`}>

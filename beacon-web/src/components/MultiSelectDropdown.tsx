@@ -51,7 +51,7 @@ export function MultiSelectDropdown({
       <Popover.Trigger asChild>
         <button
           type="button"
-          className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
+          className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
             fullWidth ? 'w-full justify-between' : ''
           } ${
             count > 0
@@ -61,11 +61,11 @@ export function MultiSelectDropdown({
         >
           {label}
           <span
-            className={`text-[9px] px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? 'bg-primary/15' : 'invisible'}`}
+            className={`text-size-9 px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? 'bg-primary/15' : 'invisible'}`}
           >
             {count || 0}
           </span>
-          <span className="text-text-dim text-[9px]">▾</span>
+          <span className="text-text-dim text-size-9">▾</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -93,7 +93,7 @@ export function MultiSelectDropdown({
                 value={filter}
                 onChange={(event) => setFilter(event.target.value)}
                 placeholder={t('filters.filterPlaceholder')}
-                className="w-full text-[11px] font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
+                className="w-full text-size-11 font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
               />
             </div>
           )}
@@ -102,8 +102,8 @@ export function MultiSelectDropdown({
               type="button"
               className={
                 count === options.length
-                  ? 'text-primary text-[11px] font-mono'
-                  : 'text-text-muted hover:text-text-normal text-[11px] font-mono'
+                  ? 'text-primary text-size-11 font-mono'
+                  : 'text-text-muted hover:text-text-normal text-size-11 font-mono'
               }
               onClick={() =>
                 onChange(options.filter((option) => !option.disabled).map((option) => option.value))
@@ -111,13 +111,13 @@ export function MultiSelectDropdown({
             >
               {t('common.all')}
             </button>
-            <span className="text-border text-[11px]">·</span>
+            <span className="text-border text-size-11">·</span>
             <button
               type="button"
               className={
                 count === 0
-                  ? 'text-primary text-[11px] font-mono'
-                  : 'text-text-muted hover:text-text-normal text-[11px] font-mono'
+                  ? 'text-primary text-size-11 font-mono'
+                  : 'text-text-muted hover:text-text-normal text-size-11 font-mono'
               }
               onClick={() => onChange([])}
             >
@@ -156,7 +156,7 @@ export function MultiSelectDropdown({
               );
             })}
             {filtered.length === 0 && (
-              <div className="px-2.5 py-2 text-[11px] font-mono text-text-dim">
+              <div className="px-2.5 py-2 text-size-11 font-mono text-text-dim">
                 {t('common.noMatches')}
               </div>
             )}

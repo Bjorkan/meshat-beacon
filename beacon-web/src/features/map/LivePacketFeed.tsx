@@ -67,7 +67,7 @@ export function LivePacketFeed({
         onClick={() => setPanelOpen(true)}
         aria-label={t('map.showLivePackets')}
         title={t('map.showLivePackets')}
-        className="relative ml-auto flex w-fit max-w-full shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
+        className="relative ml-auto flex w-fit max-w-full shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-size-10 uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden>
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" />
@@ -84,11 +84,11 @@ export function LivePacketFeed({
       className="relative ml-auto max-h-full min-w-0 w-[360px] max-w-full overflow-y-auto rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
     >
       <div className="flex items-center justify-between border-b border-border-subtle px-3 py-1.5">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+        <span className="font-mono text-size-10 font-semibold uppercase tracking-[0.16em] text-text-muted">
           {t('map.livePackets')}
         </span>
         <div className="flex items-center gap-1.5">
-          <span className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-wider text-green">
+          <span className="flex items-center gap-1.5 font-mono text-size-9 uppercase tracking-wider text-green">
             <span className="h-1.5 w-1.5 rounded-full bg-green" aria-hidden />
             {t('map.live')}
           </span>
@@ -112,7 +112,7 @@ export function LivePacketFeed({
       </div>
       <div className="max-h-48 overflow-y-auto py-1">
         {entries.length === 0 && (
-          <div className="px-3 py-3 text-center font-mono text-[10px] text-text-dim">
+          <div className="px-3 py-3 text-center font-mono text-size-10 text-text-dim">
             {t('map.waitingForPackets')}
           </div>
         )}
@@ -125,25 +125,25 @@ export function LivePacketFeed({
               key={entry.packetHash}
               data-packet-hash={entry.packetHash}
               data-packet-color={color}
-              className="group flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 transition-colors hover:bg-text-normal/5"
-              style={{ boxShadow: `inset 3px 0 ${color}` }}
+              className="group flex min-h-9 items-center gap-1.5 px-2.5 py-1.5 shadow-(--packet-accent-shadow) transition-colors hover:bg-text-normal/5"
+              style={{ '--packet-accent-shadow': `inset 3px 0 ${color}` } as React.CSSProperties}
             >
               <Badge variant={payloadTypeVariant(entry.payloadType)}>{typeName}</Badge>
               {entry.hopCount != null && (
-                <span className="rounded-sm bg-text-muted/8 px-1.5 py-px font-mono text-[10px] text-text-muted">
+                <span className="rounded-sm bg-text-muted/8 px-1.5 py-px font-mono text-size-10 text-text-muted">
                   {entry.hopCount}+
                 </span>
               )}
               {entry.scope && <ScopeTag>{entry.scope}</ScopeTag>}
-              <span className="rounded-sm bg-green/10 px-1.5 py-px font-mono text-[10px] font-bold tracking-wide text-green">
+              <span className="rounded-sm bg-green/10 px-1.5 py-px font-mono text-size-10 font-bold tracking-wide text-green">
                 {entry.iata}
               </span>
-              <span className="ml-auto whitespace-nowrap font-mono text-[10px] text-text-dim">
+              <span className="ml-auto whitespace-nowrap font-mono text-size-10 text-text-dim">
                 ×{entry.observationCount}
               </span>
               <Timestamp
                 value={entry.heardAt}
-                className="whitespace-nowrap font-mono text-[10px] text-text-muted"
+                className="whitespace-nowrap font-mono text-size-10 text-text-muted"
               />
               <button
                 type="button"

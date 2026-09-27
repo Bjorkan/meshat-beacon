@@ -18,7 +18,7 @@ export function Card({
   return (
     <div className={`rounded-lg border border-border bg-bg-surface p-3.5 ${className ?? ''}`}>
       <div className="mb-2.5 flex items-center justify-between gap-2">
-        <div className="font-mono text-[11px] font-semibold uppercase tracking-wider text-text-normal">
+        <div className="font-mono text-size-11 font-semibold uppercase tracking-wider text-text-normal">
           {title}
         </div>
         {right}
@@ -75,10 +75,10 @@ export function StatCard({
       className={`rounded-lg border border-border bg-bg-surface px-3.5 py-3 ${variant === 'snapshot' ? 'self-start' : ''}`}
     >
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+        <span className="font-mono text-size-10 font-semibold uppercase tracking-wider text-text-muted">
           {label}
         </span>
-        {sublabel && <span className="font-mono text-[9px] text-text-dim">{sublabel}</span>}
+        {sublabel && <span className="font-mono text-size-9 text-text-dim">{sublabel}</span>}
       </div>
       <div className="mt-0.5 font-mono text-2xl font-bold tabular-nums text-text-bright">
         {value}
@@ -90,7 +90,7 @@ export function StatCard({
 
 function Centered({ children }: { children: ReactNode }) {
   return (
-    <div className="flex h-full items-center justify-center font-mono text-[11px] text-text-dim">
+    <div className="flex h-full items-center justify-center font-mono text-size-11 text-text-dim">
       {children}
     </div>
   );
@@ -121,7 +121,10 @@ export function ChartCard({
   const { t } = useTranslation();
   return (
     <Card title={title} right={right} className={className}>
-      <div style={{ height }}>
+      <div
+        className="h-(--chart-height)"
+        style={{ '--chart-height': `${height}px` } as React.CSSProperties}
+      >
         {isError ? (
           <Centered>{t('common.failedToLoad')}</Centered>
         ) : isLoading ? (

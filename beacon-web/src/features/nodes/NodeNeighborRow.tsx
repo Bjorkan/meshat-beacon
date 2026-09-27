@@ -69,7 +69,7 @@ export function NodeNeighborRow({
       onFocus={() => interact('focus', true)}
       onBlur={() => interact('focus', false)}
     >
-      <div className="flex items-center gap-2 text-[11px]">
+      <div className="flex items-center gap-2 text-size-11">
         <span
           className={`font-mono font-semibold tracking-wider truncate ${neighbor.name ? 'text-primary' : 'text-text-dim italic'}`}
         >
@@ -81,10 +81,10 @@ export function NodeNeighborRow({
         <IataChip>{neighbor.iata}</IataChip>
         <Timestamp
           value={neighbor.lastSeen}
-          className="text-text-dim ml-auto font-mono text-[11px]"
+          className="text-text-dim ml-auto font-mono text-size-11"
         />
       </div>
-      <div className="font-mono text-[11px] text-text-muted mt-1 flex items-center gap-2">
+      <div className="font-mono text-size-11 text-text-muted mt-1 flex items-center gap-2">
         <span
           title={qualityLabel}
           role="img"

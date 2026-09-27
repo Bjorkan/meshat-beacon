@@ -16,7 +16,7 @@ export function LanguageSelector() {
           type="button"
           aria-label={t('language.current', { name: current.name })}
           title={t('language.current', { name: current.name })}
-          className="flex items-center gap-1.5 bg-bg-raised border border-border rounded px-2 py-1 text-text-muted font-mono text-[11px] hover:text-text-normal hover:border-text-dim transition-colors"
+          className="flex items-center gap-1.5 bg-bg-raised border border-border rounded px-2 py-1 text-text-muted font-mono text-size-11 hover:text-text-normal hover:border-text-dim transition-colors"
           onClick={toggle}
         >
           <svg
@@ -38,7 +38,7 @@ export function LanguageSelector() {
     >
       {(close) => (
         <>
-          <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim">
+          <div className="px-3 pt-2 pb-1 text-size-10 font-mono uppercase tracking-wide text-text-dim">
             {t('language.label')}
           </div>
           {availableLanguages.map((language) => (

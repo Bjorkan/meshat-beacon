@@ -4,6 +4,16 @@
 @theme {
   --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Chakra Petch', sans-serif;
+
+  --text-size-6: 6px;
+  --text-size-9: 9px;
+  --text-size-10: 10px;
+  --text-size-11: 11px;
+  --text-size-12: 12px;
+  --text-size-13: 13px;
+
+  --shadow-sheet: 0 -4px 24px color-mix(in srgb, var(--color-black) 13.333333%, transparent);
 
   --color-bg-base: var(--palette-bg-base, #09090b);
   --color-bg-surface: var(--palette-bg-surface, #111114);
@@ -17,6 +27,8 @@
   --color-green: var(--palette-green, #22c55e);
   --color-danger: var(--palette-danger, #ef4444);
   --color-warn: var(--palette-warn, #eab308);
+  --color-meshat-brand: #1f7a3d;
+  --color-observer: #c79bff;
 
   --color-text-bright: var(--palette-text-bright, #fafafa);
   --color-text-normal: var(--palette-text-normal, #a1a1aa);
@@ -24,6 +36,15 @@
   /* Dim remains readable secondary copy; decoration is only for non-text accents. */
   --color-decoration: var(--palette-decoration, #6b7280);
   --color-text-dim: var(--palette-text-dim, #9ca3af);
+}
+
+@utility bg-observation-age {
+  background: linear-gradient(
+    to right,
+    var(--palette-danger) 0%,
+    var(--palette-warn) 60%,
+    var(--palette-green) 100%
+  );
 }
 
 /* base resets */

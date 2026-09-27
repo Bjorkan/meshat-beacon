@@ -21,7 +21,7 @@ export function NodePathPackets({
   const packets = query.data?.pages.flatMap((page) => page.items) ?? [];
   return (
     <Section title={t('nodes.pathsThrough')}>
-      <p className="mb-2 text-[11px] text-text-muted">{t('nodes.pathsThroughHint')}</p>
+      <p className="mb-2 text-size-11 text-text-muted">{t('nodes.pathsThroughHint')}</p>
       {query.isLoading && (
         <p role="status" className="text-xs text-text-muted">
           {t('common.loading')}
@@ -57,15 +57,15 @@ export function NodePathPackets({
             onClick={() => onAnalyzePacket?.(packet.packetHash)}
             className="w-full min-w-0 rounded border border-border bg-bg-base px-3 py-2 text-left hover:bg-text-normal/3 focus-visible:outline-2 focus-visible:outline-primary"
           >
-            <div className="flex flex-wrap items-center gap-2 font-mono text-[11px]">
+            <div className="flex flex-wrap items-center gap-2 font-mono text-size-11">
               <span className="text-primary">{formatHex(packet.packetHash)}</span>
               <Badge variant="default">{packet.payloadTypeName}</Badge>
               <Timestamp value={packet.lastHeardAt} className="ml-auto text-text-dim" />
             </div>
-            <div className="mt-1 text-[11px]">
+            <div className="mt-1 text-size-11">
               <InlinePacketPath packet={packet} />
             </div>
-            <div className="mt-1 truncate font-mono text-[10px] text-text-muted">
+            <div className="mt-1 truncate font-mono text-size-10 text-text-muted">
               {packet.latestObserver?.displayName ?? packet.latestObserver?.id.slice(0, 8)} ·{' '}
               {packet.latestObserver?.iata} · ×{packet.observationCount}
             </div>

@@ -42,7 +42,7 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
   if (status === 'connected') {
     return (
       <div
-        className="flex items-center gap-1.5 font-mono text-[11px] text-green bg-green/8 border border-green/15 px-2 py-0.5 rounded-sm"
+        className="flex items-center gap-1.5 font-mono text-size-11 text-green bg-green/8 border border-green/15 px-2 py-0.5 rounded-sm"
         role="status"
         aria-label={t('status.live')}
         title={t('status.live')}
@@ -56,7 +56,7 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
   if (status === 'connecting') {
     return (
       <div
-        className="flex items-center gap-1.5 font-mono text-[11px] text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
+        className="flex items-center gap-1.5 font-mono text-size-11 text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
         role="status"
         aria-label={t('status.stale')}
         title={t('status.staleTitle', { age: staleStr })}
@@ -68,7 +68,7 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
 
   return (
     <div
-      className="flex items-center gap-1.5 font-mono text-[11px] text-danger bg-danger/8 border border-danger/15 px-2 py-0.5 rounded-sm"
+      className="flex items-center gap-1.5 font-mono text-size-11 text-danger bg-danger/8 border border-danger/15 px-2 py-0.5 rounded-sm"
       role="status"
       aria-label={t('status.offline')}
       title={t('status.offline')}
@@ -113,7 +113,7 @@ function RateLimitBadge() {
   return (
     <div
       role="status"
-      className="flex items-center gap-1.5 font-mono text-[11px] text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
+      className="flex items-center gap-1.5 font-mono text-size-11 text-warn bg-warn/7 border border-warn/15 px-2 py-0.5 rounded-sm"
     >
       {t('app.rateLimited', { seconds: remaining })}
     </div>
@@ -189,11 +189,11 @@ function RegionSelector() {
           className="flex max-w-full min-w-0 items-center gap-1.5 overflow-hidden bg-bg-raised border border-border rounded px-2 sm:px-3 py-1 text-text-bright font-mono text-xs font-semibold hover:border-text-dim/30 transition-colors"
           onClick={toggle}
         >
-          <span className="text-text-muted font-normal text-[11px]">{t('region.label')}</span>
+          <span className="text-text-muted font-normal text-size-11">{t('region.label')}</span>
           <span className="truncate">
             {regionSummaryLabel(effectiveSelection, t, root?.shortCode)}
           </span>
-          <span className="text-text-dim text-[11px] shrink-0">▾</span>
+          <span className="text-text-dim text-size-11 shrink-0">▾</span>
         </button>
       )}
     >
@@ -294,7 +294,7 @@ function RegionSelectorPanel() {
             }
           }}
           placeholder={t('region.filterPlaceholder')}
-          className="w-full text-base sm:text-[11px] font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
+          className="w-full text-base sm:text-size-11 font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
         />
       </div>
 
@@ -319,7 +319,7 @@ function RegionSelectorPanel() {
 
       {shownRegions.length > 0 && (
         <>
-          <div className="px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim">
+          <div className="px-3 pt-2 pb-1 text-size-10 font-mono uppercase tracking-wide text-text-dim">
             {t('region.regions')}
           </div>
           {shownRegions.map(({ region, matched }) => {
@@ -349,7 +349,7 @@ function RegionSelectorPanel() {
       {showIataGroup && (
         <>
           <div
-            className={`px-3 pt-2 pb-1 text-[10px] font-mono uppercase tracking-wide text-text-dim ${
+            className={`px-3 pt-2 pb-1 text-size-10 font-mono uppercase tracking-wide text-text-dim ${
               hasRowsAbove ? 'border-t border-border-subtle mt-1' : ''
             }`}
           >
@@ -376,11 +376,11 @@ function RegionSelectorPanel() {
               );
             })
           ) : iatasError ? (
-            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">
+            <div className="px-3 py-1.5 text-size-11 font-mono text-text-dim">
               {t('common.failedToLoad')}
             </div>
           ) : (
-            <div className="px-3 py-1.5 text-[11px] font-mono text-text-dim">
+            <div className="px-3 py-1.5 text-size-11 font-mono text-text-dim">
               {t('common.loading')}
             </div>
           )}
@@ -388,7 +388,9 @@ function RegionSelectorPanel() {
       )}
 
       {!hasRowsAbove && !showIataGroup && (
-        <div className="px-3 py-2 text-[11px] font-mono text-text-dim">{t('common.noMatches')}</div>
+        <div className="px-3 py-2 text-size-11 font-mono text-text-dim">
+          {t('common.noMatches')}
+        </div>
       )}
     </>
   );
@@ -460,14 +462,16 @@ function ThemePicker() {
           type="button"
           aria-label={t('theme.label')}
           title={t('theme.label')}
-          className="flex items-center gap-1.5 bg-bg-raised border border-border rounded px-2 py-1 text-text-muted font-mono text-[11px] hover:text-text-normal hover:border-text-dim transition-colors"
+          className="flex items-center gap-1.5 bg-bg-raised border border-border rounded px-2 py-1 text-text-muted font-mono text-size-11 hover:text-text-normal hover:border-text-dim transition-colors"
           onClick={toggle}
         >
           <span
-            className="w-2.5 h-2.5 rounded-full shrink-0 border border-text-normal/20"
-            style={{ background: current?.vars['--palette-primary'] }}
+            className="w-2.5 h-2.5 rounded-full shrink-0 border border-text-normal/20 bg-(--theme-swatch-color)"
+            style={
+              { '--theme-swatch-color': current?.vars['--palette-primary'] } as React.CSSProperties
+            }
           />
-          <span className="text-text-dim text-[11px]">▾</span>
+          <span className="text-text-dim text-size-11">▾</span>
         </button>
       )}
     >
@@ -488,8 +492,10 @@ function ThemePicker() {
               }}
             >
               <span
-                className="w-3 h-3 rounded-full shrink-0 border border-text-normal/20"
-                style={{ background: t.vars['--palette-primary'] }}
+                className="w-3 h-3 rounded-full shrink-0 border border-text-normal/20 bg-(--theme-swatch-color)"
+                style={
+                  { '--theme-swatch-color': t.vars['--palette-primary'] } as React.CSSProperties
+                }
               />
               {t.name}
             </button>
@@ -564,7 +570,7 @@ export function AppShell({ activeTab, onTabChange, wsManager, children }: AppShe
         <ErrorBoundary>{children}</ErrorBoundary>
       </main>
 
-      <footer className="hidden lg:flex items-center px-4 py-1.5 bg-bg-surface border-t border-border font-mono text-[11px] text-text-dim shrink-0">
+      <footer className="hidden lg:flex items-center px-4 py-1.5 bg-bg-surface border-t border-border font-mono text-size-11 text-text-dim shrink-0">
         <span>{t('app.footerAttribution')}</span>
       </footer>
 

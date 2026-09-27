@@ -117,7 +117,7 @@ export function MeshCoreRegionPicker({
     const text = (
       <>
         <span className="min-w-0 flex-1 text-left">
-          <span className="block font-mono text-[13px] font-medium tracking-wide">
+          <span className="block font-mono text-size-13 font-medium tracking-wide">
             {node.token}
           </span>
           {node.displayName && (
@@ -127,7 +127,7 @@ export function MeshCoreRegionPicker({
         {counts && node.count !== undefined && (
           <span
             title={t('regionPicker.confirmedNodes')}
-            className="text-[11px] text-text-dim tabular-nums"
+            className="text-size-11 text-text-dim tabular-nums"
           >
             {node.count}
           </span>
@@ -195,7 +195,7 @@ export function MeshCoreRegionPicker({
           type="button"
           aria-label={label}
           title={selectionLabel}
-          className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary ${fullWidth ? 'w-full justify-between' : ''} ${selected.length ? 'border-primary-dim bg-primary/6 text-primary' : 'border-border bg-bg-surface text-text-muted'}`}
+          className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary ${fullWidth ? 'w-full justify-between' : ''} ${selected.length ? 'border-primary-dim bg-primary/6 text-primary' : 'border-border bg-bg-surface text-text-muted'}`}
         >
           <span className="shrink-0">{label}</span>
           <span className="min-w-0 truncate">
@@ -273,7 +273,7 @@ export function MeshCoreRegionPicker({
                 {renderNode(current, false)}
               </div>
             )}
-            <div className="px-3 pt-2 pb-1 shrink-0 text-[10px] uppercase tracking-wider text-text-dim">
+            <div className="px-3 pt-2 pb-1 shrink-0 text-size-10 uppercase tracking-wider text-text-dim">
               {query
                 ? t('regionPicker.results')
                 : current?.level === 'country'

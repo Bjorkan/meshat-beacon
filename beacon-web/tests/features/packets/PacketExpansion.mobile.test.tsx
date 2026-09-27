@@ -160,7 +160,7 @@ describe('PacketExpansion below lg', () => {
       expect.arrayContaining(['min-h-11', 'lg:min-h-0', 'py-2.5', 'lg:py-0.5']),
     );
     expect(tokens(button.parentElement!)).toEqual(
-      expect.arrayContaining(['text-xs', 'lg:text-[11px]']),
+      expect.arrayContaining(['text-xs', 'lg:text-size-11']),
     );
   });
 

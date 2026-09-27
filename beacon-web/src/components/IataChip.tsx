@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 export function IataChip({ children, className }: { children: ReactNode; className?: string }) {
   return (
     <span
-      className={`font-mono text-primary font-semibold text-[11px] bg-primary/6 px-1.5 py-px rounded-sm${className ? ` ${className}` : ''}`}
+      className={`font-mono text-primary font-semibold text-size-11 bg-primary/6 px-1.5 py-px rounded-sm${className ? ` ${className}` : ''}`}
     >
       {children}
     </span>

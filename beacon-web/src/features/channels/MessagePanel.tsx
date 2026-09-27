@@ -47,7 +47,7 @@ function MessageRow({
         <span className={`text-xs font-semibold font-mono ${senderColor(msg.senderName)}`}>
           {msg.senderName}
         </span>
-        <Timestamp value={msg.sentAt} className="text-[11px] text-text-dim" />
+        <Timestamp value={msg.sentAt} className="text-size-11 text-text-dim" />
         {reach > 0 && <Badge variant="text">×{reach}</Badge>}
       </div>
       <div className="text-text-normal text-xs mt-0.5 whitespace-pre-wrap break-words">
@@ -246,7 +246,7 @@ export function MessagePanel({
           <span className="text-text-bright text-sm font-mono truncate">
             {channelDisplayName(channel)}
           </span>
-          <span className="text-text-dim text-[11px] font-mono truncate">
+          <span className="text-text-dim text-size-11 font-mono truncate">
             hash: {channel.channelHash}
           </span>
         </div>

@@ -18,7 +18,7 @@ export function FiltersButton({
       type="button"
       onClick={onClick}
       aria-haspopup="dialog"
-      className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all shrink-0 ${
+      className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all shrink-0 ${
         active
           ? 'border-primary-dim bg-primary/6 text-primary'
           : 'border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal'
@@ -34,7 +34,7 @@ export function FiltersButton({
       </svg>
       {t('filters.title')}
       {active && (
-        <span className="text-[9px] px-1 rounded-sm bg-primary/15 min-w-[1ch] text-center">
+        <span className="text-size-9 px-1 rounded-sm bg-primary/15 min-w-[1ch] text-center">
           {activeCount}
         </span>
       )}
@@ -57,7 +57,7 @@ export function FilterSheet({
   return (
     <BottomSheet onClose={onClose} label={t('filters.title')}>
       <div className="flex items-center justify-between px-4 pb-2 shrink-0">
-        <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">
+        <span className="text-size-13 font-mono font-medium text-text-dim uppercase tracking-wider">
           {t('filters.title')}
         </span>
         <CloseButton onClose={onClose} label={t('filters.close')} className="-mr-1" />

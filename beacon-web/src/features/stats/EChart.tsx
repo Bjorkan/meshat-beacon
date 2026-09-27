@@ -51,7 +51,5 @@ export function EChart({ option, className, style, onEvents, onInit }: EChartPro
     };
   }, [onEvents]);
 
-  return (
-    <div ref={elRef} className={className} style={{ width: '100%', height: '100%', ...style }} />
-  );
+  return <div ref={elRef} className={`h-full w-full ${className ?? ''}`} style={style} />;
 }

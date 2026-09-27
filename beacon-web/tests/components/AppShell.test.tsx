@@ -153,7 +153,7 @@ describe('region picker filter', () => {
     const input = await openPicker();
 
     expect(input).not.toHaveFocus();
-    expect(input).toHaveClass('text-base', 'sm:text-[11px]');
+    expect(input).toHaveClass('text-base', 'sm:text-size-11');
     const panel = input.parentElement?.parentElement;
     expect(panel).toHaveClass(
       'max-sm:w-[calc(100vw-1.5rem)]',

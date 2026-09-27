@@ -159,7 +159,11 @@ export function ChannelList({
               />
             )}
             {isError && (
-              <button type="button" className="p-3 text-xs text-red" onClick={() => void refetch()}>
+              <button
+                type="button"
+                className="p-3 text-xs text-danger"
+                onClick={() => void refetch()}
+              >
                 {t('common.failedToLoad')} · {t('common.tryAgain')}
               </button>
             )}
@@ -178,7 +182,7 @@ export function ChannelList({
         {selectedId !== null && selectedDetail.isError && !selectedChannel ? (
           <button
             type="button"
-            className="p-3 text-xs text-red"
+            className="p-3 text-xs text-danger"
             onClick={() => void selectedDetail.refetch()}
           >
             {t('common.failedToLoad')} · {t('common.tryAgain')}
