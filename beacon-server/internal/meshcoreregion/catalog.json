@@ -1,0 +1,1886 @@
+[
+  {
+    "token": "*",
+    "displayName": "Utan angiven region",
+    "parentToken": "",
+    "level": "special"
+  },
+  {
+    "token": "se",
+    "displayName": "Sverige",
+    "parentToken": "",
+    "level": "country"
+  },
+  {
+    "token": "offgrid",
+    "displayName": "Offgrid",
+    "parentToken": "",
+    "level": "special"
+  },
+  {
+    "token": "se01",
+    "displayName": "Stockholms län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0114",
+    "displayName": "Upplands Väsby kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0115",
+    "displayName": "Vallentuna kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0117",
+    "displayName": "Österåkers kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0120",
+    "displayName": "Värmdö kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0123",
+    "displayName": "Järfälla kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0125",
+    "displayName": "Ekerö kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0126",
+    "displayName": "Huddinge kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0127",
+    "displayName": "Botkyrka kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0128",
+    "displayName": "Salems kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0136",
+    "displayName": "Haninge kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0138",
+    "displayName": "Tyresö kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0139",
+    "displayName": "Upplands-Bro kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0140",
+    "displayName": "Nykvarns kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0160",
+    "displayName": "Täby kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0162",
+    "displayName": "Danderyds kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0163",
+    "displayName": "Sollentuna kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0180",
+    "displayName": "Stockholms kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0181",
+    "displayName": "Södertälje kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0182",
+    "displayName": "Nacka kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0183",
+    "displayName": "Sundbybergs kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0184",
+    "displayName": "Solna kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0186",
+    "displayName": "Lidingö kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0187",
+    "displayName": "Vaxholms kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0188",
+    "displayName": "Norrtälje kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0191",
+    "displayName": "Sigtuna kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se0192",
+    "displayName": "Nynäshamns kommun",
+    "parentToken": "se01",
+    "level": "municipality"
+  },
+  {
+    "token": "se03",
+    "displayName": "Uppsala län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0305",
+    "displayName": "Håbo kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0319",
+    "displayName": "Älvkarleby kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0330",
+    "displayName": "Knivsta kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0331",
+    "displayName": "Heby kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0360",
+    "displayName": "Tierps kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0380",
+    "displayName": "Uppsala kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0381",
+    "displayName": "Enköpings kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se0382",
+    "displayName": "Östhammars kommun",
+    "parentToken": "se03",
+    "level": "municipality"
+  },
+  {
+    "token": "se04",
+    "displayName": "Södermanlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0428",
+    "displayName": "Vingåkers kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0461",
+    "displayName": "Gnesta kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0480",
+    "displayName": "Nyköpings kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0481",
+    "displayName": "Oxelösunds kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0482",
+    "displayName": "Flens kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0483",
+    "displayName": "Katrineholms kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0484",
+    "displayName": "Eskilstuna kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0486",
+    "displayName": "Strängnäs kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se0488",
+    "displayName": "Trosa kommun",
+    "parentToken": "se04",
+    "level": "municipality"
+  },
+  {
+    "token": "se05",
+    "displayName": "Östergötlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0509",
+    "displayName": "Ödeshögs kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0512",
+    "displayName": "Ydre kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0513",
+    "displayName": "Kinda kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0560",
+    "displayName": "Boxholms kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0561",
+    "displayName": "Åtvidabergs kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0562",
+    "displayName": "Finspångs kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0563",
+    "displayName": "Valdemarsviks kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0580",
+    "displayName": "Linköpings kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0581",
+    "displayName": "Norrköpings kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0582",
+    "displayName": "Söderköpings kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0583",
+    "displayName": "Motala kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0584",
+    "displayName": "Vadstena kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se0586",
+    "displayName": "Mjölby kommun",
+    "parentToken": "se05",
+    "level": "municipality"
+  },
+  {
+    "token": "se06",
+    "displayName": "Jönköpings län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0604",
+    "displayName": "Aneby kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0617",
+    "displayName": "Gnosjö kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0642",
+    "displayName": "Mullsjö kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0643",
+    "displayName": "Habo kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0662",
+    "displayName": "Gislaveds kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0665",
+    "displayName": "Vaggeryds kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0680",
+    "displayName": "Jönköpings kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0682",
+    "displayName": "Nässjö kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0683",
+    "displayName": "Värnamo kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0684",
+    "displayName": "Sävsjö kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0685",
+    "displayName": "Vetlanda kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0686",
+    "displayName": "Eksjö kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se0687",
+    "displayName": "Tranås kommun",
+    "parentToken": "se06",
+    "level": "municipality"
+  },
+  {
+    "token": "se07",
+    "displayName": "Kronobergs län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0760",
+    "displayName": "Uppvidinge kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0761",
+    "displayName": "Lessebo kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0763",
+    "displayName": "Tingsryds kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0764",
+    "displayName": "Alvesta kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0765",
+    "displayName": "Älmhults kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0767",
+    "displayName": "Markaryds kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0780",
+    "displayName": "Växjö kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se0781",
+    "displayName": "Ljungby kommun",
+    "parentToken": "se07",
+    "level": "municipality"
+  },
+  {
+    "token": "se08",
+    "displayName": "Kalmar län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0821",
+    "displayName": "Högsby kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0834",
+    "displayName": "Torsås kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0840",
+    "displayName": "Mörbylånga kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0860",
+    "displayName": "Hultsfreds kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0861",
+    "displayName": "Mönsterås kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0862",
+    "displayName": "Emmaboda kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0880",
+    "displayName": "Kalmar kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0881",
+    "displayName": "Nybro kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0882",
+    "displayName": "Oskarshamns kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0883",
+    "displayName": "Västerviks kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0884",
+    "displayName": "Vimmerby kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se0885",
+    "displayName": "Borgholms kommun",
+    "parentToken": "se08",
+    "level": "municipality"
+  },
+  {
+    "token": "se09",
+    "displayName": "Gotlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se0980",
+    "displayName": "Gotlands kommun",
+    "parentToken": "se09",
+    "level": "municipality"
+  },
+  {
+    "token": "se10",
+    "displayName": "Blekinge län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1060",
+    "displayName": "Olofströms kommun",
+    "parentToken": "se10",
+    "level": "municipality"
+  },
+  {
+    "token": "se1080",
+    "displayName": "Karlskrona kommun",
+    "parentToken": "se10",
+    "level": "municipality"
+  },
+  {
+    "token": "se1081",
+    "displayName": "Ronneby kommun",
+    "parentToken": "se10",
+    "level": "municipality"
+  },
+  {
+    "token": "se1082",
+    "displayName": "Karlshamns kommun",
+    "parentToken": "se10",
+    "level": "municipality"
+  },
+  {
+    "token": "se1083",
+    "displayName": "Sölvesborgs kommun",
+    "parentToken": "se10",
+    "level": "municipality"
+  },
+  {
+    "token": "se12",
+    "displayName": "Skåne län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1214",
+    "displayName": "Svalövs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1230",
+    "displayName": "Staffanstorps kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1231",
+    "displayName": "Burlövs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1233",
+    "displayName": "Vellinge kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1256",
+    "displayName": "Östra Göinge kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1257",
+    "displayName": "Örkelljunga kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1260",
+    "displayName": "Bjuvs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1261",
+    "displayName": "Kävlinge kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1262",
+    "displayName": "Lomma kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1263",
+    "displayName": "Svedala kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1264",
+    "displayName": "Skurups kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1265",
+    "displayName": "Sjöbo kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1266",
+    "displayName": "Hörby kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1267",
+    "displayName": "Höörs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1270",
+    "displayName": "Tomelilla kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1272",
+    "displayName": "Bromölla kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1273",
+    "displayName": "Osby kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1275",
+    "displayName": "Perstorps kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1276",
+    "displayName": "Klippans kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1277",
+    "displayName": "Åstorps kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1278",
+    "displayName": "Båstads kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1280",
+    "displayName": "Malmö kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1281",
+    "displayName": "Lunds kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1282",
+    "displayName": "Landskrona kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1283",
+    "displayName": "Helsingborgs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1284",
+    "displayName": "Höganäs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1285",
+    "displayName": "Eslövs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1286",
+    "displayName": "Ystads kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1287",
+    "displayName": "Trelleborgs kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1290",
+    "displayName": "Kristianstads kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1291",
+    "displayName": "Simrishamns kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1292",
+    "displayName": "Ängelholms kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se1293",
+    "displayName": "Hässleholms kommun",
+    "parentToken": "se12",
+    "level": "municipality"
+  },
+  {
+    "token": "se13",
+    "displayName": "Hallands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1315",
+    "displayName": "Hylte kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se1380",
+    "displayName": "Halmstads kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se1381",
+    "displayName": "Laholms kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se1382",
+    "displayName": "Falkenbergs kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se1383",
+    "displayName": "Varbergs kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se1384",
+    "displayName": "Kungsbacka kommun",
+    "parentToken": "se13",
+    "level": "municipality"
+  },
+  {
+    "token": "se14",
+    "displayName": "Västra Götalands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1401",
+    "displayName": "Härryda kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1402",
+    "displayName": "Partille kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1407",
+    "displayName": "Öckerö kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1415",
+    "displayName": "Stenungsunds kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1419",
+    "displayName": "Tjörns kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1421",
+    "displayName": "Orusts kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1427",
+    "displayName": "Sotenäs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1430",
+    "displayName": "Munkedals kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1435",
+    "displayName": "Tanums kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1438",
+    "displayName": "Dals-Eds kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1439",
+    "displayName": "Färgelanda kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1440",
+    "displayName": "Ale kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1441",
+    "displayName": "Lerums kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1442",
+    "displayName": "Vårgårda kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1443",
+    "displayName": "Bollebygds kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1444",
+    "displayName": "Grästorps kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1445",
+    "displayName": "Essunga kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1446",
+    "displayName": "Karlsborgs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1447",
+    "displayName": "Gullspångs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1452",
+    "displayName": "Tranemo kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1460",
+    "displayName": "Bengtsfors kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1461",
+    "displayName": "Melleruds kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1462",
+    "displayName": "Lilla Edets kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1463",
+    "displayName": "Marks kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1465",
+    "displayName": "Svenljunga kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1466",
+    "displayName": "Herrljunga kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1470",
+    "displayName": "Vara kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1471",
+    "displayName": "Götene kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1472",
+    "displayName": "Tibro kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1473",
+    "displayName": "Töreboda kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1480",
+    "displayName": "Göteborgs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1481",
+    "displayName": "Mölndals kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1482",
+    "displayName": "Kungälvs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1484",
+    "displayName": "Lysekils kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1485",
+    "displayName": "Uddevalla kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1486",
+    "displayName": "Strömstads kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1487",
+    "displayName": "Vänersborgs kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1488",
+    "displayName": "Trollhättans kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1489",
+    "displayName": "Alingsås kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1490",
+    "displayName": "Borås kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1491",
+    "displayName": "Ulricehamns kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1492",
+    "displayName": "Åmåls kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1493",
+    "displayName": "Mariestads kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1494",
+    "displayName": "Lidköpings kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1495",
+    "displayName": "Skara kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1496",
+    "displayName": "Skövde kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1497",
+    "displayName": "Hjo kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1498",
+    "displayName": "Tidaholms kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se1499",
+    "displayName": "Falköpings kommun",
+    "parentToken": "se14",
+    "level": "municipality"
+  },
+  {
+    "token": "se17",
+    "displayName": "Värmlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1715",
+    "displayName": "Kils kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1730",
+    "displayName": "Eda kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1737",
+    "displayName": "Torsby kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1760",
+    "displayName": "Storfors kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1761",
+    "displayName": "Hammarö kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1762",
+    "displayName": "Munkfors kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1763",
+    "displayName": "Forshaga kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1764",
+    "displayName": "Grums kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1765",
+    "displayName": "Årjängs kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1766",
+    "displayName": "Sunne kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1780",
+    "displayName": "Karlstads kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1781",
+    "displayName": "Kristinehamns kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1782",
+    "displayName": "Filipstads kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1783",
+    "displayName": "Hagfors kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1784",
+    "displayName": "Arvika kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se1785",
+    "displayName": "Säffle kommun",
+    "parentToken": "se17",
+    "level": "municipality"
+  },
+  {
+    "token": "se18",
+    "displayName": "Örebro län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1814",
+    "displayName": "Lekebergs kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1860",
+    "displayName": "Laxå kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1861",
+    "displayName": "Hallsbergs kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1862",
+    "displayName": "Degerfors kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1863",
+    "displayName": "Hällefors kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1864",
+    "displayName": "Ljusnarsbergs kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1880",
+    "displayName": "Örebro kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1881",
+    "displayName": "Kumla kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1882",
+    "displayName": "Askersunds kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1883",
+    "displayName": "Karlskoga kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1884",
+    "displayName": "Nora kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se1885",
+    "displayName": "Lindesbergs kommun",
+    "parentToken": "se18",
+    "level": "municipality"
+  },
+  {
+    "token": "se19",
+    "displayName": "Västmanlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se1904",
+    "displayName": "Skinnskattebergs kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1907",
+    "displayName": "Surahammars kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1960",
+    "displayName": "Kungsörs kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1961",
+    "displayName": "Hallstahammars kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1962",
+    "displayName": "Norbergs kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1980",
+    "displayName": "Västerås kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1981",
+    "displayName": "Sala kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1982",
+    "displayName": "Fagersta kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1983",
+    "displayName": "Köpings kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se1984",
+    "displayName": "Arboga kommun",
+    "parentToken": "se19",
+    "level": "municipality"
+  },
+  {
+    "token": "se20",
+    "displayName": "Dalarnas län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2021",
+    "displayName": "Vansbro kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2023",
+    "displayName": "Malung-Sälens kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2026",
+    "displayName": "Gagnefs kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2029",
+    "displayName": "Leksands kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2031",
+    "displayName": "Rättviks kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2034",
+    "displayName": "Orsa kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2039",
+    "displayName": "Älvdalens kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2061",
+    "displayName": "Smedjebackens kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2062",
+    "displayName": "Mora kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2080",
+    "displayName": "Falu kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2081",
+    "displayName": "Borlänge kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2082",
+    "displayName": "Säters kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2083",
+    "displayName": "Hedemora kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2084",
+    "displayName": "Avesta kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se2085",
+    "displayName": "Ludvika kommun",
+    "parentToken": "se20",
+    "level": "municipality"
+  },
+  {
+    "token": "se21",
+    "displayName": "Gävleborgs län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2101",
+    "displayName": "Ockelbo kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2104",
+    "displayName": "Hofors kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2121",
+    "displayName": "Ovanåkers kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2132",
+    "displayName": "Nordanstigs kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2161",
+    "displayName": "Ljusdals kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2180",
+    "displayName": "Gävle kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2181",
+    "displayName": "Sandvikens kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2182",
+    "displayName": "Söderhamns kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2183",
+    "displayName": "Bollnäs kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se2184",
+    "displayName": "Hudiksvalls kommun",
+    "parentToken": "se21",
+    "level": "municipality"
+  },
+  {
+    "token": "se22",
+    "displayName": "Västernorrlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2260",
+    "displayName": "Ånge kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2262",
+    "displayName": "Timrå kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2280",
+    "displayName": "Härnösands kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2281",
+    "displayName": "Sundsvalls kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2282",
+    "displayName": "Kramfors kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2283",
+    "displayName": "Sollefteå kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se2284",
+    "displayName": "Örnsköldsviks kommun",
+    "parentToken": "se22",
+    "level": "municipality"
+  },
+  {
+    "token": "se23",
+    "displayName": "Jämtlands län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2303",
+    "displayName": "Ragunda kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2305",
+    "displayName": "Bräcke kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2309",
+    "displayName": "Krokoms kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2313",
+    "displayName": "Strömsunds kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2321",
+    "displayName": "Åre kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2326",
+    "displayName": "Bergs kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2361",
+    "displayName": "Härjedalens kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se2380",
+    "displayName": "Östersunds kommun",
+    "parentToken": "se23",
+    "level": "municipality"
+  },
+  {
+    "token": "se24",
+    "displayName": "Västerbottens län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2401",
+    "displayName": "Nordmalings kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2403",
+    "displayName": "Bjurholms kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2404",
+    "displayName": "Vindelns kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2409",
+    "displayName": "Robertsfors kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2417",
+    "displayName": "Norsjö kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2418",
+    "displayName": "Malå kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2421",
+    "displayName": "Storumans kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2422",
+    "displayName": "Sorsele kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2425",
+    "displayName": "Dorotea kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2460",
+    "displayName": "Vännäs kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2462",
+    "displayName": "Vilhelmina kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2463",
+    "displayName": "Åsele kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2480",
+    "displayName": "Umeå kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2481",
+    "displayName": "Lycksele kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se2482",
+    "displayName": "Skellefteå kommun",
+    "parentToken": "se24",
+    "level": "municipality"
+  },
+  {
+    "token": "se25",
+    "displayName": "Norrbottens län",
+    "parentToken": "se",
+    "level": "county"
+  },
+  {
+    "token": "se2505",
+    "displayName": "Arvidsjaurs kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2506",
+    "displayName": "Arjeplogs kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2510",
+    "displayName": "Jokkmokks kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2513",
+    "displayName": "Överkalix kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2514",
+    "displayName": "Kalix kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2518",
+    "displayName": "Övertorneå kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2521",
+    "displayName": "Pajala kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2523",
+    "displayName": "Gällivare kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2560",
+    "displayName": "Älvsbyns kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2580",
+    "displayName": "Luleå kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2581",
+    "displayName": "Piteå kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2582",
+    "displayName": "Bodens kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2583",
+    "displayName": "Haparanda kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  },
+  {
+    "token": "se2584",
+    "displayName": "Kiruna kommun",
+    "parentToken": "se25",
+    "level": "municipality"
+  }
+]

@@ -26,6 +26,18 @@ function pkt(over: Partial<PacketSummary>): PacketSummary {
 }
 
 describe('matchesFilters — scope', () => {
+  it('matches unscoped traffic without treating unknown transport scopes as unscoped', () => {
+    const filters = { ...EMPTY_FILTERS, scopes: ['*'] };
+    expect(matchesFilters(pkt({ routeType: 1 }), filters)).toBe(true);
+    expect(matchesFilters(pkt({ routeType: 2 }), filters)).toBe(true);
+    expect(matchesFilters(pkt({ routeType: 0 }), filters)).toBe(false);
+    expect(matchesFilters(pkt({ routeType: 3 }), filters)).toBe(false);
+    expect(matchesFilters(pkt({ scope: '#se', routeType: 0 }), filters)).toBe(false);
+    expect(
+      matchesFilters(pkt({ scope: '#se', routeType: 0 }), { ...filters, scopes: ['*', '#se'] }),
+    ).toBe(true);
+  });
+
   it('ignores scope when no scope filter is set', () => {
     expect(matchesFilters(pkt({ scope: '#bc' }), EMPTY_FILTERS)).toBe(true);
     expect(matchesFilters(pkt({ scope: undefined }), EMPTY_FILTERS)).toBe(true);

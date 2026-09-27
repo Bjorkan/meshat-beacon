@@ -1218,7 +1218,7 @@ const docTemplate = `{
         },
         "/nodes/meshcore-regions": {
             "get": {
-                "description": "Currently confirmed MeshCore region-scope values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.",
+                "description": "Built-in Swedish MeshCore regions with friendly names and parent tokens, plus discovered regions and current confirmed-node counts. Independent of IATA geography.",
                 "produces": [
                     "application/json"
                 ],
@@ -4023,8 +4023,17 @@ const docTemplate = `{
                 "token"
             ],
             "properties": {
+                "displayName": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
                 "nodeCount": {
                     "type": "integer"
+                },
+                "parentToken": {
+                    "type": "string"
                 },
                 "token": {
                     "description": "normalized lowercase token, e.g. \"se\"",

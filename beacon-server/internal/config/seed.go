@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/MeshCore-Beacon/beacon-server/internal/meshcoreregion"
 )
 
 // Seeder is the database interface required to seed config data on startup.
@@ -73,9 +75,25 @@ func Seed(ctx context.Context, cfg *Config, db Seeder) error {
 	for _, s := range cfg.Scopes {
 		name := normalizeScopeName(s.Name)
 		key := deriveScopeKey(name)
+		if region, ok := meshcoreregion.Lookup(name); ok && region.Token != "*" {
+			name = region.Token
+		}
 		h := sha256.Sum256(key)
 		fingerprint := h[:8]
 		if err := db.UpsertTransportScope(ctx, name, "", key, fingerprint); err != nil {
+			return err
+		}
+	}
+	// Built-ins are always available, even before any traffic is observed. Seed
+	// last so a duplicate config entry cannot erase its friendly name.
+	for _, region := range meshcoreregion.All() {
+		if region.Token == "*" {
+			continue // unscoped traffic has no transport key
+		}
+		name := normalizeScopeName(region.Token)
+		key := deriveScopeKey(name)
+		fingerprint := sha256.Sum256(key)
+		if err := db.UpsertTransportScope(ctx, region.Token, region.DisplayName, key, fingerprint[:8]); err != nil {
 			return err
 		}
 	}

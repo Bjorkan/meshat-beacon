@@ -42,12 +42,15 @@ type NodeIATA struct {
 	LastHeard int64  `json:"lastHeard" binding:"required"` // epoch ms
 }
 
-// MeshCoreRegion is a discovered MeshCore region-scope value with the number of
-// nodes that currently confirm it. Distinct from Beacon's geographic regions
-// and transport scopes.
+// MeshCoreRegion is a built-in or discovered MeshCore radio region with the
+// number of nodes that currently confirm it. Built-ins include display names
+// and a cosmetic hierarchy, independent of Beacon's IATA geography.
 type MeshCoreRegion struct {
-	Token     string `json:"token" binding:"required"` // normalized lowercase token, e.g. "se"
-	NodeCount int64  `json:"nodeCount" binding:"required"`
+	DisplayName string `json:"displayName,omitempty"`
+	ParentToken string `json:"parentToken,omitempty"`
+	Level       string `json:"level,omitempty"`
+	Token       string `json:"token" binding:"required"` // normalized lowercase token, e.g. "se"
+	NodeCount   int64  `json:"nodeCount" binding:"required"`
 }
 
 // NodeSummary is the minimal node representation used in list responses.

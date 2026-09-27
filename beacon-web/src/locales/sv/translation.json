@@ -705,5 +705,19 @@
     "searchObserver": "Sök {{label}}",
     "all": "Alla",
     "pathLengthDescription": "Mottagna vägposter per mottagning. Noll betyder en tom vanlig väg. Spårning och oklassificerade poster ingår inte. Exakta antal visas i tabellen."
+  },
+  "regionPicker": {
+    "title": "MeshCore-region",
+    "search": "Sök region-id eller namn…",
+    "navigation": "Regionnivåer",
+    "allRegions": "Alla regioner",
+    "regions": "Regioner",
+    "counties": "Län",
+    "municipalities": "Kommuner",
+    "results": "Sökresultat",
+    "selected": "Valda regioner: {{count}}",
+    "remove": "Ta bort {{token}}",
+    "confirmedNodes": "Noder med bekräftad region",
+    "hint": "Öppna ett land eller län för att hitta fler regioner. Markera rutan för att välja regionens etikett."
   }
 }

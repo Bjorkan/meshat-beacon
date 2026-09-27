@@ -6,7 +6,7 @@ import { SegmentedControl } from './SegmentedControl';
 import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
 import { Section } from '../../components/DetailPanel';
 import { CopyLinkButton } from '../../components/CopyLinkButton';
-import { SelectDropdown } from '../../components/SelectDropdown';
+import { MeshCoreRegionPicker } from '../../components/MeshCoreRegionPicker';
 import { meshcoreRegionQueries } from '../../api/queries';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 
@@ -69,7 +69,7 @@ interface MapSettingsPanelProps {
   onNeighborLinesChange: (mode: NeighborLinesMode) => void;
   borders: boolean;
   onBordersChange: (on: boolean) => void;
-  // confirmed MeshCore region-scope token ("" = All); options are discovered server-side
+  // MeshCore region token ("" = All); options combine the built-in catalogue and discovery.
   meshcoreRegion: string;
   onMeshcoreRegionChange: (token: string) => void;
   // builds deep-link params for the current view, evaluated at copy time (reads the live camera)
@@ -102,9 +102,7 @@ export function MapSettingsPanel({
     { value: 'selected', label: t('map.selected') },
     { value: 'off', label: t('map.off') },
   ];
-  // Discovered MeshCore Region values (normalized tokens + confirmed-node counts). All is always
-  // offered; each token appears only when the server confirms it. If the currently selected token
-  // has aged out of discovery it stays pinned to the trigger so the filter remains clearable.
+  // Built-in and discovered MeshCore regions, with confirmed-node counts.
   const { data: meshcoreRegions } = useQuery(meshcoreRegionQueries.list());
   const meshcoreOptions = (meshcoreRegions ?? [])
     .map((region) => ({ value: region.token, label: `${region.token} · ${region.nodeCount}` }))
@@ -167,14 +165,14 @@ export function MapSettingsPanel({
               onChange={onTypeChange}
             />
           </Section>
-          {/* The trigger carries the label itself (matching the global region selector), so no
-              Section title here — the dropdown reads "MESHCORE REGION ▾ se · 12". */}
+          {/* The trigger carries its label and stable token; names and counts live in the picker. */}
           <div className="px-3 py-2.5 border-t border-border-subtle">
-            <SelectDropdown
+            <MeshCoreRegionPicker
+              counts
               label={t('map.meshcoreRegion')}
               options={meshcoreOptions}
-              value={meshcoreRegion}
-              onChange={onMeshcoreRegionChange}
+              selected={meshcoreRegion ? [meshcoreRegion] : []}
+              onChange={(values) => onMeshcoreRegionChange(values[0] ?? '')}
               align="left"
               fullWidth
             />

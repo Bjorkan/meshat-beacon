@@ -50,6 +50,7 @@ vi.mock('../src/api/client', () => ({
   getRegion: async () => ({ id: 0, slug: '', displayName: '', iatas: [] }),
   getIatas: async () => [],
   getScopes: async () => [],
+  getMeshCoreRegions: async () => [],
   getChannels: async () => ({ items: [], nextCursor: null, hasMore: false, unknownCount: 0 }),
   getChannel: async (id: number) => ({
     id,

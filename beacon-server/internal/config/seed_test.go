@@ -4,7 +4,9 @@
 package config
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -18,11 +20,15 @@ type stubSeeder struct {
 		shortCode *string
 		isRoot    bool
 	}
-	iatas       []string
-	regionIATAs map[int32][]string
-	scopes      []string
-	borders     map[string]json.RawMessage
-	upsertErr   error
+	iatas        []string
+	regionIATAs  map[int32][]string
+	scopes       []string
+	scopeDetails map[string]struct {
+		name             string
+		key, fingerprint []byte
+	}
+	borders   map[string]json.RawMessage
+	upsertErr error
 }
 
 func newStubSeeder() *stubSeeder {
@@ -71,9 +77,44 @@ func (s *stubSeeder) UpsertRegionIATA(_ context.Context, regionID int32, iata st
 	return s.upsertErr
 }
 
-func (s *stubSeeder) UpsertTransportScope(_ context.Context, name, _ string, _, _ []byte) error {
+func (s *stubSeeder) UpsertTransportScope(_ context.Context, name, displayName string, key, fingerprint []byte) error {
 	s.scopes = append(s.scopes, name)
+	if s.scopeDetails == nil {
+		s.scopeDetails = make(map[string]struct {
+			name             string
+			key, fingerprint []byte
+		})
+	}
+	s.scopeDetails[name] = struct {
+		name             string
+		key, fingerprint []byte
+	}{displayName, key, fingerprint}
 	return s.upsertErr
+}
+
+func TestSeedBuiltInMeshCoreRegions(t *testing.T) {
+	db := newStubSeeder()
+	cfg := &Config{Scopes: []ScopeConfig{{Name: "se0680"}}}
+	for range 2 {
+		if err := Seed(context.Background(), cfg, db); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(db.scopeDetails) != 313 {
+		t.Fatalf("expected 313 unique built-ins, got %d", len(db.scopeDetails))
+	}
+	if _, ok := db.scopeDetails["#*"]; ok {
+		t.Fatal("unscoped traffic must not have a derived key")
+	}
+	entry := db.scopeDetails["se0680"]
+	key := sha256.Sum256([]byte("#se0680"))
+	fingerprint := sha256.Sum256(key[:16])
+	if entry.name != "Jönköpings kommun" || !bytes.Equal(entry.key, key[:16]) || !bytes.Equal(entry.fingerprint, fingerprint[:8]) {
+		t.Fatalf("wrong built-in metadata/key: %+v", entry)
+	}
+	if len(db.iatas) != 0 || len(db.regions) != 0 {
+		t.Fatal("MeshCore catalogue must not seed IATA geography")
+	}
 }
 
 func TestSeed_IATAsAndRegions(t *testing.T) {
@@ -233,8 +274,8 @@ func TestSeed_Scopes(t *testing.T) {
 	if err := Seed(context.Background(), cfg, db); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(db.scopes) != 2 {
-		t.Fatalf("expected 2 scopes, got %d", len(db.scopes))
+	if len(db.scopes) != 315 {
+		t.Fatalf("expected 2 configured and 313 built-in scopes, got %d", len(db.scopes))
 	}
 	if db.scopes[0] != "#bc" {
 		t.Errorf("expected #bc, got %s", db.scopes[0])

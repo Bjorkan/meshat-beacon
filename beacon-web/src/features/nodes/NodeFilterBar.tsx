@@ -1,3 +1,4 @@
+import { MeshCoreRegionPicker } from '../../components/MeshCoreRegionPicker';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SearchBar, type SearchFieldOption } from '../../components/SearchBar';
@@ -89,12 +90,12 @@ export function NodeFilterBar({
         fullWidth={fullWidth}
       />
       {scopeOptions.length > 0 && (
-        <SelectDropdown
+        <MeshCoreRegionPicker
           label={t('filters.scope')}
           options={scopeOptions.map((s) => ({ value: s, label: s }))}
           allLabel={t('common.any')}
-          value={scopeFilter}
-          onChange={onScopeChange}
+          selected={scopeFilter ? [scopeFilter] : []}
+          onChange={(values) => onScopeChange(values[0] ?? '')}
           fullWidth={fullWidth}
         />
       )}

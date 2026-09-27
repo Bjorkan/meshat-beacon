@@ -216,7 +216,7 @@ func validMeshCoreRegionToken(token string) bool {
 // listMeshCoreRegions godoc
 //
 //	@Summary	List MeshCore Regions
-//	@Description	Currently confirmed MeshCore region-scope values with confirmed-node counts, normalized to lowercase exact tokens. Distinct from Beacon geographic regions and transport scopes.
+//	@Description	Built-in Swedish MeshCore regions with friendly names and parent tokens, plus discovered regions and current confirmed-node counts. Independent of IATA geography.
 //	@Tags		Nodes
 //	@Produce	json
 //	@Success	200		{array}		api.MeshCoreRegion

@@ -705,5 +705,19 @@
     "searchObserver": "Search {{label}}",
     "all": "All",
     "pathLengthDescription": "Received path entries per reception. Zero means an empty ordinary path. Trace and unclassified records are excluded. Exact counts follow in the table."
+  },
+  "regionPicker": {
+    "title": "MeshCore region",
+    "search": "Search region ID or name…",
+    "navigation": "Region levels",
+    "allRegions": "All regions",
+    "regions": "Regions",
+    "counties": "Counties",
+    "municipalities": "Municipalities",
+    "results": "Search results",
+    "selected": "Selected regions: {{count}}",
+    "remove": "Remove {{token}}",
+    "confirmedNodes": "Nodes with confirmed region",
+    "hint": "Open a country or county to find more regions. Select a region to filter by its label."
   }
 }

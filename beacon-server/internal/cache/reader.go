@@ -17,16 +17,17 @@ import (
 )
 
 const (
-	keyIATAs                   = "beacon:iatas"
-	keyIATAPrefix              = "beacon:iata:"
-	keyIATABorderPrefix        = "beacon:iata:border:"
-	keyRegions                 = "beacon:regions"
-	keyRegionPrefix            = "beacon:region:"
-	keyRegionSlugPrefix        = "beacon:region:slug:"
-	keyScopeNames              = "beacon:scope:names"
-	keyScopeStats              = "beacon:scope:stats"
-	keyScopesByIATAsPrefix     = "beacon:scopes:iatas:"
-	keyScopeByNamePrefix       = "beacon:scope:name:"
+	keyIATAs            = "beacon:iatas"
+	keyIATAPrefix       = "beacon:iata:"
+	keyIATABorderPrefix = "beacon:iata:border:"
+	keyRegions          = "beacon:regions"
+	keyRegionPrefix     = "beacon:region:"
+	keyRegionSlugPrefix = "beacon:region:slug:"
+	// v2 avoids serving pre-catalogue lists and legacy #seXX names after upgrade.
+	keyScopeNames              = "beacon:scope:names:v2"
+	keyScopeStats              = "beacon:scope:stats:v2"
+	keyScopesByIATAsPrefix     = "beacon:scopes:iatas:v2:"
+	keyScopeByNamePrefix       = "beacon:scope:name:v2:"
 	keyStatsOverviewPrefix     = "beacon:stats:overview:"
 	keyStatsObservationsPrefix = "beacon:stats:observations:"
 	keySignalStatsPrefix       = "beacon:stats:signal:"
@@ -43,9 +44,9 @@ const (
 	keyNodeNeighborsPrefix     = "beacon:node:neighbors:"
 	keyNodesByIDsPrefix        = "beacon:nodes:ids:"
 	keyAmbiguousPrefix2        = "beacon:nodes:ambiguous-prefix2"
-	keyMeshCoreRegions         = "beacon:nodes:meshcore-regions"
+	keyMeshCoreRegions         = "beacon:nodes:meshcore-regions:v2"
 	keyObserverPrefix          = "beacon:observer:"
-	keyObserverScopesPrefix    = "beacon:observer:scopes:"
+	keyObserverScopesPrefix    = "beacon:observer:scopes:v2:"
 	keyObserverActivityPrefix  = "beacon:observer:activity:"
 )
 

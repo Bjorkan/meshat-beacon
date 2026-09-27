@@ -224,7 +224,9 @@ channel_keys:
       name: "Public"
       public: true
 
-# Regional transport scopes for matching TRANSPORT_FLOOD packets.
+# Additional transport scopes for matching TRANSPORT_FLOOD/TRANSPORT_DIRECT packets.
+# Swedish MeshCore regions (se, 21 counties, 290 municipalities) and offgrid
+# are built in and need no configuration. These are separate from MQTT IATAs.
 # Plain names have # prepended automatically (e.g. "bc" → "#bc").
 scopes:
   - name: bc
@@ -590,3 +592,26 @@ log:
 `LOG_LEVEL` and `LOG_FORMAT` override file settings; empty settings use `info` and `text`. Invalid values prevent startup. Configuration-loading failures can use the bootstrap text logger before file settings are available; failures after initialization retain error severity at every supported level.
 
 Records include a component field. Ingest workers also include their broker name, and HTTP completion records include the validated client address, route, status and duration. Query strings and protocol hello payloads are excluded. Expected ingest skips and routine WebSocket lifecycle details are debug-level. Changing the application's format does not change Caddy/Apache access logs or their fail2ban configuration. Collect/rotate stderr through Docker or systemd.
+
+### Built-in Swedish MeshCore regions
+
+Beacon embeds Sweden (`se`), all 21 counties (`seXX`), all 290 municipalities
+(`seXXXX`), and `offgrid`, following [Meshat.se's region catalogue](https://meshat.se/meshcore/regioner/#svenska-regionnivaer).
+The hardcoded catalogue in `internal/meshcoreregion/catalog.json` includes Swedish
+friendly names and parent tokens. It is available without a network fetch.
+The stable identifier in storage, API responses and filters is the actual token
+(e.g. `se01`); friendly names are supporting UI labels. Startup upserts the
+transport keys and friendly names; configured custom scopes
+continue to work. Public transport keys use SHA256 of the `#`-prefixed token,
+as in MeshCore firmware. Incoming transport packets are matched against these keys.
+
+`GET /nodes/meshcore-regions` returns the built-ins even with zero confirmed nodes,
+plus discovered custom tokens. `displayName`, `parentToken`, and `level` describe
+the menu hierarchy. The map and packet/node/observer scope menus support browsing
+Sweden → county → municipality and searching by name or token. Selecting a parent
+matches only its exact radio label, not all descendants. IATA geography is independent.
+
+The packet filter `scopes=*` means traffic without a transport region (ordinary
+flood/direct routes). It excludes unknown transport-region packets and does not
+mean all traffic. Clear the filter to include all traffic. No transport key is
+derived for `*`. Existing stored packets are not automatically reclassified.

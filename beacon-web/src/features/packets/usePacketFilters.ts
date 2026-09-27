@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useNavigate, useSearch } from '@tanstack/react-router';
 import type { PacketFilterState, PacketServerFilter, SearchField } from './types';
 import type { PacketSummary } from '../../types/api';
-import type { PayloadTypeValue, RouteTypeValue } from '../../types/enums';
+import { RouteType, type PayloadTypeValue, type RouteTypeValue } from '../../types/enums';
 
 // Packet filter state synced to the /packets route search params (?types/?routes/?obs/?scope/?q/?sf).
 // The params themselves are validated on the ROOT route so they survive tab switches; this hook is
@@ -133,8 +133,13 @@ export function matchesFilters(
         : false;
     if (!match) return false;
   }
-  if (filters.scopes.length > 0 && (!packet.scope || !filters.scopes.includes(packet.scope))) {
-    return false;
+  if (filters.scopes.length > 0) {
+    const unscoped = packet.routeType === RouteType.FLOOD || packet.routeType === RouteType.DIRECT;
+    if (
+      !(packet.scope && filters.scopes.includes(packet.scope)) &&
+      !(unscoped && filters.scopes.includes('*'))
+    )
+      return false;
   }
   if (filters.search && filters.searchField === 'hash') {
     const q = filters.search.toLowerCase().replace(/[\s:-]/g, '');

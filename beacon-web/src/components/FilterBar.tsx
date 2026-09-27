@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { MeshCoreRegionPicker } from './MeshCoreRegionPicker';
 import { MultiSelectDropdown } from './MultiSelectDropdown';
 import { SearchBar, type SearchFieldOption } from './SearchBar';
 import { FilterSheet, FiltersButton } from './FilterSheet';
@@ -103,7 +104,8 @@ export function FilterBar({
         fullWidth={fullWidth}
       />
       {scopeOptions.length > 0 && (
-        <MultiSelectDropdown
+        <MeshCoreRegionPicker
+          multiple
           label={t('filters.scope')}
           options={scopeOptions}
           selected={activeScopes}

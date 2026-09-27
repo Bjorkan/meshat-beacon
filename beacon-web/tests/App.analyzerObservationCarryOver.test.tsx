@@ -48,6 +48,7 @@ vi.mock('../src/api/client', () => ({
   getRegion: async () => ({ id: 0, slug: '', displayName: '', iatas: [] }),
   getIatas: async () => [],
   getScopes: async () => [],
+  getMeshCoreRegions: async () => [],
 }));
 
 const packet: PacketSummary = {

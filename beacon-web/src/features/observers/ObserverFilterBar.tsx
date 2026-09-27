@@ -1,3 +1,4 @@
+import { MeshCoreRegionPicker } from '../../components/MeshCoreRegionPicker';
 import { observerClientLabel } from './observer-client';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -89,11 +90,11 @@ export function ObserverFilterBar({
         />
       )}
       {scopeOptions.length > 0 && (
-        <SelectDropdown
+        <MeshCoreRegionPicker
           label={t('filters.scope')}
           options={scopeOptions.map((s) => ({ value: s, label: s }))}
-          value={scopeFilter}
-          onChange={onScopeChange}
+          selected={scopeFilter ? [scopeFilter] : []}
+          onChange={(values) => onScopeChange(values[0] ?? '')}
           fullWidth={fullWidth}
         />
       )}

@@ -251,9 +251,9 @@ type Reader interface {
 	// database, a high-confidence 2-byte hit is as trustworthy as a 3-byte one.
 	ListAmbiguousPrefix2(ctx context.Context) ([]string, error)
 
-	// ListMeshCoreRegions returns the MeshCore region-scope values currently
+	// ListMeshCoreRegions returns the built-in catalogue plus region-scope values
 	// confirmed by fresh observer self-reports or neighbor OTA answers, with
-	// confirmed-node counts. Tokens are normalized (lowercase, trimmed); "*"
+	// friendly names, parent tokens and confirmed-node counts. Tokens are normalized (lowercase, trimmed); "*"
 	// is a literal token, not a wildcard.
 	ListMeshCoreRegions(ctx context.Context) ([]MeshCoreRegion, error)
 

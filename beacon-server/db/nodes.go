@@ -16,6 +16,7 @@ import (
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
+	"github.com/MeshCore-Beacon/beacon-server/internal/meshcoreregion"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -376,16 +377,26 @@ func (s *Store) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
 	return out, nil
 }
 
-// ListMeshCoreRegions returns the currently confirmed MeshCore region-scope
-// values with confirmed-node counts, normalized to lowercase trimmed tokens.
+// ListMeshCoreRegions merges the built-in catalogue with currently confirmed
+// region tokens. Known regions remain available even with zero confirmed nodes.
 func (s *Store) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
 	rows, err := s.q.ListMeshCoreRegions(ctx, s.meshcoreRegionCutoff())
 	if err != nil {
 		return nil, err
 	}
-	out := make([]api.MeshCoreRegion, 0, len(rows))
+	catalogue := meshcoreregion.All()
+	out := make([]api.MeshCoreRegion, 0, len(rows)+len(catalogue))
+	indices := make(map[string]int)
+	for _, region := range catalogue {
+		indices[region.Token] = len(out)
+		out = append(out, api.MeshCoreRegion{Token: region.Token, DisplayName: region.DisplayName, ParentToken: region.ParentToken, Level: region.Level})
+	}
 	for _, r := range rows {
-		out = append(out, api.MeshCoreRegion{Token: r.Token, NodeCount: r.NodeCount})
+		if index, ok := indices[r.Token]; ok {
+			out[index].NodeCount = r.NodeCount
+		} else {
+			out = append(out, api.MeshCoreRegion{Token: r.Token, NodeCount: r.NodeCount})
+		}
 	}
 	return out, nil
 }

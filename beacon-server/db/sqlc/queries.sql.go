@@ -3747,7 +3747,7 @@ WHERE
   AND ($3::timestamptz IS NULL OR p.first_heard_at >= $3)
   AND ($4::timestamptz IS NULL OR p.first_heard_at <= $4)
   AND ($5::timestamptz IS NULL OR p.last_heard_at < $5)
-  AND (COALESCE(cardinality($7::text[]), 0) = 0 OR ts.name = ANY($7::text[]))
+  AND (COALESCE(cardinality($7::text[]), 0) = 0 OR ts.name = ANY($7::text[]) OR ('*' = ANY($7::text[]) AND p.route_type IN (1, 2)))
   AND (COALESCE(cardinality($8::uuid[]), 0) = 0 OR EXISTS (
     SELECT 1 FROM packet_observations pof
     WHERE pof.packet_hash = p.packet_hash AND pof.observer_id = ANY($8::uuid[])
@@ -3985,7 +3985,7 @@ WITH scanned AS (
       AND (COALESCE(cardinality($4::smallint[]), 0) = 0 OR p2.route_type = ANY($4::smallint[]))
       AND ($5::timestamptz IS NULL OR p2.first_heard_at >= $5)
       AND ($6::timestamptz IS NULL OR p2.first_heard_at <= $6)
-      AND (COALESCE(cardinality($7::text[]), 0) = 0 OR EXISTS (
+      AND (COALESCE(cardinality($7::text[]), 0) = 0 OR ('*' = ANY($7::text[]) AND p2.route_type IN (1, 2)) OR EXISTS (
         SELECT 1 FROM transport_scopes ts2
         WHERE ts2.id = p2.scope_id AND ts2.name = ANY($7::text[])))
       AND (COALESCE(cardinality($8::uuid[]), 0) = 0 OR EXISTS (
