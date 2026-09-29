@@ -25,7 +25,7 @@ it('emphasizes only the focused endpoint and its edge, using paint changes and r
     { initialProps: { id: 'one' as string | null, live: false } },
   );
   const evaluate = (layer: string, prop: string, properties: Record<string, unknown>) => {
-    const parsed = createExpression(paints.get(`${layer}:${prop}`));
+    const parsed = createExpression(paints.get(`${layer}:${prop}`), `layers[0].${prop}`);
     if (parsed.result === 'error') throw new Error(JSON.stringify(parsed.value));
     return parsed.value.evaluate(
       { zoom: 12 },

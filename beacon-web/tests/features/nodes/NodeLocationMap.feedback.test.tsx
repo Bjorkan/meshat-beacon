@@ -5,34 +5,32 @@ import type { Node } from '../../../src/features/nodes/types';
 
 const state = vi.hoisted(() => ({ handlers: new Map<string, () => void>(), removed: vi.fn() }));
 vi.mock('maplibre-gl', () => ({
-  default: {
-    Map: class {
-      on(event: string, cb: () => void) {
-        state.handlers.set(event, cb);
-      }
-      addControl() {}
-      getContainer() {
-        return document.createElement('div');
-      }
-      getSource() {
-        return undefined;
-      }
-      getLayer() {
-        return undefined;
-      }
-      addSource() {}
-      addLayer() {}
-      setCenter() {}
-      loaded() {
-        return false;
-      }
-      remove() {
-        state.removed();
-      }
-    },
-    NavigationControl: class {},
-    AttributionControl: class {},
+  Map: class {
+    on(event: string, cb: () => void) {
+      state.handlers.set(event, cb);
+    }
+    addControl() {}
+    getContainer() {
+      return document.createElement('div');
+    }
+    getSource() {
+      return undefined;
+    }
+    getLayer() {
+      return undefined;
+    }
+    addSource() {}
+    addLayer() {}
+    setCenter() {}
+    loaded() {
+      return false;
+    }
+    remove() {
+      state.removed();
+    }
   },
+  NavigationControl: class {},
+  AttributionControl: class {},
 }));
 beforeEach(() => {
   state.handlers.clear();

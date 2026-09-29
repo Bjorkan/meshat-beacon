@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import maplibregl from 'maplibre-gl';
+import '../map/maplibre-worker';
+import * as maplibregl from 'maplibre-gl';
 import type {
   Map as MapLibreMap,
   GeoJSONSource,
   LineLayerSpecification,
   CircleLayerSpecification,
   SymbolLayerSpecification,
+  MapLayerMouseEvent,
 } from 'maplibre-gl';
 import type { Point } from 'geojson';
 import type { TraceLegProps, TracePath, TracePointProps } from './trace-path';
@@ -66,7 +68,7 @@ function TraceCanvas({
     attrib?.classList.remove('maplibregl-compact-show');
     // klick på en nod → popup med namn + råa decimalkoordinater; klick på ett ben → popup med
     // ändpunkter + SNR. Pekarcursor vid hover.
-    map.on('click', TRACE_NODE_LAYER, (e) => {
+    map.on('click', TRACE_NODE_LAYER, (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
       const [lng, lat] = (f.geometry as Point).coordinates as [number, number];
@@ -92,7 +94,7 @@ function TraceCanvas({
     const onLeave = () => {
       map.getCanvas().style.cursor = '';
     };
-    map.on('click', TRACE_LINE_LAYER, (e) => {
+    map.on('click', TRACE_LINE_LAYER, (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
       const el = document.createElement('div');

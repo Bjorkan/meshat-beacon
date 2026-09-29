@@ -24,6 +24,7 @@ function lineExpression() {
   );
   const parsed = createExpression(
     setPaintProperty.mock.calls[0]![2],
+    'layers[0].paint.line-color',
     latest.paint_line['line-color'],
   );
   if (parsed.result === 'error') throw new Error(JSON.stringify(parsed.value));

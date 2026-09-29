@@ -10,13 +10,15 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useTranslation } from 'react-i18next';
-import maplibregl from 'maplibre-gl';
+import '../map/maplibre-worker';
+import * as maplibregl from 'maplibre-gl';
 import type {
   Map as MapLibreMap,
   GeoJSONSource,
   LineLayerSpecification,
   CircleLayerSpecification,
   SymbolLayerSpecification,
+  ErrorEvent,
 } from 'maplibre-gl';
 import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import type { PlannedRoute } from '../../types/api';
@@ -165,14 +167,20 @@ function RouteCanvas({
     m.on('mouseleave', ROUTE_HIT_LAYER, onLeave);
     let failed = false;
     let hasLoaded = false;
-    const onError = (e?: { error?: Error; sourceId?: string; tile?: unknown }) => {
+    const onError = (e?: ErrorEvent) => {
       // Transient tile/source failures (one basemap tile timing out, a
       // momentary network blip) are non-fatal: the rest of the map stays
       // usable, so never blank it for those. MapLibre tags tile/source
       // errors with a tile/sourceId; style-level errors have neither.
-      // Same rule as the main map (useMapLibre): only a style-level error
-      // before anything ever loaded is fatal.
-      if (e != null && (e.sourceId != null || e.tile != null)) return;
+      // (v6's ErrorEvent only types `error`, but tile errors still carry
+      // the tile on the event object at runtime.) Same rule as the main
+      // map (useMapLibre): only a style-level error before anything ever
+      // loaded is fatal.
+      const { sourceId, tile } = (e ?? {}) as ErrorEvent & {
+        sourceId?: string;
+        tile?: unknown;
+      };
+      if (sourceId != null || tile != null) return;
       if (hasLoaded) return;
       failed = true;
       setStatus('error');

@@ -1,7 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import './maplibre-worker';
+import * as maplibregl from 'maplibre-gl';
 import { mapOverlayInsets } from './map-insets';
-import type { Map as MapLibreMap, RasterDEMSourceSpecification } from 'maplibre-gl';
+import type {
+  Map as MapLibreMap,
+  RasterDEMSourceSpecification,
+  MapStyleImageMissingEvent,
+  ErrorEvent,
+} from 'maplibre-gl';
 import {
   DEM_TILES,
   DEM_ATTRIBUTION,
@@ -152,16 +158,18 @@ export function useMapLibre(
     // identical. Our own markers all start with "node-" and are rasterized by useMapNodes, so we
     // leave those alone. This lives here (not in useMapNodes) so it's listening before the base
     // style's first paint, when those icons are first requested.
-    map.on('styleimagemissing', (e) => {
+    map.on('styleimagemissing', (e: MapStyleImageMissingEvent) => {
       if (!e.id.startsWith('node-') && !map.hasImage(e.id)) map.addImage(e.id, new ImageData(1, 1));
     });
 
-    map.on('error', (e) => {
-      const err = e as { error?: Error; sourceId?: string; tile?: unknown };
+    map.on('error', (e: ErrorEvent) => {
+      // v6's ErrorEvent only types `error`, but tile errors still carry the tile (and some
+      // source errors a sourceId) on the event object at runtime — read them defensively.
+      const { sourceId, tile } = e as ErrorEvent & { sourceId?: string; tile?: unknown };
       // A single tile/source failure (one basemap or DEM tile timing out / 403 / a momentary network
       // blip) is transient and non-fatal — the rest of the map stays usable — so never blank the map
       // for it. maplibre tags tile/source errors with a tile/sourceId; style-level errors have neither.
-      if (err.sourceId != null || err.tile != null) return;
+      if (sourceId != null || tile != null) return;
       // The new basemap failed mid-swap. setStyle keeps the old style (and our node layers)
       // rendered, so roll back to the last good style and tell MapView to revert the picker rather
       // than blanking the map under a fatal overlay.
@@ -174,7 +182,10 @@ export function useMapLibre(
       }
       // Initial map/style load failed (no basemap ever shown): surface the overlay. It self-heals if a
       // later load succeeds (onStyleReady clears it). Other post-load style errors are left non-fatal.
-      if (!hasLoadedRef.current) setError(err.error ?? new Error('Map failed to load'));
+      if (!hasLoadedRef.current)
+        setError(
+          e.error instanceof Error ? e.error : new Error(e.error?.message ?? 'Map failed to load'),
+        );
     });
 
     return () => {

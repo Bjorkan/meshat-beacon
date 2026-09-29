@@ -1,12 +1,14 @@
 // src/features/map/PacketPathMap.tsx
 import { useEffect, useRef, useState } from 'react';
-import maplibregl from 'maplibre-gl';
+import './maplibre-worker';
+import * as maplibregl from 'maplibre-gl';
 import type {
   Map as MapLibreMap,
   GeoJSONSource,
   LineLayerSpecification,
   CircleLayerSpecification,
   SymbolLayerSpecification,
+  MapLayerMouseEvent,
 } from 'maplibre-gl';
 import type { Point } from 'geojson';
 import type { PacketPath } from './packet-path';
@@ -64,7 +66,7 @@ export function PacketPathMap({
     map.on('mouseleave', NODE_LAYER, () => {
       map.getCanvas().style.cursor = '';
     });
-    map.on('click', NODE_LAYER, (e) => {
+    map.on('click', NODE_LAYER, (e: MapLayerMouseEvent) => {
       const f = e.features?.[0];
       if (!f) return;
       const [lng, lat] = (f.geometry as Point).coordinates as [number, number];
