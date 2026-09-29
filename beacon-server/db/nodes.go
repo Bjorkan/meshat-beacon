@@ -407,14 +407,30 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 		return nil, err
 	}
 	seen := make(map[uuid.UUID]int)
+	// Marks neighbors whose IATA context already came from the node's own observation row.
+	ownRegion := make(map[uuid.UUID]bool)
 	items := make([]api.NodeNeighbor, 0, len(rows))
 	for _, r := range rows {
+		// Signal data is directional (the SQL projects it from the node's own edge row only);
+		// reverse-direction rows list the neighbor but carry no SNR to merge.
+		sampleCount := int64(0)
+		if r.SnrSampleCount != nil {
+			sampleCount = *r.SnrSampleCount
+		}
 		if idx, ok := seen[r.ID]; ok {
 			items[idx].ObservationCount += r.ObservationCount
-			mergeNeighborSNR(&items[idx], r.Snr, r.SnrSampleCount, r.SnrLastSeen)
+			mergeNeighborSNR(&items[idx], r.Snr, sampleCount, r.SnrLastSeen)
+			// IATA context: where THIS node heard the link beats where the neighbor heard
+			// it. Rows arrive freshest-first, so the first own row is the freshest own
+			// observation; own rows take over from reverse rows even when older.
+			if r.ObservedByNode && !ownRegion[r.ID] {
+				ownRegion[r.ID] = true
+				items[idx].IATA = r.Iata
+			} else if !ownRegion[r.ID] && r.LastSeen.Time.After(time.UnixMilli(items[idx].LastSeen)) {
+				items[idx].IATA = r.Iata
+			}
 			if r.LastSeen.Time.After(time.UnixMilli(items[idx].LastSeen)) {
 				items[idx].LastSeen = r.LastSeen.Time.UnixMilli()
-				items[idx].IATA = r.Iata
 			}
 			if r.FirstSeen.Time.Before(time.UnixMilli(items[idx].FirstSeen)) {
 				items[idx].FirstSeen = r.FirstSeen.Time.UnixMilli()
@@ -422,6 +438,9 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 			continue
 		}
 		seen[r.ID] = len(items)
+		if r.ObservedByNode {
+			ownRegion[r.ID] = true
+		}
 		items = append(items, api.NodeNeighbor{
 			ID:               r.ID,
 			Name:             r.Name,
@@ -435,7 +454,7 @@ func (s *Store) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.N
 			FirstSeen:        r.FirstSeen.Time.UnixMilli(),
 			LastSeen:         r.LastSeen.Time.UnixMilli(),
 			SNR:              r.Snr,
-			SNRSampleCount:   r.SnrSampleCount,
+			SNRSampleCount:   sampleCount,
 			SNRLastSeen:      timestampMillis(r.SnrLastSeen),
 		})
 	}

@@ -533,9 +533,15 @@ const getNodeNeighbors = `-- name: GetNodeNeighbors :many
 SELECT
     n.id, n.public_key, n.name, n.node_type, n.latitude, n.longitude,
     nn.iata, nn.observation_count, nn.first_seen, nn.last_seen,
-    nn.snr, nn.snr_sample_count, nn.snr_last_seen
+    own.snr, own.snr_sample_count, own.snr_last_seen,
+    (nn.node_id = $1) AS observed_by_node
 FROM node_neighbors nn
 JOIN nodes n ON n.id = CASE WHEN nn.node_id = $1 THEN nn.neighbor_id ELSE nn.node_id END
+LEFT JOIN node_neighbors own
+  ON nn.node_id = $1
+ AND own.node_id = nn.node_id
+ AND own.neighbor_id = nn.neighbor_id
+ AND own.iata = nn.iata
 WHERE nn.node_id = $1 OR nn.neighbor_id = $1
 ORDER BY nn.last_seen DESC
 `
@@ -552,11 +558,21 @@ type GetNodeNeighborsRow struct {
 	FirstSeen        pgtype.Timestamptz `json:"first_seen"`
 	LastSeen         pgtype.Timestamptz `json:"last_seen"`
 	Snr              *float32           `json:"snr"`
-	SnrSampleCount   int64              `json:"snr_sample_count"`
+	SnrSampleCount   *int64             `json:"snr_sample_count"`
 	SnrLastSeen      pgtype.Timestamptz `json:"snr_last_seen"`
+	ObservedByNode   bool               `json:"observed_by_node"`
 }
 
 // Returns the neighbors of a node with details, ordered by most recently seen.
+// SNR is directional radio reception: node_neighbors rows record what the row's
+// node_id radio measured hearing neighbor_id, so only rows where the requested
+// node itself did the hearing (nn.node_id = $1) carry signal data. The self-join
+// projects those columns from the node's own edge row (unique per node/neighbor/
+// iata, so at most one match) and stays NULL for reverse-direction rows. A link
+// known only from the neighbor's own reports still lists the neighbor — adjacency
+// is symmetric — but with NULL SNR, so neither end ever sees a mixed average of
+// two directions that can measure completely differently (asymmetric TX power,
+// noise floor, antenna). Issue #100.
 func (q *Queries) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]GetNodeNeighborsRow, error) {
 	rows, err := q.db.Query(ctx, getNodeNeighbors, nodeID)
 	if err != nil {
@@ -580,6 +596,7 @@ func (q *Queries) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]Get
 			&i.Snr,
 			&i.SnrSampleCount,
 			&i.SnrLastSeen,
+			&i.ObservedByNode,
 		); err != nil {
 			return nil, err
 		}

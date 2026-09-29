@@ -23,7 +23,7 @@ type NodeNeighbor struct {
 	ObservationCount int64     `json:"observationCount" binding:"required"`
 	FirstSeen        int64     `json:"firstSeen" binding:"required"` // epoch ms
 	LastSeen         int64     `json:"lastSeen" binding:"required"`  // epoch ms
-	SNR              *float32  `json:"snr,omitempty"`
+	SNR              *float32  `json:"snr,omitempty"`                // receive SNR at this node, from its own observations only (directional; never averaged with the reverse direction)
 	SNRSampleCount   int64     `json:"snrSampleCount" binding:"required"`
 	SNRLastSeen      int64     `json:"snrLastSeen,omitempty"` // epoch ms of most recent reliable SNR sample
 }

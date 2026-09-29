@@ -4272,6 +4272,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "snr": {
+                    "description": "receive SNR at this node, from its own observations only (directional; never averaged with the reverse direction)",
                     "type": "number"
                 },
                 "snrLastSeen": {

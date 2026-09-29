@@ -66,6 +66,15 @@ type Querier interface {
 	GetNodeByID(ctx context.Context, arg GetNodeByIDParams) (GetNodeByIDRow, error)
 	GetNodeByPubkey(ctx context.Context, publicKey []byte) (uuid.UUID, error)
 	// Returns the neighbors of a node with details, ordered by most recently seen.
+	// SNR is directional radio reception: node_neighbors rows record what the row's
+	// node_id radio measured hearing neighbor_id, so only rows where the requested
+	// node itself did the hearing (nn.node_id = $1) carry signal data. The self-join
+	// projects those columns from the node's own edge row (unique per node/neighbor/
+	// iata, so at most one match) and stays NULL for reverse-direction rows. A link
+	// known only from the neighbor's own reports still lists the neighbor — adjacency
+	// is symmetric — but with NULL SNR, so neither end ever sees a mixed average of
+	// two directions that can measure completely differently (asymmetric TX power,
+	// noise floor, antenna). Issue #100.
 	GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]GetNodeNeighborsRow, error)
 	// Copyright 2026 Beacon Contributors
 	// SPDX-License-Identifier: AGPL-3.0-or-later
