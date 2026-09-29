@@ -498,7 +498,9 @@ export function MapView({
           </MapSettingsPanel>
         </div>
         {packetFlow && (
-          <div className="pointer-events-auto mt-auto flex max-h-[40%] min-h-0 min-w-0 max-w-full shrink-0 flex-col @3xl:mt-0 @3xl:mr-12 @3xl:max-h-full @3xl:max-w-90">
+          /* The nav lane (zoom/compass/Home, ~41px + margins) is reserved at every width: below @3xl
+             the feed is bottom-anchored and would otherwise reach under the taller control stack. */
+          <div className="pointer-events-auto mr-12 mt-auto flex max-h-[40%] min-h-0 min-w-0 max-w-full shrink-0 flex-col @3xl:mt-0 @3xl:max-h-full @3xl:max-w-90">
             <LivePacketFeed
               active={packetFlow}
               resetKey={`${regionKey}:${packetFlowSession}`}

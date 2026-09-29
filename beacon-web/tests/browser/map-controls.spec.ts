@@ -72,14 +72,31 @@ async function mockMap(page: Page) {
 async function noOverlap(first: Locator, second: Locator) {
   const a = await first.boundingBox();
   const b = await second.boundingBox();
-  expect(a).not.toBeNull();
-  expect(b).not.toBeNull();
-  expect(
+  expect(a, await describeLocator(first)).not.toBeNull();
+  expect(b, await describeLocator(second)).not.toBeNull();
+  const separated =
     a!.x + a!.width <= b!.x ||
-      b!.x + b!.width <= a!.x ||
-      a!.y + a!.height <= b!.y ||
-      b!.y + b!.height <= a!.y,
-  ).toBe(true);
+    b!.x + b!.width <= a!.x ||
+    a!.y + a!.height <= b!.y ||
+    b!.y + b!.height <= a!.y;
+  if (!separated)
+    throw new Error(
+      `Overlap: ${await describeLocator(first)}=${JSON.stringify(a)} vs ${await describeLocator(
+        second,
+      )}=${JSON.stringify(b)}`,
+    );
+}
+
+async function describeLocator(locator: Locator): Promise<string> {
+  return locator
+    .evaluate((element) => {
+      const label =
+        element.getAttribute('aria-label') ??
+        element.textContent?.slice(0, 30) ??
+        element.className.slice(0, 40);
+      return `${element.tagName.toLowerCase()} "${label}"`;
+    })
+    .catch(() => 'locator');
 }
 
 for (const viewport of [
