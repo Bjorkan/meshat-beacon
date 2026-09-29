@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { nodeMarkerId, rasterizeMapMarker } from '../../../src/features/map/marker-images';
+import {
+  nodeMarkerId,
+  rasterizeMapMarker,
+  OBSERVER_EYE,
+} from '../../../src/features/map/marker-images';
 import { clusterSegments } from '../../../src/features/map/cluster-style';
 
 const ctx = {
@@ -66,11 +70,12 @@ describe('node capsules', () => {
     const normal = nodeMarkerId(key, 'repeater', false);
     expect(normal).toBe('node-pill:repeater:0:5C0680');
     rasterizeMapMarker(normal, 2);
-    expect(ctx.fillText.mock.calls[0]![0]).toBe('5C0680');
-    expect(ctx.quadraticCurveTo).not.toHaveBeenCalled();
     rasterizeMapMarker(nodeMarkerId(key, 'repeater', true), 2);
-    expect(ctx.quadraticCurveTo).toHaveBeenCalledTimes(2);
-    expect(ctx.fillText.mock.calls[1]![0]).toBe('5C0680');
+    expect(ctx.fillText.mock.calls.map((args) => args[0])).toEqual([
+      '5C0680',
+      OBSERVER_EYE,
+      '5C0680',
+    ]);
   });
 
   it('retains the same content when selected and supports unknown categories', () => {

@@ -6,6 +6,8 @@ import { CLUSTER_RADIUS_STOPS } from './marker-scale';
 // Shared dark face on both basemaps. The semantic contour is the only category treatment.
 export const MARKER_FACE = '#1D2D38';
 export const MARKER_TEXT = '#FFFFFF';
+// The platform emoji renders the observer glyph natively on every device.
+export const OBSERVER_EYE = '👁️';
 const NODE_ICON_PREFIX = 'node-pill:';
 
 export function nodeMarkerId(publicKey: string, type: string, observer: boolean): string {
@@ -111,23 +113,14 @@ function drawNode(
   ctx.strokeStyle = nodeTypeColor(type);
   ctx.lineWidth = 2.5;
   ctx.stroke();
-  if (observer) {
-    // A compact eye drawn as vectors rather than a platform-dependent emoji.
-    ctx.beginPath();
-    ctx.moveTo(12, 16);
-    ctx.quadraticCurveTo(19, 7, 26, 16);
-    ctx.quadraticCurveTo(19, 25, 12, 16);
-    ctx.fillStyle = MARKER_TEXT;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(19, 16, 3, 0, Math.PI * 2);
-    ctx.fillStyle = MARKER_FACE;
-    ctx.fill();
-  }
-  ctx.font = '700 12px monospace';
   ctx.fillStyle = MARKER_TEXT;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
+  if (observer) {
+    ctx.font = '13px sans-serif';
+    ctx.fillText(OBSERVER_EYE, 19, 17);
+  }
+  ctx.font = '700 12px monospace';
   ctx.fillText(label, width / 2 + (observer ? 9 : 0), height / 2 + 0.5);
   return ctx.getImageData(0, 0, element.width, element.height);
 }

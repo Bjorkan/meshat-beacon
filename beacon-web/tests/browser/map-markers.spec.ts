@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 interface MarkerDraw {
   text: string;
   rings: Array<{ color: string; sweep: number }>;
-  eyeCurves: number;
+  eyeEmoji: number;
 }
 declare global {
   interface Window {
@@ -23,11 +23,11 @@ test('map renders actual cluster proportions and three-byte observer capsules', 
     window.markerDraws = [];
     const records = new WeakMap<CanvasRenderingContext2D, MarkerDraw & { arc?: number }>();
     const record = (ctx: CanvasRenderingContext2D) => {
-      if (!records.has(ctx)) records.set(ctx, { text: '', rings: [], eyeCurves: 0 });
+      if (!records.has(ctx)) records.set(ctx, { text: '', rings: [], eyeEmoji: 0 });
       return records.get(ctx)!;
     };
     const proto = CanvasRenderingContext2D.prototype;
-    const { beginPath, arc, stroke, fillText, quadraticCurveTo, getImageData } = proto;
+    const { beginPath, arc, stroke, fillText, getImageData } = proto;
     proto.beginPath = function () {
       record(this).arc = undefined;
       return beginPath.call(this);
@@ -43,12 +43,9 @@ test('map renders actual cluster proportions and three-byte observer capsules', 
       return stroke.apply(this, args);
     };
     proto.fillText = function (...args) {
-      record(this).text = args[0];
+      if (args[0] === '👁️') record(this).eyeEmoji += 1;
+      else record(this).text = args[0];
       return fillText.apply(this, args);
-    };
-    proto.quadraticCurveTo = function (...args) {
-      record(this).eyeCurves++;
-      return quadraticCurveTo.apply(this, args);
     };
     proto.getImageData = function (...args) {
       const data = record(this);
@@ -56,7 +53,7 @@ test('map renders actual cluster proportions and three-byte observer capsules', 
         window.markerDraws.push({
           text: data.text,
           rings: [...data.rings],
-          eyeCurves: data.eyeCurves,
+          eyeEmoji: data.eyeEmoji,
         });
       return getImageData.apply(this, args);
     };
@@ -115,12 +112,12 @@ test('map renders actual cluster proportions and three-byte observer capsules', 
     .toEqual([{ color: '#0072b2', sweep: Math.PI * 2 }]);
   await expect
     .poll(() =>
-      page.evaluate(() => window.markerDraws.find((draw) => draw.text === '5C0680')?.eyeCurves),
+      page.evaluate(() => window.markerDraws.find((draw) => draw.text === '5C0680')?.eyeEmoji),
     )
-    .toBe(2);
+    .toBe(1);
   await expect
     .poll(() =>
-      page.evaluate(() => window.markerDraws.find((draw) => draw.text === 'ABCDEF')?.eyeCurves),
+      page.evaluate(() => window.markerDraws.find((draw) => draw.text === 'ABCDEF')?.eyeEmoji),
     )
     .toBe(0);
   await page.screenshot({ path: '/tmp/beacon-map-markers.png' });

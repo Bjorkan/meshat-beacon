@@ -1,5 +1,6 @@
 import { useTranslation } from 'react-i18next';
 import { NODE_TYPES } from '../../lib/node-types';
+import { ObserverIcon } from '../../components/ObserverIcon';
 import { NODE_TYPE_COLORS } from '../node-type-colors';
 import { PACKET_FLOW_COLOR } from './types';
 
@@ -35,10 +36,7 @@ export function MapLegend({
             </li>
           ))}
           <li className="col-span-2 flex items-center gap-1.5">
-            <svg aria-hidden width="14" height="14" viewBox="0 0 20 20" fill="none">
-              <path d="M2 10Q10 0 18 10Q10 20 2 10Z" stroke="currentColor" strokeWidth="1.5" />
-              <circle cx="10" cy="10" r="3" fill="currentColor" />
-            </svg>
+            <ObserverIcon />
             {t('entities.observer')}
           </li>
         </ul>
