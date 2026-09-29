@@ -128,6 +128,14 @@ export const FOCUSED_NEIGHBORS_LAYER_ID = 'focused-neighbors-markers';
 export const MAP_NEIGHBOR_LINES_STORAGE_KEY = 'beacon-map-neighbor-lines';
 export type NeighborLinesMode = 'on' | 'selected' | 'off';
 
+// Neutral map-view values — what a fresh visitor gets (the useState seeds in MapView agree). The
+// live URL sync omits params equal to these so everyday links stay compact; an absent param always
+// means the neutral value.
+export const DEFAULT_CLUSTERED = true;
+export const DEFAULT_NEIGHBOR_LINES: NeighborLinesMode = 'selected';
+export const DEFAULT_FLOW = false;
+export const DEFAULT_BORDERS = false;
+
 // --- IATA border layer ---
 export const IATA_BORDERS_SOURCE_ID = 'iata-borders';
 export const IATA_BORDERS_LINE_LAYER_ID = 'iata-borders-line'; // outline stroke beneath the markers

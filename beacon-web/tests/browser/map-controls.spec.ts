@@ -130,9 +130,6 @@ for (const viewport of [
     await page.getByText('Map legend', { exact: true }).click();
     await noOverlap(panel, feed);
     await noOverlap(feed, nav);
-    await page
-      .getByRole('button', { name: 'Copy a link to this map view' })
-      .scrollIntoViewIfNeeded();
     await noOverlap(panel, live);
     await page.screenshot({ path: `/tmp/beacon-map-controls-${viewport.width}.png` });
 

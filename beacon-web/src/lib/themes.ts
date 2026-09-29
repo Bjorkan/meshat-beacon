@@ -19,8 +19,6 @@ const FALLBACK: Theme = {
     '--palette-bg-raised': '#263243',
     '--palette-border': '#374151',
     '--palette-border-subtle': '#2C3844',
-    // space around the globe sphere: a soft, weaker primary green
-    '--palette-globe-space': '#16251E',
     '--palette-primary': '#5CCE7A',
     '--palette-primary-dim': '#349251',
     '--palette-secondary': '#67EA94',

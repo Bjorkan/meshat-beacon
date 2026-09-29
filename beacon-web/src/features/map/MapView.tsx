@@ -4,6 +4,7 @@ import { readPreference, writePreference } from '../../lib/storage';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useMapLibre } from './useMapLibre';
 import { useMapNodes } from './useMapNodes';
@@ -27,7 +28,14 @@ import {
 } from './node-geojson';
 import { MapLegend } from './MapLegend';
 import { MapSettingsPanel } from './MapSettingsPanel';
-import { buildMapParams, type MapViewSnapshot, type ParsedMapView } from './map-url';
+import {
+  buildCameraPatch,
+  buildSettingsPatch,
+  cameraMatchesUrl,
+  settingsMatchUrl,
+  urlCamera,
+  type ParsedMapView,
+} from './map-url';
 import {
   MAP_BORDERS_STORAGE_KEY,
   mapStyleForTheme,
@@ -36,7 +44,6 @@ import {
   MAP_CLUSTER_STORAGE_KEY,
   MAP_NODE_TYPE_STORAGE_KEY,
   MAP_MESHCORE_REGION_STORAGE_KEY,
-  DEFAULT_CENTER,
   DEFAULT_ZOOM,
   type NeighborLinesMode,
 } from './types';
@@ -131,10 +138,18 @@ export function MapView({
     writePreference(MAP_BORDERS_STORAGE_KEY, on ? 'on' : 'off');
   }, []);
 
-  // A deep-link camera opens the map here and suppresses the initial region fit (see useMapLibre).
+  // A deep-link camera opens the map here and suppresses the initial region fit (see useMapLibre);
+// tilt/rotation ride along so a shared link restores the exact view.
   const initialCamera = useMemo(
     () =>
-      urlView.center ? { center: urlView.center, zoom: urlView.zoom ?? DEFAULT_ZOOM } : undefined,
+      urlView.center
+        ? {
+            center: urlView.center,
+            zoom: urlView.zoom ?? DEFAULT_ZOOM,
+            pitch: urlView.pitch,
+            bearing: urlView.bearing,
+          }
+        : undefined,
     [urlView],
   );
 
@@ -281,24 +296,131 @@ export function MapView({
     return () => window.clearTimeout(timer);
   }, [mapRef, presentationKey]);
 
-  // Snapshot the current view (live camera + settings) into deep-link params for the copy button.
-  // Evaluated at click, so it reads the real camera. The current route is already /map.
-  const buildShareParams = useCallback((): Record<string, string | null> => {
-    const map = mapRef.current;
-    const center = map?.getCenter();
-    const snapshot: MapViewSnapshot = {
-      center: center ? [center.lng, center.lat] : DEFAULT_CENTER,
-      zoom: map?.getZoom() ?? DEFAULT_ZOOM,
+  // ── live URL sync ─────────────────────────────────────────────────────────────────────────────
+  // The address bar always mirrors the map: camera (lat/lng/zoom/pitch/bearing) after every move,
+  // settings after every toggle — so copying the URL at any moment shares the exact view. Writes
+  // use replace (no history spam). An arriving URL with foreign values (a pasted deep link) flows
+  // the other way: its settings are adopted and its camera flies. Params a region navigation
+  // strips are regained by the same loop.
+
+  const navigate = useNavigate({ from: '/map' });
+  const urlViewRef = useRef(urlView); // read by the moveend writer without re-attaching per render
+  useEffect(() => {
+    urlViewRef.current = urlView;
+  }, [urlView]);
+
+  // Adopt a foreign deep link during render — the react-hooks-endorsed alternative to setState in
+  // effects. The serialized view is the change detector: our own URL writes round-trip values
+  // identical to the live settings, so they adopt as no-ops. Absent params never adopt, keeping
+  // storage-seeded state intact.
+  const urlKey = JSON.stringify(urlView);
+  const [lastUrlKey, setLastUrlKey] = useState(urlKey);
+  if (urlKey !== lastUrlKey) {
+    setLastUrlKey(urlKey);
+    if (urlView.clustered !== undefined && urlView.clustered !== clustered)
+      setClustered(urlView.clustered);
+    if (urlView.nodeType !== undefined && urlView.nodeType !== typeFilter)
+      setTypeFilter(urlView.nodeType);
+    if (urlView.neighborLines !== undefined && urlView.neighborLines !== neighborLines)
+      setNeighborLines(urlView.neighborLines);
+    if (urlView.flow !== undefined && urlView.flow !== packetFlow) setPacketFlow(urlView.flow);
+    if (urlView.borders !== undefined && urlView.borders !== borders) setBorders(urlView.borders);
+    if (urlView.meshcoreRegion !== undefined && urlView.meshcoreRegion !== meshcoreRegionFilter)
+      setMeshcoreRegionFilter(urlView.meshcoreRegion);
+  }
+
+  // Settings -> URL whenever they differ from it: local toggles, storage-seeded state on a
+  // param-less load, or params a region navigation stripped. Only non-neutral settings are written
+  // (an absent param means the neutral default). Camera keys ride along untouched (prev) — the
+  // moveend writer below owns them.
+  useEffect(() => {
+    const settings = {
       clustered,
       nodeType: typeFilter,
       neighborLines,
-
       flow: packetFlow,
       borders,
       meshcoreRegion: meshcoreRegionFilter,
     };
-    return buildMapParams(snapshot);
-  }, [mapRef, clustered, typeFilter, neighborLines, packetFlow, borders, meshcoreRegionFilter]);
+    if (settingsMatchUrl(urlView, settings)) return;
+    navigate({
+      to: '.',
+      // The patch omits neutral keys, so each managed key is set explicitly — undefined drops a
+      // stale param from the URL (e.g. clustering=off returning to the clustered default).
+      search: (prev) => {
+        const patch = buildSettingsPatch(settings);
+        return {
+          ...prev,
+          clustering: patch.clustering,
+          node_type: patch.node_type,
+          neighbor_lines: patch.neighbor_lines,
+          flow: patch.flow,
+          borders: patch.borders,
+          meshcore_region: patch.meshcore_region,
+        };
+      },
+      replace: true,
+    });
+  }, [urlView, clustered, typeFilter, neighborLines, packetFlow, borders, meshcoreRegionFilter, navigate]);
+
+  // Camera: fly to an arriving deep-link camera that differs from the live one. Our own writes
+  // round-trip equal, so they skip. Absent tilt/rotation in a link mean the flat defaults.
+  useEffect(() => {
+    const map = mapRef.current;
+    const target = urlCamera(urlView);
+    if (!map || !target) return;
+    const center = map.getCenter();
+    if (
+      cameraMatchesUrl(urlView, {
+        center: [center.lng, center.lat],
+        zoom: map.getZoom(),
+        pitch: map.getPitch(),
+        bearing: map.getBearing(),
+      })
+    )
+      return;
+    map.flyTo({ ...target, essential: true });
+  }, [urlView, isReady, mapRef]);
+
+  // Camera -> URL. moveend covers pan/zoom/fly/rotate/tilt ends; the immediate write makes the view
+  // the map opens with (deep-link camera or default) shareable before any move. Neutral values are
+  // omitted, so a default view keeps the URL clean until the camera actually moves.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady) return;
+    const write = () => {
+      const center = map.getCenter();
+      const camera = {
+        center: [center.lng, center.lat] as [number, number],
+        zoom: map.getZoom(),
+        pitch: map.getPitch(),
+        bearing: map.getBearing(),
+      };
+      if (cameraMatchesUrl(urlViewRef.current, camera)) return;
+      navigate({
+        to: '.',
+        // Same explicit-set pattern as the settings writer: neutral camera values drop their keys
+        // (e.g. returning Home to the default view clears lat/lng/zoom, flat tilt clears pitch).
+        search: (prev) => {
+          const patch = buildCameraPatch(camera);
+          return {
+            ...prev,
+            lat: patch.lat,
+            lng: patch.lng,
+            zoom: patch.zoom,
+            pitch: patch.pitch,
+            bearing: patch.bearing,
+          };
+        },
+        replace: true,
+      });
+    };
+    write();
+    map.on('moveend', write);
+    return () => {
+      map.off('moveend', write);
+    };
+  }, [isReady, navigate, mapRef]);
 
   useMapNodes(
     mapRef,
@@ -338,9 +460,8 @@ export function MapView({
     >
       {/* Fill via flex-1, NOT absolute inset-0: maplibre adds .maplibregl-map { position: relative }
           to this element, which overrides Tailwind's `absolute` and would collapse inset-0 to 0
-          height. data-dark drives the maplibre control theming in index.css. bg-globe-space paints
-          the space around the globe sphere (the canvas is transparent outside it). */}
-      <div ref={containerRef} data-dark={isDark} className="flex-1 bg-globe-space" />
+          height. data-dark drives the maplibre control theming in index.css. */}
+      <div ref={containerRef} data-dark={isDark} className="flex-1" />
       {/* Shared flow prevents panel collisions. Use the map's width, including when a node
           sidebar is open, and leave the right-hand navigation controls their own lane. */}
       <div className="pointer-events-none absolute inset-x-3 top-3 bottom-24 z-10 flex min-h-0 flex-col gap-2 @3xl:flex-row @3xl:items-start @3xl:justify-between">
@@ -357,7 +478,6 @@ export function MapView({
             onBordersChange={handleBordersChange}
             meshcoreRegion={meshcoreRegionFilter}
             onMeshcoreRegionChange={handleMeshcoreRegionChange}
-            buildShareParams={buildShareParams}
           >
             <MapLegend
               borders={borders}

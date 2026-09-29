@@ -45,8 +45,9 @@ export function MapRoute() {
 
   return (
     <>
+      {/* No key: the URL syncs live with the map (camera + settings), so a remount on every search
+          change would rebuild the map in a loop. MapView reacts to urlView prop changes instead. */}
       <MapView
-        key={JSON.stringify(urlView)}
         wsManager={wsManager}
         urlView={urlView}
         selectedNodeId={selectedNodeId}

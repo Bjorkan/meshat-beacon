@@ -21,7 +21,6 @@ const baseProps = {
   onBordersChange: vi.fn(),
   meshcoreRegion: '',
   onMeshcoreRegionChange: vi.fn(),
-  buildShareParams: () => ({}),
 };
 
 const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });

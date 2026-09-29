@@ -3,7 +3,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
 import { SegmentedControl } from './SegmentedControl';
 import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
-import { CopyLinkButton } from '../../components/CopyLinkButton';
 import { MeshCoreRegionPicker } from '../../components/MeshCoreRegionPicker';
 import { meshcoreRegionQueries } from '../../api/queries';
 
@@ -20,8 +19,6 @@ interface MapSettingsPanelProps {
   // MeshCore region token ("" = All); options combine the built-in catalogue and discovery.
   meshcoreRegion: string;
   onMeshcoreRegionChange: (token: string) => void;
-  // builds deep-link params for the current view, evaluated at copy time (reads the live camera)
-  buildShareParams: () => Record<string, string | null>;
   children?: ReactNode;
 }
 
@@ -37,7 +34,6 @@ export function MapSettingsPanel({
   onBordersChange,
   meshcoreRegion,
   onMeshcoreRegionChange,
-  buildShareParams,
   children,
 }: MapSettingsPanelProps) {
   const { t } = useTranslation();
@@ -167,13 +163,6 @@ export function MapSettingsPanel({
             )}
           </div>
           {children}
-          <div className="px-3 py-2.5 border-t border-border-subtle flex justify-end">
-            <CopyLinkButton
-              params={buildShareParams}
-              label={t('map.copyLink')}
-              ariaLabel={t('map.copyLinkLabel')}
-            />
-          </div>
         </div>
       )}
     </div>

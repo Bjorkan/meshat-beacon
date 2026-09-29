@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import './maplibre-worker';
 import * as maplibregl from 'maplibre-gl';
+import i18n from '../../i18n';
 import { mapOverlayInsets } from './map-insets';
 import type {
   Map as MapLibreMap,
@@ -70,6 +71,85 @@ function addTerrain(map: MapLibreMap, isDark: boolean) {
   map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
 }
 
+// Camera framing shared by the selection fit effect and the Home control. keepDeepLinkView lets the
+// first fit after a deep-link camera keep the URL-supplied view instead of framing the region.
+function performFit(
+  map: MapLibreMap,
+  points: [number, number][] | null,
+  keepDeepLinkView: boolean,
+) {
+  if (!points || points.length === 0) {
+    map.flyTo({
+      center: DEFAULT_CENTER,
+      padding: map.getPadding(),
+      zoom: DEFAULT_ZOOM,
+      pitch: DEFAULT_PITCH,
+      bearing: DEFAULT_BEARING,
+    });
+    return;
+  }
+  if (keepDeepLinkView) return;
+  const bounds = points.reduce(
+    (b, p) => b.extend(p),
+    new maplibregl.LngLatBounds(points[0], points[0]),
+  );
+  map.fitBounds(bounds, {
+    // Use the same safe rectangle as node focus and cluster navigation.
+    padding: map.getPadding(),
+    maxZoom: IATA_ZOOM,
+    pitch: points.length === 1 ? IATA_PITCH : DEFAULT_PITCH,
+    bearing: DEFAULT_BEARING,
+  });
+}
+
+// House glyph in MapLibre's control-icon style (29x29, baked #333 like the built-in icons; the
+// data-dark CSS in index.css inverts it alongside the zoom/compass glyphs).
+const HOME_ICON = encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="29" height="29" fill="#333" viewBox="0 0 29 29"><path fill-rule="evenodd" d="M14.5 4.5 3.5 13.5h3V24h16V13.5h3zM12.5 24v-6a2 2 0 0 1 4 0v6z"/></svg>',
+);
+
+// Home button joining the top-right control stack under the zoom/compass group: replays the camera
+// the map opens with (the region fit, or the configured default overview). Deliberately ignores the
+// deep-link suppression — pressing Home is an explicit request for that start view. The aria/title
+// label tracks the app language via the i18n singleton (the control is built outside React).
+class HomeControl implements maplibregl.IControl {
+  private readonly goHome: (map: MapLibreMap) => void;
+  private container: HTMLElement | null = null;
+  private applyTitle: () => void = () => {};
+
+  constructor(goHome: (map: MapLibreMap) => void) {
+    this.goHome = goHome;
+  }
+
+  onAdd(map: MapLibreMap): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
+    const button = document.createElement('button');
+    button.type = 'button';
+    const icon = document.createElement('span');
+    icon.className = 'maplibregl-ctrl-icon';
+    icon.style.backgroundImage = `url("data:image/svg+xml;charset=utf-8,${HOME_ICON}")`;
+    button.appendChild(icon);
+    this.applyTitle = () => {
+      const label = String(i18n.t('map.home'));
+      button.setAttribute('aria-label', label);
+      button.title = label;
+    };
+    this.applyTitle();
+    i18n.on('languageChanged', this.applyTitle);
+    button.addEventListener('click', () => this.goHome(map));
+    container.appendChild(button);
+    this.container = container;
+    return container;
+  }
+
+  onRemove() {
+    i18n.off('languageChanged', this.applyTitle);
+    this.container?.remove();
+    this.container = null;
+  }
+}
+
 // Basemap label language. The OpenFreeMap styles bake their label expressions into every symbol
 // layer as "name:latin [+ name:nonlatin], else name_en/name". For Swedish, each of those name
 // leaves is rewritten to prefer the OSM Swedish name (tile key "name:sv"; the tiles carry every
@@ -125,9 +205,9 @@ export function useMapLibre(
   // lng/lat pairs to fitBounds over; null/empty falls back to the configured default view
   fitPoints: [number, number][] | null,
   onStyleError?: (lastGoodStyleId: string) => void,
-  // a deep-link camera ([lng, lat] + zoom); when set it opens the map here and wins over the initial
-  // region fitBounds. Later region changes still auto-fit.
-  initialCamera?: { center: [number, number]; zoom: number },
+  // a deep-link camera ([lng, lat] + zoom + optional tilt/rotation); when set it opens the map here
+  // and wins over the initial region fitBounds. Later region changes still auto-fit.
+  initialCamera?: { center: [number, number]; zoom: number; pitch?: number; bearing?: number },
   live = false,
   // basemap label language; 'sv' prefers OSM Swedish names, anything else keeps the style default
   mapLanguage = 'sv',
@@ -142,12 +222,19 @@ export function useMapLibre(
   const onStyleErrorRef = useRef(onStyleError);
   const lastFitKeyRef = useRef<string | null>(null); // last applied fit target; skips redundant re-fits
   const labelFieldsRef = useRef(new Map<string, unknown>()); // pristine text-fields of the loaded style
+  const fitPointsRef = useRef(fitPoints); // current fit target, read by the Home control at click time
   const skipInitialFitRef = useRef(!!initialCamera); // let a deep-link camera win over the first fit
   const initialCameraRef = useRef(initialCamera); // read once at map creation (deep link is load-time only)
   const [isReady, setIsReady] = useState(false);
   const [styleRevision, setStyleRevision] = useState(0);
   const [loadedStyleId, setLoadedStyleId] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
+
+  // Home: replay the camera the map opens with — the region fit, or the configured default overview.
+  // Ignores the deep-link suppression: pressing Home is an explicit request for that start view.
+  const goHome = useCallback((map: MapLibreMap) => {
+    performFit(map, fitPointsRef.current, false);
+  }, []);
 
   // keep styleId / callback readable inside the async map handlers without writing a ref during render
   useEffect(() => {
@@ -156,6 +243,9 @@ export function useMapLibre(
   useEffect(() => {
     onStyleErrorRef.current = onStyleError;
   }, [onStyleError]);
+  useEffect(() => {
+    fitPointsRef.current = fitPoints;
+  }, [fitPoints]);
 
   // Init once. StrictMode-safe: the guard prevents a duplicate map, and cleanup fully tears the
   // map down (map.remove() disposes the GL context + all map.on listeners) and nulls the ref so a
@@ -172,8 +262,8 @@ export function useMapLibre(
       style: resolveMapStyle(styleIdRef.current).url,
       center: initialCameraRef.current?.center ?? DEFAULT_CENTER,
       zoom: initialCameraRef.current?.zoom ?? DEFAULT_ZOOM,
-      pitch: DEFAULT_PITCH,
-      bearing: DEFAULT_BEARING,
+      pitch: initialCameraRef.current?.pitch ?? DEFAULT_PITCH,
+      bearing: initialCameraRef.current?.bearing ?? DEFAULT_BEARING,
       maxPitch: MAX_PITCH,
       attributionControl: false, // replaced below with a compact (always-collapsed) control
     });
@@ -181,6 +271,7 @@ export function useMapLibre(
     lastStyleIdRef.current = styleIdRef.current;
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new HomeControl(goHome), 'top-right'); // under the zoom/compass group
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
     map.addControl(new maplibregl.AttributionControl({ compact: true })); // bottom-right
     // maplibre pops the compact attribution open the first time the basemap credit loads (it tacks
@@ -192,10 +283,6 @@ export function useMapLibre(
 
     const onStyleReady = () => {
       addTerrain(map, resolveMapStyle(styleIdRef.current).dark);
-      // setStyle() resets the projection to the incoming style's (mercator), so the globe must be
-      // reapplied after every style load, the same way terrain is re-added. 'globe' renders the
-      // world as a sphere at low zoom and blends back to mercator as the camera zooms in.
-      map.setProjection({ type: 'globe' });
       // snapshot the pristine label expressions before anything mutates them (see localizeMapLabels)
       captureLabelFields(map, labelFieldsRef.current);
       hasLoadedRef.current = true;
@@ -253,8 +340,9 @@ export function useMapLibre(
       mapRef.current = null;
       setIsReady(false);
     };
-    // styleId is read via styleIdRef so the map is built once; style swaps go through the effect below.
-  }, []);
+    // styleId / fitPoints / goHome are read via refs + the stable goHome callback so the map is
+    // built once; style swaps go through the effect below.
+  }, [goHome]);
 
   // Swap the basemap only when the style really changes. Skip the initial render (the map's already
   // built with the right style) and redundant swaps, which would cause a wasteful re-fetch and an
@@ -294,35 +382,11 @@ export function useMapLibre(
     if (key === lastFitKeyRef.current) return;
     lastFitKeyRef.current = key;
 
-    if (!fitPoints || fitPoints.length === 0) {
-      map.flyTo({
-        center: DEFAULT_CENTER,
-        padding: map.getPadding(),
-        zoom: DEFAULT_ZOOM,
-        pitch: DEFAULT_PITCH,
-        bearing: DEFAULT_BEARING,
-      });
-      return;
-    }
-
     // First real fit after a deep-link camera: keep the URL-supplied view instead of framing the
     // region. Consumed once, so later region changes fit normally.
-    if (skipInitialFitRef.current) {
-      skipInitialFitRef.current = false;
-      return;
-    }
-
-    const bounds = fitPoints.reduce(
-      (b, p) => b.extend(p),
-      new maplibregl.LngLatBounds(fitPoints[0], fitPoints[0]),
-    );
-    map.fitBounds(bounds, {
-      // Use the same safe rectangle as node focus and cluster navigation.
-      padding: map.getPadding(),
-      maxZoom: IATA_ZOOM,
-      pitch: fitPoints.length === 1 ? IATA_PITCH : DEFAULT_PITCH,
-      bearing: DEFAULT_BEARING,
-    });
+    const keepDeepLinkView = skipInitialFitRef.current;
+    skipInitialFitRef.current = false;
+    performFit(map, fitPoints, keepDeepLinkView);
   }, [fitPoints, isReady]);
 
   // Basemap label language: re-apply after every style (re)load and whenever the app language

@@ -121,6 +121,8 @@ export interface MapSearch {
   lat?: number;
   lng?: number;
   zoom?: number;
+  pitch?: number;
+  bearing?: number;
   clustering?: boolean;
   node_type?: string;
   neighbor_lines?: 'on' | 'selected' | 'off';
@@ -136,6 +138,8 @@ export function validateMapSearch(search: Record<string, unknown>): MapSearch {
     lat: mapView.center?.[1],
     lng: mapView.center?.[0],
     zoom: mapView.zoom,
+    pitch: mapView.pitch,
+    bearing: mapView.bearing,
     clustering: mapView.clustered,
     node_type: mapView.nodeType,
     neighbor_lines: mapView.neighborLines,

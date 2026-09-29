@@ -20,9 +20,6 @@
   --color-bg-raised: var(--palette-bg-raised, #1a1a1f);
   --color-border: var(--palette-border, #27272a);
   --color-border-subtle: var(--palette-border-subtle, #1e1e22);
-  /* The space visible around the globe projection's sphere; the maplibre canvas is transparent
-     there, so this paints the container behind it. A muted primary green, softer than bg-base. */
-  --color-globe-space: var(--palette-globe-space, #16251e);
 
   --color-primary: var(--palette-primary, #3b82f6);
   --color-primary-dim: var(--palette-primary-dim, #1d4ed8);
