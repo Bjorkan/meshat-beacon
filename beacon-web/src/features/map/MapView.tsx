@@ -337,8 +337,9 @@ export function MapView({
     >
       {/* Fill via flex-1, NOT absolute inset-0: maplibre adds .maplibregl-map { position: relative }
           to this element, which overrides Tailwind's `absolute` and would collapse inset-0 to 0
-          height. data-dark drives the maplibre control theming in index.css. */}
-      <div ref={containerRef} data-dark={isDark} className="flex-1" />
+          height. data-dark drives the maplibre control theming in index.css. bg-globe-space paints
+          the space around the globe sphere (the canvas is transparent outside it). */}
+      <div ref={containerRef} data-dark={isDark} className="flex-1 bg-globe-space" />
       {/* Shared flow prevents panel collisions. Use the map's width, including when a node
           sidebar is open, and leave the right-hand navigation controls their own lane. */}
       <div className="pointer-events-none absolute inset-x-3 top-3 bottom-24 z-10 flex min-h-0 flex-col gap-2 @3xl:flex-row @3xl:items-start @3xl:justify-between">
