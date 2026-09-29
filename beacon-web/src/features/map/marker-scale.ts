@@ -1,16 +1,20 @@
-// Compact capsules stay legible at overview zooms; clusters absorb dense populations.
-// Live mode keeps the existing quiet dot presentation for animated packet paths.
+// Overview zooms present ungrouped nodes as compact category-coloured dots — the standard
+// low-zoom presentation — then crossfade into capsule node IDs past z8. The capsule layer is
+// zoom-gated in useMapNodes, so tiles below that zoom never request capsule images at all and
+// hundreds of unique icons can no longer pile up. Live mode keeps the quiet dot presentation
+// for animated packet paths.
 
 export type NumericStop = readonly [input: number, output: number];
 
 export const NODE_ICON_SCALE_STOPS: readonly NumericStop[] = [
-  [0, 0.85],
+  [8, 0.85],
   [13, 1],
 ];
 
 export const NODE_ICON_OPACITY_STOPS: readonly NumericStop[] = [
-  [0, 1],
-  [13, 1],
+  [0, 0],
+  [8, 0],
+  [9, 1],
 ];
 
 export const NODE_DOT_RADIUS_STOPS: readonly NumericStop[] = [
@@ -22,8 +26,10 @@ export const NODE_DOT_RADIUS_STOPS: readonly NumericStop[] = [
 ];
 
 export const NODE_DOT_OPACITY_STOPS: readonly NumericStop[] = [
-  [0, 0],
-  [13, 0],
+  [0, 0.94],
+  [7.5, 0.94],
+  [8.5, 0.55],
+  [9, 0],
 ];
 
 export const SELECTION_RADIUS_STOPS: readonly NumericStop[] = [

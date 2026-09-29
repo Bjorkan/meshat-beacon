@@ -220,7 +220,8 @@ export function useMapNodes(
       if (map.getLayer(layerId)) map.setLayoutProperty(layerId, 'visibility', clusterVisibility);
     }
 
-    // Live mode uses compact category-coloured dots so the packet paths remain legible.
+    // Compact category-coloured dots present ungrouped nodes at overview zooms (and Live mode);
+    // the capsule layer takes over past z8.
     const dotColor: ExpressionSpecification = [
       'match',
       ['get', 'nodeTypeName'],
@@ -234,7 +235,6 @@ export function useMapNodes(
       NODE_TYPE_COLORS.sensor,
       NODE_TYPE_COLORS.unknown,
     ] as unknown as ExpressionSpecification;
-    const dotOutline = MARKER_FACE;
     if (!map.getLayer(NODES_DOT_LAYER_ID)) {
       map.addLayer({
         id: NODES_DOT_LAYER_ID,
@@ -243,20 +243,23 @@ export function useMapNodes(
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-radius': nodeDotRadiusExpression(liveMode) as ExpressionSpecification,
-          'circle-color': liveMode ? dotColor : MARKER_FACE,
+          'circle-color': dotColor,
           'circle-opacity': nodeDotOpacityExpression(liveMode) as ExpressionSpecification,
-          'circle-stroke-color': liveMode ? dotOutline : dotColor,
-          'circle-stroke-width': liveMode ? LIVE_NODE_STROKE_WIDTH_PX : 1.5,
+          'circle-stroke-color': MARKER_FACE,
+          'circle-stroke-width': liveMode ? LIVE_NODE_STROKE_WIDTH_PX : 0.9,
         },
       } as CircleLayerSpecification);
     }
 
+    // Zoom-gated: tiles below z8 never place this layer, so overview views never request the
+    // hundreds of unique capsule images — the compact dot layer covers them instead.
     if (!map.getLayer(NODES_POINT_LAYER_ID)) {
       map.addLayer({
         id: NODES_POINT_LAYER_ID,
         type: 'symbol',
         source: NODES_SOURCE_ID,
         filter: ['!', ['has', 'point_count']],
+        minzoom: 8,
         layout: {
           'icon-image': nodeMarkerExpression(selectedNodeIdRef.current),
           'icon-size': nodeIconSizeExpression() as ExpressionSpecification,
@@ -335,18 +338,14 @@ export function useMapNodes(
       'circle-stroke-opacity',
       nodeDotOpacityExpression(liveMode),
     );
-    map.setPaintProperty(NODES_DOT_LAYER_ID, 'circle-color', liveMode ? dotColor : MARKER_FACE);
+    map.setPaintProperty(NODES_DOT_LAYER_ID, 'circle-color', dotColor);
     map.setPaintProperty(NODES_DOT_LAYER_ID, 'circle-radius', nodeDotRadiusExpression(liveMode));
     map.setPaintProperty(NODES_DOT_LAYER_ID, 'circle-opacity', nodeDotOpacityExpression(liveMode));
-    map.setPaintProperty(
-      NODES_DOT_LAYER_ID,
-      'circle-stroke-color',
-      liveMode ? dotOutline : dotColor,
-    );
+    map.setPaintProperty(NODES_DOT_LAYER_ID, 'circle-stroke-color', MARKER_FACE);
     map.setPaintProperty(
       NODES_DOT_LAYER_ID,
       'circle-stroke-width',
-      liveMode ? LIVE_NODE_STROKE_WIDTH_PX : 1.5,
+      liveMode ? LIVE_NODE_STROKE_WIDTH_PX : 0.9,
     );
     map.setPaintProperty(NODES_POINT_LAYER_ID, 'icon-opacity', nodeIconOpacityExpression(liveMode));
     map.setPaintProperty(

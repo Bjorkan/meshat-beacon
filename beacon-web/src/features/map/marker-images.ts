@@ -26,7 +26,10 @@ function canvas(width: number, height: number, scale: number) {
   const element = document.createElement('canvas');
   element.width = Math.ceil(width * scale);
   element.height = Math.ceil(height * scale);
-  const context = element.getContext('2d')!;
+  // CPU-backed canvases keep getImageData readbacks reliable on GPU-accelerated Firefox, where
+  // hardware canvases under memory pressure can read back black — and hundreds of runtime icons
+  // have done exactly that. Drawing is one-shot, so software rasterization costs nothing.
+  const context = element.getContext('2d', { willReadFrequently: true })!;
   context.scale(scale, scale);
   return { element, context };
 }

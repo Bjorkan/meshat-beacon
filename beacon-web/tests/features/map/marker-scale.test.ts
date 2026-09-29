@@ -43,10 +43,10 @@ describe('zoom-aware map marker sizing', () => {
       expect(scale[i]!).toBeGreaterThanOrEqual(scale[i - 1]!);
   });
 
-  it('keeps node IDs visible at every zoom outside Live mode', () => {
-    expect(NODE_ICON_OPACITY_STOPS[0]).toEqual([0, 1]);
+  it('crossfades overview dots into capsule node IDs outside Live mode', () => {
+    expect(NODE_ICON_OPACITY_STOPS[0]).toEqual([0, 0]);
     expect(NODE_ICON_OPACITY_STOPS.at(-1)?.[1]).toBe(1);
-    expect(NODE_DOT_OPACITY_STOPS[0]?.[1]).toBe(0);
+    expect(NODE_DOT_OPACITY_STOPS[0]?.[1]).toBeGreaterThan(0.9);
     expect(NODE_DOT_OPACITY_STOPS.at(-1)?.[1]).toBe(0);
   });
 
