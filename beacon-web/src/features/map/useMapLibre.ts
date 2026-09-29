@@ -138,6 +138,10 @@ export function useMapLibre(
 
     const onStyleReady = () => {
       addTerrain(map, resolveMapStyle(styleIdRef.current).dark);
+      // setStyle() resets the projection to the incoming style's (mercator), so the globe must be
+      // reapplied after every style load, the same way terrain is re-added. 'globe' renders the
+      // world as a sphere at low zoom and blends back to mercator as the camera zooms in.
+      map.setProjection({ type: 'globe' });
       hasLoadedRef.current = true;
       swapPendingRef.current = false;
       lastGoodStyleIdRef.current = styleIdRef.current;
