@@ -5,6 +5,7 @@ import type { Node } from '../../../src/features/nodes/types';
 
 const state = vi.hoisted(() => ({ handlers: new Map<string, () => void>(), removed: vi.fn() }));
 vi.mock('maplibre-gl', () => ({
+  setWorkerUrl: vi.fn(),
   Map: class {
     on(event: string, cb: () => void) {
       state.handlers.set(event, cb);
