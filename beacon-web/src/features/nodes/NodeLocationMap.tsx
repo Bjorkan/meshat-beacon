@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import maplibregl from 'maplibre-gl';
+import '../map/maplibre-worker';
+import * as maplibregl from 'maplibre-gl';
 import type { Map as MapLibreMap, GeoJSONSource } from 'maplibre-gl';
 import { mapStyleForTheme, resolveMapStyle } from '../map/types';
 import { useTheme } from '../../hooks/useTheme';

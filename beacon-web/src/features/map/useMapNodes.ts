@@ -183,7 +183,7 @@ export function useMapNodes(
         source: NODES_SOURCE_ID,
         filter: ['has', 'point_count'],
         paint: {
-          'circle-radius': clusterRadiusExpression() as ExpressionSpecification,
+          'circle-radius': clusterRadiusExpression(),
           'circle-color': clusterFill,
           'circle-pitch-alignment': 'viewport',
           'circle-pitch-scale': 'viewport',
@@ -242,9 +242,9 @@ export function useMapNodes(
         source: NODES_SOURCE_ID,
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-radius': nodeDotRadiusExpression(liveMode) as ExpressionSpecification,
+          'circle-radius': nodeDotRadiusExpression(liveMode),
           'circle-color': dotColor,
-          'circle-opacity': nodeDotOpacityExpression(liveMode) as ExpressionSpecification,
+          'circle-opacity': nodeDotOpacityExpression(liveMode),
           'circle-stroke-color': MARKER_FACE,
           'circle-stroke-width': liveMode ? LIVE_NODE_STROKE_WIDTH_PX : 0.9,
         },
@@ -262,13 +262,13 @@ export function useMapNodes(
         minzoom: 8,
         layout: {
           'icon-image': nodeMarkerExpression(selectedNodeIdRef.current),
-          'icon-size': nodeIconSizeExpression() as ExpressionSpecification,
+          'icon-size': nodeIconSizeExpression(),
           'icon-allow-overlap': true,
           'icon-pitch-alignment': 'viewport',
           'icon-rotation-alignment': 'viewport',
         },
         paint: {
-          'icon-opacity': nodeIconOpacityExpression(liveMode) as ExpressionSpecification,
+          'icon-opacity': nodeIconOpacityExpression(liveMode),
         },
       } as SymbolLayerSpecification);
     }
@@ -285,7 +285,7 @@ export function useMapNodes(
           source: NODES_SOURCE_ID,
           filter: ['!', ['has', 'point_count']],
           paint: {
-            'circle-radius': glowRadiusExpression() as ExpressionSpecification,
+            'circle-radius': glowRadiusExpression(),
             'circle-color': flowColor,
             'circle-opacity': ['*', ['coalesce', ['feature-state', 'glow'], 0], 0.4],
             'circle-blur': 1,
@@ -307,11 +307,11 @@ export function useMapNodes(
           source: NODES_SOURCE_ID,
           filter: ['==', ['get', 'id'], selectedNodeIdRef.current ?? ''],
           paint: {
-            'circle-radius': selectionRadiusExpression(liveMode) as ExpressionSpecification,
+            'circle-radius': selectionRadiusExpression(liveMode),
             // A small opaque knockout prevents focused-neighbor lines from visually cutting through
             // the selected repeater while the symbol icon remains on top.
             'circle-color': isDark ? 'rgba(9,9,11,0.9)' : 'rgba(255,255,255,0.92)',
-            'circle-stroke-width': selectionStrokeExpression() as ExpressionSpecification,
+            'circle-stroke-width': selectionStrokeExpression(),
             'circle-stroke-color': primary,
             'circle-stroke-opacity': 0.95,
           },
@@ -462,7 +462,7 @@ export function useMapNodes(
       spiralOptions: { leavesSeparation: 110, legLengthStart: 45 },
       spiderLeavesLayout: {
         'icon-image': nodeMarkerExpression(selectedNodeIdRef.current),
-        'icon-size': nodeIconSizeExpression() as ExpressionSpecification,
+        'icon-size': nodeIconSizeExpression(),
         'icon-allow-overlap': true,
         'icon-pitch-alignment': 'viewport',
         'icon-rotation-alignment': 'viewport',

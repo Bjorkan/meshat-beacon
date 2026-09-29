@@ -3,6 +3,7 @@
 // zoom-gated in useMapNodes, so tiles below that zoom never request capsule images at all and
 // hundreds of unique icons can no longer pile up. Live mode keeps the quiet dot presentation
 // for animated packet paths.
+import type { ExpressionSpecification } from 'maplibre-gl';
 
 export type NumericStop = readonly [input: number, output: number];
 
@@ -80,11 +81,14 @@ export const GLOW_EXTRA_RADIUS_STOPS: readonly NumericStop[] = [
   [13, 15],
 ];
 
-export function zoomInterpolate(stops: readonly NumericStop[]): unknown[] {
+export function zoomInterpolate(stops: readonly NumericStop[]): ExpressionSpecification {
   return ['interpolate', ['linear'], ['zoom'], ...stops.flatMap(([zoom, value]) => [zoom, value])];
 }
 
-export function propertyInterpolate(property: string, stops: readonly NumericStop[]): unknown[] {
+export function propertyInterpolate(
+  property: string,
+  stops: readonly NumericStop[],
+): ExpressionSpecification {
   return [
     'interpolate',
     ['linear'],
@@ -93,23 +97,23 @@ export function propertyInterpolate(property: string, stops: readonly NumericSto
   ];
 }
 
-export function nodeIconSizeExpression(): unknown[] {
+export function nodeIconSizeExpression(): ExpressionSpecification {
   return zoomInterpolate(NODE_ICON_SCALE_STOPS);
 }
 
-export function nodeIconOpacityExpression(liveMode = false): unknown[] | number {
+export function nodeIconOpacityExpression(liveMode = false): number | ExpressionSpecification {
   return liveMode ? 0 : zoomInterpolate(NODE_ICON_OPACITY_STOPS);
 }
 
-export function nodeDotRadiusExpression(liveMode = false): unknown[] | number {
+export function nodeDotRadiusExpression(liveMode = false): number | ExpressionSpecification {
   return liveMode ? LIVE_NODE_RADIUS_PX : zoomInterpolate(NODE_DOT_RADIUS_STOPS);
 }
 
-export function nodeDotOpacityExpression(liveMode = false): unknown[] | number {
+export function nodeDotOpacityExpression(liveMode = false): number | ExpressionSpecification {
   return liveMode ? LIVE_NODE_OPACITY : zoomInterpolate(NODE_DOT_OPACITY_STOPS);
 }
 
-export function selectionRadiusExpression(liveMode = false): unknown[] | number {
+export function selectionRadiusExpression(liveMode = false): number | ExpressionSpecification {
   return liveMode ? LIVE_SELECTION_RADIUS_PX : zoomInterpolate(SELECTION_RADIUS_STOPS);
 }
 
@@ -117,26 +121,30 @@ export function shouldClusterNodes(clustered: boolean, liveMode: boolean): boole
   return clustered && !liveMode;
 }
 
-export function selectionStrokeExpression(): unknown[] {
+export function selectionStrokeExpression(): ExpressionSpecification {
   return zoomInterpolate(SELECTION_STROKE_STOPS);
 }
 
-export function clusterRadiusExpression(): unknown[] {
+export function clusterRadiusExpression(): ExpressionSpecification {
   return propertyInterpolate('point_count', CLUSTER_RADIUS_STOPS);
 }
 
-export function glowRadiusExpression(): unknown[] {
+// Glow radius = zoom-scaled base plus a feature-state-driven bloom. The plus expression is
+// hoisted so the flatMap pairs stay (number | ExpressionSpecification)[] and the whole array
+// satisfies the interpolate arm of ExpressionSpecification.
+export function glowRadiusExpression(): ExpressionSpecification {
+  const plusGlow = (base: number, extra: number): ExpressionSpecification => [
+    '+',
+    base,
+    ['*', extra, ['coalesce', ['feature-state', 'glow'], 0]],
+  ];
   return [
     'interpolate',
     ['linear'],
     ['zoom'],
     ...GLOW_BASE_RADIUS_STOPS.flatMap(([zoom, base], index) => [
       zoom,
-      [
-        '+',
-        base,
-        ['*', GLOW_EXTRA_RADIUS_STOPS[index]![1], ['coalesce', ['feature-state', 'glow'], 0]],
-      ],
+      plusGlow(base, GLOW_EXTRA_RADIUS_STOPS[index]![1]),
     ]),
   ];
 }
