@@ -4,6 +4,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { useTranslation } from 'react-i18next';
 import { meshcoreRegionQueries } from '../api/queries';
 import { useIsMobile } from '../hooks/useMediaQuery';
+import { CloseButton } from './CloseButton';
 
 interface Option {
   value: string;
@@ -117,11 +118,11 @@ export function MeshCoreRegionPicker({
     const text = (
       <>
         <span className="min-w-0 flex-1 text-left">
-          <span className="block font-mono text-size-13 font-medium tracking-wide">
-            {node.token}
-          </span>
+          <span className="block text-xs">{node.token}</span>
           {node.displayName && (
-            <span className="block text-xs text-text-muted leading-snug">{node.displayName}</span>
+            <span className="block text-size-11 text-text-dim leading-snug">
+              {node.displayName}
+            </span>
           )}
         </span>
         {counts && node.count !== undefined && (
@@ -137,9 +138,9 @@ export function MeshCoreRegionPicker({
     return (
       <div
         key={node.value}
-        className={`flex items-stretch rounded-md border transition-colors ${checked ? 'border-primary/30 bg-primary/10 text-primary' : 'border-transparent text-text-normal hover:bg-text-normal/5'}`}
+        className={`flex items-stretch transition-colors ${checked ? 'bg-primary/10 text-text-bright' : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3'}`}
       >
-        <label className="order-last flex w-10 shrink-0 items-center justify-center cursor-pointer">
+        <label className="flex shrink-0 items-center justify-center pl-2.5 pr-2 cursor-pointer">
           <input
             type={multiple ? 'checkbox' : 'radio'}
             id={inputID}
@@ -147,7 +148,7 @@ export function MeshCoreRegionPicker({
             aria-label={node.label}
             checked={checked}
             onChange={() => choose(node.value)}
-            className="h-4 w-4 accent-primary cursor-pointer"
+            className="accent-primary cursor-pointer"
           />
         </label>
         {canBrowse ? (
@@ -155,17 +156,17 @@ export function MeshCoreRegionPicker({
             type="button"
             aria-label={node.label}
             onClick={() => browse(node.token)}
-            className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1 cursor-pointer rounded-l-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+            className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2.5 cursor-pointer"
           >
             {text}
-            <span aria-hidden className="text-text-muted text-lg">
+            <span aria-hidden className="text-text-dim text-xs">
               ›
             </span>
           </button>
         ) : (
           <label
             htmlFor={inputID}
-            className="flex min-w-0 flex-1 items-center gap-3 py-2 pl-3 pr-1 cursor-pointer"
+            className="flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2.5 cursor-pointer"
           >
             {text}
           </label>
@@ -195,13 +196,25 @@ export function MeshCoreRegionPicker({
           type="button"
           aria-label={label}
           title={selectionLabel}
-          className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary ${fullWidth ? 'w-full justify-between' : ''} ${selected.length ? 'border-primary-dim bg-primary/6 text-primary' : 'border-border bg-bg-surface text-text-muted'}`}
+          className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${fullWidth ? 'w-full justify-between' : ''} ${selected.length ? 'border-primary-dim bg-primary/6 text-primary' : 'border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal'}`}
         >
           <span className="shrink-0">{label}</span>
-          <span className="min-w-0 truncate">
-            {selected.length === 1 ? selected[0] : selected.length || allLabel || t('common.all')}
+          {multiple ? (
+            <span
+              className={`text-size-9 px-1 rounded-sm min-w-[1ch] text-center ${selected.length ? 'bg-primary/15' : 'invisible'}`}
+            >
+              {selected.length}
+            </span>
+          ) : (
+            <span
+              className={`min-w-0 truncate ${selected.length ? 'text-primary' : 'text-text-dim'}`}
+            >
+              {selected[0] || allLabel || t('common.all')}
+            </span>
+          )}
+          <span aria-hidden className="text-text-dim text-size-9">
+            ▾
           </span>
-          <span aria-hidden>▾</span>
         </button>
       </Popover.Trigger>
       <Popover.Portal>
@@ -209,39 +222,34 @@ export function MeshCoreRegionPicker({
           aria-label={t('regionPicker.title')}
           align={align === 'right' ? 'end' : 'start'}
           side={isMobile ? 'top' : 'bottom'}
-          sideOffset={8}
+          sideOffset={4}
           collisionPadding={12}
           onOpenAutoFocus={(event) => {
             if (isMobile) event.preventDefault();
           }}
-          className="flex flex-col w-96 max-w-[calc(100vw-1.5rem)] max-h-[min(36rem,var(--radix-popover-content-available-height))] bg-bg-raised border border-border rounded-xl shadow-xl z-50 overflow-hidden"
+          className="flex flex-col w-80 max-w-[calc(100vw-1.5rem)] max-h-[min(36rem,var(--radix-popover-content-available-height))] bg-bg-raised border border-border rounded-md shadow-lg z-50 overflow-hidden font-mono focus:outline-none"
         >
-          <div className="shrink-0 px-3 pt-3 pb-2 border-b border-border-subtle">
-            <div className="flex items-center justify-between gap-2 mb-2">
-              <span className="text-sm font-medium text-text-bright">
+          <div className="shrink-0 px-2 pt-1 pb-1 border-b border-border-subtle">
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <span className="text-size-10 uppercase tracking-wider text-text-dim">
                 {t('regionPicker.title')}
               </span>
-              <Popover.Close
-                aria-label={t('common.close')}
-                className="w-7 h-7 rounded text-text-muted hover:bg-text-normal/5 cursor-pointer"
-              >
-                ×
-              </Popover.Close>
+              <CloseButton onClose={() => setOpen(false)} />
             </div>
             <input
               aria-label={t('regionPicker.search')}
               placeholder={t('regionPicker.search')}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              className="w-full text-base sm:text-sm bg-bg-surface border border-border rounded-md px-3 py-2 text-text-normal placeholder:text-text-dim focus:outline-none focus:ring-1 focus:ring-primary"
+              className="w-full text-base sm:text-size-11 font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim focus:outline-none focus:ring-1 focus:ring-primary"
             />
             <nav
               aria-label={t('regionPicker.navigation')}
-              className="flex flex-wrap items-center gap-x-1 gap-y-1 pt-2 text-xs"
+              className="flex flex-wrap items-center gap-1 pt-1 text-size-11"
             >
               <button
                 type="button"
-                className="text-text-muted hover:text-primary py-1 cursor-pointer"
+                className="text-text-muted hover:text-text-normal py-1 cursor-pointer transition-colors"
                 onClick={() => browse()}
               >
                 {t('regionPicker.allRegions')}
@@ -254,7 +262,7 @@ export function MeshCoreRegionPicker({
                   <button
                     type="button"
                     aria-current={node === current ? 'location' : undefined}
-                    className="text-text-normal hover:text-primary py-1 cursor-pointer"
+                    className="text-text-muted hover:text-text-normal aria-[current=location]:text-text-bright py-1 cursor-pointer transition-colors"
                     onClick={() => browse(node.token)}
                   >
                     {node.displayName ?? node.token}
@@ -269,11 +277,11 @@ export function MeshCoreRegionPicker({
             className="flex flex-col min-h-0"
           >
             {current && !query && (
-              <div className="shrink-0 px-2 py-2 border-b border-border-subtle">
+              <div className="shrink-0 py-1 border-b border-border-subtle">
                 {renderNode(current, false)}
               </div>
             )}
-            <div className="px-3 pt-2 pb-1 shrink-0 text-size-10 uppercase tracking-wider text-text-dim">
+            <div className="px-2.5 pt-2 pb-1 shrink-0 text-size-10 uppercase tracking-wider text-text-dim">
               {query
                 ? t('regionPicker.results')
                 : current?.level === 'country'
@@ -284,17 +292,17 @@ export function MeshCoreRegionPicker({
             </div>
             <div
               key={query || current?.token || 'root'}
-              className="min-h-0 max-h-72 overflow-y-auto overscroll-contain px-2 pb-2"
+              className="min-h-0 max-h-64 overflow-y-auto overscroll-contain pb-1"
             >
               {isPending ? (
-                <div role="status" className="p-3 text-sm text-text-muted">
+                <div role="status" className="px-2.5 py-2 text-size-11 text-text-muted">
                   {t('common.loading')}
                 </div>
               ) : isError ? (
                 <button
                   type="button"
                   onClick={() => void refetch()}
-                  className="p-3 text-sm text-primary"
+                  className="px-2.5 py-2 text-size-11 text-primary cursor-pointer"
                 >
                   {t('common.retry')}
                 </button>
@@ -302,20 +310,22 @@ export function MeshCoreRegionPicker({
                 visible.map((node) => renderNode(node))
               )}
               {!isPending && !isError && !visible.length && (
-                <div className="p-3 text-sm text-text-dim">{t('common.noMatches')}</div>
+                <div className="px-2.5 py-2 text-size-11 text-text-dim">
+                  {t('common.noMatches')}
+                </div>
               )}
             </div>
           </div>
-          <div className="shrink-0 border-t border-border-subtle px-3 py-2.5 bg-bg-surface">
+          <div className="shrink-0 border-t border-border-subtle px-2.5 py-2">
             {selected.length > 0 ? (
               <>
-                <div className="flex items-center justify-between gap-2 mb-2 text-xs">
+                <div className="flex items-center justify-between gap-2 mb-1.5 text-size-11">
                   <span className="text-text-muted">
                     {t('regionPicker.selected', { count: selected.length })}
                   </span>
                   <button
                     type="button"
-                    className="text-primary cursor-pointer"
+                    className="text-text-dim hover:text-danger cursor-pointer transition-colors"
                     onClick={() => {
                       onChange([]);
                       if (!multiple) setOpen(false);
@@ -324,7 +334,7 @@ export function MeshCoreRegionPicker({
                     {t('common.clearAll')}
                   </button>
                 </div>
-                <div className="flex flex-wrap gap-1.5 max-h-20 overflow-y-auto">
+                <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto">
                   {selected.map((value) => (
                     <button
                       key={value}
@@ -332,7 +342,7 @@ export function MeshCoreRegionPicker({
                       title={nodes.find((node) => node.value === value)?.label}
                       aria-label={t('regionPicker.remove', { token: value })}
                       onClick={() => onChange(selected.filter((item) => item !== value))}
-                      className="inline-flex items-center gap-2 px-2 py-1 rounded border border-primary/25 bg-primary/8 text-primary text-xs font-mono cursor-pointer"
+                      className="inline-flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm border border-primary-dim bg-primary/6 text-primary text-size-11 cursor-pointer transition-colors hover:bg-primary/10"
                     >
                       {value}
                       <span aria-hidden>×</span>
@@ -341,7 +351,7 @@ export function MeshCoreRegionPicker({
                 </div>
               </>
             ) : (
-              <p className="text-xs text-text-muted leading-relaxed">{t('regionPicker.hint')}</p>
+              <p className="text-size-11 text-text-dim leading-relaxed">{t('regionPicker.hint')}</p>
             )}
           </div>
         </Popover.Content>
