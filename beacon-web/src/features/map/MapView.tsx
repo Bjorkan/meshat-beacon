@@ -139,7 +139,7 @@ export function MapView({
   }, []);
 
   // A deep-link camera opens the map here and suppresses the initial region fit (see useMapLibre);
-// tilt/rotation ride along so a shared link restores the exact view.
+  // tilt/rotation ride along so a shared link restores the exact view.
   const initialCamera = useMemo(
     () =>
       urlView.center
@@ -361,7 +361,16 @@ export function MapView({
       },
       replace: true,
     });
-  }, [urlView, clustered, typeFilter, neighborLines, packetFlow, borders, meshcoreRegionFilter, navigate]);
+  }, [
+    urlView,
+    clustered,
+    typeFilter,
+    neighborLines,
+    packetFlow,
+    borders,
+    meshcoreRegionFilter,
+    navigate,
+  ]);
 
   // Camera: fly to an arriving deep-link camera that differs from the live one. Our own writes
   // round-trip equal, so they skip. Absent tilt/rotation in a link mean the flat defaults.
