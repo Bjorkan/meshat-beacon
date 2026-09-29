@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
+  columnVisibilityFeature,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnDef,
+  type RowData,
   type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -13,7 +16,15 @@ import { EmptyState } from './EmptyState';
 import { SkeletonRows } from './SkeletonRows';
 import { useIsMobile } from '../hooks/useMediaQuery';
 
-export interface Column<T> {
+// TanStack v9 registers features and row-model factories on the instance. Static so the feature
+// types stay stable across renders.
+const dataTableFeatures = tableFeatures({
+  rowSortingFeature,
+  columnVisibilityFeature,
+  sortedRowModel: createSortedRowModel(),
+});
+
+export interface Column<T extends RowData> {
   // Stable identity, independent of displayed or translated text.
   id?: string;
   header: string;
@@ -46,7 +57,7 @@ export interface MobileSortOption {
   };
 }
 
-interface DataTableProps<T> {
+interface DataTableProps<T extends RowData> {
   columns: Column<T>[];
   rows: T[] | undefined;
   rowKey: (row: T) => string;
@@ -83,7 +94,7 @@ function sortStateToTanStack(sort: SortState): SortingState {
 
 // TanStack owns the column, row and sorting models. Desktop and mobile are two presentations of the
 // same model, avoiding a second hand-written list implementation that can drift out of sync.
-export function DataTable<T>({
+export function DataTable<T extends RowData>({
   columns,
   rows,
   rowKey,
@@ -105,6 +116,15 @@ export function DataTable<T>({
   const { t } = useTranslation();
   const isMobile = useIsMobile();
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Cell className classes live on our own columns; no need to route them through TanStack meta.
+  const classNameById = useMemo(
+    () => new Map(columns.map((column) => [column.id ?? column.header, column.className])),
+    [columns],
+  );
+  const cellClassName = (columnId: string, row: T) => {
+    const className = classNameById.get(columnId);
+    return typeof className === 'function' ? className(row) : (className ?? '');
+  };
   const [internalSort, setInternalSort] = useState<SortState>(() => ({
     columnId: defaultSort?.columnId ?? '',
     direction: defaultSort?.direction ?? 'asc',
@@ -117,7 +137,7 @@ export function DataTable<T>({
   );
   const visibleColumnCount = columns.filter((column) => !column.hidden).length;
 
-  const tableColumns = useMemo<ColumnDef<T>[]>(
+  const tableColumns = useMemo<ColumnDef<typeof dataTableFeatures, T>[]>(
     () =>
       columns
         .filter((column) => !column.hidden)
@@ -129,13 +149,12 @@ export function DataTable<T>({
           enableSorting: !!column.sortValue,
           sortDescFirst: false,
           sortUndefined: 'last',
-          meta: { className: column.className },
         })),
     [columns],
   );
   // Hidden sort-only columns never render a desktop header, but TanStack still needs their
   // accessor so mobile semantic options can sort by them. They are appended after visible ones.
-  const hiddenSortColumns = useMemo<ColumnDef<T>[]>(
+  const hiddenSortColumns = useMemo<ColumnDef<typeof dataTableFeatures, T>[]>(
     () =>
       columns
         .filter((column) => column.hidden && column.sortValue)
@@ -147,20 +166,16 @@ export function DataTable<T>({
           enableSorting: true,
           sortDescFirst: false,
           sortUndefined: 'last',
-          meta: {},
         })),
     [columns],
   );
 
-  // React Compiler deliberately skips components using TanStack Table's imperative API.
-  // eslint-disable-next-line react-hooks/incompatible-library
-  const table = useReactTable({
+  const table = useTable({
+    features: dataTableFeatures,
     data: rows ?? EMPTY_ROWS,
     columns: [...tableColumns, ...hiddenSortColumns],
     state: { sorting, columnVisibility },
     getRowId: (row) => rowKey(row),
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     manualSorting: sortMode === 'server' || !sortReady,
     enableSortingRemoval: false,
     onSortingChange: (updater) => {
@@ -181,6 +196,9 @@ export function DataTable<T>({
   // measureElement stays OFF for desktop rows: with ~11k px of variable-height content
   // the measure pass itself is the long task. Lanes force a constant row height so the
   // estimate is exact and only viewport + overscan ever mounts.
+  // React Compiler skips the virtualizer (its measure/scroll callbacks resist memoization),
+  // which is safe here: memoized children receive plain data, not the returned functions.
+  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: virtualize ? modelRows.length : 0,
     getScrollElement: () => scrollRef.current,
@@ -316,11 +334,7 @@ export function DataTable<T>({
                                   : cell.column.id}
                               </dt>
                               <dd
-                                className={`min-w-0 ${
-                                  typeof cell.column.columnDef.meta?.className === 'function'
-                                    ? cell.column.columnDef.meta.className(row.original)
-                                    : (cell.column.columnDef.meta?.className ?? '')
-                                }`}
+                                className={`min-w-0 ${cellClassName(cell.column.id, row.original)}`}
                               >
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                               </dd>
@@ -459,9 +473,7 @@ export function DataTable<T>({
                   onClick={() => onSelect(isSelected ? null : row.id)}
                 >
                   {row.getVisibleCells().map((cell) => {
-                    const metaClass = cell.column.columnDef.meta?.className;
-                    const cellClass =
-                      typeof metaClass === 'function' ? metaClass(row.original) : (metaClass ?? '');
+                    const cellClass = cellClassName(cell.column.id, row.original);
                     return (
                       <td key={cell.id} className={`px-4 py-2 align-middle ${cellClass}`}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -487,11 +499,4 @@ export function DataTable<T>({
       )}
     </div>
   );
-}
-
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface ColumnMeta<TData, TValue> {
-    className?: string | ((row: TData) => string);
-  }
 }
