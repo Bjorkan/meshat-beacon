@@ -34,6 +34,14 @@ import { syncMapOverlayLayerOrder } from './map-layer-order';
 
 const EMPTY_FC: FeatureCollection = { type: 'FeatureCollection', features: [] };
 
+// Update cadences. Dot/trail/pulse geometry re-issues at ~30fps — motion is slow (480ms per hop,
+// 760ms pulses) and the savings compound: every update re-tiles three GeoJSON sources. Node glow
+// feature-state ticks at ~10Hz and is quantized, because it is the update that dirties the large
+// node source's tiles; a soft blurred halo makes 10Hz indistinguishable from 60.
+const FRAME_INTERVAL_MS = 1000 / 30;
+const GLOW_INTERVAL_MS = 100;
+const GLOW_QUANTUM = 0.05;
+
 // One packet riding its hop path once. lastNode is the latest hop whose arrival pulse has been
 // emitted; it also bounds the persistent feature-state glow for the already traversed path.
 interface Flow {
@@ -52,6 +60,12 @@ interface Pulse {
   start: number;
 }
 
+interface SourceSizes {
+  lines: number;
+  dots: number;
+  pulses: number;
+}
+
 // Live mode: each packet gets a stable hash colour, rides its resolved hop path, leaves a fading
 // trail and generates radio-like node pulses. Transmit is an expanding ring; receive is the same
 // visual language in reverse, contracting into the receiving node. Relays therefore read naturally
@@ -66,8 +80,13 @@ export function useMapPacketFlow(
 ) {
   const flowsRef = useRef<Flow[]>([]);
   const pulsesRef = useRef<Pulse[]>([]);
-  const litRef = useRef<Set<string>>(new Set());
+  // Last APPLIED quantized glow per node id — the diff baseline for feature-state writes, and the
+  // set of ids clearFlows must scrub when the animation stops or the hook tears down.
+  const litRef = useRef<Map<string, number>>(new Map());
   const rafRef = useRef<number | null>(null);
+  const lastFrameRef = useRef(0);
+  const lastGlowRef = useRef(0);
+  const lastSizesRef = useRef<SourceSizes>({ lines: 0, dots: 0, pulses: 0 });
 
   const pushPulse = useCallback((pulse: Pulse) => {
     while (pulsesRef.current.length >= PACKET_PULSE_MAX) pulsesRef.current.shift();
@@ -82,7 +101,7 @@ export function useMapPacketFlow(
     flowsRef.current = [];
     pulsesRef.current = [];
     try {
-      for (const id of litRef.current)
+      for (const id of litRef.current.keys())
         map?.removeFeatureState({ source: NODES_SOURCE_ID, id }, 'glow');
       (map?.getSource(PACKET_FLOW_TRAIL_SOURCE_ID) as GeoJSONSource | undefined)?.setData(EMPTY_FC);
       (map?.getSource(PACKET_FLOW_DOT_SOURCE_ID) as GeoJSONSource | undefined)?.setData(EMPTY_FC);
@@ -91,6 +110,8 @@ export function useMapPacketFlow(
       // style not ready / map already removed
     }
     litRef.current.clear();
+    lastGlowRef.current = 0;
+    lastSizesRef.current = { lines: 0, dots: 0, pulses: 0 };
   }, []);
 
   const startLoop = useCallback(() => {
@@ -99,6 +120,14 @@ export function useMapPacketFlow(
     function frame() {
       const map = mapRef.current;
       const now = performance.now();
+      // Skip this display frame unless the update interval elapsed; heavy work below re-tiles
+      // three sources and repaints, which is what competes with map interaction.
+      if (now - lastFrameRef.current < FRAME_INTERVAL_MS) {
+        rafRef.current = requestAnimationFrame(frame);
+        return;
+      }
+      lastFrameRef.current = now;
+
       const dots: Feature<Point>[] = [];
       const lines: Feature<LineString>[] = [];
       const pulseFeatures: Feature<Point>[] = [];
@@ -192,29 +221,52 @@ export function useMapPacketFlow(
         });
       }
 
-      try {
-        for (const [id, glow] of glowByNode)
-          map?.setFeatureState({ source: NODES_SOURCE_ID, id }, { glow });
-        for (const id of litRef.current) {
-          if (!glowByNode.has(id)) map?.removeFeatureState({ source: NODES_SOURCE_ID, id }, 'glow');
+      // Feature-state writes dirty the large node source's tiles, so they only run at the glow
+      // cadence — plus a final pass once the flows/pulses drain, so the map never ends a burst
+      // with residual glow. Values are quantized and diffed to skip no-op writes.
+      const flowsIdle = flowsRef.current.length === 0 && pulsesRef.current.length === 0;
+      if (flowsIdle || now - lastGlowRef.current >= GLOW_INTERVAL_MS) {
+        lastGlowRef.current = now;
+        const quantized = new Map<string, number>();
+        for (const [id, glow] of glowByNode) {
+          const value = Math.round(glow / GLOW_QUANTUM) * GLOW_QUANTUM;
+          if (value > 0) quantized.set(id, value);
         }
-      } catch {
-        // the node source may have been recreated by a Live/clustering/style transition
+        try {
+          for (const [id, glow] of quantized) {
+            if (litRef.current.get(id) !== glow)
+              map?.setFeatureState({ source: NODES_SOURCE_ID, id }, { glow });
+            litRef.current.set(id, glow);
+          }
+          for (const id of [...litRef.current.keys()]) {
+            if (!quantized.has(id)) {
+              map?.removeFeatureState({ source: NODES_SOURCE_ID, id }, 'glow');
+              litRef.current.delete(id);
+            }
+          }
+        } catch {
+          // the node source may have been recreated by a Live/clustering/style transition;
+          // drop the bookkeeping so a rebuilt source starts clean
+          litRef.current.clear();
+        }
       }
-      litRef.current = new Set(glowByNode.keys());
 
-      (map?.getSource(PACKET_FLOW_TRAIL_SOURCE_ID) as GeoJSONSource | undefined)?.setData({
-        type: 'FeatureCollection',
-        features: lines,
-      });
-      (map?.getSource(PACKET_FLOW_DOT_SOURCE_ID) as GeoJSONSource | undefined)?.setData({
-        type: 'FeatureCollection',
-        features: dots,
-      });
-      (map?.getSource(PACKET_FLOW_PULSE_SOURCE_ID) as GeoJSONSource | undefined)?.setData({
-        type: 'FeatureCollection',
-        features: pulseFeatures,
-      });
+      // Re-tiling an empty source is pure overhead: each source gets a setData only when it has
+      // content or held content on the previous frame (that one final clear).
+      const sizes = lastSizesRef.current;
+      const put = (sourceId: string, features: Feature[], held: number) => {
+        if (features.length > 0 || held > 0)
+          (map?.getSource(sourceId) as GeoJSONSource | undefined)?.setData({
+            type: 'FeatureCollection',
+            features,
+          });
+        return features.length;
+      };
+      lastSizesRef.current = {
+        lines: put(PACKET_FLOW_TRAIL_SOURCE_ID, lines, sizes.lines),
+        dots: put(PACKET_FLOW_DOT_SOURCE_ID, dots, sizes.dots),
+        pulses: put(PACKET_FLOW_PULSE_SOURCE_ID, pulseFeatures, sizes.pulses),
+      };
 
       const busy =
         flowsRef.current.length > 0 || pulsesRef.current.length > 0 || litRef.current.size > 0;
