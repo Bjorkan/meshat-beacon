@@ -1,24 +1,16 @@
-// Zoom-aware marker sizing for the network map. Kept maplibre-free so the visual contract can be
-// unit-tested without WebGL. The low-zoom dot → icon crossfade is intentionally gradual: a country/
-// region overview should read like a network distribution map, while close zoom keeps the full
-// Beacon glyphs and their observer pip.
+// Compact capsules stay legible at overview zooms; clusters absorb dense populations.
+// Live mode keeps the existing quiet dot presentation for animated packet paths.
 
 export type NumericStop = readonly [input: number, output: number];
 
 export const NODE_ICON_SCALE_STOPS: readonly NumericStop[] = [
-  [0, 0.2],
-  [7.5, 0.3],
-  [8.5, 0.45],
-  [10, 0.62],
-  [11.5, 0.8],
+  [0, 0.85],
   [13, 1],
 ];
 
 export const NODE_ICON_OPACITY_STOPS: readonly NumericStop[] = [
-  [0, 0],
-  [7.6, 0],
-  [8.5, 0.45],
-  [9.5, 1],
+  [0, 1],
+  [13, 1],
 ];
 
 export const NODE_DOT_RADIUS_STOPS: readonly NumericStop[] = [
@@ -30,10 +22,8 @@ export const NODE_DOT_RADIUS_STOPS: readonly NumericStop[] = [
 ];
 
 export const NODE_DOT_OPACITY_STOPS: readonly NumericStop[] = [
-  [0, 0.94],
-  [7.5, 0.94],
-  [8.7, 0.72],
-  [9.6, 0],
+  [0, 0],
+  [13, 0],
 ];
 
 export const SELECTION_RADIUS_STOPS: readonly NumericStop[] = [
@@ -66,13 +56,6 @@ export const CLUSTER_RADIUS_STOPS: readonly NumericStop[] = [
   [30, 24],
   [100, 28],
   [500, 30],
-];
-
-export const CLUSTER_TEXT_SIZE_STOPS: readonly NumericStop[] = [
-  [2, 13],
-  [30, 14],
-  [100, 16],
-  [500, 17],
 ];
 
 export const GLOW_BASE_RADIUS_STOPS: readonly NumericStop[] = [
@@ -134,10 +117,6 @@ export function selectionStrokeExpression(): unknown[] {
 
 export function clusterRadiusExpression(): unknown[] {
   return propertyInterpolate('point_count', CLUSTER_RADIUS_STOPS);
-}
-
-export function clusterTextSizeExpression(): unknown[] {
-  return propertyInterpolate('point_count', CLUSTER_TEXT_SIZE_STOPS);
 }
 
 export function glowRadiusExpression(): unknown[] {

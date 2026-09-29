@@ -15,7 +15,7 @@ export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
       aria-pressed={active}
       aria-label={actionLabel}
       title={actionLabel}
-      className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-lg font-mono text-size-11 uppercase tracking-wider transition-colors cursor-pointer ${
+      className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-md border shadow-lg font-mono text-size-11 transition-colors cursor-pointer ${
         active
           ? 'bg-primary/15 border-primary-dim text-text-bright'
           : 'bg-bg-raised border-border text-text-dim hover:text-text-normal'
@@ -31,7 +31,7 @@ export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
           <path d="M2 1.5v7l6-3.5z" />
         </svg>
       )}
-      {t('map.live')}
+      {t('map.liveTraffic')}
     </button>
   );
 }

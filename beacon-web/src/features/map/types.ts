@@ -157,8 +157,6 @@ export const CLUSTER_RADIUS = 58; // px, close to the legible city-level groupin
 export const CLUSTER_MIN_POINTS = 2; // any two nearby nodes are eligible to form a cluster
 export const CLUSTER_MAX_ZOOM = 16;
 export const NODES_SOURCE_MAXZOOM = 17; // must exceed CLUSTER_MAX_ZOOM
-// Node name labels fade in at/above this zoom (hidden when zoomed out / clustered).
-export const NODE_LABEL_MIN_ZOOM = 12;
 
 // Device types live in lib/node-types; re-exported here for the map feature's consumers.
 export {
@@ -166,5 +164,3 @@ export {
   NODE_TYPE_OPTIONS as NODE_TYPE_FILTER_OPTIONS,
 } from '../../lib/node-types';
 export type { NodeTypeName } from '../../lib/node-types';
-export const NODE_ICON_UNKNOWN = 'node-unknown';
-export const nodeIconId = (typeName: string): string => `node-${typeName}`;

@@ -50,6 +50,7 @@ describe('nodesToFeatureCollection', () => {
       name: 'Relay A',
       nodeTypeName: 'sensor',
       isObserver: false,
+      markerImage: 'node-pill:sensor:0:PK',
     });
   });
 

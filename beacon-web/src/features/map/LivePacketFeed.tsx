@@ -4,6 +4,7 @@ import type { WsManager } from '../../api/ws-manager';
 import { Badge } from '../../components/Badge';
 import { ScopeTag } from '../../components/ScopeTag';
 import { Timestamp } from '../../components/Timestamp';
+import { CloseButton } from '../../components/CloseButton';
 import { payloadTypeVariant } from '../../components/badge-utils';
 import { useWsPacketHandler } from '../../hooks/useWsHandlers';
 import type { WsPacketObservation } from '../../types/ws';
@@ -67,7 +68,7 @@ export function LivePacketFeed({
         onClick={() => setPanelOpen(true)}
         aria-label={t('map.showLivePackets')}
         title={t('map.showLivePackets')}
-        className="relative ml-auto flex w-fit max-w-full shrink-0 items-center gap-2 rounded-full border border-border bg-bg-raised/95 px-2.5 py-1.5 font-mono text-size-10 uppercase tracking-wider text-text-muted shadow-lg backdrop-blur-sm transition-colors hover:border-primary/40 hover:text-text-bright cursor-pointer"
+        className="relative ml-auto flex w-fit max-w-full shrink-0 items-center gap-2 rounded-md border border-border bg-bg-raised px-3 py-2 font-mono text-size-11 text-text-muted shadow-lg transition-colors hover:text-text-bright cursor-pointer"
       >
         <span className="relative flex h-1.5 w-1.5" aria-hidden>
           <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green opacity-60" />
@@ -81,36 +82,20 @@ export function LivePacketFeed({
   return (
     <section
       aria-label={t('map.livePackets')}
-      className="relative ml-auto max-h-full min-w-0 w-[360px] max-w-full overflow-y-auto rounded-lg border border-border bg-bg-raised/95 shadow-xl backdrop-blur-sm"
+      className="relative ml-auto flex max-h-full min-h-0 min-w-0 w-90 max-w-full flex-col overflow-hidden rounded-md border border-border bg-bg-raised shadow-lg"
     >
-      <div className="flex items-center justify-between border-b border-border-subtle px-3 py-1.5">
-        <span className="font-mono text-size-10 font-semibold uppercase tracking-[0.16em] text-text-muted">
+      <div className="flex shrink-0 items-center justify-between border-b border-border-subtle px-3 py-1">
+        <span className="flex items-center gap-1.5 font-mono text-size-11 text-text-muted">
+          <span className="h-1.5 w-1.5 rounded-full bg-green" aria-hidden />
           {t('map.livePackets')}
         </span>
-        <div className="flex items-center gap-1.5">
-          <span className="flex items-center gap-1.5 font-mono text-size-9 uppercase tracking-wider text-green">
-            <span className="h-1.5 w-1.5 rounded-full bg-green" aria-hidden />
-            {t('map.live')}
-          </span>
-          <button
-            type="button"
-            onClick={() => setPanelOpen(false)}
-            aria-label={t('map.hideLivePackets')}
-            title={t('map.hideLivePackets')}
-            className="-mr-1 flex h-6 w-6 items-center justify-center rounded text-text-muted transition-colors hover:bg-text-normal/5 hover:text-text-bright cursor-pointer"
-          >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
-              <path
-                d="M3 3l6 6M9 3L3 9"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
+        <CloseButton
+          onClose={() => setPanelOpen(false)}
+          label={t('map.hideLivePackets')}
+          className="-mr-1"
+        />
       </div>
-      <div className="max-h-48 overflow-y-auto py-1">
+      <div className="min-h-0 max-h-48 overflow-y-auto overscroll-contain py-1">
         {entries.length === 0 && (
           <div className="px-3 py-3 text-center font-mono text-size-10 text-text-dim">
             {t('map.waitingForPackets')}
@@ -129,21 +114,17 @@ export function LivePacketFeed({
               style={{ '--packet-accent-shadow': `inset 3px 0 ${color}` } as React.CSSProperties}
             >
               <Badge variant={payloadTypeVariant(entry.payloadType)}>{typeName}</Badge>
-              {entry.hopCount != null && (
-                <span className="rounded-sm bg-text-muted/8 px-1.5 py-px font-mono text-size-10 text-text-muted">
-                  {entry.hopCount}+
+              {entry.scope && (
+                <span className="min-w-0 truncate" title={entry.scope}>
+                  <ScopeTag>{entry.scope}</ScopeTag>
                 </span>
               )}
-              {entry.scope && <ScopeTag>{entry.scope}</ScopeTag>}
-              <span className="rounded-sm bg-green/10 px-1.5 py-px font-mono text-size-10 font-bold tracking-wide text-green">
+              <span className="shrink-0 rounded-sm bg-green/10 px-1.5 py-px font-mono text-size-10 font-bold tracking-wide text-green">
                 {entry.iata}
-              </span>
-              <span className="ml-auto whitespace-nowrap font-mono text-size-10 text-text-dim">
-                ×{entry.observationCount}
               </span>
               <Timestamp
                 value={entry.heardAt}
-                className="whitespace-nowrap font-mono text-size-10 text-text-muted"
+                className="ml-auto shrink-0 whitespace-nowrap font-mono text-size-10 text-text-muted"
               />
               <button
                 type="button"

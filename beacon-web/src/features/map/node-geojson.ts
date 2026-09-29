@@ -2,6 +2,7 @@ import type { Feature, FeatureCollection, LineString, Point } from 'geojson';
 import type { NodeSummary, NodeNeighbor, NodeLinkMetric } from '../nodes/types';
 import type { NeighborLinesMode } from './types';
 import { hasMapLocation } from './location';
+import { nodeMarkerId } from './marker-images';
 
 // Build the maplibre GeoJSON source from the nodes API response. Properties stay primitive because
 // clustering serializes them, and there's no maplibre import, so this stays unit-testable.
@@ -11,6 +12,7 @@ export interface NodeFeatureProps {
   name: string | null;
   nodeTypeName: string;
   isObserver: boolean; // role flag; selects the observer-pip marker variant (default false)
+  markerImage: string;
 }
 
 export function nodesToFeatureCollection(
@@ -28,6 +30,7 @@ export function nodesToFeatureCollection(
         name: n.name,
         nodeTypeName: n.nodeTypeName,
         isObserver: !!n.isObserver,
+        markerImage: nodeMarkerId(n.publicKey, n.nodeTypeName, !!n.isObserver),
       },
     });
   }

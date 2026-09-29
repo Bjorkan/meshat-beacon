@@ -2,7 +2,6 @@ import { useTranslation } from 'react-i18next';
 import { NODE_TYPES } from '../../lib/node-types';
 import { NODE_TYPE_COLORS } from '../node-type-colors';
 import { PACKET_FLOW_COLOR } from './types';
-import { CLUSTER_ROLE_COLORS } from './cluster-style';
 
 export function MapLegend({
   borders,
@@ -19,9 +18,11 @@ export function MapLegend({
 }) {
   const { t } = useTranslation();
   return (
-    <details className="w-full rounded-md border border-border bg-bg-surface font-mono text-xs text-text-normal shadow-lg">
-      <summary className="cursor-pointer px-3 py-2">{t('map.legend')}</summary>
-      <div className="space-y-2 border-t border-border px-3 py-2">
+    <details className="border-t border-border-subtle font-mono text-size-11 text-text-muted">
+      <summary className="cursor-pointer px-3 py-2 hover:text-text-normal">
+        {t('map.legend')}
+      </summary>
+      <div className="space-y-2 px-3 pb-2">
         <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
           {NODE_TYPES.map((type) => (
             <li key={type.name} className="flex items-center gap-1.5">
@@ -34,11 +35,10 @@ export function MapLegend({
             </li>
           ))}
           <li className="col-span-2 flex items-center gap-1.5">
-            <span
-              aria-hidden
-              className="size-3 rounded-full border-2 border-(--legend-color)"
-              style={{ '--legend-color': CLUSTER_ROLE_COLORS.observer } as React.CSSProperties}
-            />
+            <svg aria-hidden width="14" height="14" viewBox="0 0 20 20" fill="none">
+              <path d="M2 10Q10 0 18 10Q10 20 2 10Z" stroke="currentColor" strokeWidth="1.5" />
+              <circle cx="10" cy="10" r="3" fill="currentColor" />
+            </svg>
             {t('entities.observer')}
           </li>
         </ul>

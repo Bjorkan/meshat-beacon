@@ -204,6 +204,7 @@ export function useMapLibre(
     const container = containerRef.current;
     if (!map || !container) return;
     const update = () => {
+      map.resize();
       map.setPadding(mapOverlayInsets(container.clientWidth, container.clientHeight, live));
     };
     update();

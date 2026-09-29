@@ -332,16 +332,17 @@ export function MapView({
   useMapPacketFlow(mapRef, isReady, packetFlow, wsManager, mapThemeKey, regionKey);
 
   return (
-    <div className="relative flex flex-1 min-h-0">
+    <div
+      className={`@container relative flex flex-1 min-h-0 min-w-0 ${selectedNodeId ? 'max-lg:mb-14' : ''}`}
+    >
       {/* Fill via flex-1, NOT absolute inset-0: maplibre adds .maplibregl-map { position: relative }
           to this element, which overrides Tailwind's `absolute` and would collapse inset-0 to 0
           height. data-dark drives the maplibre control theming in index.css. */}
       <div ref={containerRef} data-dark={isDark} className="flex-1" />
-      {/* Top overlays: map settings dock top-left; the live feed docks top-right on wide
-          screens and stacks below settings on narrow ones. Separate absolute slots (not one
-          shared flex row) so each keeps its own anchor and they can never overlap. */}
-      <div className="pointer-events-none absolute inset-x-3 top-3 bottom-16 z-10 sm:inset-x-3">
-        <div className="pointer-events-auto absolute left-0 top-0 flex max-h-full min-w-0 max-w-[calc(100%-3.5rem)] flex-col gap-2 overflow-y-auto sm:max-w-[240px]">
+      {/* Shared flow prevents panel collisions. Use the map's width, including when a node
+          sidebar is open, and leave the right-hand navigation controls their own lane. */}
+      <div className="pointer-events-none absolute inset-x-3 top-3 bottom-24 z-10 flex min-h-0 flex-col gap-2 @3xl:flex-row @3xl:items-start @3xl:justify-between">
+        <div className="pointer-events-auto flex min-h-0 max-h-full min-w-0 max-w-[calc(100%-3.5rem)] flex-col @3xl:max-w-64">
           <MapSettingsPanel
             typeFilter={typeFilter}
             onTypeChange={handleTypeChange}
@@ -355,17 +356,18 @@ export function MapView({
             meshcoreRegion={meshcoreRegionFilter}
             onMeshcoreRegionChange={handleMeshcoreRegionChange}
             buildShareParams={buildShareParams}
-          />
-          <MapLegend
-            borders={borders}
-            neighbors={neighborEdges.features.length > 0}
-            live={packetFlow}
-            clustered={clustered && !packetFlow}
-            selected={!!selectedNodeId}
-          />
+          >
+            <MapLegend
+              borders={borders}
+              neighbors={neighborEdges.features.length > 0}
+              live={packetFlow}
+              clustered={clustered && !packetFlow}
+              selected={!!selectedNodeId}
+            />
+          </MapSettingsPanel>
         </div>
         {packetFlow && (
-          <div className="pointer-events-auto absolute right-0 top-0 flex max-h-full min-w-0 max-w-full flex-col overflow-y-auto sm:left-auto sm:top-0 sm:max-w-[360px] max-sm:left-0 max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[45%]">
+          <div className="pointer-events-auto mt-auto flex max-h-[40%] min-h-0 min-w-0 max-w-full shrink-0 flex-col @3xl:mt-0 @3xl:mr-12 @3xl:max-h-full @3xl:max-w-90">
             <LivePacketFeed
               active={packetFlow}
               resetKey={`${regionKey}:${packetFlowSession}`}
@@ -383,13 +385,13 @@ export function MapView({
           setPacketFlow((value) => !value);
         }}
       />
-      {/* Keep loading status above LIVE on mobile, clear of the settings header. */}
+      {/* A dedicated bottom lane keeps status clear of settings, the feed and LIVE. */}
       <LoadingPill
         loading={isPaging}
         error={nodesError}
         count={loadedCount}
         noun={t('entities.nodes')}
-        position="bottom-14 left-1/2 -translate-x-1/2 sm:bottom-auto sm:top-3"
+        position="bottom-14 left-1/2 -translate-x-1/2 w-max"
       />
       {error && (
         // z-20 so the failure overlay covers the settings card (z-10) instead of it floating on top

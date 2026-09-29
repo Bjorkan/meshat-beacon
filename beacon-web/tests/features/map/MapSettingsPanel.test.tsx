@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MapSettingsPanel } from '../../../src/features/map/MapSettingsPanel';
 import { getMeshCoreRegions } from '../../../src/api/client';
@@ -39,40 +39,64 @@ beforeEach(() => {
   });
   localStorage.clear();
   localStorage.setItem('beacon-map-settings-open', 'true');
+  vi.clearAllMocks();
   vi.mocked(getMeshCoreRegions).mockResolvedValue([]);
 });
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe('MapSettingsPanel Live presentation', () => {
-  it('explains that Live temporarily overrides visual clustering without changing the saved preference', () => {
+describe('MapSettingsPanel', () => {
+  it('starts collapsed even with a legacy open preference and indicates active filters', () => {
+    renderPanel(<MapSettingsPanel {...baseProps} typeFilter="repeater" meshcoreRegion="se" />);
+    const trigger = screen.getByRole('button', { name: 'Map settings' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(trigger).toHaveTextContent('2');
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument();
+    fireEvent.click(trigger);
+    expect(screen.getByRole('switch', { name: 'IATA borders' })).toBeChecked();
+  });
+
+  it('shows clustering as paused during Live and restores the saved preference afterward', () => {
     const { rerender } = renderPanel(<MapSettingsPanel {...baseProps} />);
-    expect(screen.queryByText(/Live shows every node/i)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Map settings' }));
+    expect(screen.getByRole('switch', { name: 'Group nodes' })).toBeChecked();
 
     rerender(
       <QueryClientProvider client={client}>
         <MapSettingsPanel {...baseProps} liveMode />
       </QueryClientProvider>,
     );
-    expect(screen.getByText(/Live shows every node as an individual dot/i)).toBeInTheDocument();
+    expect(screen.getByText('Paused during live traffic.')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Group nodes' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Group nodes' })).toBeDisabled();
+    expect(baseProps.onClusteredChange).not.toHaveBeenCalled();
 
-    const clustering = screen.getByRole('group', { name: 'Clustering' });
-    expect(within(clustering).getByRole('button', { name: 'On' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
+    rerender(
+      <QueryClientProvider client={client}>
+        <MapSettingsPanel {...baseProps} />
+      </QueryClientProvider>,
     );
+    expect(screen.getByRole('switch', { name: 'Group nodes' })).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Group nodes' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('switch', { name: 'Group nodes' }));
+    expect(baseProps.onClusteredChange).toHaveBeenCalledWith(false);
+    fireEvent.click(screen.getByRole('switch', { name: 'IATA borders' }));
+    expect(baseProps.onBordersChange).toHaveBeenCalledWith(false);
   });
   it('explains that Live suppresses only the ambient neighbor mesh', () => {
     const { rerender } = renderPanel(
       <MapSettingsPanel {...baseProps} liveMode neighborLines="on" />,
     );
-    expect(screen.getByText(/Live hides the ambient neighbor mesh/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Map settings' }));
+    expect(screen.getByText(/Live traffic shows only the selected node/i)).toBeInTheDocument();
 
     rerender(
       <QueryClientProvider client={client}>
         <MapSettingsPanel {...baseProps} liveMode neighborLines="off" />
       </QueryClientProvider>,
     );
-    expect(screen.queryByText(/Live hides the ambient neighbor mesh/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Live traffic shows only the selected node/i),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,5 +1,4 @@
-// Observer "eye" glyph. Matches the map's observer pip (OBSERVER_COLOR in
-// features/map/node-icons.ts) through the shared observer theme token.
+// Observer "eye" glyph, rendered through the shared observer theme token.
 export function ObserverIcon({ className = '' }: { className?: string }) {
   return (
     <svg
