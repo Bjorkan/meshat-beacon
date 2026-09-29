@@ -37,7 +37,7 @@ export function validateNodesSearch(search: Record<string, unknown>): NodesSearc
 export interface ObserversSearch {
   oq?: string;
   osf?: 'name';
-  ost?: 'online' | 'offline';
+  ost?: 'online' | 'offline' | 'all';
   ot?: string;
   ob?: string;
   os?: string;
@@ -49,7 +49,7 @@ export function validateObserversSearch(search: Record<string, unknown>): Observ
   return {
     oq: searchString(search.oq),
     osf: oneOf(search.osf, ['name'] as const),
-    ost: oneOf(search.ost, ['online', 'offline'] as const),
+    ost: oneOf(search.ost, ['online', 'offline', 'all'] as const),
     ot: searchString(search.ot),
     ob: searchString(search.ob),
     os: searchString(search.os),

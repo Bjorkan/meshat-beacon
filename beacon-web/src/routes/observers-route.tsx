@@ -6,10 +6,14 @@ import { observerSortId } from '../features/observers/observer-sort';
 import { useOverlays } from './overlays';
 
 function observerViewState(search: Record<string, unknown>): ObserverTableViewState {
+  // Default to online-only: absent ost behaves like ost=online; ost=all is the explicit unfiltered view.
+  const ost = search.ost;
+  const statusFilter =
+    ost === 'online' || ost === 'offline' || ost === 'all' ? (ost as string) : 'online';
   return {
     search: typeof search.oq === 'string' ? search.oq : '',
     searchField: 'name',
-    statusFilter: search.ost === 'online' || search.ost === 'offline' ? search.ost : '',
+    statusFilter: statusFilter === 'all' ? '' : statusFilter,
     typeFilter: typeof search.ot === 'string' ? search.ot : '',
     brokerFilter: typeof search.ob === 'string' ? search.ob : '',
     scopeFilter: typeof search.os === 'string' ? search.os : '',
@@ -37,7 +41,7 @@ export function ObserversRoute() {
             ...prev,
             ...(patch.search !== undefined ? { oq: patch.search || undefined } : {}),
             ...(patch.statusFilter !== undefined
-              ? { ost: (patch.statusFilter || undefined) as 'online' | 'offline' | undefined }
+              ? { ost: (patch.statusFilter || 'all') as 'all' }
               : {}),
             ...(patch.typeFilter !== undefined ? { ot: patch.typeFilter || undefined } : {}),
             ...(patch.brokerFilter !== undefined ? { ob: patch.brokerFilter || undefined } : {}),

@@ -61,6 +61,9 @@ vi.mock('../../src/features/observers/ObserverTable', () => ({
       >
         observer-sort
       </button>
+      <button onClick={() => props.onViewStateChange({ statusFilter: '' })}>
+        observer-status-all
+      </button>
     </div>
   ),
 }));
@@ -174,6 +177,23 @@ describe('controlled list route state', () => {
     expect(latestNavigation().search(routeState.search)).toMatchObject({
       osort: 'status',
       odir: undefined,
+    });
+  });
+
+  it('defaults Observers to online-only and keeps Alla as the explicit unfiltered state', () => {
+    routeState.search = {};
+    const view = render(<ObserversRoute />);
+    expect(JSON.parse(screen.getByTestId('observer-state').textContent!)).toMatchObject({
+      statusFilter: 'online',
+    });
+
+    fireEvent.click(screen.getByText('observer-status-all'));
+    expect(latestNavigation().search(routeState.search).ost).toBe('all');
+
+    routeState.search = { ost: 'all' };
+    view.rerender(<ObserversRoute />);
+    expect(JSON.parse(screen.getByTestId('observer-state').textContent!)).toMatchObject({
+      statusFilter: '',
     });
   });
 
