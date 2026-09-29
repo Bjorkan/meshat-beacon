@@ -131,7 +131,6 @@
     "scope": "Scope",
     "status": "Status",
     "type": "Type",
-    "broker": "Broker",
     "key": "Key",
     "hashtag": "Hashtag",
     "multibytePaths": "Multibyte paths",

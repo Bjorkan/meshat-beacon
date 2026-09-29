@@ -10,7 +10,6 @@ import { getObserversPage } from '../../../src/api/client';
 
 vi.mock('../../../src/api/client', () => ({
   getObserversPage: vi.fn(),
-  getBrokers: vi.fn().mockResolvedValue([]),
 }));
 vi.mock('../../../src/hooks/useRegion', () => ({
   useRegion: () => ({ regionKey: 'STO', iatas: ['STO'] }),
@@ -34,7 +33,6 @@ it('uses stable mobile sort IDs for fresh server pages while preserving region a
     const [viewState, setViewState] = useState<ObserverTableViewState>({
       sort: { columnId: 'name', direction: 'asc' },
       typeFilter: '',
-      brokerFilter: '',
       statusFilter: '',
       scopeFilter: '',
       search: '',

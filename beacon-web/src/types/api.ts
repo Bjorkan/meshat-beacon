@@ -32,7 +32,6 @@ export type PacketDetail = Omit<
 export type IataCode = Models.IATA;
 export type RegionSummary = Models.RegionSummary;
 export type Region = Models.Region;
-export type BrokerStatus = Models.BrokerStatus;
 export type RouteHop = Models.RouteHop;
 export type KnownRoute = Models.KnownRoute;
 export type CrossIATAHop = Models.CrossIATAHop;

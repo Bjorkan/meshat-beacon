@@ -15,9 +15,6 @@ it('keeps an active type visible and clearable with no result-derived options', 
       typeFilter="meshcore"
       onTypeChange={change}
       typeOptions={[]}
-      brokerFilter=""
-      onBrokerChange={() => {}}
-      brokerOptions={[]}
       scopeFilter=""
       onScopeChange={() => {}}
       scopeOptions={[]}

@@ -155,7 +155,6 @@ describe('controlled list route state', () => {
       oq: 'raven',
       ost: 'offline',
       ot: 'mqtt',
-      ob: 'broker',
       os: '#west',
       osort: 'status',
       odir: 'desc',
@@ -166,7 +165,6 @@ describe('controlled list route state', () => {
       search: 'raven',
       statusFilter: 'offline',
       typeFilter: 'mqtt',
-      brokerFilter: 'broker',
       scopeFilter: '#west',
       sort: { columnId: 'status', direction: 'desc' },
     });

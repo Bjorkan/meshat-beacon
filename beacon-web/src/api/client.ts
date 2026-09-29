@@ -7,7 +7,6 @@ import type {
   IataCode,
   RegionSummary,
   Region,
-  BrokerStatus,
   KnownRoute,
   CrossIATARoute,
   BestRouteResult,
@@ -45,7 +44,6 @@ import {
   rawGetStatsPaths,
   rawGetStatsObserverComparison,
   rawGetObserversObserverIdActivity,
-  rawGetBrokers,
   rawGetChannels,
   rawGetChannelsChannelID,
   rawGetChannelsChannelIDMessages,
@@ -313,10 +311,6 @@ export async function getChannelMessagesPage(
   return toCursorPage(items, limit, (m) => m.id);
 }
 
-export function getBrokers(): Promise<BrokerStatus[]> {
-  return rawGetBrokers();
-}
-
 // The authoritative list of configured transport scope names (e.g. "#bc", "#west"), used to populate
 // the scope filter dropdowns. The no-param /scopes endpoint returns the names directly.
 export function getScopes(): Promise<string[]> {
@@ -502,7 +496,6 @@ export function getObserversPage(
     sort?: string;
     direction?: 'asc' | 'desc';
     type?: string;
-    broker?: string;
     status?: string;
     name?: string;
     scope?: string;
@@ -516,7 +509,6 @@ export function getObserversPage(
     sort: params?.sort,
     direction: params?.direction,
     type: params?.type,
-    broker: params?.broker,
     status: params?.status,
     name: params?.name,
     scope: params?.scope,

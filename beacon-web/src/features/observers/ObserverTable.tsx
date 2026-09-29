@@ -3,8 +3,7 @@ import { observerClientKey, observerClientLabel } from './observer-client';
 import { useMemo } from 'react';
 import { type TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { brokerQueries, observerQueries } from '../../api/queries';
+import { observerQueries } from '../../api/queries';
 import { useRegion } from '../../hooks/useRegion';
 import { useScopes } from '../../hooks/useScopes';
 import { useInfinitePages } from '../../hooks/useInfinitePages';
@@ -29,7 +28,6 @@ export interface ObserverTableViewState {
   searchField: string;
   statusFilter: string;
   typeFilter: string;
-  brokerFilter: string;
   scopeFilter: string;
   sort: SortState;
 }
@@ -162,14 +160,9 @@ export function ObserverTable({
 }: ObserverTableProps) {
   const { t } = useTranslation();
   const { iatas, regionKey } = useRegion();
-  const { search, searchField, statusFilter, typeFilter, brokerFilter, scopeFilter, sort } =
-    viewState;
+  const { search, searchField, statusFilter, typeFilter, scopeFilter, sort } = viewState;
 
   useTick(); // keep recency-derived status badges fresh
-
-  const { data: brokers } = useQuery(brokerQueries.list());
-
-  const brokerNames = useMemo(() => brokers?.map((b) => b.name) ?? [], [brokers]);
 
   const serverSort = observerSortId(sort.columnId);
 
@@ -182,7 +175,6 @@ export function ObserverTable({
         iatas,
         status: statusFilter,
         type: typeFilter,
-        broker: brokerFilter,
         name: search,
         searchField,
         scope: scopeFilter || undefined,
@@ -194,7 +186,6 @@ export function ObserverTable({
       iatas,
       statusFilter,
       typeFilter,
-      brokerFilter,
       search,
       searchField,
       scopeFilter,
@@ -258,9 +249,6 @@ export function ObserverTable({
           typeFilter={typeFilter}
           onTypeChange={(value) => onViewStateChange({ typeFilter: value })}
           typeOptions={typeOptions}
-          brokerFilter={brokerFilter}
-          onBrokerChange={(value) => onViewStateChange({ brokerFilter: value })}
-          brokerOptions={brokerNames}
           scopeFilter={scopeFilter}
           onScopeChange={(value) => onViewStateChange({ scopeFilter: value })}
           scopeOptions={scopeOptions}

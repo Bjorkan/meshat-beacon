@@ -17,9 +17,6 @@ interface ObserverFilterBarProps {
   typeFilter: string;
   onTypeChange: (t: string) => void;
   typeOptions: string[];
-  brokerFilter: string;
-  onBrokerChange: (b: string) => void;
-  brokerOptions: string[];
   scopeFilter: string;
   onScopeChange: (s: string) => void;
   scopeOptions: string[];
@@ -35,9 +32,6 @@ export function ObserverFilterBar({
   typeFilter,
   onTypeChange,
   typeOptions,
-  brokerFilter,
-  onBrokerChange,
-  brokerOptions,
   scopeFilter,
   onScopeChange,
   scopeOptions,
@@ -48,7 +42,7 @@ export function ObserverFilterBar({
   // close the sheet when leaving mobile — derive during render, not in an effect
   if (sheetOpen && !isMobile) setSheetOpen(false);
 
-  const activeCount = [statusFilter, typeFilter, brokerFilter, scopeFilter].filter(Boolean).length;
+  const activeCount = [statusFilter, typeFilter, scopeFilter].filter(Boolean).length;
   const statusOptions = [
     { value: 'online', label: t('options.online') },
     { value: 'offline', label: t('options.offline') },
@@ -57,7 +51,6 @@ export function ObserverFilterBar({
   const clearAll = () => {
     onStatusChange('');
     onTypeChange('');
-    onBrokerChange('');
     onScopeChange('');
   };
 
@@ -80,15 +73,6 @@ export function ObserverFilterBar({
         onChange={onTypeChange}
         fullWidth={fullWidth}
       />
-      {brokerOptions.length > 0 && (
-        <SelectDropdown
-          label={t('filters.broker')}
-          options={brokerOptions.map((b) => ({ value: b, label: b }))}
-          value={brokerFilter}
-          onChange={onBrokerChange}
-          fullWidth={fullWidth}
-        />
-      )}
       {scopeOptions.length > 0 && (
         <MeshCoreRegionPicker
           label={t('filters.scope')}

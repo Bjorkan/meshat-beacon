@@ -13,7 +13,6 @@ import { infiniteQueryOptions, keepPreviousData, queryOptions } from '@tanstack/
 import type { InfiniteData, QueryKey, UseInfiniteQueryOptions } from '@tanstack/react-query';
 import {
   getAmbiguousPrefix2,
-  getBrokers,
   getChannels,
   getChannel,
   getChannelMessagesPage,
@@ -128,7 +127,7 @@ export const meshcoreRegionQueries = {
     }),
 };
 
-// ── scopes + brokers ─────────────────────────────────────────────────────────────────────────
+// ── scopes ───────────────────────────────────────────────────────────────────────────────────
 
 export const scopeQueries = {
   all: () => ['scopes'] as const,
@@ -137,16 +136,6 @@ export const scopeQueries = {
       queryKey: scopeQueries.all(),
       queryFn: getScopes,
       staleTime: 5 * 60_000,
-    }),
-};
-
-export const brokerQueries = {
-  all: () => ['brokers'] as const,
-  list: () =>
-    queryOptions({
-      queryKey: brokerQueries.all(),
-      queryFn: getBrokers,
-      staleTime: 60_000,
     }),
 };
 
@@ -297,7 +286,6 @@ export interface ObserverListFilters {
   iatas?: string[];
   status?: string;
   type?: string;
-  broker?: string;
   name?: string;
   searchField?: string;
   scope?: string;
@@ -311,7 +299,6 @@ function observerListKey(f: ObserverListFilters) {
     f.regionKey,
     f.status ?? '',
     f.type ?? '',
-    f.broker ?? '',
     f.name ?? '',
     f.searchField ?? '',
     f.scope ?? '',
@@ -339,7 +326,6 @@ export const observerQueries = {
           direction: f.direction ?? 'asc',
           status: f.status || undefined,
           type: f.type || undefined,
-          broker: f.broker || undefined,
           name: f.searchField === 'name' ? f.name || undefined : undefined,
           scope: f.scope || undefined,
         }),

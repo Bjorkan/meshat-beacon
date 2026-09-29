@@ -39,7 +39,6 @@ export interface ObserversSearch {
   osf?: 'name';
   ost?: 'online' | 'offline' | 'all';
   ot?: string;
-  ob?: string;
   os?: string;
   osort?: 'name' | 'type' | 'radio' | 'iata' | 'status';
   odir?: 'asc' | 'desc';
@@ -51,7 +50,6 @@ export function validateObserversSearch(search: Record<string, unknown>): Observ
     osf: oneOf(search.osf, ['name'] as const),
     ost: oneOf(search.ost, ['online', 'offline', 'all'] as const),
     ot: searchString(search.ot),
-    ob: searchString(search.ob),
     os: searchString(search.os),
     osort: oneOf(search.osort, ['name', 'type', 'radio', 'iata', 'status'] as const),
     odir: oneOf(search.odir, ['asc', 'desc'] as const),

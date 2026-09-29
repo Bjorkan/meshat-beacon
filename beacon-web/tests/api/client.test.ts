@@ -470,7 +470,6 @@ describe('getObserversPage', () => {
     await getObserversPage(undefined, {
       status: 'online',
       type: 'rak',
-      broker: 'b1',
       name: 'north',
       scope: '#west',
     });
@@ -479,7 +478,6 @@ describe('getObserversPage', () => {
     expect(url).not.toContain('cursor=');
     expect(url).toContain('status=online');
     expect(url).toContain('type=rak');
-    expect(url).toContain('broker=b1');
     expect(url).toContain('name=north');
     expect(new URL(url).searchParams.get('scope')).toBe('#west');
   });

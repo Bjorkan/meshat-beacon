@@ -131,7 +131,6 @@
     "scope": "Scope",
     "status": "Status",
     "type": "Typ",
-    "broker": "Broker",
     "key": "Nyckel",
     "hashtag": "Hashtagg",
     "multibytePaths": "Multibyte-sökvägar",

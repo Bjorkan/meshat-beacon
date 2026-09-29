@@ -15,7 +15,6 @@ function observerViewState(search: Record<string, unknown>): ObserverTableViewSt
     searchField: 'name',
     statusFilter: statusFilter === 'all' ? '' : statusFilter,
     typeFilter: typeof search.ot === 'string' ? search.ot : '',
-    brokerFilter: typeof search.ob === 'string' ? search.ob : '',
     scopeFilter: typeof search.os === 'string' ? search.os : '',
     sort: {
       columnId: observerSortId(search.osort),
@@ -44,7 +43,6 @@ export function ObserversRoute() {
               ? { ost: (patch.statusFilter || 'all') as 'all' }
               : {}),
             ...(patch.typeFilter !== undefined ? { ot: patch.typeFilter || undefined } : {}),
-            ...(patch.brokerFilter !== undefined ? { ob: patch.brokerFilter || undefined } : {}),
             ...(patch.scopeFilter !== undefined ? { os: patch.scopeFilter || undefined } : {}),
             ...(patch.sort !== undefined
               ? {

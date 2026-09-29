@@ -112,13 +112,12 @@ describe('application routes', () => {
     });
 
     const observers = await routerAt(
-      '/observers?oq=raven&ost=offline&ot=mqtt&ob=broker-1&os=%23west&osort=status&odir=desc',
+      '/observers?oq=raven&ost=offline&ot=mqtt&os=%23west&osort=status&odir=desc',
     );
     expect(routeSearch(observers)).toMatchObject({
       oq: 'raven',
       ost: 'offline',
       ot: 'mqtt',
-      ob: 'broker-1',
       os: '#west',
       osort: 'status',
       odir: 'desc',
