@@ -7,6 +7,7 @@ import type {
   RasterDEMSourceSpecification,
   MapStyleImageMissingEvent,
   ErrorEvent,
+  SymbolLayerSpecification,
 } from 'maplibre-gl';
 import {
   DEM_TILES,
@@ -69,6 +70,56 @@ function addTerrain(map: MapLibreMap, isDark: boolean) {
   map.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: TERRAIN_EXAGGERATION });
 }
 
+// Basemap label language. The OpenFreeMap styles bake their label expressions into every symbol
+// layer as "name:latin [+ name:nonlatin], else name_en/name". For Swedish, each of those name
+// leaves is rewritten to prefer the OSM Swedish name (tile key "name:sv"; the tiles carry every
+// OSM language and Swedish exonyms like Tyskland/Norge exist), falling back to the style's own
+// expression when a feature has no Swedish name. Any other language restores the style's own
+// expression. Road refs ("to-string", ref) contain no name leaves and stay untouched. Idempotent:
+// layers whose serialized field is unchanged are skipped, so redundant calls are free.
+function rewriteLabelToSwedish(expr: unknown): unknown {
+  return Array.isArray(expr)
+    ? expr[0] === 'get' && (expr[1] === 'name:latin' || expr[1] === 'name_en')
+      ? ['coalesce', ['get', 'name:sv'], expr]
+      : expr.map(rewriteLabelToSwedish)
+    : expr;
+}
+
+function symbolTextFields(map: MapLibreMap): [string, unknown][] {
+  return (map.getStyle().layers ?? []).flatMap((layer) =>
+    layer.type === 'symbol'
+      ? ([[layer.id, (layer as SymbolLayerSpecification).layout?.['text-field']]] as [
+          string,
+          unknown,
+        ][])
+      : [],
+  );
+}
+
+// captureLabelFields snapshots the freshly loaded style's label expressions (before any mutation)
+// so localize can both apply Swedish and restore the originals for other languages. Called from
+// onStyleReady, where the style is always pristine. Overlay layers added later (clusters, focused
+// neighbors) are absent from the snapshot; localize falls back to their live field, and since
+// those carry no name leaves the rewrite leaves them unchanged anyway.
+function captureLabelFields(map: MapLibreMap, originals: Map<string, unknown>) {
+  originals.clear();
+  for (const [id, field] of symbolTextFields(map)) if (field) originals.set(id, field);
+}
+
+function localizeMapLabels(map: MapLibreMap, language: string, originals: Map<string, unknown>) {
+  for (const [id, current] of symbolTextFields(map)) {
+    if (current == null) continue;
+    const original = originals.get(id) ?? current;
+    const target = language === 'sv' ? rewriteLabelToSwedish(original) : original;
+    if (JSON.stringify(target) === JSON.stringify(current)) continue;
+    map.setLayoutProperty(
+      id,
+      'text-field',
+      target as NonNullable<SymbolLayerSpecification['layout']>['text-field'],
+    );
+  }
+}
+
 export function useMapLibre(
   styleId: string,
   // lng/lat pairs to fitBounds over; null/empty falls back to the configured default view
@@ -78,6 +129,8 @@ export function useMapLibre(
   // region fitBounds. Later region changes still auto-fit.
   initialCamera?: { center: [number, number]; zoom: number },
   live = false,
+  // basemap label language; 'sv' prefers OSM Swedish names, anything else keeps the style default
+  mapLanguage = 'sv',
 ) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -88,6 +141,7 @@ export function useMapLibre(
   const swapPendingRef = useRef(false); // a setStyle() basemap swap is in flight (awaiting style.load)
   const onStyleErrorRef = useRef(onStyleError);
   const lastFitKeyRef = useRef<string | null>(null); // last applied fit target; skips redundant re-fits
+  const labelFieldsRef = useRef(new Map<string, unknown>()); // pristine text-fields of the loaded style
   const skipInitialFitRef = useRef(!!initialCamera); // let a deep-link camera win over the first fit
   const initialCameraRef = useRef(initialCamera); // read once at map creation (deep link is load-time only)
   const [isReady, setIsReady] = useState(false);
@@ -142,6 +196,8 @@ export function useMapLibre(
       // reapplied after every style load, the same way terrain is re-added. 'globe' renders the
       // world as a sphere at low zoom and blends back to mercator as the camera zooms in.
       map.setProjection({ type: 'globe' });
+      // snapshot the pristine label expressions before anything mutates them (see localizeMapLabels)
+      captureLabelFields(map, labelFieldsRef.current);
       hasLoadedRef.current = true;
       swapPendingRef.current = false;
       lastGoodStyleIdRef.current = styleIdRef.current;
@@ -268,6 +324,16 @@ export function useMapLibre(
       bearing: DEFAULT_BEARING,
     });
   }, [fitPoints, isReady]);
+
+  // Basemap label language: re-apply after every style (re)load and whenever the app language
+  // changes (a language switch performs no setStyle, so onStyleReady never fires for it; sv applies
+  // the Swedish rewrite, other languages restore the pristine fields). The stringify guard in
+  // localizeMapLabels makes the overlapping runs no-ops when both flip together.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !isReady || loadedStyleId !== styleId) return;
+    localizeMapLabels(map, mapLanguage, labelFieldsRef.current);
+  }, [mapLanguage, isReady, loadedStyleId, styleId]);
 
   // The style prop changes one render before the async style.load event. Comparing the confirmed
   // loaded id keeps overlay hooks out of that gap even if React batches isReady false -> true.

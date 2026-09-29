@@ -72,7 +72,7 @@ export function MapView({
   onOpenPacket,
   urlView,
 }: MapViewProps) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   // Deep-link params, read once at mount (like the region's ?iata seed). Each setting below is seeded
   // URL -> localStorage -> default; the URL wins for this session but is never written back to
   // localStorage, so a shared link can't clobber the visitor's saved prefs.
@@ -236,6 +236,7 @@ export function MapView({
     undefined,
     initialCamera,
     packetFlow,
+    i18n.language,
   );
   const isDark = resolveMapStyle(styleId).dark; // drives marker theming + maplibre control chrome
   const mapThemeKey = `${themeKey}:${styleRevision}`;
