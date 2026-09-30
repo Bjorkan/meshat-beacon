@@ -252,4 +252,6 @@ export function healLiveQueryCaches(queryClient: QueryClient): void {
   void queryClient.invalidateQueries({ queryKey: observerQueries.all(), refetchType: 'active' });
   void queryClient.invalidateQueries({ queryKey: ['observer-adverts'], refetchType: 'active' });
   void queryClient.invalidateQueries({ queryKey: channelQueries.all(), refetchType: 'active' });
+  // channel messages live under their own key family, so the 'channels' prefix above misses them
+  void queryClient.invalidateQueries({ queryKey: ['channel-messages'], refetchType: 'active' });
 }

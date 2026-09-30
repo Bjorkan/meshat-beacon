@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"sync/atomic"
 )
 
 // EventType identifies the kind of server-push event. These match the
@@ -122,6 +123,16 @@ type Hub struct {
 	unsubscribe chan unsubscribeMsg
 	remove      chan *Client
 	broadcast   chan Event
+	// overflow carries a "the global queue had to drop events" signal from
+	// Broadcast() to Run(), which turns it into a per-client lagged
+	// notification — the same recovery path a full per-client send buffer
+	// already uses. Buffered size 1 so signaling never blocks; concurrent
+	// drops collapse into one pending signal whose batch size is carried by
+	// the dropped counter below.
+	overflow chan struct{}
+	// dropped counts events dropped by Broadcast() since the last overflow
+	// signal was consumed. Touched by ingest goroutines and Run(), so atomic.
+	dropped atomic.Uint64
 }
 
 // subscribeMsg carries a client registration, a scope subscription, or a
@@ -163,6 +174,7 @@ func New() *Hub {
 		unsubscribe: make(chan unsubscribeMsg, 64),
 		remove:      make(chan *Client, 64),
 		broadcast:   make(chan Event, 512),
+		overflow:    make(chan struct{}, 1),
 	}
 }
 
@@ -211,11 +223,24 @@ func (h *Hub) Remove(c *Client) {
 }
 
 // Broadcast enqueues an event for fan-out. Safe to call from any goroutine.
+//
+// Non-blocking by design: the MQTT ingest path must never stall on hub
+// backpressure. When the global queue is full the event is lost before
+// subscription matching — meaning any subscribed client may now have a gap —
+// so the drop is signaled to Run(), which notifies subscribed clients through
+// the same lagged channel a per-client overflow uses. The web client
+// reconciles against the canonical REST state on that signal.
 func (h *Hub) Broadcast(e Event) {
 	select {
 	case h.broadcast <- e:
 	default:
-		slog.Warn("hub: broadcast channel full, dropping event", "component", "hub")
+		dropped := h.dropped.Add(1)
+		select {
+		case h.overflow <- struct{}{}:
+		default:
+			// a signal is already pending; the loop will report the accumulated count
+		}
+		slog.Warn("hub: broadcast channel full, dropping event", "component", "hub", "droppedTotal", dropped)
 	}
 }
 
@@ -290,6 +315,31 @@ func (h *Hub) Run() {
 					slog.Warn(fmt.Sprintf("hub: client send buffer full, dropped event type=%s", evt.Type), "component", "hub")
 				}
 			}
+
+		case <-h.overflow:
+			h.notifyGlobalOverflow(clients)
+		}
+	}
+}
+
+// notifyGlobalOverflow tells every subscribed client that events were dropped
+// upstream of subscription matching, so they can reconcile against the
+// canonical REST state. Only Run() calls it.
+func (h *Hub) notifyGlobalOverflow(clients map[*Client]struct{}) {
+	dropped := int(h.dropped.Swap(0))
+	if dropped == 0 {
+		dropped = 1
+	}
+	for c := range clients {
+		// A client with no subscriptions can never have missed an event.
+		if len(c.subscriptions) == 0 {
+			continue
+		}
+		select {
+		case c.laggedCH <- LaggedNotification{DroppedCount: dropped}:
+		default:
+			// laggedCH full; the write pump drains it and the next
+			// overflow signal (or per-client overflow) retries
 		}
 	}
 }

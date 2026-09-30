@@ -240,6 +240,82 @@ func TestHub_Broadcast_FullBuffer_SendsLaggedNotification(t *testing.T) {
 	}
 }
 
+func TestHub_NotifyGlobalOverflow_CountsAndSkipsUnsubscribed(t *testing.T) {
+	h := New()
+	h.dropped.Store(3)
+	subscribed := &Client{
+		Send:          make(chan Event, 8),
+		laggedCH:      make(chan LaggedNotification, 8),
+		subscriptions: map[string]Scope{"s1": {Events: []EventType{EventPacketObservation}}},
+	}
+	unsubscribed := &Client{
+		Send:          make(chan Event, 8),
+		laggedCH:      make(chan LaggedNotification, 8),
+		subscriptions: map[string]Scope{},
+	}
+	clients := map[*Client]struct{}{subscribed: {}, unsubscribed: {}}
+
+	h.notifyGlobalOverflow(clients)
+
+	select {
+	case notif := <-subscribed.laggedCH:
+		if notif.DroppedCount != 3 {
+			t.Errorf("expected DroppedCount 3, got %d", notif.DroppedCount)
+		}
+	default:
+		t.Fatal("expected a lagged notification for the subscribed client")
+	}
+	if h.dropped.Load() != 0 {
+		t.Errorf("expected the dropped counter to reset, got %d", h.dropped.Load())
+	}
+	select {
+	case notif := <-unsubscribed.laggedCH:
+		t.Errorf("client without subscriptions must not be notified, got %+v", notif)
+	default:
+		// expected: it can never have missed an event
+	}
+}
+
+func TestHub_GlobalBroadcastOverflow_SendsLaggedNotification(t *testing.T) {
+	h := runHub(t)
+	subscribed := h.NewClient()
+	h.AddScope(subscribed, "sub1", Scope{Events: []EventType{EventPacketObservation}})
+	unsubscribed := h.NewClient()
+
+	time.Sleep(20 * time.Millisecond) // let the hub apply registration + scope
+
+	// Saturate the global queue. The loop drains concurrently, so keep topping
+	// the queue up and broadcasting until an actual drop is recorded — a
+	// queued event that the loop steals before Broadcast makes room again.
+	// The queued events deliberately don't match any client scope, so the
+	// subscribed client can only receive the overflow notification.
+	for i := 0; i < 1000 && h.dropped.Load() == 0; i++ {
+		for len(h.broadcast) < cap(h.broadcast) {
+			h.broadcast <- Event{Type: EventNodeUpdate, IATA: "YVR"}
+		}
+		h.Broadcast(Event{Type: EventPacketObservation, IATA: "YVR"})
+	}
+	if h.dropped.Load() == 0 {
+		t.Fatal("expected the global queue to overflow under saturation")
+	}
+
+	select {
+	case notif := <-subscribed.LaggedCH():
+		if notif.DroppedCount < 1 {
+			t.Errorf("expected DroppedCount >= 1, got %d", notif.DroppedCount)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("expected a lagged notification for the global overflow, timed out")
+	}
+
+	select {
+	case notif := <-unsubscribed.LaggedCH():
+		t.Errorf("client without subscriptions must not be notified, got %+v", notif)
+	case <-time.After(50 * time.Millisecond):
+		// expected: it can never have missed an event
+	}
+}
+
 func TestClientMatches_NoSubscriptions(t *testing.T) {
 	c := &Client{subscriptions: make(map[string]Scope)}
 	if c.matches(Event{Type: EventPacketObservation}) {

@@ -17,6 +17,7 @@ import {
 import { channelQueries, nodeQueries, observerQueries, packetQueries } from '../../src/api/queries';
 import type { NodeSummary } from '../../src/features/nodes/types';
 import type { ObserverSummary } from '../../src/features/observers/types';
+import type { ChannelMessage } from '../../src/features/channels/types';
 import type { CursorPage, PacketSummary } from '../../src/types/api';
 import type { WsNodeUpdate, WsObserverStatus, WsPacketObservation } from '../../src/types/ws';
 
@@ -177,11 +178,13 @@ describe('global WebSocket to Query cache policy', () => {
     const nodeKey = nodeQueries.list({ regionKey: 'YOW' }).queryKey;
     const observerKey = observerQueries.list({ regionKey: 'YOW' }).queryKey;
     const channelKey = channelQueries.list({ regionKey: 'YOW' }).queryKey;
+    const channelMessagesKey = channelQueries.messages({ channelId: 1, regionKey: 'YOW' }).queryKey;
     const packetKey = packetQueries.list({ regionKey: 'YOW' }).queryKey;
     const packetDetailKey = packetQueries.detail('AA11').queryKey;
     client.setQueryData(nodeKey, page([node]));
     client.setQueryData(observerKey, page([observer]));
     client.setQueryData(channelKey, []);
+    client.setQueryData(channelMessagesKey, page<ChannelMessage>([]));
     client.setQueryData(packetKey, page<PacketSummary>([]));
     client.setQueryData(packetDetailKey, { packetHash: 'AA11' });
 
@@ -200,6 +203,7 @@ describe('global WebSocket to Query cache policy', () => {
     expect(client.getQueryState(nodeKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(observerKey)?.isInvalidated).toBe(true);
     expect(client.getQueryState(channelKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(channelMessagesKey)?.isInvalidated).toBe(true);
   });
 
   it('keeps mounted packet history stable because the route-local live buffer owns new events', () => {
