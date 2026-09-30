@@ -6,7 +6,7 @@ import { usePackets } from '../../../src/features/packets/usePackets';
 import type { PacketServerFilter } from '../../../src/features/packets/types';
 import type { PacketSummary } from '../../../src/types/api';
 import type { WsPacketObservation } from '../../../src/types/ws';
-import { noteRateLimited, noteRequestOk } from '../../../src/api/rate-limit';
+import { noteRateLimited, resetRateLimit } from '../../../src/api/rate-limit';
 
 vi.mock('../../../src/hooks/useRegion', () => ({
   useRegion: () => ({ iatas: ['YOW'], regionKey: 'YOW' }),
@@ -100,7 +100,7 @@ describe('usePackets cache ownership', () => {
         lastObservationId: 0,
       });
     });
-    noteRequestOk();
+    resetRateLimit();
 
     expect(getPackets).not.toHaveBeenCalled();
     expect(qc.getQueryData<{ pages: unknown[] }>(['packets', 'YOW'])?.pages).toHaveLength(3);

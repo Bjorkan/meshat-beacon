@@ -4,6 +4,7 @@ import {
   shouldRetryQuery,
   noteRateLimited,
   noteRequestOk,
+  resetRateLimit,
   getRateLimitedUntil,
   isRateLimited,
   subscribeRateLimit,
@@ -11,7 +12,7 @@ import {
 import { RATE_LIMIT_DEFAULT_MS, RATE_LIMIT_MAX_MS } from '../../src/lib/constants';
 
 afterEach(() => {
-  noteRequestOk();
+  resetRateLimit();
   vi.useRealTimers();
 });
 
@@ -83,11 +84,44 @@ describe('rate-limit store', () => {
     expect(getRateLimitedUntil()).toBe(1_000_000 + RATE_LIMIT_DEFAULT_MS);
   });
 
-  it('is no longer limited once the window elapses', () => {
+  it('is no longer limited once the window elapses, without needing any request', () => {
     vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const cb = vi.fn();
+    subscribeRateLimit(cb);
     noteRateLimited(5_000);
+    cb.mockClear();
     vi.advanceTimersByTime(5_000);
+    expect(getRateLimitedUntil()).toBeNull();
     expect(isRateLimited()).toBe(false);
+    expect(cb).toHaveBeenCalledOnce(); // expiry notifies the indicator
+  });
+
+  it('a successful overlapping response cannot clear an active Retry-After deadline', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    noteRateLimited(10_000);
+    // a parallel request that completes after the 429 must not shorten the backoff
+    noteRequestOk();
+    expect(getRateLimitedUntil()).toBe(10_000);
+    expect(isRateLimited()).toBe(true);
+    vi.advanceTimersByTime(9_999);
+    expect(isRateLimited()).toBe(true);
+    vi.advanceTimersByTime(1);
+    expect(isRateLimited()).toBe(false);
+  });
+
+  it('a second 429 reschedules expiry, and the earlier window cannot clear it early', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    noteRateLimited(5_000);
+    vi.advanceTimersByTime(2_000);
+    noteRateLimited(10_000); // extends to t=12_000 and reschedules the expiry timer
+    vi.advanceTimersByTime(3_000); // the original t=5_000 expiry point
+    expect(getRateLimitedUntil()).toBe(12_000);
+    expect(isRateLimited()).toBe(true);
+    vi.advanceTimersByTime(7_000);
+    expect(getRateLimitedUntil()).toBeNull();
   });
 
   it('a longer window extends, a shorter one does not shrink', () => {
@@ -100,17 +134,22 @@ describe('rate-limit store', () => {
     expect(getRateLimitedUntil()).toBe(10_000);
   });
 
-  it('noteRequestOk clears and notifies, and stays quiet when nothing was set', () => {
+  it('clears only already-expired state and stays quiet while the deadline is active', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
     const cb = vi.fn();
-    const unsub = subscribeRateLimit(cb);
+    subscribeRateLimit(cb);
 
     noteRequestOk();
     expect(cb).not.toHaveBeenCalled();
 
     noteRateLimited(5_000);
+    cb.mockClear();
+    noteRequestOk(); // still active — must be a no-op
+    expect(getRateLimitedUntil()).toBe(5_000);
+    expect(cb).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(5_000); // expired
     noteRequestOk();
     expect(getRateLimitedUntil()).toBeNull();
-    expect(cb).toHaveBeenCalledTimes(2);
-    unsub();
   });
 });

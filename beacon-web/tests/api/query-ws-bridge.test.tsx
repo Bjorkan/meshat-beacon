@@ -1,4 +1,4 @@
-import { noteRateLimited, noteRequestOk } from '../../src/api/rate-limit';
+import { noteRateLimited, resetRateLimit } from '../../src/api/rate-limit';
 import { StrictMode } from 'react';
 import { act, render } from '@testing-library/react';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
@@ -134,7 +134,7 @@ it('coalesces lag recovery until Retry-After expires and cancels deferred work o
   } finally {
     view.unmount();
     client.clear();
-    noteRequestOk();
+    resetRateLimit();
     vi.useRealTimers();
   }
 });

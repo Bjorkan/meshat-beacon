@@ -1,11 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { getIatas, getIataBorder, ApiError } from '../../src/api/client';
-import { getRateLimitedUntil, noteRequestOk } from '../../src/api/rate-limit';
+import { getRateLimitedUntil, resetRateLimit } from '../../src/api/rate-limit';
 
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
-  noteRequestOk();
+  resetRateLimit();
 });
 
 it.each([() => getIatas(), () => getIataBorder('STO')])(
@@ -23,9 +23,10 @@ it.each([() => getIatas(), () => getIataBorder('STO')])(
     );
     await expect(request()).rejects.toMatchObject({ status: 429, retryAfterMs: 7000 });
     expect(getRateLimitedUntil()).toBe(8000);
+    // an overlapping success must not clear the still-active backoff
     vi.mocked(fetch).mockResolvedValue(new Response(null, { status: 204 }));
     await getIataBorder('STO');
-    expect(getRateLimitedUntil()).toBeNull();
+    expect(getRateLimitedUntil()).toBe(8000);
   },
 );
 
