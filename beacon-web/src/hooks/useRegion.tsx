@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { regionQueries } from '../api/queries';
 import {
   resolveIatas,
+  isAllRegions,
   normalizeSelection,
   regionKey as toRegionKey,
   serializeSelection,
@@ -74,11 +75,14 @@ export function useRegions(): RegionsData {
   }, [data]);
 }
 
-export interface RegionFilter {
-  iatas: string[] | undefined; // resolved member IATAs to query; undefined = all regions
-  regionKey: string; // stable query-key fragment ("*" = all)
-  isResolved?: boolean; // false while a selected region's member IATAs are unavailable
-}
+// The geographic filter consumers pass to queries. The three states are deliberately distinct:
+// a specific selection whose member IATAs have not loaded yet is PENDING, never "all regions" —
+// `undefined` iatas / "*" regionKey mean an explicit no-filter scope, so consumers can rely on
+// them without also checking a flag.
+export type RegionFilter =
+  | { status: 'all'; iatas: undefined; regionKey: '*' } // explicit all-regions selection
+  | { status: 'pending'; iatas: null; regionKey: null } // selected slugs not resolvable yet
+  | { status: 'resolved'; iatas: string[]; regionKey: string };
 
 // The resolved geographic filter consumers pass to queries: the flattened IATA list plus a stable key.
 export function useRegion(): RegionFilter {
@@ -87,13 +91,17 @@ export function useRegion(): RegionFilter {
   const rootSlug = regions.find((region) => region.isRoot)?.slug ?? null;
 
   return useMemo(() => {
-    const iatas = resolveIatas(normalizeSelection(selection, rootSlug), regionIatas);
-    return {
-      iatas,
-      regionKey: toRegionKey(iatas),
-      isResolved: normalizeSelection(selection, rootSlug).regions.every((slug) =>
-        regionIatas.has(slug),
-      ),
-    };
+    const normalized = normalizeSelection(selection, rootSlug);
+    if (isAllRegions(normalized)) {
+      return { status: 'all', iatas: undefined, regionKey: '*' };
+    }
+    // A specific selection is pending until every chosen slug has expanded to member IATAs.
+    if (normalized.regions.some((slug) => !regionIatas.has(slug))) {
+      return { status: 'pending', iatas: null, regionKey: null };
+    }
+    const iatas = resolveIatas(normalized, regionIatas);
+    // A selection that resolves to zero IATAs filters nothing, so it behaves as all-regions.
+    if (!iatas) return { status: 'all', iatas: undefined, regionKey: '*' };
+    return { status: 'resolved', iatas, regionKey: toRegionKey(iatas) };
   }, [selection, rootSlug, regionIatas]);
 }

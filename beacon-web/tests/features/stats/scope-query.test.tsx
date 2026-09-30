@@ -5,14 +5,18 @@ import type { ReactNode } from 'react';
 import { useScopes } from '../../../src/features/stats/useStats';
 import { getStatsScopes } from '../../../src/api/client';
 
-const region = { iatas: ['YVR'] as string[] | undefined, regionKey: 'YVR', isResolved: true };
+const region = {
+  status: 'resolved' as 'resolved' | 'pending' | 'all',
+  iatas: ['YVR'] as string[] | null | undefined,
+  regionKey: 'YVR' as string | null,
+};
 vi.mock('../../../src/hooks/useRegion', () => ({ useRegion: () => region }));
 vi.mock('../../../src/api/client', () => ({ getStatsScopes: vi.fn(() => Promise.resolve([])) }));
 afterEach(() => {
   vi.clearAllMocks();
+  region.status = 'resolved';
   region.iatas = ['YVR'];
   region.regionKey = 'YVR';
-  region.isResolved = true;
 });
 
 it('sends the selected IATAs and fetches a separate global query when the filter is cleared', async () => {
@@ -25,6 +29,7 @@ it('sends the selected IATAs and fetches a separate global query when the filter
   await waitFor(() =>
     expect(getStatsScopes).toHaveBeenCalledWith(['YVR'], expect.any(AbortSignal)),
   );
+  region.status = 'all';
   region.iatas = undefined;
   region.regionKey = '*';
   rerender();
@@ -37,7 +42,9 @@ it('sends the selected IATAs and fetches a separate global query when the filter
 });
 
 it('does not fetch a global fallback for unresolved selected regions', () => {
-  region.isResolved = false;
+  region.status = 'pending';
+  region.iatas = null;
+  region.regionKey = null;
   const client = new QueryClient();
   const { unmount } = renderHook(() => useScopes(), {
     wrapper: ({ children }: { children: ReactNode }) => (

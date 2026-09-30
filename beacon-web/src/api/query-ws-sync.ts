@@ -181,7 +181,9 @@ export function syncObserverStatus(queryClient: QueryClient, data: WsObserverSta
 export function syncChannelMessage(
   queryClient: QueryClient,
   data: WsChannelMessage['data'],
-  currentRegionKey: string,
+  // null while the region filter is pending: no live subscription exists then, and the null key
+  // below never matches a resolved cache entry, so unrelated-region data cannot be inserted.
+  currentRegionKey: string | null,
 ): void {
   let channelId: number | undefined;
   for (const [queryKey, channels] of queryClient.getQueriesData<InfiniteData<ChannelPage>>({

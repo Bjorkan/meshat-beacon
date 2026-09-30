@@ -85,7 +85,7 @@ function ObserverList({
 
   const search = useQuery({
     ...statsQueries.observerSearch({ regionKey, iatas, q }),
-    enabled: searching,
+    enabled: searching && regionKey !== null,
   });
 
   type Row = { id: string; name: string; count?: number; iata?: string; online?: boolean };

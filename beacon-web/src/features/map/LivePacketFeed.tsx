@@ -20,7 +20,7 @@ import { packetFlowColor } from './packet-flow-colors';
 interface LivePacketFeedProps {
   active: boolean;
   resetKey: string;
-  selectedIatas: string[] | undefined;
+  selectedIatas: string[] | null | undefined;
   wsManager: WsManager;
   onOpenPacket: (packetHash: string) => void;
 }

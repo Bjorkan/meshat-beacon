@@ -49,7 +49,7 @@ function ObserverSelect({
   onChange: (id: string) => void;
 }) {
   const { t } = useTranslation();
-  const { iatas, regionKey, isResolved } = useRegion();
+  const { iatas, regionKey } = useRegion();
   const [search, setSearch] = useState('');
   const [name, setName] = useState('');
   useEffect(() => {
@@ -58,9 +58,9 @@ function ObserverSelect({
   }, [search]);
   const options = useQuery({
     queryKey: ['comparison-observers', regionKey, name],
-    queryFn: () => getObserversPage(iatas, { name: name || undefined, limit: 50 }),
+    queryFn: () => getObserversPage(iatas ?? undefined, { name: name || undefined, limit: 50 }),
     staleTime: 30_000,
-    enabled: isResolved !== false,
+    enabled: regionKey !== null,
   });
   const selected = useQuery({
     queryKey: ['observer', value],
@@ -194,7 +194,7 @@ function ComparisonForm({
 export function CompareObserversTab() {
   const { t } = useTranslation();
   const colors = useChartColors();
-  const { iatas, regionKey, isResolved } = useRegion();
+  const { iatas, regionKey } = useRegion();
   const search = useSearch({ from: '/analytics' });
   const navigate = useNavigate({ from: '/analytics' });
   const params = new URLSearchParams();
@@ -215,8 +215,8 @@ export function CompareObserversTab() {
   const selection = valid ? parsed : null;
   const result = useQuery({
     queryKey: ['observer-comparison', regionKey, selection],
-    queryFn: ({ signal }) => getObserverComparison(iatas, selection!, signal),
-    enabled: selection !== null && isResolved !== false,
+    queryFn: ({ signal }) => getObserverComparison(iatas ?? undefined, selection!, signal),
+    enabled: selection !== null && regionKey !== null,
     retry: false,
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -224,14 +224,14 @@ export function CompareObserversTab() {
   const observerA = useQuery({
     queryKey: ['observer', selection?.observerA],
     queryFn: () => getObserver(selection!.observerA),
-    enabled: selection !== null && isResolved !== false,
+    enabled: selection !== null && regionKey !== null,
     staleTime: 30_000,
     retry: false,
   });
   const observerB = useQuery({
     queryKey: ['observer', selection?.observerB],
     queryFn: () => getObserver(selection!.observerB),
-    enabled: selection !== null && isResolved !== false,
+    enabled: selection !== null && regionKey !== null,
     staleTime: 30_000,
     retry: false,
   });

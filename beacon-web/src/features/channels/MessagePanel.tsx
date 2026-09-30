@@ -63,8 +63,8 @@ interface MessagePanelProps {
   suggestedChannel?: ChannelSummary;
   onSelectChannel?: (id: number) => void;
   heardCounts: Record<string, number>;
-  iatas?: string[];
-  regionKey: string;
+  iatas?: string[] | null;
+  regionKey: string | null;
   onAnalyze?: (packetHash: string) => void;
   // mobile-only: renders a back button, since here the panel replaces the channel list
   onBack?: () => void;
@@ -94,7 +94,7 @@ export function MessagePanel({
     isFetchingNextPage,
   } = useInfiniteQuery({
     ...channelQueries.messages({ channelId: channel?.id, regionKey, iatas }),
-    enabled: channel !== null,
+    enabled: channel !== null && regionKey !== null,
   });
 
   // flatten order is irrelevant — the ascending sort below restores chat order from newest-first pages
@@ -108,7 +108,10 @@ export function MessagePanel({
   const bottomRef = useRef<HTMLDivElement>(null);
   const targetRef = useRef<HTMLDivElement>(null);
   const visitedTarget = useRef<string | null>(null);
-  const targetKey = targetMessageHash ? `${regionKey}:${channel?.id}:${targetMessageHash}` : null;
+  const targetKey =
+    targetMessageHash && regionKey !== null
+      ? `${regionKey}:${channel?.id}:${targetMessageHash}`
+      : null;
   const targetFound = sorted.some((msg) => msg.packetHash === targetMessageHash);
 
   // Follow the existing history cursors until the linked message is present, including

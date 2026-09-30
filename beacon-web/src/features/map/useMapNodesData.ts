@@ -12,8 +12,8 @@ const nodeId = (n: NodeSummary) => n.id;
 // refetch when toggling. The MeshCore Region filter is applied server-side, so markers, clusters
 // and topology lines all derive from the already-confirmed set.
 export function useMapNodesData(
-  selectedIatas: string[] | undefined,
-  regionKey: string,
+  selectedIatas: string[] | null | undefined,
+  regionKey: string | null,
   meshcoreRegion: string,
   opts?: { enabled?: boolean },
 ) {

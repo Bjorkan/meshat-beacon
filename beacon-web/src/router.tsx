@@ -12,7 +12,7 @@ import { readPreference } from './lib/storage';
 // Transient overlay state (the analyzer/node/path overlays) stays in React state below — it is
 // not shareable navigation state, so it deliberately never touches the URL.
 
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Outlet,
   createRootRouteWithContext,
@@ -66,7 +66,7 @@ const PacketPathMapModal = lazy(() =>
   import('./features/map/PacketPathMapModal').then((m) => ({ default: m.PacketPathMapModal })),
 );
 
-const WS_EVENTS = ['packetObservation', 'channelMessage', 'observerStatus', 'nodeUpdate'];
+export const WS_EVENTS = ['packetObservation', 'channelMessage', 'observerStatus', 'nodeUpdate'];
 
 // ── search param validation ─────────────────────────────────────────────────────────────────
 
@@ -205,23 +205,35 @@ function computeInitialSelection(fromUrl: RegionSelection): RegionSelection {
   return ALL_REGIONS;
 }
 
-// null-render component — easiest way to sync region changes into the WS manager
-function RegionWatcher() {
-  const { iatas, regionKey } = useRegion();
+// null-render component — easiest way to sync region changes into the WS manager. Exported for
+// the region-subscription regression tests.
+export function RegionWatcher() {
+  const { status, iatas, regionKey } = useRegion();
+  const connected = useRef(false);
+  const usable = status !== 'pending';
 
+  // A pending specific selection has no representable scope yet: connecting would subscribe to the
+  // unfiltered global stream, so hold the connection until the filter first becomes usable (and
+  // drop it if it becomes pending again). Later scope changes never re-run this effect.
   useEffect(() => {
+    if (!usable || connected.current) return;
+    connected.current = true;
     wsManager.connect({ iatas, events: WS_EVENTS });
-    return () => wsManager.disconnect();
-    // The initial selection is intentionally captured once. The effect below updates the active
-    // subscription whenever async region expansion or a user selection changes the resolved IATAs.
+    return () => {
+      connected.current = false;
+      wsManager.disconnect();
+    };
+    // iatas is captured at first connect; subsequent changes flow through updateSubscription below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [usable]);
 
+  // regionKey is the stable identity of the resolved iatas; on the first usable render this
+  // restates the scope connect() just established, afterwards it applies changes in place.
   useEffect(() => {
+    if (!usable) return;
     wsManager.updateSubscription({ iatas, events: WS_EVENTS });
-    // regionKey is the stable identity of the resolved iatas
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regionKey]);
+  }, [usable, regionKey]);
 
   return null;
 }

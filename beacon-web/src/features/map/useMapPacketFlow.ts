@@ -76,7 +76,7 @@ export function useMapPacketFlow(
   enabled: boolean,
   wsManager: WsManager,
   themeKey: string,
-  resetKey: string,
+  resetKey: string | null,
 ) {
   const flowsRef = useRef<Flow[]>([]);
   const pulsesRef = useRef<Pulse[]>([]);

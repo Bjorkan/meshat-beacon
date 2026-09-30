@@ -72,6 +72,19 @@ type PagedOptions<T, TPageParam = number | undefined> = UseInfiniteQueryOptions<
 
 type SortablePageParam = string | number | undefined;
 
+// ── region scoping ───────────────────────────────────────────────────────────────────────────
+// Region-scoped factories accept the useRegion() filter as-is: `regionKey: null` marks a selected
+// region whose member IATAs have not resolved yet. Such a filter can never run as an unfiltered
+// request — the shared `regionEnabled` gate disables it and its key element stays null, distinct
+// from the "*" all-regions key — so call sites cannot accidentally fetch across all regions while
+// the region catalogue is loading. `iatas ?? undefined` inside queryFns is unreachable for null
+// regionKey for the same reason.
+
+type RegionKey = string | null;
+type RegionIatas = string[] | null | undefined;
+
+const regionEnabled = (regionKey: RegionKey) => regionKey !== null;
+
 // ── regions ──────────────────────────────────────────────────────────────────────────────────
 // The loader expands each summary into its full detail (member IATAs + map-focus hints) in one
 // query — regions are near-static, so the combined result caches long and is shared app-wide.
@@ -142,8 +155,8 @@ export const scopeQueries = {
 // ── nodes ────────────────────────────────────────────────────────────────────────────────────
 
 export interface NodeListFilters {
-  regionKey: string;
-  iatas?: string[];
+  regionKey: RegionKey;
+  iatas?: RegionIatas;
   type?: string;
   name?: string;
   pubkeyPrefix?: string;
@@ -172,11 +185,12 @@ function nodeListKey(f: NodeListFilters) {
 }
 
 export const nodeQueries = {
-  pathPackets: (nodeId: string, regionKey: string, iatas?: string[]) =>
+  pathPackets: (nodeId: string, regionKey: RegionKey, iatas?: RegionIatas) =>
     infiniteQueryOptions({
       queryKey: ['node-path-packets', nodeId, regionKey] as const,
+      enabled: regionEnabled(regionKey),
       queryFn: ({ pageParam }) =>
-        getNodePathPackets(nodeId, { iatas, pageToken: pageParam, limit: 25 }),
+        getNodePathPackets(nodeId, { iatas: iatas ?? undefined, pageToken: pageParam, limit: 25 }),
       initialPageParam: undefined as string | undefined,
       getNextPageParam: (last: CursorPage<PacketSummary>) => last.nextPageToken ?? undefined,
       staleTime: 30_000,
@@ -188,8 +202,8 @@ export const nodeQueries = {
   // is a server-side confirmed-MeshCore-Region filter; when set, every page contains only matching
   // nodes, so markers, clusters and neighbor lines all honor it without client-side reconstruction.
   mapList: (args: {
-    regionKey: string;
-    iatas?: string[];
+    regionKey: RegionKey;
+    iatas?: RegionIatas;
     meshcoreRegion?: string;
   }): PagedOptions<NodeSummary, SortablePageParam> =>
     infiniteQueryOptions<
@@ -200,8 +214,9 @@ export const nodeQueries = {
       SortablePageParam
     >({
       queryKey: ['map-nodes', args.regionKey, args.meshcoreRegion ?? ''] as const,
+      enabled: regionEnabled(args.regionKey),
       queryFn: ({ pageParam }) =>
-        getNodesPage(args.iatas, {
+        getNodesPage(args.iatas ?? undefined, {
           cursor: typeof pageParam === 'number' ? pageParam : undefined,
           pageToken: typeof pageParam === 'string' ? pageParam : undefined,
           // The map needs the complete population and auto-pages until it has it. Use the endpoint's
@@ -227,8 +242,9 @@ export const nodeQueries = {
       SortablePageParam
     >({
       queryKey: nodeListKey(f),
+      enabled: regionEnabled(f.regionKey),
       queryFn: ({ pageParam }) =>
-        getNodesPage(f.iatas, {
+        getNodesPage(f.iatas ?? undefined, {
           cursor: typeof pageParam === 'number' ? pageParam : undefined,
           pageToken: typeof pageParam === 'string' ? pageParam : undefined,
           sort: f.sort ?? 'name',
@@ -282,8 +298,8 @@ export const nodeQueries = {
 // ── observers ────────────────────────────────────────────────────────────────────────────────
 
 export interface ObserverListFilters {
-  regionKey: string;
-  iatas?: string[];
+  regionKey: RegionKey;
+  iatas?: RegionIatas;
   status?: string;
   type?: string;
   name?: string;
@@ -318,8 +334,9 @@ export const observerQueries = {
       SortablePageParam
     >({
       queryKey: observerListKey(f),
+      enabled: regionEnabled(f.regionKey),
       queryFn: ({ pageParam }) =>
-        getObserversPage(f.iatas, {
+        getObserversPage(f.iatas ?? undefined, {
           cursor: typeof pageParam === 'number' ? pageParam : undefined,
           pageToken: typeof pageParam === 'string' ? pageParam : undefined,
           sort: f.sort ?? 'name',
@@ -388,8 +405,8 @@ export const packetQueries = {
   all: () => ['packets'] as const,
   // 2-element key when unfiltered (cache survives filter toggling; prefix resets match both shapes)
   list: (args: {
-    regionKey: string;
-    iatas?: string[];
+    regionKey: RegionKey;
+    iatas?: RegionIatas;
     filter?: PacketServerFilter | null;
   }): PagedOptions<PacketSummary> =>
     infiniteQueryOptions<
@@ -402,8 +419,9 @@ export const packetQueries = {
       queryKey: args.filter
         ? (['packets', args.regionKey, args.filter] as const)
         : (['packets', args.regionKey] as const),
+      enabled: regionEnabled(args.regionKey),
       queryFn: ({ pageParam }) =>
-        getPackets(args.iatas, {
+        getPackets(args.iatas ?? undefined, {
           cursor: pageParam,
           ...(args.filter ?? {}),
           includeResolvedPath: true,
@@ -440,8 +458,8 @@ export const channelQueries = {
       staleTime: 60_000,
     }),
   list: (args: {
-    regionKey: string;
-    iatas?: string[];
+    regionKey: RegionKey;
+    iatas?: RegionIatas;
     hash?: string;
     key?: 'known' | 'unknown' | 'all';
   }) =>
@@ -453,8 +471,14 @@ export const channelQueries = {
       string | undefined
     >({
       queryKey: ['channels', args.regionKey, { hash: args.hash, key: args.key }] as const,
+      enabled: regionEnabled(args.regionKey),
       queryFn: ({ pageParam }) =>
-        getChannels({ iatas: args.iatas, hash: args.hash, key: args.key, pageCursor: pageParam }),
+        getChannels({
+          iatas: args.iatas ?? undefined,
+          hash: args.hash,
+          key: args.key,
+          pageCursor: pageParam,
+        }),
       initialPageParam: undefined,
       getNextPageParam: (page) => (page.hasMore ? (page.nextPageCursor ?? undefined) : undefined),
       // Incoming channel events patch the cached rows and mark uncertain aggregate metadata stale.
@@ -464,8 +488,8 @@ export const channelQueries = {
     }),
   messages: (args: {
     channelId: number | undefined;
-    regionKey: string;
-    iatas?: string[];
+    regionKey: RegionKey;
+    iatas?: RegionIatas;
   }): PagedOptions<ChannelMessage> =>
     infiniteQueryOptions<
       CursorPage<ChannelMessage>,
@@ -484,13 +508,13 @@ export const channelQueries = {
           });
         }
         return getChannelMessagesPage(args.channelId, {
-          iatas: args.iatas,
+          iatas: args.iatas ?? undefined,
           cursor: pageParam,
         });
       },
       getNextPageParam: (last) => last.nextCursor ?? undefined,
       initialPageParam: undefined,
-      enabled: args.channelId !== undefined,
+      enabled: args.channelId !== undefined && regionEnabled(args.regionKey),
       // New messages are inserted by the global WS bridge. Reopening a thread should reuse those
       // pages instead of refetching its entire scrollback after a short timeout.
       staleTime: Infinity,
@@ -589,14 +613,15 @@ export const routeQueries = {
 
 export const traceQueries = {
   all: () => ['traces'] as const,
-  list: (args: { regionKey: string; iatas?: string[]; type?: string; limit?: number }) =>
+  list: (args: { regionKey: RegionKey; iatas?: RegionIatas; type?: string; limit?: number }) =>
     queryOptions({
       queryKey: ['traces', args.regionKey, args.type ?? ''] as const,
+      enabled: regionEnabled(args.regionKey),
       // TanStack cancels the in-flight fetch when the filter changes (signal aborted),
       // so a superseded 200-row response never parses, caches, or commits a stale render.
       queryFn: ({ signal }) =>
         getTraces(
-          args.iatas,
+          args.iatas ?? undefined,
           {
             limit: args.limit,
             type: (args.type || undefined) as TraceType | undefined,
@@ -634,84 +659,96 @@ const sinceFor = (range: StatsRange) => Date.now() - RANGE_MS_VALUES[range];
 
 export const statsQueries = {
   all: () => ['stats'] as const,
-  overview: (regionKey: string, iatas?: string[]) =>
+  overview: (regionKey: RegionKey, iatas?: RegionIatas) =>
     queryOptions({
       queryKey: ['stats-overview', regionKey] as const,
-      queryFn: () => getStatsOverview(iatas),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getStatsOverview(iatas ?? undefined),
       ...statsCommon,
       // self-correct the WS-accumulated live counters against the server
       refetchInterval: 60_000,
     }),
-  observations: (regionKey: string, iatas: string[] | undefined, range: StatsRange) =>
+  observations: (regionKey: RegionKey, iatas: RegionIatas, range: StatsRange) =>
     queryOptions({
       queryKey: ['stats-observations', regionKey, range] as const,
-      queryFn: ({ signal }) => getStatsObservations(iatas, sinceFor(range), signal),
+      enabled: regionEnabled(regionKey),
+      queryFn: ({ signal }) => getStatsObservations(iatas ?? undefined, sinceFor(range), signal),
       ...statsCommon,
       // feeds the observations chart + sparklines and gets no WS bumps, so refetch to stay fresh
       refetchInterval: 60_000,
     }),
-  payloadBreakdown: (regionKey: string, iatas: string[] | undefined, range: StatsRange) =>
+  payloadBreakdown: (regionKey: RegionKey, iatas: RegionIatas, range: StatsRange) =>
     queryOptions({
       queryKey: ['stats-payload', regionKey, range] as const,
-      queryFn: () => getPayloadBreakdown(iatas, sinceFor(range)),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getPayloadBreakdown(iatas ?? undefined, sinceFor(range)),
       ...statsCommon,
     }),
-  topNodes: (regionKey: string, iatas: string[] | undefined, limit = 10) =>
+  topNodes: (regionKey: RegionKey, iatas: RegionIatas, limit = 10) =>
     queryOptions({
       queryKey: ['stats-top-nodes', regionKey, limit] as const,
-      queryFn: () => getTopNodes(iatas, limit),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getTopNodes(iatas ?? undefined, limit),
       ...statsCommon,
     }),
-  topObservers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
+  topObservers: (regionKey: RegionKey, iatas: RegionIatas, range: StatsRange, limit = 10) =>
     queryOptions({
       queryKey: ['stats-top-observers', regionKey, range, limit] as const,
-      queryFn: () => getTopObservers(iatas, sinceFor(range), limit),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getTopObservers(iatas ?? undefined, sinceFor(range), limit),
       ...statsCommon,
     }),
-  topAdvertisers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
+  topAdvertisers: (regionKey: RegionKey, iatas: RegionIatas, range: StatsRange, limit = 10) =>
     queryOptions({
       queryKey: ['stats-top-advertisers', regionKey, range, limit] as const,
-      queryFn: () => getTopAdvertisers(iatas, sinceFor(range), limit),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getTopAdvertisers(iatas ?? undefined, sinceFor(range), limit),
       ...statsCommon,
     }),
-  topTalkers: (regionKey: string, iatas: string[] | undefined, range: StatsRange, limit = 10) =>
+  topTalkers: (regionKey: RegionKey, iatas: RegionIatas, range: StatsRange, limit = 10) =>
     queryOptions({
       queryKey: ['stats-top-talkers', regionKey, range, limit] as const,
-      queryFn: () => getTopTalkers(iatas, sinceFor(range), limit),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getTopTalkers(iatas ?? undefined, sinceFor(range), limit),
       ...statsCommon,
     }),
-  radioPresets: (regionKey: string, iatas?: string[]) =>
+  radioPresets: (regionKey: RegionKey, iatas?: RegionIatas) =>
     queryOptions({
       queryKey: ['stats-radio-presets', regionKey] as const,
-      queryFn: () => getRadioPresets(iatas),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getRadioPresets(iatas ?? undefined),
       ...statsCommon,
     }),
   // node-types is a population census (no time window), so the key is region-only
-  nodeTypes: (regionKey: string, iatas?: string[]) =>
+  nodeTypes: (regionKey: RegionKey, iatas?: RegionIatas) =>
     queryOptions({
       queryKey: ['stats-node-types', regionKey] as const,
-      queryFn: () => getStatsNodeTypes(iatas),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getStatsNodeTypes(iatas ?? undefined),
       ...statsCommon,
     }),
   // clock drift reflects each node's latest measured drift, not a windowed aggregate, so region-only
-  clockDrift: (regionKey: string, iatas?: string[], limit = 100) =>
+  clockDrift: (regionKey: RegionKey, iatas?: RegionIatas, limit = 100) =>
     queryOptions({
       queryKey: ['stats-clock-drift', regionKey, limit] as const,
-      queryFn: () => getClockDrift(iatas, limit),
+      enabled: regionEnabled(regionKey),
+      queryFn: () => getClockDrift(iatas ?? undefined, limit),
       ...statsCommon,
     }),
   // Scope snapshots follow the selected region.
-  scopes: (regionKey: string, iatas?: string[]) =>
+  scopes: (regionKey: RegionKey, iatas?: RegionIatas) =>
     queryOptions({
       queryKey: ['stats-scopes', regionKey] as const,
-      queryFn: ({ signal }) => getStatsScopes(iatas, signal),
+      enabled: regionEnabled(regionKey),
+      queryFn: ({ signal }) => getStatsScopes(iatas ?? undefined, signal),
       refetchInterval: 60_000,
       ...statsCommon,
     }),
-  observerSearch: (args: { regionKey: string; iatas?: string[]; q: string }) =>
+  observerSearch: (args: { regionKey: RegionKey; iatas?: RegionIatas; q: string }) =>
     queryOptions({
       queryKey: ['observer-search', args.regionKey, args.q] as const,
-      queryFn: () => getObserversPage(args.iatas, { name: args.q, limit: 50 }),
+      enabled: regionEnabled(args.regionKey),
+      queryFn: () => getObserversPage(args.iatas ?? undefined, { name: args.q, limit: 50 }),
       staleTime: 30_000,
       placeholderData: keepPreviousData,
     }),

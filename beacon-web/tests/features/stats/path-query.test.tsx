@@ -6,18 +6,24 @@ import { usePathStats } from '../../../src/features/stats/usePathStats';
 import { getPathStats } from '../../../src/api/client';
 import type { StatsRange } from '../../../src/features/stats/types';
 
-const region = { iatas: ['YVR'], regionKey: 'YVR', isResolved: true };
+const region = {
+  status: 'resolved' as 'resolved' | 'pending' | 'all',
+  iatas: ['YVR'] as string[] | null | undefined,
+  regionKey: 'YVR' as string | null,
+};
 vi.mock('../../../src/hooks/useRegion', () => ({ useRegion: () => region }));
 vi.mock('../../../src/api/client', () => ({ getPathStats: vi.fn(() => new Promise(() => {})) }));
 afterEach(() => {
   vi.clearAllMocks();
+  region.status = 'resolved';
   region.iatas = ['YVR'];
   region.regionKey = 'YVR';
-  region.isResolved = true;
 });
 
 it('blocks unresolved regions and then uses bounded minute windows and cancellation', async () => {
-  region.isResolved = false;
+  region.status = 'pending';
+  region.iatas = null;
+  region.regionKey = null;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const { result, rerender, unmount } = renderHook(
     ({ range }: { range: StatsRange }) => usePathStats(range),
@@ -30,7 +36,9 @@ it('blocks unresolved regions and then uses bounded minute windows and cancellat
   );
   expect(result.current.isPending).toBe(true);
   expect(getPathStats).not.toHaveBeenCalled();
-  region.isResolved = true;
+  region.status = 'resolved';
+  region.iatas = ['YVR'];
+  region.regionKey = 'YVR';
   rerender({ range: '24h' });
   await waitFor(() => expect(getPathStats).toHaveBeenCalledOnce());
   const first = vi.mocked(getPathStats).mock.calls[0]!;

@@ -5,20 +5,26 @@ import type { ReactNode } from 'react';
 import { useStatsObservations } from '../../../src/features/stats/useStats';
 import { getStatsObservations } from '../../../src/api/client';
 
-const region = { iatas: ['YVR'], regionKey: 'YVR', isResolved: true };
+const region = {
+  status: 'resolved' as 'resolved' | 'pending' | 'all',
+  iatas: ['YVR'] as string[] | null | undefined,
+  regionKey: 'YVR' as string | null,
+};
 vi.mock('../../../src/hooks/useRegion', () => ({ useRegion: () => region }));
 vi.mock('../../../src/api/client', () => ({
   getStatsObservations: vi.fn(() => new Promise(() => {})),
 }));
 afterEach(() => {
   vi.clearAllMocks();
+  region.status = 'resolved';
   region.iatas = ['YVR'];
   region.regionKey = 'YVR';
-  region.isResolved = true;
 });
 
 it('waits for a selected region to resolve instead of making an unfiltered request', async () => {
-  region.isResolved = false;
+  region.status = 'pending';
+  region.iatas = null;
+  region.regionKey = null;
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const { result, unmount } = renderHook(() => useStatsObservations('24h'), {
     wrapper: ({ children }: { children: ReactNode }) => (

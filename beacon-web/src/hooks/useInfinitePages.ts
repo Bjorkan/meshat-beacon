@@ -52,7 +52,9 @@ export function useInfinitePages<T, TPageParam = number | undefined>({
     isLoading,
   } = useInfiniteQuery({
     ...options,
-    enabled,
+    // The factory's own enabled (e.g. the region-pending gate in queries.ts) must survive: this
+    // hook's flag can only narrow it, never widen a disabled factory back into fetching.
+    enabled: options.enabled !== false && enabled,
     placeholderData: keepPrevious ? keepPreviousData : undefined,
   });
 
