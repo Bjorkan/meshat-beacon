@@ -11,6 +11,7 @@ import Spiderfy from '@nazka/map-gl-js-spiderfy';
 import type { FeatureCollection, Point } from 'geojson';
 import { NODE_TYPE_COLORS } from '../node-type-colors';
 import { nodeMarkerExpression, rasterizeMapMarker, MARKER_FACE } from './marker-images';
+import { setNodeImageProvider, clearNodeImageProvider } from './map-image-provider';
 import type { NodeFeatureProps } from './node-geojson';
 import {
   NODES_SOURCE_ID,
@@ -359,14 +360,16 @@ export function useMapNodes(
     syncMapOverlayLayerOrder(map);
   }, [mapRef, isReady, isDark, effectiveClustered, liveMode, themeKey]);
 
-  // Register images synchronously when tile layout requests them. Distributions are part of
-  // each key, so clusters with the same total but different contents never share the wrong ring.
+  // Provide generated marker images through the map's v6 missing-image resolver. Distributions are
+  // part of each key, so clusters with the same total but different contents never share the wrong
+  // ring. The resolver awaits this provider before the requesting tiles parse; cleanup keeps the
+  // existing ownership semantics (see provided/destroyed below).
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !isReady) return;
     const pixelRatio = Math.min(4, Math.max(2, Math.ceil(dpr || 1)));
     const provided = new Set<string>();
-    const provide = ({ id }: { id: string }) => {
+    const provide = (id: string) => {
       if (map.hasImage(id)) return;
       const data = rasterizeMapMarker(id, pixelRatio);
       if (!data) return;
@@ -380,12 +383,12 @@ export function useMapNodes(
       destroyed = true;
     };
     map.on('remove', onDestroy);
-    map.on('styleimagemissing', provide);
+    setNodeImageProvider(provide);
     // Re-layout existing tiles after a style/DPR change, including already-known image names.
     const source = map.getSource(NODES_SOURCE_ID) as GeoJSONSource | undefined;
     source?.setData(geojsonRef.current);
     return () => {
-      map.off('styleimagemissing', provide);
+      clearNodeImageProvider(provide);
       map.off('remove', onDestroy);
       if (!destroyed) {
         for (const id of provided) if (map.hasImage(id)) map.removeImage(id);
