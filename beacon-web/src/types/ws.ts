@@ -151,15 +151,14 @@ export type WsServerMessage =
   | WsLagged
   | WsError;
 
-// client-sent subscription filter
-
+// client-sent subscription filter. Only the dimensions the server enforces are advertised:
+// routeTypes/observerIds were never applied by the hub (a subscribed ack silently ignored
+// them) and are intentionally not part of the contract until implemented end-to-end.
 export interface SubscriptionFilter {
   iatas?: string[];
   regionIds?: string[];
   regionSlugs?: string[];
   payloadTypes?: number[];
-  routeTypes?: number[];
   channelHashes?: string[];
-  observerIds?: string[];
   events?: string[];
 }

@@ -178,14 +178,19 @@ type clientMessage struct {
 }
 
 // subscribeScope mirrors the scope object in the subscribe message.
+//
+// Note: routeTypes and observerIds were previously declared here but never
+// propagated into the hub — a `subscribed` acknowledgement silently ignored
+// them. They are no longer part of the contract: a scope is restricted only
+// by the dimensions it actually declares (iatas/regions, payloadTypes,
+// channelHashes, events). Unrecognized fields are ignored like any unknown
+// JSON field, never acknowledged as an active filter.
 type subscribeScope struct {
 	IATAs         []string        `json:"iatas"`
 	RegionIDs     []string        `json:"regionIds"`
 	RegionSlugs   []string        `json:"regionSlugs"`
 	PayloadTypes  []uint8         `json:"payloadTypes"`
-	RouteTypes    []uint8         `json:"routeTypes"`
 	ChannelHashes []string        `json:"channelHashes"`
-	ObserverIDs   []string        `json:"observerIds"`
 	Events        []hub.EventType `json:"events"`
 }
 
