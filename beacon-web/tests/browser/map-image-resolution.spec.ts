@@ -198,7 +198,8 @@ test('spiderfying a terminal cluster renders clickable leaf capsules', async ({ 
   await expect.poll(spiderfyLeafCount(page), { timeout: 15000 }).toBe(3);
   // A leaf click must select the node instead of closing the fan as a click on empty map. The
   // selected ring cannot render for a node that is still inside the terminal cluster, so assert
-  // the selection through the URL the app writes and the opened detail panel.
+  // the selection through the URL the app writes and the opened detail panel. Opening the panel
+  // also changes the map insets, which moves the camera and closes the fan by design.
   await clickAt(110);
   await expect.poll(() => page.url(), { timeout: 15000 }).toContain('node=cc0001');
   await expect(page.getByText('cc0001' + '0'.repeat(12))).toBeVisible();
