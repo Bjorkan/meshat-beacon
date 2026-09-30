@@ -46,7 +46,14 @@ export class WsManager {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private msgCounter = 0;
-  private lastEventTimestamp: number = Date.now();
+  // Freshness of the CURRENT connection's server traffic, used by the heartbeat to decide whether
+  // pongs/events have stopped. Split from the gap timestamp below so a previous connection's
+  // staleness can never force-reconnect a healthy new socket.
+  private lastServerActivityAt: number = Date.now();
+  // When the last connection's server stream went dark (captured at every close and at
+  // disconnect()). Drives the reconnect lag notice's `since` and the "stale for Ns" badge while
+  // connecting; cleared once the new connection's hello has consumed it.
+  private gapSince: number | null = null;
 
   private packetHandlers: PacketHandler[] = [];
   private laggedHandlers: LaggedHandler[] = [];
@@ -63,8 +70,10 @@ export class WsManager {
     return this.status;
   }
 
-  getLastEventTimestamp(): number {
-    return this.lastEventTimestamp;
+  // Most recent server traffic of the current connection, or — while a reconnect is pending —
+  // when the previous connection's stream went dark.
+  getLastServerActivityAt(): number {
+    return this.gapSince ?? this.lastServerActivityAt;
   }
 
   onPacketObservation(handler: PacketHandler): () => void {
@@ -148,6 +157,7 @@ export class WsManager {
     this.intentionalClose = true;
     this.reconnectAttempt = 0;
     this.openedAt = null;
+    this.gapSince = this.lastServerActivityAt; // the stream went dark here
     this.clearTimers();
     this.teardownSocket();
     this.subscriptionId = null;
@@ -203,6 +213,9 @@ export class WsManager {
       case 'hello': {
         const isReconnect = this.everConnected;
         this.everConnected = true;
+        // the previous connection's staleness must not count against this one: a healthy socket
+        // gets a full heartbeat window before any force-reconnect
+        this.lastServerActivityAt = Date.now();
         this.setStatus('connected');
         this.startPing();
         this.sendSubscribe();
@@ -213,8 +226,9 @@ export class WsManager {
             v: 1,
             type: 'lagged',
             droppedCount: 0,
-            since: this.lastEventTimestamp,
+            since: this.gapSince ?? this.lastServerActivityAt,
           };
+          this.gapSince = null; // consumed: the current connection owns freshness from here
           for (const handler of this.laggedHandlers) {
             handler(notice);
           }
@@ -242,11 +256,11 @@ export class WsManager {
 
       case 'pong':
         // a pong proves the link is alive, so it counts as recent activity
-        this.lastEventTimestamp = Date.now();
+        this.lastServerActivityAt = Date.now();
         break;
 
       case 'event':
-        this.lastEventTimestamp = Date.now();
+        this.lastServerActivityAt = Date.now();
         if (msg.event === 'packetObservation') {
           for (const handler of this.packetHandlers) {
             handler(msg.data);
@@ -268,7 +282,7 @@ export class WsManager {
 
       case 'lagged':
         // a lag notice is still server traffic, so it counts as recent activity
-        this.lastEventTimestamp = Date.now();
+        this.lastServerActivityAt = Date.now();
         for (const handler of this.laggedHandlers) {
           handler(msg);
         }
@@ -303,7 +317,7 @@ export class WsManager {
   private startPing(): void {
     if (this.pingTimer) clearInterval(this.pingTimer); // a second hello must not double the interval
     this.pingTimer = setInterval(() => {
-      if (Date.now() - this.lastEventTimestamp > WS_PING_INTERVAL_MS * 2 + 5_000) {
+      if (Date.now() - this.lastServerActivityAt > WS_PING_INTERVAL_MS * 2 + 5_000) {
         // pongs stopped coming back — the link is half-open, rebuild it
         this.forceReconnect();
         return;
@@ -322,6 +336,9 @@ export class WsManager {
 
   private scheduleReconnect(closeCode?: number): void {
     this.setStatus('connecting');
+    // the stream went dark: remember when the dying connection last had server traffic so the
+    // reconnect lag notice can report the true gap start
+    this.gapSince = this.lastServerActivityAt;
     // only a link that actually held resets the backoff — an accept-then-close must keep escalating
     if (this.openedAt !== null && Date.now() - this.openedAt >= WS_STABLE_MS)
       this.reconnectAttempt = 0;

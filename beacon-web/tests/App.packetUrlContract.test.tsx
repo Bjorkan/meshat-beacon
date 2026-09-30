@@ -38,7 +38,7 @@ vi.mock('../src/api/ws-manager', () => {
     getStatus() {
       return 'disconnected';
     }
-    getLastEventTimestamp() {
+    getLastServerActivityAt() {
       return Date.now();
     }
   }

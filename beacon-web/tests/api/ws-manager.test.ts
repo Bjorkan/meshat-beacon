@@ -237,7 +237,7 @@ describe('WsManager', () => {
     expect(handler.mock.calls[0]![0].droppedCount).toBe(47);
   });
 
-  it('refreshes the last-event timestamp on lagged and pong messages', () => {
+  it('refreshes the current-connection activity timestamp on lagged and pong messages', () => {
     const mgr = new WsManager('ws://test/ws');
     mgr.connect({ iatas: ['YOW'] });
 
@@ -245,18 +245,18 @@ describe('WsManager', () => {
     ws.simulateOpen();
     ws.simulateMessage({ v: 1, type: 'hello', serverTime: 123, connectionId: 'abc' });
 
-    const baseline = mgr.getLastEventTimestamp();
+    const baseline = mgr.getLastServerActivityAt();
 
     // a lag notice is still server traffic and should reset the stale timer
     vi.advanceTimersByTime(5000);
     ws.simulateMessage({ v: 1, type: 'lagged', droppedCount: 1, since: 0, lastObservationId: 0 });
-    const afterLagged = mgr.getLastEventTimestamp();
+    const afterLagged = mgr.getLastServerActivityAt();
     expect(afterLagged).toBeGreaterThan(baseline);
 
     // so should a heartbeat pong
     vi.advanceTimersByTime(5000);
     ws.simulateMessage({ v: 1, type: 'pong', id: 'p-1' });
-    expect(mgr.getLastEventTimestamp()).toBeGreaterThan(afterLagged);
+    expect(mgr.getLastServerActivityAt()).toBeGreaterThan(afterLagged);
   });
 
   it('dispatches channelMessage events to handlers', () => {
@@ -337,6 +337,65 @@ describe('WsManager', () => {
     ws.sent = [];
     vi.advanceTimersByTime(30_000);
     expect(ws.sent.map((s) => JSON.parse(s)).filter((m) => m.type === 'ping')).toHaveLength(1);
+  });
+
+  it('keeps a healthy reconnected socket alive through its first heartbeat cycle after a long outage', () => {
+    const mgr = new WsManager('ws://test/ws');
+    mgr.connect({ iatas: ['YOW'] });
+
+    const ws1 = MockWebSocket.instances[0]!;
+    ws1.simulateOpen();
+    ws1.simulateMessage({ v: 1, type: 'hello', serverTime: 1, connectionId: 'c1' });
+    ws1.simulateMessage({
+      v: 1,
+      type: 'event',
+      event: 'packetObservation',
+      data: { packetHash: 'aa', packet: {}, observation: {} },
+    });
+
+    // outages much longer than the heartbeat threshold must not leak into the next connection
+    ws1.simulateClose(1006);
+    vi.advanceTimersByTime(5 * 60_000);
+    const ws2 = MockWebSocket.instances[1]!;
+    ws2.simulateOpen();
+    ws2.simulateMessage({ v: 1, type: 'hello', serverTime: 2, connectionId: 'c2' });
+
+    // the first heartbeat interval must send a ping, not tear the fresh socket down again
+    const socketCountAfterHello = MockWebSocket.instances.length;
+    vi.advanceTimersByTime(30_000);
+    expect(MockWebSocket.instances.length).toBe(socketCountAfterHello);
+    expect(ws2.sent.map((s) => JSON.parse(s)).some((m) => m.type === 'ping')).toBe(true);
+
+    // but a genuinely half-open link is still detected once pongs stop coming
+    vi.advanceTimersByTime(120_000);
+    expect(MockWebSocket.instances.length).toBeGreaterThan(socketCountAfterHello);
+  });
+
+  it('reports the pre-outage activity time as the reconnect lag notice since', () => {
+    const handler = vi.fn();
+    const mgr = new WsManager('ws://test/ws');
+    mgr.onLagged(handler);
+    mgr.connect({ iatas: ['YOW'] });
+
+    const ws1 = MockWebSocket.instances[0]!;
+    ws1.simulateOpen();
+    ws1.simulateMessage({ v: 1, type: 'hello', serverTime: 1, connectionId: 'c1' });
+    ws1.simulateMessage({
+      v: 1,
+      type: 'event',
+      event: 'packetObservation',
+      data: { packetHash: 'aa', packet: {}, observation: {} },
+    });
+    const lastActivity = Date.now();
+
+    ws1.simulateClose(1006);
+    vi.advanceTimersByTime(5 * 60_000);
+    const ws2 = MockWebSocket.instances[1]!;
+    ws2.simulateOpen();
+    ws2.simulateMessage({ v: 1, type: 'hello', serverTime: 2, connectionId: 'c2' });
+
+    expect(handler).toHaveBeenCalledOnce();
+    expect(handler.mock.calls[0]![0].since).toBe(lastActivity);
   });
 
   it('forces a reconnect when pongs stop coming (half-open link)', () => {

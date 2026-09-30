@@ -31,7 +31,7 @@ function LiveBadge({ wsManager }: { wsManager: WsManager }) {
   useEffect(() => {
     if (status !== 'connecting') return;
     function update() {
-      const staleSec = Math.floor((Date.now() - wsManager.getLastEventTimestamp()) / 1000);
+      const staleSec = Math.floor((Date.now() - wsManager.getLastServerActivityAt()) / 1000);
       setStaleStr(staleSec > 60 ? `${Math.floor(staleSec / 60)}m` : `${staleSec}s`);
     }
     update();

@@ -16,7 +16,7 @@ vi.mock('../../src/api/client', () => ({
 const wsManager = {
   onStatusChange: () => () => {},
   getStatus: () => 'connected',
-  getLastEventTimestamp: () => Date.now(),
+  getLastServerActivityAt: () => Date.now(),
 } as unknown as WsManager;
 
 const defaultMatchMedia = window.matchMedia;
