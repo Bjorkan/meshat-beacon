@@ -128,8 +128,9 @@ function drawNode(
   return ctx.getImageData(0, 0, element.width, element.height);
 }
 
-// Synchronous styleimagemissing handler: draw only images requested by the visible map tiles.
-// Keys contain the actual counts/content, so changing filters or membership cannot reuse stale art.
+// Synchronous missing-image resolver callback (see map-image-provider): draw only images
+// requested by the visible map tiles. Keys contain the actual counts/content, so changing filters
+// or membership cannot reuse stale art.
 export function rasterizeMapMarker(id: string, pixelRatio: number): ImageData | null {
   if (id.startsWith(CLUSTER_ICON_PREFIX)) {
     const [total = 0, ...counts] = id.slice(CLUSTER_ICON_PREFIX.length).split(':').map(Number);

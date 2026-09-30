@@ -3,10 +3,10 @@ import './maplibre-worker';
 import * as maplibregl from 'maplibre-gl';
 import i18n from '../../i18n';
 import { mapOverlayInsets } from './map-insets';
+import { provideMissingStyleImage } from './map-image-provider';
 import type {
   Map as MapLibreMap,
   RasterDEMSourceSpecification,
-  MapStyleImageMissingEvent,
   ErrorEvent,
   SymbolLayerSpecification,
 } from 'maplibre-gl';
@@ -269,6 +269,9 @@ export function useMapLibre(
     });
     mapRef.current = map;
     lastStyleIdRef.current = styleIdRef.current;
+    // Browser tests and live debugging reach the imperative map through this handle; the DOM offers
+    // no public path back to the Map instance.
+    (window as unknown as { beaconMap?: MapLibreMap }).beaconMap = map;
 
     map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
     map.addControl(new HomeControl(goHome), 'top-right'); // under the zoom/compass group
@@ -299,15 +302,12 @@ export function useMapLibre(
     map.on('load', onStyleReady); // first paint (style.load does not reliably fire on initial load)
     map.on('style.load', onStyleReady); // re-add terrain after every setStyle
 
-    // The OpenFreeMap base styles ask for a handful of sprite icons their sprite doesn't ship (e.g.
-    // "circle-11"), so maplibre warns on every load. Hand it a transparent 1x1 for anything that
-    // isn't ours and the noise goes away — a missing icon already draws nothing, so the map looks
-    // identical. Our own markers all start with "node-" and are rasterized by useMapNodes, so we
-    // leave those alone. This lives here (not in useMapNodes) so it's listening before the base
-    // style's first paint, when those icons are first requested.
-    map.on('styleimagemissing', (e: MapStyleImageMissingEvent) => {
-      if (!e.id.startsWith('node-') && !map.hasImage(e.id)) map.addImage(e.id, new ImageData(1, 1));
-    });
+    // MapLibre 6 resolves missing style images through this one per-map resolver, awaited before
+    // the requesting tiles parse, so it must be installed here — before the base style's first
+    // paint, when the style's sprite icons are first requested. It survives setStyle(): each new
+    // style picks the resolver up from the map. Generated node markers are dispatched to the
+    // provider mounted by useMapNodes (see map-image-provider).
+    map.setMissingStyleImageResolver((id) => provideMissingStyleImage(map, id));
 
     map.on('error', (e: ErrorEvent) => {
       // v6's ErrorEvent only types `error`, but tile errors still carry the tile (and some
@@ -336,6 +336,7 @@ export function useMapLibre(
     });
 
     return () => {
+      (window as unknown as { beaconMap?: MapLibreMap }).beaconMap = undefined;
       map.remove();
       mapRef.current = null;
       setIsReady(false);

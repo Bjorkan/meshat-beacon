@@ -22,6 +22,13 @@ allowed on runners without a GPU (see [Mozilla bug 1970486](https://bugzilla.moz
 CI uses this wrapper and uploads failure screenshots and traces as the
 `browser-test-results` artifact.
 
+`map-image-resolution.spec.ts` guards the MapLibre v6 missing-image contract (#101/#102):
+generated cluster symbols and spiderfy leaf capsules must resolve their runtime images
+through the map's missing-image resolver, so both regress by never rendering at all. The
+specs reach the live map through `window.beaconMap` (exposed by `useMapLibre`) and gate
+interaction on `map.loaded()`; clicking a terminal cluster before 'load' races the
+GeoJSON source and can silently produce an empty spiderfy fan.
+
 `trace-detail.spec.ts` covers layout, path containment and nested interactions.
 `trace-filter.spec.ts` uses 200 summaries per filter, eight realistic path hops and
 two timestamps per desktop row. It checks repeated All/Trace/Ping changes, a held
