@@ -31,6 +31,10 @@ type stubReader struct {
 	calls int
 }
 
+func (s *stubReader) AnalyticsRevision(context.Context) (int64, error) { return 0, nil }
+func (s *stubReader) GetStatsSeries(context.Context, time.Time, time.Time, []string) (*api.StatsSeries, error) {
+	return &api.StatsSeries{}, nil
+}
 func (s *stubReader) GetSignalStats(context.Context, time.Time, time.Time, []string) (*api.SignalStats, error) {
 	return nil, s.err
 }
@@ -73,13 +77,9 @@ func (s *stubReader) GetRegionBySlug(_ context.Context, _ string) (*api.Region, 
 	return nil, nil
 }
 func (s *stubReader) GetScopeNames(_ context.Context) ([]string, error) { return nil, nil }
-func (s *stubReader) GetScopeStats(_ context.Context, _ []string) ([]api.ScopeStats, error) {
+func (s *stubReader) GetScopeStats(_ context.Context, _ []string, _ time.Time) ([]api.ScopeStats, error) {
 	return nil, nil
 }
-func (s *stubReader) GetScopesByIATAs(_ context.Context, _ []string) ([]api.ScopeSummary, error) {
-	return nil, nil
-}
-
 func (s *stubReader) GetScopeByName(_ context.Context, _ string) (*api.ScopeDetail, error) {
 	return nil, nil
 }
@@ -96,7 +96,7 @@ func (s *stubReader) GetStatsPayloadBreakdown(_ context.Context, _ []string, _ t
 	return nil, nil
 }
 
-func (s *stubReader) GetStatsTopNodes(_ context.Context, _ []string, _ int32) ([]api.TopNode, error) {
+func (s *stubReader) GetStatsTopNodes(_ context.Context, _ []string, _ time.Time, _ int32) ([]api.TopNode, error) {
 	return nil, nil
 }
 
@@ -128,14 +128,6 @@ func (s *stubReader) GetNodeNeighbors(_ context.Context, _ uuid.UUID) ([]api.Nod
 	return nil, nil
 }
 
-func (s *stubReader) ListAmbiguousPrefix2(_ context.Context) ([]string, error) {
-	return nil, nil
-}
-
-func (s *stubReader) ListMeshCoreRegions(_ context.Context) ([]api.MeshCoreRegion, error) {
-	return nil, nil
-}
-
 func (s *stubReader) GetNodesByIDs(_ context.Context, _ []uuid.UUID) (map[uuid.UUID]*api.ResolvedNode, error) {
 	return nil, nil
 }
@@ -156,7 +148,7 @@ func (s *stubReader) GetObserverTelemetryBucketed(_ context.Context, _ uuid.UUID
 	return nil, nil
 }
 
-func (s *stubReader) GetObserverActivity(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+func (s *stubReader) GetObserverActivity(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 	return nil, nil
 }
 
@@ -176,7 +168,7 @@ func (s *stubReader) GetCrossIATANeighbors(_ context.Context, _ uuid.UUID, _ str
 	return nil, nil
 }
 
-func (s *stubReader) ListChannels(_ context.Context, _ int32, _ []byte, _ []string, _ int64, _ string, _ *api.ChannelCursor) (api.ChannelPage, error) {
+func (s *stubReader) ListChannels(_ context.Context, _ int32, _ []byte, _ []string, _ *bool, _ int64, _ *api.ChannelCursor) (api.ChannelPage, error) {
 	return api.ChannelPage{}, nil
 }
 
@@ -192,7 +184,7 @@ func (s *stubReader) ListMessagesAfterID(_ context.Context, _ int64, _ []string,
 	return nil, nil
 }
 
-func (s *stubReader) ListNodes(_ context.Context, _ api.NodeListParams) (api.Page[api.NodeSummary], error) {
+func (s *stubReader) ListNodes(_ context.Context, _ int16, _ []string, _, _ *bool, _ []byte, _, _, _ string, _ int64, _ int32, _ bool) (api.Page[api.NodeSummary], error) {
 	return api.Page[api.NodeSummary]{}, nil
 }
 
@@ -200,7 +192,7 @@ func (s *stubReader) ListNodeObservations(_ context.Context, _ uuid.UUID, _ int6
 	return api.Page[api.PacketObservationSummary]{}, nil
 }
 
-func (s *stubReader) ListObservers(_ context.Context, _ api.ObserverListParams) (api.Page[api.ObserverSummary], error) {
+func (s *stubReader) ListObservers(_ context.Context, _ []string, _, _, _, _, _ string, _ int64, _ int32) (api.Page[api.ObserverSummary], error) {
 	return api.Page[api.ObserverSummary]{}, nil
 }
 
@@ -208,16 +200,16 @@ func (s *stubReader) ListObserverAdverts(_ context.Context, _ uuid.UUID, _ int64
 	return api.Page[api.AdvertObservation]{}, nil
 }
 
-func (s *stubReader) ListPackets(_ context.Context, _ api.PacketListParams) (api.Page[api.PacketSummary], error) {
+func (s *stubReader) ListPackets(_ context.Context, _, _ []int16, _ []string, _ []string, _, _ time.Time, _ int64, _ int32) (api.Page[api.PacketSummary], error) {
 	return api.Page[api.PacketSummary]{}, nil
 }
 
-func (s *stubReader) ListPacketsAfterID(_ context.Context, _ int64, _, _ int16, _ []string, _ string, _ int32, _ bool) ([]api.PacketSummary, error) {
+func (s *stubReader) ListPacketsAfterID(_ context.Context, _ int64, _, _ int16, _ []string, _ string, _ int32) ([]api.PacketSummary, error) {
 	return nil, nil
 }
 
-func (s *stubReader) ListKnownRoutes(_ context.Context, _ api.RouteListParams) (api.Page[api.KnownRoute], error) {
-	return api.Page[api.KnownRoute]{}, nil
+func (s *stubReader) ListKnownRoutes(_ context.Context, _ string, _ int32, _ time.Time, _ int64, _ int32) ([]api.KnownRoute, error) {
+	return nil, nil
 }
 
 func (s *stubReader) SearchKnownRoutes(_ context.Context, _, _, _ string) ([]api.KnownRoute, error) {
@@ -228,19 +220,7 @@ func (s *stubReader) SearchCrossIATARoutes(_ context.Context, _, _, _, _ string)
 	return nil, nil
 }
 
-func (s *stubReader) PlanBestRoute(_ context.Context, _, _ uuid.UUID, _ int) (api.BestRouteResult, error) {
-	return api.BestRouteResult{Paths: []api.PlannedRoute{}}, nil
-}
-
-func (s *stubReader) GetNodeIDByPubkey(_ context.Context, _ []byte) (*uuid.UUID, error) {
-	return nil, nil
-}
-
-func (s *stubReader) GetNodeTypeByPubkey(_ context.Context, _ []byte) (*int16, error) {
-	return nil, nil
-}
-
-func (s *stubReader) ListTraceTags(_ context.Context, _ []string, _, _ string, _, _ time.Time, _ time.Time, _ int32) ([]api.TraceTagSummary, error) {
+func (s *stubReader) ListTraceTags(_ context.Context, _ []string, _, _ string, _, _ time.Time, _ time.Time, _ string, _ int32) ([]api.TraceTagSummary, error) {
 	return nil, nil
 }
 
@@ -282,7 +262,7 @@ func TestGetOrSet_CacheMiss_FetchesAndStores(t *testing.T) {
 	c, _ := newTestClient(t)
 	stub := &stubReader{iatas: []api.IATA{{IATA: "YVR"}}}
 
-	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	if err != nil {
@@ -301,11 +281,11 @@ func TestGetOrSet_CacheHit_DoesNotFetch(t *testing.T) {
 	stub := &stubReader{iatas: []api.IATA{{IATA: "YVR"}}}
 
 	// prime the cache
-	_, _ = getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	_, _ = getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	// second call should hit cache
-	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	if err != nil {
@@ -324,7 +304,7 @@ func TestGetOrSet_RedisError_DegradeGracefully(t *testing.T) {
 	mr.Close() // kill Redis
 
 	stub := &stubReader{iatas: []api.IATA{{IATA: "YVR"}}}
-	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	if err != nil {
@@ -340,7 +320,7 @@ func TestGetOrSet_CorruptEntry_Overwrites(t *testing.T) {
 	mr.Set("test:key", "not-valid-json")
 
 	stub := &stubReader{iatas: []api.IATA{{IATA: "YVR"}}}
-	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	result, err := getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	if err != nil {
@@ -358,7 +338,7 @@ func TestGetOrSet_FetchError_Propagates(t *testing.T) {
 	c, _ := newTestClient(t)
 	stub := &stubReader{err: errors.New("db error")}
 
-	_, err := getOrSet(context.Background(), c, "test:key", time.Minute, func() ([]api.IATA, error) {
+	_, err := getOrSet(context.Background(), c, "test:key", time.Minute, func(ctx context.Context) ([]api.IATA, error) {
 		return stub.ListIATAs(context.Background())
 	})
 	if err == nil {
@@ -381,14 +361,14 @@ func TestCachedReader_IATASortingForStableKey(t *testing.T) {
 	}
 
 	// call with unsorted IATAs
-	getOrSet(context.Background(), c, "beacon:stats:overview:YVR,YYJ", time.Minute, func() (*api.StatsOverview, error) {
+	getOrSet(context.Background(), c, "beacon:stats:overview:YVR,YYJ", time.Minute, func(ctx context.Context) (*api.StatsOverview, error) {
 		calls++
 		return &api.StatsOverview{TotalPackets: 42}, nil
 	})
 
 	// call CachedReader with reversed order — should hit same key
 	_ = cr
-	result, err := getOrSet(context.Background(), c, "beacon:stats:overview:YVR,YYJ", time.Minute, func() (*api.StatsOverview, error) {
+	result, err := getOrSet(context.Background(), c, "beacon:stats:overview:YVR,YYJ", time.Minute, func(ctx context.Context) (*api.StatsOverview, error) {
 		calls++
 		return &api.StatsOverview{TotalPackets: 42}, nil
 	})
@@ -400,6 +380,30 @@ func TestCachedReader_IATASortingForStableKey(t *testing.T) {
 	}
 	if calls != 1 {
 		t.Errorf("expected 1 fetch call, got %d", calls)
+	}
+}
+
+func TestInvalidateScopeNamesClearsDerivedKeys(t *testing.T) {
+	c, mr := newTestClient(t)
+	cr := &CachedReader{inner: &stubReader{}, c: c, ttl: CacheTTLs{}}
+	for _, k := range []string{keyScopeNames, keyScopeByNamePrefix + "#yow"} {
+		mr.Set(k, "x")
+	}
+	mr.Set("beacon:iatas", "keep")
+	cr.InvalidateScopeNames(context.Background())
+	if got := mr.Keys(); len(got) != 1 || got[0] != "beacon:iatas" {
+		t.Fatalf("keys left: %v", got)
+	}
+}
+
+func TestInvalidateIATABorder(t *testing.T) {
+	c, mr := newTestClient(t)
+	cr := &CachedReader{inner: &stubReader{}, c: c, ttl: CacheTTLs{}}
+	mr.Set(keyIATABorderPrefix+"YOW", "x")
+	mr.Set(keyIATABorderPrefix+"YYZ", "keep")
+	cr.InvalidateIATABorder(context.Background(), "YOW")
+	if got := mr.Keys(); len(got) != 1 || got[0] != keyIATABorderPrefix+"YYZ" {
+		t.Fatalf("keys left: %v", got)
 	}
 }
 
@@ -421,23 +425,6 @@ func TestCachedReader_InvalidateNode(t *testing.T) {
 	}
 }
 
-func TestCachedReader_InvalidateAllNodes(t *testing.T) {
-	c, mr := newTestClient(t)
-	mr.Set(keyNodePrefix+"one", `"cached"`)
-	mr.Set(keyNodeNeighborsPrefix+"two", `"cached"`)
-	mr.Set(keyObserverPrefix+"keep", `"cached"`)
-
-	cr := &CachedReader{inner: &stubReader{}, c: c, ttl: CacheTTLs{}}
-	cr.InvalidateAllNodes(context.Background())
-
-	if mr.Exists(keyNodePrefix+"one") || mr.Exists(keyNodeNeighborsPrefix+"two") {
-		t.Error("expected every node and neighbor key to be deleted")
-	}
-	if !mr.Exists(keyObserverPrefix + "keep") {
-		t.Error("expected non-node keys to remain")
-	}
-}
-
 func TestCachedReader_InvalidateObserver(t *testing.T) {
 	c, mr := newTestClient(t)
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
@@ -456,6 +443,6 @@ func TestCachedReader_InvalidateObserver(t *testing.T) {
 	}
 }
 
-func (s *stubReader) ListNodePathPackets(context.Context, uuid.UUID, []string, *api.PageToken, int32) (api.Page[api.PacketSummary], error) {
-	return api.Page[api.PacketSummary]{}, nil
+func (s *stubReader) GetRouteEvidence(_ context.Context, _, _ string, _ api.RouteEvidenceQuery) (*api.RouteEvidence, error) {
+	return nil, nil
 }

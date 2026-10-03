@@ -12,12 +12,11 @@ import (
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
-	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string, kind keystore.ChannelKind) (int, error) {
+func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFingerprint []byte, name string, hashtag string) (int, error) {
 	var namePtr, hashtagPtr *string
 	if name != "" {
 		namePtr = &name
@@ -25,41 +24,18 @@ func (s *Store) UpsertChannel(ctx context.Context, channelHash []byte, keyFinger
 	if hashtag != "" {
 		hashtagPtr = &hashtag
 	}
-	isHashtag := kind == keystore.ChannelKindHashtag
-	isPublic := kind == keystore.ChannelKindPublic
+	isHashtag := hashtag != ""
 	row, err := s.q.UpsertChannel(ctx, sqlc.UpsertChannelParams{
-		ChannelHash:      channelHash,
-		KeyFingerprint:   keyFingerprint,
-		Name:             namePtr,
-		Hashtag:          hashtagPtr,
-		IsHashtag:        &isHashtag,
-		IsPublic:         &isPublic,
-		IncrementMessage: false, // message count bumped separately by InsertChannelMessage
+		ChannelHash: channelHash,
+		Column2:     keyFingerprint, // key_fingerprint
+		Name:        namePtr,
+		Hashtag:     hashtagPtr,
+		IsHashtag:   &isHashtag,
 	})
 	if err != nil {
 		return 0, err
 	}
 	return int(row.ID), nil
-}
-
-func (s *Store) UpdateConfiguredChannelMetadata(ctx context.Context, channelHash []byte, entry keystore.Entry) error {
-	var name, hashtag *string
-	if entry.Name != "" {
-		name = &entry.Name
-	}
-	if entry.Hashtag != "" {
-		hashtag = &entry.Hashtag
-	}
-	isHashtag := entry.Kind == keystore.ChannelKindHashtag
-	isPublic := entry.Kind == keystore.ChannelKindPublic
-	return s.q.UpdateConfiguredChannelMetadata(ctx, sqlc.UpdateConfiguredChannelMetadataParams{
-		Name:           name,
-		Hashtag:        hashtag,
-		IsHashtag:      &isHashtag,
-		IsPublic:       &isPublic,
-		ChannelHash:    channelHash,
-		KeyFingerprint: entry.Fingerprint,
-	})
 }
 
 func (s *Store) UpsertChannelHashOnly(ctx context.Context, channelHash []byte) (int, error) {
@@ -88,6 +64,31 @@ func (s *Store) ListUndecryptedGroupTextPackets(ctx context.Context) ([]ingest.U
 	return packets, nil
 }
 
+// ListUndecryptedGroupTextPacketsByHash limits the boot backfill to channels that just gained a key.
+func (s *Store) ListUndecryptedGroupTextPacketsByHash(ctx context.Context, hashes [][]byte) ([]ingest.UndecryptedPacket, error) {
+	rows, err := s.q.ListUndecryptedGroupTextPacketsByHash(ctx, hashes)
+	if err != nil {
+		return nil, err
+	}
+	packets := make([]ingest.UndecryptedPacket, 0, len(rows))
+	for _, v := range rows {
+		packets = append(packets, ingest.UndecryptedPacket{PacketHash: v.PacketHash, RawPayload: v.RawPayload})
+	}
+	return packets, nil
+}
+
+// SetChannelConfigScopes replaces every configured channel's region placement;
+// an empty region means Beacon-wide.
+func (s *Store) SetChannelConfigScopes(ctx context.Context, fingerprints [][]byte, regions []string) error {
+	if err := s.q.DeleteChannelConfigScopes(ctx); err != nil {
+		return err
+	}
+	if len(fingerprints) == 0 {
+		return nil
+	}
+	return s.q.AddChannelConfigScopes(ctx, sqlc.AddChannelConfigScopesParams{Fingerprints: fingerprints, Regions: regions})
+}
+
 func (s *Store) UpsertChannelIATA(ctx context.Context, channelHash []byte, iata string, heardAt time.Time) error {
 	return s.q.UpsertChannelIATA(ctx, sqlc.UpsertChannelIATAParams{
 		ChannelHash: channelHash,
@@ -100,7 +101,7 @@ func (s *Store) DeleteOldChannelIATAs(ctx context.Context, cutoff time.Time) err
 	return s.q.DeleteOldChannelIATAs(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
 
-func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
+func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, keyKnown *bool, cursor int64, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
 	var cursorTS pgtype.Timestamptz
 	if cursor > 0 {
 		cursorTS = pgtype.Timestamptz{Time: time.UnixMilli(cursor), Valid: true}
@@ -109,18 +110,14 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 	var err error
 	if pageCursor != nil {
 		rows, err = s.q.ListChannelsAfter(ctx, sqlc.ListChannelsAfterParams{
-			KeyFilter: keyFilter, ChannelHash: hash, Iatas: iatas, PageLimit: limit + 1,
+			ChannelHash: hash, Iatas: iatas, KeyKnown: keyKnown, PageLimit: limit + 1,
 			CursorTs: pgtype.Timestamptz{Time: pageCursor.LastSeen, Valid: true}, CursorID: pageCursor.ID,
 		})
 	} else {
 		rows, err = s.q.ListChannels(ctx, sqlc.ListChannelsParams{
-			KeyFilter: keyFilter, ChannelHash: hash, Iatas: iatas, CursorTs: cursorTS, PageLimit: limit + 1,
+			ChannelHash: hash, Iatas: iatas, KeyKnown: keyKnown, CursorTs: cursorTS, PageLimit: limit + 1,
 		})
 	}
-	if err != nil {
-		return api.ChannelPage{}, err
-	}
-	unknownCount, err := s.q.CountUnknownChannels(ctx, sqlc.CountUnknownChannelsParams{ChannelHash: hash, Iatas: iatas})
 	if err != nil {
 		return api.ChannelPage{}, err
 	}
@@ -130,17 +127,13 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 	}
 	items := make([]api.ChannelSummary, 0, len(rows))
 	for _, v := range rows {
-		isHashtag := v.IsHashtag != nil && *v.IsHashtag
-		isPublic := v.IsPublic != nil && *v.IsPublic
-		keyKnown := v.KeyKnown != nil && *v.KeyKnown
 		items = append(items, api.ChannelSummary{
 			ID:          int(v.ID),
 			Name:        v.Name,
 			ChannelHash: hex.EncodeToString(v.ChannelHash),
 			LastSeen:    v.LastSeen.Time.UnixMilli(),
-			IsHashtag:   isHashtag,
-			KeyKnown:    keyKnown,
-			Kind:        api.ClassifyChannel(keyKnown, isHashtag, isPublic),
+			IsHashtag:   v.IsHashtag != nil && *v.IsHashtag,
+			KeyKnown:    v.KeyKnown != nil && *v.KeyKnown,
 		})
 	}
 	var nextCursor *int64
@@ -153,11 +146,8 @@ func (s *Store) ListChannels(ctx context.Context, limit int32, hash []byte, iata
 		nextPageCursor = &precise
 	}
 	return api.ChannelPage{
-		UnknownCount:   unknownCount,
+		Page:           api.Page[api.ChannelSummary]{Items: items, NextCursor: nextCursor, HasMore: hasMore},
 		NextPageCursor: nextPageCursor,
-		Items:          items,
-		NextCursor:     nextCursor,
-		HasMore:        hasMore,
 	}, nil
 }
 
@@ -174,17 +164,9 @@ func (s *Store) GetChannel(ctx context.Context, channelID int32) (*api.Channel, 
 			LastSeen:    row.LastSeen.Time.UnixMilli(),
 			IsHashtag:   row.IsHashtag != nil && *row.IsHashtag,
 			KeyKnown:    row.KeyKnown != nil && *row.KeyKnown,
-			Kind: api.ClassifyChannel(
-				row.KeyKnown != nil && *row.KeyKnown,
-				row.IsHashtag != nil && *row.IsHashtag,
-				row.IsPublic != nil && *row.IsPublic,
-			),
 		},
 		Hashtag:      row.Hashtag,
-		MessageCount: 0,
-	}
-	if row.MessageCount != nil {
-		channel.MessageCount = *row.MessageCount
+		MessageCount: row.MessageCount,
 	}
 	if row.IsHashtag != nil && *row.IsHashtag && row.KeyFingerprint != nil {
 		fp := hex.EncodeToString(row.KeyFingerprint)
@@ -193,16 +175,16 @@ func (s *Store) GetChannel(ctx context.Context, channelID int32) (*api.Channel, 
 	return &channel, nil
 }
 
-func (s *Store) InsertChannelMessage(ctx context.Context, m ingest.InsertChannelMessageParams) (bool, error) {
-	params := sqlc.InsertChannelMessageParams{ChannelID: int32(m.ChannelID), PacketHash: m.PacketHash, SenderName: &m.SenderName, Content: &m.Content, SentAt: pgtype.Timestamptz{Time: m.SentAt, Valid: true}}
-	_, err := s.q.InsertChannelMessage(ctx, params)
+func (s *Store) InsertChannelMessage(ctx context.Context, m ingest.InsertChannelMessageParams) (*ingest.InsertedChannelMessage, error) {
+	params := sqlc.InsertChannelMessageParams{ChannelID: int32(m.ChannelID), PacketHash: m.PacketHash, SenderName: &m.SenderName, Content: &m.Content, SentAt: pgtype.Timestamptz{Time: m.SentAt, Valid: true}, Column6: m.Historical}
+	row, err := s.q.InsertChannelMessage(ctx, params)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return false, nil // duplicate
+		return nil, nil // duplicate
 	}
 	if err != nil {
-		return false, err
+		return nil, err
 	}
-	return true, nil
+	return &ingest.InsertedChannelMessage{ID: row.ID, Scope: row.ScopeName, ScopeStatus: api.RecordedChannelScopeStatus(row.ScopeName, row.TransportCodesPresent)}, nil
 }
 
 func (s *Store) ListChannelMessages(ctx context.Context, channelID *int32, since time.Time, limit int32, iatas []string, scope string, cursor int64) (api.Page[api.ChannelMessage], error) {
@@ -226,7 +208,7 @@ func (s *Store) ListChannelMessages(ctx context.Context, channelID *int32, since
 		}
 		messages = make([]api.ChannelMessage, 0, len(rows))
 		for _, v := range rows {
-			messages = append(messages, toChannelMessage(v.ID, v.PacketHashHex, v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount))
+			messages = append(messages, toChannelMessage(v.ID, v.PacketHashHex, v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount, v.ScopeName, v.TransportCodesPresent))
 		}
 	} else {
 		rows, err := s.q.ListChannelMessages(ctx, sqlc.ListChannelMessagesParams{
@@ -246,7 +228,7 @@ func (s *Store) ListChannelMessages(ctx context.Context, channelID *int32, since
 		}
 		messages = make([]api.ChannelMessage, 0, len(rows))
 		for _, v := range rows {
-			messages = append(messages, toChannelMessage(v.ID, v.PacketHashHex, v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount))
+			messages = append(messages, toChannelMessage(v.ID, v.PacketHashHex, v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount, v.ScopeName, v.TransportCodesPresent))
 		}
 	}
 
@@ -280,7 +262,7 @@ func (s *Store) ListChannelMessagesByHash(ctx context.Context, hash []byte, sinc
 	}
 	messages := make([]api.ChannelMessage, 0, len(rows))
 	for _, v := range rows {
-		messages = append(messages, toChannelMessage(v.ID, hex.EncodeToString(v.PacketHash), v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount))
+		messages = append(messages, toChannelMessage(v.ID, hex.EncodeToString(v.PacketHash), v.ChannelHash, v.SenderName, v.Content, v.SentAt, v.ObservationCount, v.ScopeName, v.TransportCodesPresent))
 	}
 	var nextCursor *int64
 	if hasMore && len(messages) > 0 {
@@ -314,6 +296,8 @@ func (s *Store) ListMessagesAfterID(ctx context.Context, afterID int64, iatas []
 			v.Content,
 			v.SentAt,
 			v.ObservationCount,
+			v.ScopeName,
+			v.TransportCodesPresent,
 		))
 	}
 	return items, nil

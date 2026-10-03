@@ -12,9 +12,9 @@ import (
 )
 
 // WithLocalBorders annotates node responses after cache reads. Historical rows
-// use the current startup configuration without extra SQL or cached-policy drift.
+// use the current boundaries without extra SQL or cached-policy drift.
 // Cached values are copied; the decorator never changes its inner reader's data.
-func WithLocalBorders(reader Reader, local *borders.Local) Reader {
+func WithLocalBorders(reader Reader, local *borders.Live) Reader {
 	if local == nil {
 		return reader
 	}
@@ -23,11 +23,11 @@ func WithLocalBorders(reader Reader, local *borders.Local) Reader {
 
 type localBorderReader struct {
 	Reader
-	local *borders.Local
+	local *borders.Live
 }
 
-func (r *localBorderReader) ListNodes(ctx context.Context, params NodeListParams) (Page[NodeSummary], error) {
-	page, err := r.Reader.ListNodes(ctx, params)
+func (r *localBorderReader) ListNodes(ctx context.Context, nodeType int16, iatas []string, paths, traces *bool, pubkey []byte, prefix, name, scope string, cursor int64, limit int32, neighbors bool) (Page[NodeSummary], error) {
+	page, err := r.Reader.ListNodes(ctx, nodeType, iatas, paths, traces, pubkey, prefix, name, scope, cursor, limit, neighbors)
 	if err != nil {
 		return page, err
 	}

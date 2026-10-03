@@ -34,7 +34,7 @@ func TestPossiblyForeign(t *testing.T) {
 		{"companion", 1, 25, 25, nil},
 		{"room", 3, 25, 25, nil},
 		{"sensor", 4, 25, 25, nil},
-		{"zero reset", 2, 0, 0, nil},
+		{"null island is a position", 2, 0, 0, new(true)},
 		{"equator is valid", 2, 0, 25, new(true)},
 		{"prime meridian is valid", 2, 25, 0, new(true)},
 		{"invalid latitude", 2, 91, 25, nil},
@@ -112,5 +112,30 @@ func BenchmarkPossiblyForeign(b *testing.B) {
 				local.PossiblyForeign(2, &tc.lat, &tc.lng)
 			}
 		})
+	}
+}
+
+func TestLiveSwap(t *testing.T) {
+	var disabled *Live
+	if disabled.PossiblyForeign(2, new(15.0), new(15.0)) != nil {
+		t.Fatal("nil live classified")
+	}
+	live := NewLive(nil)
+	if disabled.Ready() || live.Ready() {
+		t.Fatal("ready without boundaries")
+	}
+	if live.PossiblyForeign(2, new(15.0), new(15.0)) != nil {
+		t.Fatal("empty live classified")
+	}
+	local, err := New([]orb.Polygon{{{{10, 10}, {20, 10}, {20, 20}, {10, 20}, {10, 10}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	live.Store(local)
+	if !live.Ready() {
+		t.Fatal("not ready after store")
+	}
+	if got := live.PossiblyForeign(2, new(15.0), new(15.0)); got == nil || *got {
+		t.Fatal("stored classifier not used", got)
 	}
 }

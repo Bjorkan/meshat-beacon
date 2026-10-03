@@ -7,7 +7,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"strings"
 	"testing"
 
@@ -130,7 +129,7 @@ func TestListNodes_OK(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	r := chi.NewRouter()
 	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, _ api.NodeListParams) (api.Page[api.NodeSummary], error) {
+		listNodes: func(_ context.Context, _ int16, _ []string, _, _ *bool, _ []byte, _, _, _ string, _ int64, _ int32, _ bool) (api.Page[api.NodeSummary], error) {
 			return api.Page[api.NodeSummary]{Items: []api.NodeSummary{{ID: nodeID}}}, nil
 		},
 	}))
@@ -148,8 +147,8 @@ func TestListNodes_NeighborsParam_PassedThrough(t *testing.T) {
 	var gotIncludeNeighbors bool
 	r := chi.NewRouter()
 	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-			gotIncludeNeighbors = params.IncludeNeighbors
+		listNodes: func(_ context.Context, _ int16, _ []string, _, _ *bool, _ []byte, _, _, _ string, _ int64, _ int32, includeNeighbors bool) (api.Page[api.NodeSummary], error) {
+			gotIncludeNeighbors = includeNeighbors
 			return api.Page[api.NodeSummary]{Items: []api.NodeSummary{{ID: nodeID, NeighborIDs: []uuid.UUID{neighborID}}}}, nil
 		},
 	}))
@@ -182,8 +181,8 @@ func TestListNodes_NeighborsParam_BareFlagMeansTrue(t *testing.T) {
 	var gotIncludeNeighbors bool
 	r := chi.NewRouter()
 	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-			gotIncludeNeighbors = params.IncludeNeighbors
+		listNodes: func(_ context.Context, _ int16, _ []string, _, _ *bool, _ []byte, _, _, _ string, _ int64, _ int32, includeNeighbors bool) (api.Page[api.NodeSummary], error) {
+			gotIncludeNeighbors = includeNeighbors
 			return api.Page[api.NodeSummary]{}, nil
 		},
 	}))
@@ -202,8 +201,8 @@ func TestListNodes_PubkeyPrefixParam_PassedThrough(t *testing.T) {
 	var gotPubkeyPrefix string
 	r := chi.NewRouter()
 	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-			gotPubkeyPrefix = params.PubkeyPrefix
+		listNodes: func(_ context.Context, _ int16, _ []string, _, _ *bool, _ []byte, pubkeyPrefix, _, _ string, _ int64, _ int32, _ bool) (api.Page[api.NodeSummary], error) {
+			gotPubkeyPrefix = pubkeyPrefix
 			return api.Page[api.NodeSummary]{}, nil
 		},
 	}))
@@ -215,57 +214,6 @@ func TestListNodes_PubkeyPrefixParam_PassedThrough(t *testing.T) {
 	}
 	if gotPubkeyPrefix != "ab12" {
 		t.Errorf("expected pubkeyPrefix to be lowercased and passed through, got %q", gotPubkeyPrefix)
-	}
-}
-
-func TestListNodes_MeshCoreRegionParam_PassedThrough(t *testing.T) {
-	var got string
-	r := chi.NewRouter()
-	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-			got = params.MeshCoreRegion
-			return api.Page[api.NodeSummary]{}, nil
-		},
-	}))
-	req := httptest.NewRequest(http.MethodGet, "/nodes?meshcoreRegion=SE", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-	if got != "se" {
-		t.Errorf("expected meshcoreRegion to be lowercased and passed through, got %q", got)
-	}
-}
-
-func TestListNodes_MeshCoreRegionParam_InvalidToken(t *testing.T) {
-	r := chi.NewRouter()
-	r.Get("/nodes", listNodes(stubReader{}))
-	for _, bad := range []string{"se,no", "se no", "%", "a b", "se/no"} {
-		req := httptest.NewRequest(http.MethodGet, "/nodes?meshcoreRegion="+url.QueryEscape(bad), nil)
-		w := httptest.NewRecorder()
-		r.ServeHTTP(w, req)
-		if w.Code != http.StatusBadRequest {
-			t.Errorf("expected 400 for meshcoreRegion=%q, got %d", bad, w.Code)
-		}
-	}
-}
-
-func TestListMeshCoreRegions_OK(t *testing.T) {
-	r := chi.NewRouter()
-	r.Get("/nodes/meshcore-regions", listMeshCoreRegions(stubReader{
-		listMeshCoreRegions: func(_ context.Context) ([]api.MeshCoreRegion, error) {
-			return []api.MeshCoreRegion{{Token: "se", NodeCount: 12}}, nil
-		},
-	}))
-	req := httptest.NewRequest(http.MethodGet, "/nodes/meshcore-regions", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", w.Code)
-	}
-	if !strings.Contains(w.Body.String(), `"token":"se"`) || !strings.Contains(w.Body.String(), `"nodeCount":12`) {
-		t.Errorf("expected token se with count 12, got %s", w.Body.String())
 	}
 }
 
@@ -350,73 +298,5 @@ func TestListNodeObservations_OK(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestListNodes_SortAndPageTokenPassedThrough(t *testing.T) {
-	id := uuid.MustParse("00000000-0000-0000-0000-000000000123")
-	token := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionNodes, Sort: api.NodeSortName, Direction: api.SortAsc, Key: "alpha", ID: id})
-	var got api.NodeListParams
-	r := chi.NewRouter()
-	r.Get("/nodes", listNodes(stubReader{
-		listNodes: func(_ context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-			got = params
-			return api.Page[api.NodeSummary]{}, nil
-		},
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/nodes?sort=name&direction=asc&pageToken="+token+"&scope=%23bc", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	if got.Sort != api.NodeSortName || got.Direction != api.SortAsc {
-		t.Fatalf("got sort=%q direction=%q", got.Sort, got.Direction)
-	}
-	if got.PageToken == nil || got.PageToken.ID != id || got.PageToken.Key != "alpha" {
-		t.Fatalf("page token not passed through: %#v", got.PageToken)
-	}
-	if got.Scope != "#bc" {
-		t.Fatalf("got scope %q, want #bc", got.Scope)
-	}
-}
-
-func TestListNodes_RejectsInvalidSortablePagination(t *testing.T) {
-	validID := uuid.MustParse("00000000-0000-0000-0000-000000000123")
-	mismatched := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionNodes, Sort: api.NodeSortType, Direction: api.SortAsc, Key: "repeater", ID: validID})
-	wrongCollection := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionObservers, Sort: api.NodeSortName, Direction: api.SortAsc, Key: "alpha", ID: validID})
-	tests := []string{
-		"/nodes?sort=bogus",
-		"/nodes?direction=sideways",
-		"/nodes?pageToken=not-a-token",
-		"/nodes?sort=name&direction=asc&pageToken=" + mismatched,
-		"/nodes?sort=name&direction=asc&pageToken=" + wrongCollection,
-		"/nodes?sort=name&direction=asc&cursor=1700000000000",
-	}
-	for _, target := range tests {
-		t.Run(target, func(t *testing.T) {
-			r := chi.NewRouter()
-			r.Get("/nodes", listNodes(stubReader{}))
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, target, nil))
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-			}
-		})
-	}
-}
-
-func TestListAmbiguousPrefix2_OK(t *testing.T) {
-	r := chi.NewRouter()
-	r.Mount("/nodes", NodesRouter(stubReader{}))
-	req := httptest.NewRequest(http.MethodGet, "/nodes/ambiguous-prefix2", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", w.Code)
-	}
-	if strings.TrimSpace(w.Body.String()) != "[]" {
-		t.Errorf("expected empty JSON array, got %s", w.Body.String())
 	}
 }

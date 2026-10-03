@@ -16,63 +16,66 @@ import (
 // Unset fields return zero values. Use it for both validation tests
 // (leave all fields nil) and happy path tests (set only what you need).
 type stubReader struct {
+	getStatsSeries               func(context.Context, time.Time, time.Time, []string) (*api.StatsSeries, error)
+	getRouteEvidence             func(context.Context, string, string, api.RouteEvidenceQuery) (*api.RouteEvidence, error)
 	getObserverComparison        func(context.Context, uuid.UUID, uuid.UUID, time.Time, time.Time, []string) (*api.ObserverComparison, error)
-	listNodePathPackets          func(context.Context, uuid.UUID, []string, *api.PageToken, int32) (api.Page[api.PacketSummary], error)
 	listIATAs                    func(ctx context.Context) ([]api.IATA, error)
 	getIATA                      func(ctx context.Context, iata string) (*api.IATA, error)
 	getIATABorder                func(ctx context.Context, iata string) (json.RawMessage, error)
 	listRegions                  func(ctx context.Context) ([]api.RegionSummary, error)
 	getRegion                    func(ctx context.Context, regionID int32) (*api.Region, error)
 	getRegionBySlug              func(ctx context.Context, slug string) (*api.Region, error)
-	listChannels                 func(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error)
+	listChannels                 func(ctx context.Context, limit int32, hash []byte, iatas []string, keyKnown *bool, cursor int64, pageCursor *api.ChannelCursor) (api.ChannelPage, error)
 	getChannel                   func(ctx context.Context, channelID int32) (*api.Channel, error)
 	listChannelMessages          func(ctx context.Context, channelID *int32, since time.Time, limit int32, iatas []string, scope string, cursor int64) (api.Page[api.ChannelMessage], error)
 	listChannelMessagesByHash    func(ctx context.Context, hash []byte, since time.Time, limit int32, iatas []string, scope string, cursor int64) (api.Page[api.ChannelMessage], error)
 	listMessagesAfterID          func(ctx context.Context, afterID int64, iatas []string, scope string, limit int32) ([]api.ChannelMessage, error)
-	listObservers                func(ctx context.Context, params api.ObserverListParams) (api.Page[api.ObserverSummary], error)
+	listObservers                func(ctx context.Context, iatas []string, observerType, broker, status, name, scope string, cursor int64, limit int32) (api.Page[api.ObserverSummary], error)
 	getObserver                  func(ctx context.Context, observerID uuid.UUID) (*api.Observer, error)
 	getObserverTelemetry         func(ctx context.Context, observerID uuid.UUID, since, until time.Time, afterID int64) (*api.ObserverTelemetry, error)
 	getObserverTelemetryBucketed func(ctx context.Context, observerID uuid.UUID, since, until time.Time, bucketHours int32) ([]api.ObserverTelemetryPoint, error)
-	getObserverActivity          func(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error)
+	getObserverActivity          func(ctx context.Context, observerID uuid.UUID, window, interval time.Duration, until time.Time) (*api.ObserverActivity, error)
 	getObserverScopes            func(ctx context.Context, observerID uuid.UUID) ([]string, error)
 	listObserverAdverts          func(ctx context.Context, observerID uuid.UUID, cursor int64, limit int32) (api.Page[api.AdvertObservation], error)
-	listNodes                    func(ctx context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error)
+	listNodes                    func(ctx context.Context, nodeType int16, iatas []string, supportsMultibytePaths, supportsMultibyteTraces *bool, pubkey []byte, pubkeyPrefix, name, scope string, cursor int64, limit int32, includeNeighbors bool) (api.Page[api.NodeSummary], error)
 	getNode                      func(ctx context.Context, nodeID uuid.UUID) (*api.Node, error)
 	getNodeNeighbors             func(ctx context.Context, nodeID uuid.UUID) ([]api.NodeNeighbor, error)
 	listNodeObservations         func(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (api.Page[api.PacketObservationSummary], error)
-	listMeshCoreRegions          func(ctx context.Context) ([]api.MeshCoreRegion, error)
-	listPackets                  func(ctx context.Context, params api.PacketListParams) (api.Page[api.PacketSummary], error)
-	listPacketsAfterID           func(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32, includeResolvedPath bool) ([]api.PacketSummary, error)
+	listPackets                  func(ctx context.Context, payloadTypes, routeTypes []int16, iatas []string, scopes []string, since, until time.Time, cursor int64, limit int32) (api.Page[api.PacketSummary], error)
+	listPacketsAfterID           func(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32) ([]api.PacketSummary, error)
 	getPacket                    func(ctx context.Context, packetHash []byte) (*api.Packet, error)
 	getRadioPresets              func(ctx context.Context, preset string, iatas []string) ([]api.RadioPreset, error)
 	getStatsOverview             func(ctx context.Context, iatas []string) (*api.StatsOverview, error)
 	getStatsObservations         func(ctx context.Context, iatas []string, since time.Time) ([]api.ObservationPoint, error)
 	getStatsPayloadBreakdown     func(ctx context.Context, iatas []string, since time.Time) ([]api.PayloadBreakdownItem, error)
-	getStatsTopNodes             func(ctx context.Context, iatas []string, limit int32) ([]api.TopNode, error)
+	getStatsTopNodes             func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopNode, error)
 	getStatsTopObservers         func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopObserver, error)
 	getStatsTopAdvertisers       func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopAdvertiser, error)
 	getStatsClockDrift           func(ctx context.Context, iatas []string, limit int32) ([]api.ClockDriftEntry, error)
 	getStatsTopTalkers           func(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopTalker, error)
-	getScopeStats                func(ctx context.Context, iatas []string) ([]api.ScopeStats, error)
+	getScopeStats                func(ctx context.Context, iatas []string, since time.Time) ([]api.ScopeStats, error)
 	getStatsNodeTypes            func(ctx context.Context, iatas []string) ([]api.NodeTypeCount, error)
 	getScopeNames                func(ctx context.Context) ([]string, error)
-	getScopesByIATAs             func(ctx context.Context, iatas []string) ([]api.ScopeSummary, error)
 	getScopeByName               func(ctx context.Context, name string) (*api.ScopeDetail, error)
-	listTraceTags                func(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error)
+	listTraceTags                func(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, cursorTag string, limit int32) ([]api.TraceTagSummary, error)
 	getTraceByTag                func(ctx context.Context, tag string) (*api.TraceDetail, error)
-	listKnownRoutes              func(ctx context.Context, params api.RouteListParams) (api.Page[api.KnownRoute], error)
+	listKnownRoutes              func(ctx context.Context, iata string, hopCount int32, cursor time.Time, cursorID int64, limit int32) ([]api.KnownRoute, error)
 	searchKnownRoutes            func(ctx context.Context, iata, fromHash, toHash string) ([]api.KnownRoute, error)
 	getKnownRoutesByNode         func(ctx context.Context, iata string, nodeID uuid.UUID) ([]api.KnownRoute, error)
 	getCrossIATANeighbors        func(ctx context.Context, nodeID uuid.UUID, iata string) ([]api.NodeNeighbor, error)
 	searchCrossIATARoutes        func(ctx context.Context, fromHash, fromIATA, toHash, toIATA string) ([]api.CrossIATARoute, error)
 	getNodesByIDs                func(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*api.ResolvedNode, error)
-	getNodeIDByPubkey            func(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
-	getNodeTypeByPubkey          func(ctx context.Context, pubkey []byte) (*int16, error)
-	planBestRoute                func(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error)
 }
 
 func (s stubReader) GetSignalStats(context.Context, time.Time, time.Time, []string) (*api.SignalStats, error) {
 	return nil, nil
+}
+
+func (s stubReader) GetStatsSeries(ctx context.Context, since, until time.Time, iatas []string) (*api.StatsSeries, error) {
+	if s.getStatsSeries != nil {
+		return s.getStatsSeries(ctx, since, until, iatas)
+	}
+	return &api.StatsSeries{}, nil
 }
 
 func (s stubReader) GetPathStats(context.Context, time.Time, time.Time, []string) (*api.PathStats, error) {
@@ -128,9 +131,9 @@ func (s stubReader) GetRegionBySlug(ctx context.Context, slug string) (*api.Regi
 	return nil, nil
 }
 
-func (s stubReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
+func (s stubReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, keyKnown *bool, cursor int64, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
 	if s.listChannels != nil {
-		return s.listChannels(ctx, limit, hash, iatas, cursor, keyFilter, pageCursor)
+		return s.listChannels(ctx, limit, hash, iatas, keyKnown, cursor, pageCursor)
 	}
 	return api.ChannelPage{}, nil
 }
@@ -163,9 +166,9 @@ func (s stubReader) ListMessagesAfterID(ctx context.Context, afterID int64, iata
 	return nil, nil
 }
 
-func (s stubReader) ListObservers(ctx context.Context, params api.ObserverListParams) (api.Page[api.ObserverSummary], error) {
+func (s stubReader) ListObservers(ctx context.Context, iatas []string, observerType, broker, status, name, scope string, cursor int64, limit int32) (api.Page[api.ObserverSummary], error) {
 	if s.listObservers != nil {
-		return s.listObservers(ctx, params)
+		return s.listObservers(ctx, iatas, observerType, broker, status, name, scope, cursor, limit)
 	}
 	return api.Page[api.ObserverSummary]{}, nil
 }
@@ -191,9 +194,9 @@ func (s stubReader) GetObserverTelemetryBucketed(ctx context.Context, observerID
 	return nil, nil
 }
 
-func (s stubReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+func (s stubReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration, until time.Time) (*api.ObserverActivity, error) {
 	if s.getObserverActivity != nil {
-		return s.getObserverActivity(ctx, observerID, window, interval)
+		return s.getObserverActivity(ctx, observerID, window, interval, until)
 	}
 	return nil, nil
 }
@@ -212,9 +215,9 @@ func (s stubReader) ListObserverAdverts(ctx context.Context, observerID uuid.UUI
 	return api.Page[api.AdvertObservation]{}, nil
 }
 
-func (s stubReader) ListNodes(ctx context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
+func (s stubReader) ListNodes(ctx context.Context, nodeType int16, iatas []string, supportsMultibytePaths, supportsMultibyteTraces *bool, pubkey []byte, pubkeyPrefix, name, scope string, cursor int64, limit int32, includeNeighbors bool) (api.Page[api.NodeSummary], error) {
 	if s.listNodes != nil {
-		return s.listNodes(ctx, params)
+		return s.listNodes(ctx, nodeType, iatas, supportsMultibytePaths, supportsMultibyteTraces, pubkey, pubkeyPrefix, name, scope, cursor, limit, includeNeighbors)
 	}
 	return api.Page[api.NodeSummary]{}, nil
 }
@@ -233,17 +236,6 @@ func (s stubReader) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]a
 	return nil, nil
 }
 
-func (s stubReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
-	return nil, nil
-}
-
-func (s stubReader) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
-	if s.listMeshCoreRegions != nil {
-		return s.listMeshCoreRegions(ctx)
-	}
-	return nil, nil
-}
-
 func (s stubReader) ListNodeObservations(ctx context.Context, nodeID uuid.UUID, cursor int64, limit int32) (api.Page[api.PacketObservationSummary], error) {
 	if s.listNodeObservations != nil {
 		return s.listNodeObservations(ctx, nodeID, cursor, limit)
@@ -251,16 +243,16 @@ func (s stubReader) ListNodeObservations(ctx context.Context, nodeID uuid.UUID, 
 	return api.Page[api.PacketObservationSummary]{}, nil
 }
 
-func (s stubReader) ListPackets(ctx context.Context, params api.PacketListParams) (api.Page[api.PacketSummary], error) {
+func (s stubReader) ListPackets(ctx context.Context, payloadTypes, routeTypes []int16, iatas []string, scopes []string, since, until time.Time, cursor int64, limit int32) (api.Page[api.PacketSummary], error) {
 	if s.listPackets != nil {
-		return s.listPackets(ctx, params)
+		return s.listPackets(ctx, payloadTypes, routeTypes, iatas, scopes, since, until, cursor, limit)
 	}
 	return api.Page[api.PacketSummary]{}, nil
 }
 
-func (s stubReader) ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32, includeResolvedPath bool) ([]api.PacketSummary, error) {
+func (s stubReader) ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32) ([]api.PacketSummary, error) {
 	if s.listPacketsAfterID != nil {
-		return s.listPacketsAfterID(ctx, afterObservationID, payloadType, routeType, iatas, scope, limit, includeResolvedPath)
+		return s.listPacketsAfterID(ctx, afterObservationID, payloadType, routeType, iatas, scope, limit)
 	}
 	return nil, nil
 }
@@ -300,9 +292,9 @@ func (s stubReader) GetStatsPayloadBreakdown(ctx context.Context, iatas []string
 	return nil, nil
 }
 
-func (s stubReader) GetStatsTopNodes(ctx context.Context, iatas []string, limit int32) ([]api.TopNode, error) {
+func (s stubReader) GetStatsTopNodes(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopNode, error) {
 	if s.getStatsTopNodes != nil {
-		return s.getStatsTopNodes(ctx, iatas, limit)
+		return s.getStatsTopNodes(ctx, iatas, since, limit)
 	}
 	return nil, nil
 }
@@ -335,9 +327,9 @@ func (s stubReader) GetStatsTopTalkers(ctx context.Context, iatas []string, sinc
 	return nil, nil
 }
 
-func (s stubReader) GetScopeStats(ctx context.Context, iatas []string) ([]api.ScopeStats, error) {
+func (s stubReader) GetScopeStats(ctx context.Context, iatas []string, since time.Time) ([]api.ScopeStats, error) {
 	if s.getScopeStats != nil {
-		return s.getScopeStats(ctx, iatas)
+		return s.getScopeStats(ctx, iatas, since)
 	}
 	return nil, nil
 }
@@ -356,13 +348,6 @@ func (s stubReader) GetScopeNames(ctx context.Context) ([]string, error) {
 	return nil, nil
 }
 
-func (s stubReader) GetScopesByIATAs(ctx context.Context, iatas []string) ([]api.ScopeSummary, error) {
-	if s.getScopesByIATAs != nil {
-		return s.getScopesByIATAs(ctx, iatas)
-	}
-	return nil, nil
-}
-
 func (s stubReader) GetScopeByName(ctx context.Context, name string) (*api.ScopeDetail, error) {
 	if s.getScopeByName != nil {
 		return s.getScopeByName(ctx, name)
@@ -370,9 +355,9 @@ func (s stubReader) GetScopeByName(ctx context.Context, name string) (*api.Scope
 	return nil, nil
 }
 
-func (s stubReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
+func (s stubReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, cursorTag string, limit int32) ([]api.TraceTagSummary, error) {
 	if s.listTraceTags != nil {
-		return s.listTraceTags(ctx, iatas, scope, traceType, since, until, cursor, limit)
+		return s.listTraceTags(ctx, iatas, scope, traceType, since, until, cursor, cursorTag, limit)
 	}
 	return nil, nil
 }
@@ -384,11 +369,11 @@ func (s stubReader) GetTraceByTag(ctx context.Context, tag string) (*api.TraceDe
 	return nil, nil
 }
 
-func (s stubReader) ListKnownRoutes(ctx context.Context, params api.RouteListParams) (api.Page[api.KnownRoute], error) {
+func (s stubReader) ListKnownRoutes(ctx context.Context, iata string, hopCount int32, cursor time.Time, cursorID int64, limit int32) ([]api.KnownRoute, error) {
 	if s.listKnownRoutes != nil {
-		return s.listKnownRoutes(ctx, params)
+		return s.listKnownRoutes(ctx, iata, hopCount, cursor, cursorID, limit)
 	}
-	return api.Page[api.KnownRoute]{}, nil
+	return nil, nil
 }
 
 func (s stubReader) SearchKnownRoutes(ctx context.Context, iata, fromHash, toHash string) ([]api.KnownRoute, error) {
@@ -426,33 +411,9 @@ func (s stubReader) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map[uui
 	return nil, nil
 }
 
-func (s stubReader) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error) {
-	if s.getNodeIDByPubkey != nil {
-		return s.getNodeIDByPubkey(ctx, pubkey)
+func (s stubReader) GetRouteEvidence(ctx context.Context, iata, key string, q api.RouteEvidenceQuery) (*api.RouteEvidence, error) {
+	if s.getRouteEvidence != nil {
+		return s.getRouteEvidence(ctx, iata, key, q)
 	}
 	return nil, nil
-}
-
-func (s stubReader) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
-	if s.getNodeTypeByPubkey != nil {
-		return s.getNodeTypeByPubkey(ctx, pubkey)
-	}
-	// Default test double: endpoints are repeaters (node type 2), so existing
-	// tests exercise the happy path without wiring the new field.
-	two := int16(2)
-	return &two, nil
-}
-
-func (s stubReader) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
-	if s.planBestRoute != nil {
-		return s.planBestRoute(ctx, fromID, toID, maxAlternatives)
-	}
-	return api.BestRouteResult{Paths: []api.PlannedRoute{}}, nil
-}
-
-func (s stubReader) ListNodePathPackets(ctx context.Context, id uuid.UUID, iatas []string, cursor *api.PageToken, limit int32) (api.Page[api.PacketSummary], error) {
-	if s.listNodePathPackets != nil {
-		return s.listNodePathPackets(ctx, id, iatas, cursor, limit)
-	}
-	return api.Page[api.PacketSummary]{}, nil
 }

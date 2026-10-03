@@ -4,6 +4,7 @@
 package handlers
 
 import (
+	"encoding/hex"
 	"net/http"
 	"strconv"
 	"strings"
@@ -32,57 +33,64 @@ func TracesRouter(reader api.Reader) http.Handler {
 //	@Param		iatas		query		string	false	"Filter by IATA code(s), comma-separated"
 //	@Param		region		query		string	false	"Filter by region slug"
 //	@Param		regionId	query		int		false	"Filter by region ID"
-//	@Param		scope		query		string	false	"Filter by transport scope name"
-//	@Param		type		query		string	false	"Filter by type: TRACE or PING (default: all)"
+//	@Param		scope		query		string	false	"Filter by the tag's first transport scope name"
+//	@Param		type		query		string	false	"Filter by type: TRACE (any multi-hop packet) or PING (default: all)"
 //	@Param		since		query		int		false	"Filter by first_heard_at >= since (epoch ms)"
 //	@Param		until		query		int		false	"Filter by first_heard_at <= until (epoch ms)"
-//	@Param		cursor		query		int		false	"last_heard_at epoch ms of last item for pagination"
-//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
-//	@Success	200			{object}	[]api.TraceTagSummary
+//	@Param		cursor		query		int		false	"lastHeardAt (epoch ms) of the last item; returns older tags"
+//	@Param		cursorTag	query		string	false	"traceTag (hex) of the last item; with cursor, also returns later tags sharing that millisecond"
+//	@Param		limit		query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
 //	@Failure	400			{object}	handlers.APIError
+//	@Success	200			{object}	[]api.TraceTagSummary
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/traces [get]
 func listTraceTags(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		var since, until, cursor time.Time
-		for _, field := range []struct {
-			name  string
-			value *time.Time
-		}{{"since", &since}, {"until", &until}, {"cursor", &cursor}} {
-			if raw := r.URL.Query().Get(field.name); raw != "" {
-				ms, err := strconv.ParseInt(raw, 10, 64)
-				if err != nil {
-					respondError(w, http.StatusBadRequest, "invalid "+field.name+", expected epoch milliseconds")
-					return
-				}
-				*field.value = time.UnixMilli(ms)
+		if v := r.URL.Query().Get("since"); v != "" {
+			if ms, err := strconv.ParseInt(v, 10, 64); err == nil {
+				since = time.UnixMilli(ms)
 			}
 		}
-		if !since.IsZero() && !until.IsZero() && until.Before(since) {
-			respondError(w, http.StatusBadRequest, "until must not be before since")
-			return
+		if v := r.URL.Query().Get("until"); v != "" {
+			if ms, err := strconv.ParseInt(v, 10, 64); err == nil {
+				until = time.UnixMilli(ms)
+			}
+		}
+		if v := r.URL.Query().Get("cursor"); v != "" {
+			if ms, err := strconv.ParseInt(v, 10, 64); err == nil {
+				cursor = time.UnixMilli(ms)
+			}
+		}
+		// cursorTag breaks ties within the cursor's millisecond.
+		cursorTag := strings.ToLower(r.URL.Query().Get("cursorTag"))
+		if cursorTag != "" {
+			if b, err := hex.DecodeString(cursorTag); err != nil || len(b) == 0 {
+				respondError(w, http.StatusBadRequest, "cursorTag must be hex")
+				return
+			}
+			if cursor.IsZero() {
+				respondError(w, http.StatusBadRequest, "cursorTag requires cursor")
+				return
+			}
 		}
 		iatas := parseIATAs(r)
 		if regionIDStr := r.URL.Query().Get("regionId"); regionIDStr != "" || r.URL.Query().Get("region") != "" {
 			regionIATAs, err := resolveRegionIATAs(r.Context(), r.URL.Query().Get("regionId"), r.URL.Query().Get("region"), reader)
 			if err != nil {
-				respondError(w, http.StatusBadRequest, err.Error())
+				respondRegionError(w, err)
 				return
 			}
 			iatas = append(iatas, regionIATAs...)
 		}
 		scope := r.URL.Query().Get("scope")
 		traceType := strings.ToUpper(r.URL.Query().Get("type"))
-		if traceType != "" && traceType != "TRACE" && traceType != "PING" {
-			respondError(w, http.StatusBadRequest, "invalid type, use TRACE or PING")
-			return
-		}
-		tags, err := reader.ListTraceTags(r.Context(), iatas, scope, traceType, since, until, cursor, limit)
+		tags, err := reader.ListTraceTags(r.Context(), iatas, scope, traceType, since, until, cursor, cursorTag, limit)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return

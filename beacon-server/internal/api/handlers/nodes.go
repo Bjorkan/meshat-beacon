@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,24 +13,20 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 // NodesRouter mounts all /nodes routes onto a subrouter.
 //
 // GET  /nodes                       → listNodes
-// GET  /nodes/ambiguous-prefix2     → listAmbiguousPrefix2
-// GET  /nodes/meshcore-regions      → listMeshCoreRegions
 // GET  /nodes/{nodeId}              → getNode
 // GET  /nodes/{nodeId}/observations → listNodeObservations
 func NodesRouter(reader api.Reader) http.Handler {
 	r := chi.NewRouter()
 	r.Get("/", listNodes(reader))
-	r.Get("/ambiguous-prefix2", listAmbiguousPrefix2(reader))
-	r.Get("/meshcore-regions", listMeshCoreRegions(reader))
 	r.Route("/{nodeId}", func(r chi.Router) {
 		r.Get("/", getNode(reader))
 		r.Get("/observations", listNodeObservations(reader))
-		r.Get("/path-packets", listNodePathPackets(reader))
 		r.Get("/neighbors", listNodeNeighbors(reader))
 	})
 	return r
@@ -53,12 +50,8 @@ func NodesRouter(reader api.Reader) http.Handler {
 //	@Param		supportsMultibytePaths	query		bool	false	"Filter by multibyte path support (true/false); omit for no filter"
 //	@Param		supportsMultibyteTraces	query		bool	false	"Filter by multibyte trace support (true/false); omit for no filter"
 //	@Param		neighbors				query		bool	false	"Include each node's known neighbor IDs (neighborIds field). Bare ?neighbors or ?neighbors=true enables it; omit/false for none"
-//	@Param		meshcoreRegion			query		string	false	"Filter by confirmed MeshCore region-scope token (case-insensitive exact token, e.g. se). Unrelated to region/IATA and transport scope"
-//	@Param		sort					query		string	false	"Sort field: name, type, radio, neighbors, last_seen (default last_seen)"
-//	@Param		direction				query		string	false	"Sort direction: asc or desc (default desc)"
-//	@Param		pageToken				query		string	false	"Opaque keyset cursor returned as nextPageToken"
-//	@Param		cursor					query		int		false	"Legacy last_seen epoch ms cursor (only for last_seen desc)"
-//	@Param		limit					query		int		false	"Max results (1-1000, default 50)"
+//	@Param		cursor					query		int		false	"last_seen epoch ms of last item for pagination"
+//	@Param		limit					query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
 //	@Success	200						{object}	api.Page[api.NodeSummary]
 //	@Failure	400						{object}	handlers.APIError
 //	@Failure	500						{object}	handlers.APIError
@@ -76,9 +69,9 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 		} else if typeName := r.URL.Query().Get("typeName"); typeName != "" {
 			nodeType = api.NodeTypeFromString(typeName)
 		}
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		var cursor int64
@@ -90,20 +83,6 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 			}
 			cursor = c
 		}
-		sort, direction, pageToken, err := parseSortablePage(r, api.PageCollectionNodes, api.NodeSortLastSeen, api.SortDesc, api.ValidNodeSort)
-		if err != nil {
-			respondError(w, http.StatusBadRequest, err.Error())
-			return
-		}
-		if pageToken != nil && cursor != 0 {
-			respondError(w, http.StatusBadRequest, "cursor and pageToken cannot be combined")
-			return
-		}
-		if cursor != 0 && (sort != api.NodeSortLastSeen || direction != api.SortDesc) {
-			respondError(w, http.StatusBadRequest, "legacy cursor is only valid with sort=last_seen&direction=desc")
-			return
-		}
-
 		var pubkey []byte
 		if pubkeyParam := strings.ToLower(r.URL.Query().Get("pubkey")); pubkeyParam != "" {
 			b, err := hex.DecodeString(pubkeyParam)
@@ -122,21 +101,13 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 		if regionIDStr := r.URL.Query().Get("regionId"); regionIDStr != "" || r.URL.Query().Get("region") != "" {
 			regionIATAs, err := resolveRegionIATAs(r.Context(), regionIDStr, r.URL.Query().Get("region"), reader)
 			if err != nil {
-				respondError(w, http.StatusBadRequest, err.Error())
+				respondRegionError(w, err)
 				return
 			}
 			iatas = append(iatas, regionIATAs...)
 		}
 		name := r.URL.Query().Get("name")
 		scope := r.URL.Query().Get("scope")
-		meshcoreRegion := r.URL.Query().Get("meshcoreRegion")
-		if meshcoreRegion != "" {
-			if !validMeshCoreRegionToken(meshcoreRegion) {
-				respondError(w, http.StatusBadRequest, "meshcoreRegion must be a single MeshCore region token (letters, digits, *, -, _ or .), e.g. se")
-				return
-			}
-			meshcoreRegion = strings.ToLower(meshcoreRegion)
-		}
 		var supportsMultibytePaths *bool
 		if v := r.URL.Query().Get("supportsMultibytePaths"); v != "" {
 			b, err := strconv.ParseBool(v)
@@ -169,92 +140,12 @@ func listNodes(reader api.Reader) http.HandlerFunc {
 				includeNeighbors = b
 			}
 		}
-		nodes, err := reader.ListNodes(r.Context(), api.NodeListParams{
-			NodeType:                nodeType,
-			IATAs:                   iatas,
-			SupportsMultibytePaths:  supportsMultibytePaths,
-			SupportsMultibyteTraces: supportsMultibyteTraces,
-			PublicKey:               pubkey,
-			PubkeyPrefix:            pubkeyPrefix,
-			Name:                    name,
-			Scope:                   scope,
-			MeshCoreRegion:          meshcoreRegion,
-			LegacyCursor:            cursor,
-			PageToken:               pageToken,
-			Sort:                    sort,
-			Direction:               direction,
-			Limit:                   limit,
-			IncludeNeighbors:        includeNeighbors,
-		})
+		nodes, err := reader.ListNodes(r.Context(), nodeType, iatas, supportsMultibytePaths, supportsMultibyteTraces, pubkey, pubkeyPrefix, name, scope, cursor, limit, includeNeighbors)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 		respond(w, http.StatusOK, nodes)
-	}
-}
-
-// validMeshCoreRegionToken reports whether a client-supplied MeshCore Region
-// token is a single, non-empty exact token: letters, digits, "*", "-", "_" or
-// ".". No commas or whitespace — those are separators in stored values, and
-// matching stays exact rather than substring-based.
-func validMeshCoreRegionToken(token string) bool {
-	if token == "" || len(token) > 64 {
-		return false
-	}
-	for _, r := range token {
-		switch {
-		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
-		case r == '*', r == '-', r == '_', r == '.':
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-// listMeshCoreRegions godoc
-//
-//	@Summary	List MeshCore Regions
-//	@Description	Built-in Swedish MeshCore regions with friendly names and parent tokens, plus discovered regions and current confirmed-node counts. Independent of IATA geography.
-//	@Tags		Nodes
-//	@Produce	json
-//	@Success	200		{array}		api.MeshCoreRegion
-//	@Failure	500		{object}	handlers.APIError
-//	@Router		/nodes/meshcore-regions [get]
-func listMeshCoreRegions(reader api.Reader) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		regions, err := reader.ListMeshCoreRegions(r.Context())
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
-		respond(w, http.StatusOK, regions)
-	}
-}
-
-// listAmbiguousPrefix2 godoc
-//
-//	@Summary	List ambiguous 2-byte prefixes
-//	@Description	Every 2-byte node prefix claimed by more than one infra node, globally.
-//	@Description	The path map draws a 2-byte route only when this list is empty
-//	@Description	for its prefixes and every hop resolved high-confidence.
-//	@Tags		Nodes
-//	@Produce	json
-//	@Success	200		{array}		string
-//	@Failure	500		{object}	handlers.APIError
-//	@Router		/nodes/ambiguous-prefix2 [get]
-func listAmbiguousPrefix2(reader api.Reader) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		prefixes, err := reader.ListAmbiguousPrefix2(r.Context())
-		if err != nil {
-			respondError(w, http.StatusInternalServerError, "internal server error")
-			return
-		}
-		if prefixes == nil {
-			prefixes = []string{}
-		}
-		respond(w, http.StatusOK, prefixes)
 	}
 }
 
@@ -267,6 +158,7 @@ func listAmbiguousPrefix2(reader api.Reader) http.HandlerFunc {
 //	@Success	200		{object}	api.Node
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	404		{object}	handlers.APIError
+//	@Failure	500		{object}	handlers.APIError
 //	@Router		/nodes/{nodeId} [get]
 func getNode(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -276,8 +168,12 @@ func getNode(reader api.Reader) http.HandlerFunc {
 			return
 		}
 		node, err := reader.GetNode(r.Context(), nodeID)
-		if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows), err == nil && node == nil:
 			respondError(w, http.StatusNotFound, "node not found")
+			return
+		case err != nil:
+			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 		respond(w, http.StatusOK, node)
@@ -291,7 +187,7 @@ func getNode(reader api.Reader) http.HandlerFunc {
 //	@Produce	json
 //	@Param		nodeId	path		string	true	"Node UUID"
 //	@Param		cursor	query		int		false	"Observation ID of last item for pagination"
-//	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
+//	@Param		limit	query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
 //	@Success	200		{object}	api.Page[api.PacketObservationSummary]
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	500		{object}	handlers.APIError
@@ -312,9 +208,9 @@ func listNodeObservations(reader api.Reader) http.HandlerFunc {
 			}
 			cursor = c
 		}
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		observations, err := reader.ListNodeObservations(r.Context(), nodeID, cursor, limit)

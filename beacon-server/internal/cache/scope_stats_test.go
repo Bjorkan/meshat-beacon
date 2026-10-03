@@ -17,10 +17,12 @@ type scopeStatsReader struct {
 	calls int64
 }
 
-func (r *scopeStatsReader) GetScopeStats(context.Context, []string) ([]api.ScopeStats, error) {
+func (r *scopeStatsReader) GetScopeStats(context.Context, []string, time.Time) ([]api.ScopeStats, error) {
 	r.calls++
 	return []api.ScopeStats{{Name: "#test", PacketCount: r.calls}}, nil
 }
+
+func (r *scopeStatsReader) AnalyticsRevision(context.Context) (int64, error) { return 0, nil }
 
 func TestScopeStatsCacheSeparatesIATAs(t *testing.T) {
 	c, _ := newTestClient(t)
@@ -42,7 +44,7 @@ func TestScopeStatsCacheSeparatesIATAs(t *testing.T) {
 		{nil, 1},
 	} {
 		before := slices.Clone(tc.iatas)
-		rows, err := reader.GetScopeStats(context.Background(), tc.iatas)
+		rows, err := reader.GetScopeStats(context.Background(), tc.iatas, time.Time{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -56,4 +58,32 @@ func TestScopeStatsCacheSeparatesIATAs(t *testing.T) {
 	if inner.calls != 6 {
 		t.Fatalf("underlying calls = %d, want 6", inner.calls)
 	}
+}
+
+func TestDefaultWindowKeyFollowsTheHour(t *testing.T) {
+	c, _ := newTestClient(t)
+	inner := &scopeStatsReader{}
+	cr := NewCachedReader(inner, c, CacheTTLs{Stats: time.Hour}).(*CachedReader)
+	clock := time.Date(2026, 10, 2, 10, 30, 0, 0, time.UTC)
+	cr.now = func() time.Time { return clock }
+	get := func(since time.Time) int64 {
+		t.Helper()
+		rows, err := cr.GetScopeStats(context.Background(), nil, since)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return rows[0].PacketCount
+	}
+	if get(time.Time{}) != 1 || get(time.Time{}) != 1 {
+		t.Fatal("default window not cached within the hour")
+	}
+	clock = clock.Add(35 * time.Minute)
+	if get(time.Time{}) != 2 {
+		t.Fatal("default window served from the previous hour")
+	}
+	// An explicit since at the current hour is a different window.
+	if get(clock.Truncate(time.Hour)) != 3 {
+		t.Fatal("explicit since collided with the default window")
+	}
+
 }

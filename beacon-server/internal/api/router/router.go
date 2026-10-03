@@ -18,7 +18,7 @@ import (
 	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ws"
-	httpSwagger "github.com/swaggo/http-swagger/v2"
+	httpSwagger "github.com/swaggo/http-swagger"
 )
 
 // New builds and returns the top-level Chi router.
@@ -91,7 +91,7 @@ func New(h *hub.Hub, reader api.Reader, workers []*ingest.Worker, opts Options) 
 	))
 
 	// ── WebSocket ────────────────────────────────────────────────────────────
-	r.Get("/ws", ws.Handler(h, reader, opts.MaxConnsPerIP, opts.MaxConnectsPerMinute))
+	r.Get("/ws", ws.Handler(h, reader, opts.MaxConnsPerIP, opts.MaxConnectsPerMinute, opts.WSAllowedOrigins))
 
 	// ── Public REST API (v1) ─────────────────────────────────────────────────
 	r.Route("/api/v1", func(r chi.Router) {
@@ -107,8 +107,8 @@ func New(h *hub.Hub, reader api.Reader, workers []*ingest.Worker, opts Options) 
 			r.Mount("/iatas", handlers.IATAsRouter(reader))
 			r.Mount("/regions", handlers.RegionsRouter(reader))
 			r.Mount("/routes", handlers.RoutesRouter(reader))
-			r.Mount("/scopes", handlers.ScopesRouter(reader))
-			r.Mount("/stats", handlers.StatsRouter(reader))
+			r.Mount("/scopes", handlers.ScopesRouter(reader, opts.Scopes))
+			r.Mount("/stats", handlers.StatsRouter(reader, handlers.StatsOptions{Scopes: opts.Scopes, SeriesWindow: opts.RollupRetention}))
 			r.Mount("/traces", handlers.TracesRouter(reader))
 		})
 

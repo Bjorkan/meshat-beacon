@@ -9,16 +9,11 @@ package db
 import (
 	"context"
 	"encoding/hex"
-	"encoding/json"
 	"time"
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
-	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
-	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/google/uuid"
-
-	"sync"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,61 +22,21 @@ import (
 // Store wraps the sqlc-generated Queries and implements both ingest.DB and api.Reader.
 type Store struct {
 	q                   sqlc.Querier
+	pool                *pgxpool.Pool // rollups need a dedicated connection; nil in mock-backed tests
 	clockDriftThreshold time.Duration // see api.Node.ClockOutOfSync
 	staleThreshold      time.Duration // see api.NodeSummary.Stale
-	neighborMaxKm       float64       // direct LoRa sanity cap for node_neighbors edges (0 = unlimited)
-	nodeIATATTL         time.Duration // how long a node_iatas row counts as current membership
-	meshcoreRegionFresh time.Duration // how long a MeshCore region-scope confirmation counts as fresh
-	presetCatalogue     *radiopreset.Catalogue
-	routePlan           RoutePlanConfig // /routes/best cost model; zero value falls back to defaults
-	routePlanSet        bool
-	// routeHolder is the single routing-snapshot manager (see
-	// routes_snapshot.go). PostgreSQL stays the source of truth; steady-state
-	// planning reads the Holder's immutable snapshot instead of rebuilding
-	// the global graph per request.
-	routeSnapMu sync.RWMutex
-	routeHolder *routeplan.Holder
-}
-
-// SetPresetCatalogue installs the startup-loaded MeshCore suggested-settings catalogue used to
-// resolve radio preset display titles. Nil (or empty) means raw preset labels.
-func (s *Store) SetPresetCatalogue(cat *radiopreset.Catalogue) {
-	s.presetCatalogue = cat
 }
 
 // New creates a Store backed by the given pgxpool connection pool. clockDriftThreshold is
 // the |device clock - server clock| magnitude above which a repeater/room server's
 // clockOutOfSync is reported true; see internal/config.ResolvedConfig.ClockDriftThreshold.
 // staleThreshold is how long since last_seen before a node's Stale is reported true; see
-// internal/config.ResolvedConfig.NodeStaleThreshold. neighborMaxKm is the great-circle
-// distance beyond which a node_neighbors edge is refused as physically impossible for a
-// direct LoRa hop (0 = unlimited); see internal/config.ResolvedConfig.NeighborMaxKm.
-// nodeIATATTL bounds current node-to-IATA membership; see
-// internal/config.ResolvedConfig.NodeIATAMembershipTTL.
-// meshcoreRegionFresh bounds how long a MeshCore region-scope confirmation counts
-// as fresh; see internal/config.ResolvedConfig.MeshCoreRegionFreshness.
-func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration, neighborMaxKm float64, nodeIATATTL, meshcoreRegionFresh time.Duration) *Store {
-	return &Store{q: sqlc.New(pool), clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold, neighborMaxKm: neighborMaxKm, nodeIATATTL: nodeIATATTL, meshcoreRegionFresh: meshcoreRegionFresh}
+// internal/config.ResolvedConfig.NodeStaleThreshold.
+func New(pool *pgxpool.Pool, clockDriftThreshold, staleThreshold time.Duration) *Store {
+	return &Store{q: sqlc.New(pool), pool: pool, clockDriftThreshold: clockDriftThreshold, staleThreshold: staleThreshold}
 }
 
-// membershipCutoff is the oldest last_heard that still counts as current node-to-IATA
-// membership. Stale rows remain stored; every read path that interprets node_iatas as
-// current scope uses this same cutoff so badges, filters, and stats agree.
-func (s *Store) membershipCutoff() pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: time.Now().Add(-s.nodeIATATTL), Valid: true}
-}
-
-// meshcoreRegionCutoff is the oldest region_scope_last_seen that still counts
-// as a fresh MeshCore region-scope confirmation.
-func (s *Store) meshcoreRegionCutoff() pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: time.Now().Add(-s.meshcoreRegionFresh), Valid: true}
-}
-
-// ResolvePathHashes resolves path hash prefixes to nodes GLOBALLY — across
-// every IATA area. Packets routinely cross regions, so a hash is only
-// trustworthy when no other node anywhere shares it; callers must treat a
-// multi-entry result as ambiguous and skip it.
-func (s *Store) ResolvePathHashes(ctx context.Context, hashes [][]byte) (map[string][]api.ResolvedPathEntry, error) {
+func (s *Store) ResolvePathHashes(ctx context.Context, iata string, hashes [][]byte) (map[string][]api.ResolvedPathEntry, error) {
 	if len(hashes) == 0 {
 		return nil, nil
 	}
@@ -91,24 +46,24 @@ func (s *Store) ResolvePathHashes(ctx context.Context, hashes [][]byte) (map[str
 	switch len(hashes[0]) {
 	case 1:
 		var rs []sqlc.ResolvePathHashesP1Row
-		rs, err = s.q.ResolvePathHashesP1(ctx, hashes)
+		rs, err = s.q.ResolvePathHashesP1(ctx, sqlc.ResolvePathHashesP1Params{Iata: iata, Column2: hashes})
 		for _, r := range rs {
 			rows = append(rows, sqlc.ResolvePathHashesP4Row(r))
 		}
 	case 2:
 		var rs []sqlc.ResolvePathHashesP2Row
-		rs, err = s.q.ResolvePathHashesP2(ctx, hashes)
+		rs, err = s.q.ResolvePathHashesP2(ctx, sqlc.ResolvePathHashesP2Params{Iata: iata, Column2: hashes})
 		for _, r := range rs {
 			rows = append(rows, sqlc.ResolvePathHashesP4Row(r))
 		}
 	case 3:
 		var rs []sqlc.ResolvePathHashesP3Row
-		rs, err = s.q.ResolvePathHashesP3(ctx, hashes)
+		rs, err = s.q.ResolvePathHashesP3(ctx, sqlc.ResolvePathHashesP3Params{Iata: iata, Column2: hashes})
 		for _, r := range rs {
 			rows = append(rows, sqlc.ResolvePathHashesP4Row(r))
 		}
 	case 4:
-		rows, err = s.q.ResolvePathHashesP4(ctx, hashes)
+		rows, err = s.q.ResolvePathHashesP4(ctx, sqlc.ResolvePathHashesP4Params{Iata: iata, Column2: hashes})
 	default:
 		return nil, nil
 	}
@@ -163,37 +118,6 @@ func nullableUUID(id uuid.UUID) *uuid.UUID {
 	return &id
 }
 
-// uuidFromPgtype converts a nullable pgtype.UUID to a plain uuid.UUID.
-// Invalid/NULL values become uuid.Nil; used where a column became nullable
-// (packet_observations.observer_id after ON DELETE SET NULL) but the API
-// still carries a plain UUID.
-func uuidFromPgtype(u pgtype.UUID) uuid.UUID {
-	if !u.Valid {
-		return uuid.Nil
-	}
-	return uuid.UUID(u.Bytes)
-}
-
-// uuidToPgtype converts a plain uuid.UUID to a valid pgtype.UUID.
-func uuidToPgtype(id uuid.UUID) pgtype.UUID {
-	return pgtype.UUID{Bytes: id, Valid: true}
-}
-
-// jsonbToAny decodes a raw JSONB column into a plain JSON value for API
-// responses. Passing the raw []byte through an `any` field would make
-// encoding/json emit it base64-encoded. Undecodable content (not valid JSON)
-// is dropped rather than emitting invalid JSON for the whole response.
-func jsonbToAny(b []byte) any {
-	if len(b) == 0 {
-		return nil
-	}
-	var v any
-	if err := json.Unmarshal(b, &v); err != nil {
-		return nil
-	}
-	return v
-}
-
 // tristate converts a *bool to a SQL-friendly string for the ListNodes filter:
 // nil → "any", true → "true", false → "false".
 func tristate(b *bool) string {
@@ -207,7 +131,7 @@ func tristate(b *bool) string {
 }
 
 // toChannelMessage maps raw sqlc row fields to an api.ChannelMessage.
-func toChannelMessage(id int64, packetHashHex string, channelHash []byte, senderName *string, content *string, sentAt pgtype.Timestamptz, observationCount int64) api.ChannelMessage {
+func toChannelMessage(id int64, packetHashHex string, channelHash []byte, senderName *string, content *string, sentAt pgtype.Timestamptz, observationCount int64, scope *string, transport *bool) api.ChannelMessage {
 	sn := ""
 	if senderName != nil {
 		sn = *senderName
@@ -224,5 +148,23 @@ func toChannelMessage(id int64, packetHashHex string, channelHash []byte, sender
 		Content:          ct,
 		SentAt:           sentAt.Time.UnixMilli(),
 		ObservationCount: observationCount,
+		Scope:            scope,
+		ScopeStatus:      api.RecordedChannelScopeStatus(scope, transport),
+	}
+}
+
+// deleteInBatches repeats a delete until a batch comes back short.
+func deleteInBatches(ctx context.Context, batchSize int32, del func(context.Context, int32) (int64, error)) error {
+	for {
+		n, err := del(ctx, batchSize)
+		if err != nil {
+			return err
+		}
+		if n < int64(batchSize) {
+			return nil
+		}
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 	}
 }

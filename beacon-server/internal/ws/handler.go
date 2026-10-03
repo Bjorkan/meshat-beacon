@@ -9,20 +9,22 @@
 //
 //	Client → Server:
 //	  subscribe   { v, type, id, scope }         → server replies subscribed { v, type, id, subscriptionId }
-//	  unsubscribe { v, type, id, subscriptionId }
-//	  configure   { v, type, id, resolvePath }   → server replies configured { v, type, id, resolvePath }
+//	  unsubscribe { v, type, id, subscriptionId } → server replies unsubscribed { v, type, id, subscriptionId }
+//	  configure   { v, type, id, resolvePath, includeObserverKey, includeRepeats }
+//	              → server replies configured { v, type, id, resolvePath, includeObserverKey, includeRepeats }
 //	  ping        { v, type, id }                → server replies pong { v, type, id }
 //
-//	configure's resolvePath (bool) is a connection-wide setting, not
-//	per-subscription: enables/disables per-hop resolvedPath data on
-//	packetObservation events. Freely toggleable at any point during the
-//	connection; each configure call sets it to exactly the value sent
-//	(not additive across calls, unlike subscribe scopes). Default false.
+//	configure's flags are connection-wide settings, not per-subscription.
+//	resolvePath adds per-hop resolvedPath data to packetObservation events,
+//	includeObserverKey adds observation.observerPublicKey, and includeRepeats
+//	also streams later hearings of an already-stored observation over a new
+//	path, as packetObservation events with packet.isRepeat true and
+//	observationCount 0. Each configure sets all three to exactly the values
+//	sent, so an omitted flag turns off. All default false.
 //
 //	Server → Client events (unsolicited):
 //	  packetObservation, observerStatus, nodeUpdate, channelMessage
-//	  lagged { v, type, droppedCount, since, lastObservationId }
-//	  error  { v, type, code, message }
+//	  lagged { v, type, droppedCount, since }
 //
 //	Idle connections (no ping) closed after 90s.
 //	Client should ping every 30s.
@@ -48,12 +50,16 @@ import (
 
 const (
 	pingTimeout  = 90 * time.Second // server closes connection if no message received within this window
-	writeTimeout = 10 * time.Second
+	writeTimeout = 10 * time.Second // TODO: apply per-write deadline once nhooyr supports it cleanly
 )
 
 // Handler returns an http.HandlerFunc that requires the hub to be injected.
 // Wire it via router.New(h) so the hub is available at startup.
-func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute int) http.HandlerFunc {
+func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute int, allowedOrigins []string) http.HandlerFunc {
+	var acceptOpts *websocket.AcceptOptions
+	if len(allowedOrigins) > 0 {
+		acceptOpts = &websocket.AcceptOptions{OriginPatterns: allowedOrigins}
+	}
 	limiter := newIPLimiter(maxConnsPerIP)
 	attempts := httprate.NewRateLimiter(maxConnectsPerMinute, time.Minute,
 		httprate.WithResponseHeaders(httprate.ResponseHeaders{RetryAfter: "Retry-After"}))
@@ -67,7 +73,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute 
 		if attempts.RespondOnLimit(w, r, httprate.CanonicalizeIP(ip)) {
 			return
 		}
-		conn, err := websocket.Accept(w, r, nil)
+		conn, err := websocket.Accept(w, r, acceptOpts)
 		if err != nil {
 			slog.Warn("ws: failed to accept connection", "component", "ws", "error", err)
 			return
@@ -98,7 +104,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute 
 		}
 		helloBytes, _ := json.Marshal(hello)
 		slog.Debug("connected", "component", "ws", "connection_id", connID)
-		err = writeMessage(ctx, conn, helloBytes)
+		err = conn.Write(ctx, websocket.MessageText, helloBytes)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("ws[%s]: failed to send hello", connID), "component", "ws", "error", err)
 			return
@@ -119,7 +125,8 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute 
 						"data":  json.RawMessage(evt.Payload),
 					}
 					msgBytes, _ := json.Marshal(msg)
-					if err := writeMessage(ctx, conn, msgBytes); err != nil {
+					err = conn.Write(ctx, websocket.MessageText, msgBytes)
+					if err != nil {
 						slog.Warn(fmt.Sprintf("ws[%s]: failed to write hub event", connID), "component", "ws", "error", err)
 						cancel()
 						return
@@ -136,7 +143,7 @@ func Handler(h *hub.Hub, reader api.Reader, maxConnsPerIP, maxConnectsPerMinute 
 						"since":        time.Now().UnixMilli(),
 					}
 					lagBytes, _ := json.Marshal(lagged)
-					if err := writeMessage(ctx, conn, lagBytes); err != nil {
+					if err := conn.Write(ctx, websocket.MessageText, lagBytes); err != nil {
 						slog.Warn(fmt.Sprintf("ws[%s]: failed to write lagged notice", connID), "component", "ws", "error", err)
 						cancel()
 						return
@@ -171,26 +178,21 @@ type clientMessage struct {
 	SubscriptionID string          `json:"subscriptionId,omitempty"`
 	Scope          *subscribeScope `json:"scope,omitempty"`
 
-	// ResolvePath is only read for "configure" messages: enables/disables
-	// the resolvedPath variant of packetObservation events for the whole
-	// connection. See package doc.
-	ResolvePath bool `json:"resolvePath,omitempty"`
+	// Only read for "configure" messages. See package doc.
+	ResolvePath        bool `json:"resolvePath,omitempty"`
+	IncludeObserverKey bool `json:"includeObserverKey,omitempty"`
+	IncludeRepeats     bool `json:"includeRepeats,omitempty"`
 }
 
 // subscribeScope mirrors the scope object in the subscribe message.
-//
-// Note: routeTypes and observerIds were previously declared here but never
-// propagated into the hub — a `subscribed` acknowledgement silently ignored
-// them. They are no longer part of the contract: a scope is restricted only
-// by the dimensions it actually declares (iatas/regions, payloadTypes,
-// channelHashes, events). Unrecognized fields are ignored like any unknown
-// JSON field, never acknowledged as an active filter.
 type subscribeScope struct {
 	IATAs         []string        `json:"iatas"`
 	RegionIDs     []string        `json:"regionIds"`
 	RegionSlugs   []string        `json:"regionSlugs"`
 	PayloadTypes  []uint8         `json:"payloadTypes"`
+	RouteTypes    []uint8         `json:"routeTypes"`
 	ChannelHashes []string        `json:"channelHashes"`
+	ObserverIDs   []string        `json:"observerIds"`
 	Events        []hub.EventType `json:"events"`
 }
 
@@ -232,7 +234,9 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		scope := hub.Scope{
 			IATAs:         iatas,
 			PayloadTypes:  msg.Scope.PayloadTypes,
+			RouteTypes:    msg.Scope.RouteTypes,
 			ChannelHashes: msg.Scope.ChannelHashes,
+			ObserverIDs:   msg.Scope.ObserverIDs,
 			Events:        msg.Scope.Events,
 		}
 		subID := uuid.NewString()
@@ -243,7 +247,7 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 			slog.Debug(fmt.Sprintf("ws[%s]: subscribed %s → %s", connID, msg.ID, subID), "component", "ws")
 		}
-		err := writeMessage(ctx, conn, reply)
+		err := conn.Write(ctx, websocket.MessageText, reply)
 		if err != nil {
 			slog.Warn("failed to send subscribed reply", "component", "ws", "connection_id", connID, "error", err)
 		}
@@ -259,25 +263,26 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
 			slog.Debug(fmt.Sprintf("ws[%s]: unsubscribed %s", connID, msg.SubscriptionID), "component", "ws")
 		}
-		if err := writeMessage(ctx, conn, reply); err != nil {
+		if err := conn.Write(ctx, websocket.MessageText, reply); err != nil {
 			slog.Warn("failed to send unsubscribed reply", "component", "ws", "connection_id", connID, "error", err)
 		}
 
 	case "configure":
-		h.SetResolvePath(client, msg.ResolvePath)
+		h.Configure(client, hub.ClientOptions{ResolvePath: msg.ResolvePath, IncludeObserverKey: msg.IncludeObserverKey, IncludeRepeats: msg.IncludeRepeats})
 		reply, _ := json.Marshal(map[string]any{
-			"v": 1, "type": "configured", "id": msg.ID, "resolvePath": msg.ResolvePath,
+			"v": 1, "type": "configured", "id": msg.ID,
+			"resolvePath": msg.ResolvePath, "includeObserverKey": msg.IncludeObserverKey, "includeRepeats": msg.IncludeRepeats,
 		})
 		if slog.Default().Enabled(context.Background(), slog.LevelDebug) {
-			slog.Debug(fmt.Sprintf("ws[%s]: configured resolvePath=%t", connID, msg.ResolvePath), "component", "ws")
+			slog.Debug(fmt.Sprintf("ws[%s]: configured resolvePath=%t includeObserverKey=%t includeRepeats=%t", connID, msg.ResolvePath, msg.IncludeObserverKey, msg.IncludeRepeats), "component", "ws")
 		}
-		if err := writeMessage(ctx, conn, reply); err != nil {
+		if err := conn.Write(ctx, websocket.MessageText, reply); err != nil {
 			slog.Warn(fmt.Sprintf("ws[%s]: failed to send configured reply", connID), "component", "ws", "error", err)
 		}
 
 	case "ping":
 		reply, _ := json.Marshal(map[string]any{"v": 1, "type": "pong", "id": msg.ID})
-		err := writeMessage(ctx, conn, reply)
+		err := conn.Write(ctx, websocket.MessageText, reply)
 		if err != nil {
 			slog.Warn(fmt.Sprintf("ws[%s]: failed to send pong", connID), "component", "ws", "error", err)
 		}
@@ -285,11 +290,4 @@ func handleClientMessage(ctx context.Context, client *hub.Client, reader api.Rea
 	default:
 		slog.Warn("unknown message type", "component", "ws", "connection_id", connID)
 	}
-}
-
-// writeMessage bounds every write, including replies made by the read pump.
-func writeMessage(ctx context.Context, conn *websocket.Conn, payload []byte) error {
-	writeCtx, cancel := context.WithTimeout(ctx, writeTimeout)
-	defer cancel()
-	return conn.Write(writeCtx, websocket.MessageText, payload)
 }

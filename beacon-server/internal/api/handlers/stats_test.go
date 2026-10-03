@@ -117,7 +117,7 @@ func TestGetStatsPayloadBreakdown_OK(t *testing.T) {
 func TestGetStatsTopNodes_OK(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/stats/top-nodes", getStatsTopNodes(stubReader{
-		getStatsTopNodes: func(_ context.Context, _ []string, _ int32) ([]api.TopNode, error) {
+		getStatsTopNodes: func(_ context.Context, _ []string, _ time.Time, _ int32) ([]api.TopNode, error) {
 			return []api.TopNode{{IATA: "YVR", ObservationCount: 50}}, nil
 		},
 	}))
@@ -282,10 +282,10 @@ func TestGetStatsRadioPresets_OK(t *testing.T) {
 func TestGetStatsScopes_OK(t *testing.T) {
 	r := chi.NewRouter()
 	r.Get("/stats/scopes", getStatsScopes(stubReader{
-		getScopeStats: func(_ context.Context, _ []string) ([]api.ScopeStats, error) {
+		getScopeStats: func(_ context.Context, _ []string, _ time.Time) ([]api.ScopeStats, error) {
 			return []api.ScopeStats{{Name: "#bc", PacketCount: 100}}, nil
 		},
-	}))
+	}, nil))
 	req := httptest.NewRequest(http.MethodGet, "/stats/scopes", nil)
 	w := httptest.NewRecorder()
 	r.ServeHTTP(w, req)
@@ -306,19 +306,5 @@ func TestGetStatsNodeTypes_OK(t *testing.T) {
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", w.Code)
-	}
-}
-
-func TestStatsRejectNonPositiveLimits(t *testing.T) {
-	for _, endpoint := range []string{"top-nodes", "top-observers", "top-advertisers", "top-talkers", "clock-drift"} {
-		for _, limit := range []string{"0", "-1"} {
-			t.Run(endpoint+"/"+limit, func(t *testing.T) {
-				w := httptest.NewRecorder()
-				StatsRouter(stubReader{}).ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/"+endpoint+"?limit="+limit, nil))
-				if w.Code != http.StatusBadRequest {
-					t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-				}
-			})
-		}
 	}
 }

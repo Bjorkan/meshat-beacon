@@ -7,188 +7,141 @@ import (
 	"bytes"
 	"context"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
-	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
-	"github.com/google/uuid"
+	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
+	"github.com/MeshCore-Beacon/beacon-server/internal/presence"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// Run against a disposable PostgreSQL with BEACON_TEST_DATABASE_URL set.
-// Each test owns a unique schema; it never changes existing application tables.
-func TestObserverRetentionIntegration(t *testing.T) {
-	url := os.Getenv("BEACON_TEST_DATABASE_URL")
-	if url == "" {
-		t.Skip("set BEACON_TEST_DATABASE_URL for PostgreSQL integration tests")
+func TestObserverRetentionPostgres(t *testing.T) {
+	dsn := os.Getenv("BEACON_TEST_POSTGRES_DSN")
+	if dsn == "" {
+		t.Skip("set BEACON_TEST_POSTGRES_DSN for the PostgreSQL regression test")
 	}
-	ctx := context.Background()
-	admin, err := pgxpool.New(ctx, url)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	conn, err := pgx.Connect(ctx, dsn)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer admin.Close()
-	schema := "obsret_" + strings.ReplaceAll(uuid.NewString(), "-", "")
-	if _, err := admin.Exec(ctx, "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize()); err != nil {
-		t.Fatal(err)
-	}
-	defer admin.Exec(ctx, "DROP SCHEMA "+pgx.Identifier{schema}.Sanitize()+" CASCADE")
-	cfg, err := pgxpool.ParseConfig(url)
+	defer conn.Close(context.Background())
+	tx, err := conn.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
-	cfg.ConnConfig.RuntimeParams["search_path"] = schema
-	pool, err := pgxpool.NewWithConfig(ctx, cfg)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer pool.Close()
-	if err := RunMigrations(ctx, pool); err != nil {
-		t.Fatal(err)
-	}
+	defer tx.Rollback(context.Background())
 	exec := func(query string, args ...any) {
 		t.Helper()
-		if _, err := pool.Exec(ctx, query, args...); err != nil {
+		if _, err := tx.Exec(ctx, query, args...); err != nil {
 			t.Fatal(err)
 		}
 	}
-
-	store := New(pool, 5*time.Minute, time.Hour, 0, 24*time.Hour, 7*24*time.Hour)
-
-	// Minimal rows the observer-owned cascade tables need.
-	exec(`INSERT INTO iata_codes (iata) VALUES ('YVR')`)
-	exec(`INSERT INTO transport_scopes (name, transport_key, key_fingerprint) VALUES ('#test', decode(repeat('01', 16), 'hex'), decode(repeat('02', 8), 'hex'))`)
-
-	// ── 13d23h59m old observer must survive cleanup ─────────────────────────
-	youngID, _, err := store.UpsertObserver(ctx, bytes.Repeat([]byte{0x11}, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	exec(`UPDATE observers SET last_seen = NOW() - INTERVAL '13 days 23 hours 59 minutes' WHERE id = $1`, youngID)
-
-	// ── >14d observer with full metadata and a retained packet observation ──
-	staleID, _, err := store.UpsertObserver(ctx, bytes.Repeat([]byte{0x22}, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	exec(`INSERT INTO observer_brokers (observer_id, broker_name) VALUES ($1, 'meshat.se')`, staleID)
-	exec(`INSERT INTO observer_scopes (observer_id, scope_id) SELECT $1, id FROM transport_scopes WHERE name = '#test'`, staleID)
-	exec(`INSERT INTO observer_locations (observer_id, iata, latitude, longitude) VALUES ($1, 'YVR', 49.2, -123.1)`, staleID)
-	exec(`INSERT INTO observer_telemetry (observer_id, reported_at, battery_voltage_mv) VALUES ($1, NOW(), 4200)`, staleID)
-	exec(`INSERT INTO observer_owners (observer_id, contact_name) VALUES ($1, 'op')`, staleID)
-
-	exec(`INSERT INTO packets (packet_hash, payload_type, payload_version, route_type, raw_payload, raw_header, first_heard_at, last_heard_at) VALUES (decode('aa', 'hex'), 1, 1, 1, decode('00', 'hex'), decode('00', 'hex'), NOW() - INTERVAL '15 days', NOW() - INTERVAL '15 days')`)
-	inserted, err := store.InsertObservation(ctx, ingest.InsertObservationParams{
-		PacketHash: []byte{0xaa},
-		ObserverID: staleID,
-		IATA:       "YVR",
-		HeardAt:    time.Now(),
-	})
-	if err != nil || !inserted {
-		t.Fatalf("InsertObservation: inserted=%v err=%v", inserted, err)
-	}
-
-	exec(`UPDATE observers SET last_seen = NOW() - INTERVAL '15 days' WHERE id = $1`, staleID)
-
-	// ── Cleanup: young survives, stale is deleted, metadata cascades ────────
-	deleted, err := store.DeleteOldObservers(ctx, time.Now().Add(-14*24*time.Hour))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(deleted) != 1 || deleted[0] != staleID {
-		t.Fatalf("expected exactly the stale observer deleted, got %v", deleted)
-	}
-	if !store.IsObserverByPubkey(ctx, bytes.Repeat([]byte{0x11}, 32)) {
-		t.Error("expected the 13d23h59m observer to survive cleanup")
-	}
-	var childCount int
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM observer_brokers WHERE observer_id = $1`, staleID).Scan(&childCount); err != nil {
-		t.Fatal(err)
-	}
-	if childCount != 0 {
-		t.Error("expected observer_brokers to cascade-delete with the observer")
-	}
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM observer_locations WHERE observer_id = $1`, staleID).Scan(&childCount); err != nil {
-		t.Fatal(err)
-	}
-	if childCount != 0 {
-		t.Error("expected observer_locations to cascade-delete with the observer")
-	}
-
-	// ── Retained packet history must survive with the identity snapshot ────
-	var obsID uuid.UUID
-	if err := pool.QueryRow(ctx, `SELECT observer_id FROM packet_observations WHERE packet_hash = decode('aa', 'hex')`).Scan(&obsID); err != nil {
-		t.Fatal(err)
-	}
-	if obsID != uuid.Nil {
-		t.Errorf("expected observation observer_id to be NULL after observer deletion, got %v", obsID)
-	}
-	var pubkey []byte
-	if err := pool.QueryRow(ctx, `SELECT observer_public_key FROM packet_observations WHERE packet_hash = decode('aa', 'hex')`).Scan(&pubkey); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(pubkey, bytes.Repeat([]byte{0x22}, 32)) {
-		t.Errorf("expected observation to snapshot the observer public key, got %x", pubkey)
-	}
-	pkt, err := store.GetPacket(ctx, []byte{0xaa})
-	if err != nil {
-		t.Fatalf("expected the historical packet to remain queryable: %v", err)
-	}
-	if len(pkt.Observations) != 1 {
-		t.Fatalf("expected 1 retained observation, got %d", len(pkt.Observations))
-	}
-
-	// ── A returning public key is recreated cleanly by ingest ───────────────
-	recreatedID, _, err := store.UpsertObserver(ctx, bytes.Repeat([]byte{0x22}, 32))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if recreatedID == staleID {
-		t.Error("expected a fresh observer row for the returning public key")
-	}
-	var orphanCount int
-	if err := pool.QueryRow(ctx, `SELECT COUNT(*) FROM observer_brokers WHERE observer_id = $1`, recreatedID).Scan(&orphanCount); err != nil {
-		t.Fatal(err)
-	}
-	if orphanCount != 0 {
-		t.Error("expected the recreated observer to start without stale child data")
-	}
-
-	// ── Status/neighbors activity resets the retention clock ────────────────
-	oldSeen := time.Now().Add(-15 * 24 * time.Hour)
-	if _, err := store.UpdateObserverStatus(ctx, ingest.UpdateObserverStatusParams{PublicKey: bytes.Repeat([]byte{0x11}, 32)}); err != nil {
-		t.Fatal(err)
-	}
-	var seen time.Time
-	if err := pool.QueryRow(ctx, `SELECT last_seen FROM observers WHERE id = $1`, youngID).Scan(&seen); err != nil {
-		t.Fatal(err)
-	}
-	if !seen.After(oldSeen) {
-		t.Errorf("expected last_seen to be refreshed by status activity, got %v", seen)
-	}
-
-	// ── Materialized view still counts retained history ─────────────────────
-	// The retained observation's observer row is gone, so it surfaces under a
-	// nil observer ID with its identity snapshot; its count must not vanish.
-	if err := store.RefreshTopObservers(ctx); err != nil {
-		t.Fatalf("refresh top observers: %v", err)
-	}
-	top, err := store.GetStatsTopObservers(ctx, nil, time.Now().Add(-30*24*time.Hour), 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	found := false
-	for _, trow := range top {
-		if trow.ObserverID == uuid.Nil {
-			found = true
-			if trow.ObservationCount < 1 {
-				t.Errorf("expected retained observation count in top observers stats, got %d", trow.ObservationCount)
+	for _, table := range []string{"observers", "packet_observations", "observer_telemetry", "observer_owners", "observer_brokers", "observer_locations", "observer_scopes"} {
+		exec("CREATE TEMP TABLE " + table + " (LIKE public." + table + " INCLUDING ALL) ON COMMIT DROP")
+		if table != "observers" {
+			fk := "ALTER TABLE pg_temp." + table + " ADD FOREIGN KEY (observer_id) REFERENCES pg_temp.observers(id)"
+			if table != "packet_observations" {
+				fk += " ON DELETE CASCADE"
 			}
+			exec(fk)
 		}
 	}
-	if !found {
-		t.Error("expected the stale observer's retained history to appear in top observers stats")
+	store := &Store{q: sqlc.New(tx)}
+	cutoff := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
+	exec(`INSERT INTO observers(public_key,display_name,last_seen,last_status_at)
+SELECT decode(lpad(to_hex(i),64,'0'),'hex'),label,$1::timestamptz+seen*interval '1 second',
+ $1::timestamptz+status*interval '1 second'
+FROM (VALUES (1,'expired',-1,NULL),(2,'boundary',0,NULL),(3,'recent',1,NULL),
+ (4,'recent status',-1,1),(5,'status boundary',-1,0),
+ (6,'packet history',-1,NULL),(7,'telemetry',-1,NULL),(8,'owned',-1,NULL)) v(i,label,seen,status)`, cutoff)
+	exec(`INSERT INTO packet_observations(id,packet_hash,observer_id,iata,heard_at,path_length_byte,hash_size,hop_count)
+SELECT 1,'\x01',id,'YYZ',last_seen,0,1,0 FROM observers WHERE display_name='packet history';
+INSERT INTO observer_telemetry(id,observer_id,reported_at)
+SELECT 1,id,last_seen FROM observers WHERE display_name='telemetry';
+INSERT INTO observer_owners(observer_id,notes)
+SELECT id,'fixture ownership without a node link' FROM observers WHERE display_name='owned';
+INSERT INTO observer_brokers(observer_id,broker_name)
+SELECT id,'fixture' FROM observers WHERE display_name='expired';
+INSERT INTO observer_locations(observer_id,reported_at)
+SELECT id,last_seen FROM observers WHERE display_name='expired';
+INSERT INTO observer_scopes(observer_id,scope_id)
+SELECT id,1 FROM observers WHERE display_name='expired';`)
+	ids, err := store.DeleteOldObservers(ctx, cutoff)
+	if err != nil || len(ids) != 1 {
+		t.Fatalf("expected one unreferenced expired observer deleted, got %d: %v", len(ids), err)
+	}
+	var remaining string
+	if err := tx.QueryRow(ctx, "SELECT string_agg(display_name,',' ORDER BY display_name) FROM observers").Scan(&remaining); err != nil {
+		t.Fatal(err)
+	}
+	if remaining != "boundary,owned,packet history,recent,recent status,status boundary,telemetry" {
+		t.Fatalf("incorrect retained observers: %s", remaining)
+	}
+	var history, metadata int
+	if err := tx.QueryRow(ctx, `SELECT
+ (SELECT count(*) FROM packet_observations)+(SELECT count(*) FROM observer_telemetry)+(SELECT count(*) FROM observer_owners),
+ (SELECT count(*) FROM observer_brokers)+(SELECT count(*) FROM observer_locations)+(SELECT count(*) FROM observer_scopes)`).Scan(&history, &metadata); err != nil {
+		t.Fatal(err)
+	}
+	if history != 3 || metadata != 0 {
+		t.Fatalf("history=%d, cascading metadata=%d; want 3, 0", history, metadata)
+	}
+	if ids, err := store.DeleteOldObservers(ctx, cutoff); err != nil || len(ids) != 0 {
+		t.Fatalf("repeated cleanup changed protected rows: %v, %v", ids, err)
+	}
+
+	// All relations below are temporary; no persistent fixtures or sequences are used.
+	exec("TRUNCATE pg_temp.observers CASCADE")
+	coalescer := presence.New(store, time.Second, time.Second)
+	pubkey := bytes.Repeat([]byte{42}, 32)
+	oldID, _, err := coalescer.UpsertObserver(ctx, pubkey, "YVR")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := coalescer.UpsertObserverBroker(ctx, oldID, "fixture", true); err != nil {
+		t.Fatal(err)
+	}
+	// A future cutoff simulates this cached observer having aged past retention.
+	ids, err = coalescer.DeleteOldObservers(ctx, time.Now().Add(time.Hour))
+	if err != nil || len(ids) != 1 || ids[0] != oldID {
+		t.Fatalf("cached expired observer was not deleted: %v, %v", ids, err)
+	}
+	newID, _, err := coalescer.UpsertObserver(ctx, pubkey, "YVR")
+	if err != nil || newID == oldID {
+		t.Fatalf("returning observer reused a deleted ID: %v", err)
+	}
+	if err := coalescer.UpsertObserverBroker(ctx, newID, "fixture", true); err != nil {
+		t.Fatal(err)
+	}
+	var brokers int
+	if err := tx.QueryRow(ctx, "SELECT count(*) FROM observer_brokers WHERE observer_id=$1", newID).Scan(&brokers); err != nil || brokers != 1 {
+		t.Fatalf("returning observer's broker was not recreated: count=%d, err=%v", brokers, err)
+	}
+	// The persisted row looks stale while fresh activity is still coalesced.
+	cutoff = time.Now().Add(-24 * time.Hour)
+	exec("UPDATE observers SET last_seen=$1 WHERE id=$2", cutoff.Add(-time.Hour), newID)
+	if _, _, err := coalescer.UpsertObserver(ctx, pubkey, "YVR"); err != nil {
+		t.Fatal(err)
+	}
+	if ids, err := coalescer.DeleteOldObservers(ctx, cutoff); err != nil || len(ids) != 0 {
+		t.Fatalf("pending presence did not protect a returning observer: %v, %v", ids, err)
+	}
+	var fresh bool
+	if err := tx.QueryRow(ctx, "SELECT last_seen >= $1 AND observation_count=1 FROM observers WHERE id=$2", cutoff, newID).Scan(&fresh); err != nil || !fresh {
+		t.Fatalf("pending presence was not persisted before cleanup: %v", err)
+	}
+
+	exec("TRUNCATE pg_temp.observers CASCADE")
+	exec(`INSERT INTO observers(public_key,last_seen)
+SELECT decode(lpad(to_hex(i),64,'0'),'hex'),$1::timestamptz-interval '1 second'
+FROM generate_series(1,1005) i`, cutoff)
+	for _, want := range []int{1000, 5, 0} {
+		ids, err := store.DeleteOldObservers(ctx, cutoff)
+		if err != nil || len(ids) != want {
+			t.Fatalf("bounded cleanup removed %d observers, want %d: %v", len(ids), want, err)
+		}
+		t.Logf("bounded cleanup deleted %d observers", len(ids))
 	}
 }

@@ -7,10 +7,12 @@ import (
 	"context"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -20,19 +22,23 @@ type tracePayload struct {
 	SNRValues  []float32 `json:"snrValues"`
 }
 
-func (s *Store) UpsertTraceIATA(ctx context.Context, traceTag []byte, iata string, heardAt time.Time) error {
-	return s.q.UpsertTraceIATA(ctx, sqlc.UpsertTraceIATAParams{
-		TraceTag:  traceTag,
-		Iata:      iata,
-		LastHeard: pgtype.Timestamptz{Time: heardAt, Valid: true},
+func (s *Store) RecordTrace(ctx context.Context, h ingest.TraceHearing) error {
+	return s.q.RecordTrace(ctx, sqlc.RecordTraceParams{
+		TraceTag: h.TraceTag,
+		Iata:     h.IATA,
+		HeardAt:  pgtype.Timestamptz{Time: h.HeardAt, Valid: true},
 	})
+}
+
+func (s *Store) DeleteOldTraceTags(ctx context.Context, cutoff time.Time) error {
+	return s.q.DeleteOldTraceTags(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
 
 func (s *Store) DeleteOldTraceIATAs(ctx context.Context, cutoff time.Time) error {
 	return s.q.DeleteOldTraceIATAs(ctx, pgtype.Timestamptz{Time: cutoff, Valid: true})
 }
 
-func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
+func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, cursorTag string, limit int32) ([]api.TraceTagSummary, error) {
 	var sinceTS, untilTS, cursorTS pgtype.Timestamptz
 	if !since.IsZero() {
 		sinceTS = pgtype.Timestamptz{Time: since, Valid: true}
@@ -43,6 +49,14 @@ func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceT
 	if !cursor.IsZero() {
 		cursorTS = pgtype.Timestamptz{Time: cursor, Valid: true}
 	}
+	var tag []byte
+	if cursorTag != "" {
+		b, err := hex.DecodeString(cursorTag)
+		if err != nil {
+			return nil, fmt.Errorf("cursor tag: %w", err)
+		}
+		tag = b
+	}
 	rows, err := s.q.ListTraceTags(ctx, sqlc.ListTraceTagsParams{
 		Column1: iatas,
 		Column2: scope,
@@ -51,21 +65,13 @@ func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceT
 		Column5: cursorTS,
 		Limit:   limit,
 		Column7: traceType,
+		Column8: tag,
 	})
 	if err != nil {
 		return nil, err
 	}
 	items := make([]api.TraceTagSummary, 0, len(rows))
-	// Batch global resolution across the page: one query per hash width, results mapped
-	// back per tag. Resolution stays global (not IATA-local) so a prefix that looks unique
-	// in one region but collides elsewhere still reports ambiguous.
-	type tagPayload struct {
-		idx  int
-		best tracePayload
-	}
-	payloads := make([]tagPayload, 0, len(rows))
-	uniqueByWidth := make(map[int]map[string][]byte)
-	for i, r := range rows {
+	for _, r := range rows {
 		var best tracePayload
 		if len(r.BestPayload) > 0 {
 			_ = json.Unmarshal(r.BestPayload, &best)
@@ -80,78 +86,6 @@ func (s *Store) ListTraceTags(ctx context.Context, iatas []string, scope, traceT
 			PathHashes:   best.PathHashes,
 			SNRValues:    best.SNRValues,
 		})
-		if len(best.PathHashes) == 0 {
-			continue
-		}
-		payloads = append(payloads, tagPayload{idx: i, best: best})
-		hashSize := int(1 << (best.Flags & 0x03))
-		if hashSize < 1 || hashSize > 4 {
-			continue
-		}
-		if uniqueByWidth[hashSize] == nil {
-			uniqueByWidth[hashSize] = make(map[string][]byte)
-		}
-		for _, h := range best.PathHashes {
-			b, err := hex.DecodeString(h)
-			if err != nil || len(b) < hashSize {
-				continue
-			}
-			prefix := b[:hashSize]
-			key := hex.EncodeToString(prefix)
-			if _, exists := uniqueByWidth[hashSize][key]; !exists {
-				cp := make([]byte, hashSize)
-				copy(cp, prefix)
-				uniqueByWidth[hashSize][key] = cp
-			}
-		}
-	}
-	resolvedByWidth := make(map[int]map[string][]api.ResolvedPathEntry, len(uniqueByWidth))
-	for width := 1; width <= 4; width++ {
-		unique := uniqueByWidth[width]
-		if len(unique) == 0 {
-			continue
-		}
-		hashes := make([][]byte, 0, len(unique))
-		for _, h := range unique {
-			hashes = append(hashes, h)
-		}
-		resolved, err := s.ResolvePathHashes(ctx, hashes)
-		if err != nil {
-			return nil, err
-		}
-		resolvedByWidth[width] = resolved
-	}
-	for _, tp := range payloads {
-		hashSize := int(1 << (tp.best.Flags & 0x03))
-		if hashSize < 1 || hashSize > 4 {
-			continue
-		}
-		resolved := resolvedByWidth[hashSize]
-		lite := make([]api.ResolvedHopLite, 0, len(tp.best.PathHashes))
-		for _, h := range tp.best.PathHashes {
-			b, err := hex.DecodeString(h)
-			hop := api.ResolvedHopLite{Confidence: "none"}
-			if err == nil && len(b) >= hashSize {
-				key := hex.EncodeToString(b[:hashSize])
-				entries := resolved[key]
-				switch len(entries) {
-				case 0:
-					hop.Confidence = "none"
-				case 1:
-					hop.Confidence = "high"
-					id := entries[0].NodeID.String()
-					hop.NodeID = &id
-					if entries[0].Name != nil {
-						name := *entries[0].Name
-						hop.NodeName = &name
-					}
-				default:
-					hop.Confidence = "ambiguous"
-				}
-			}
-			lite = append(lite, hop)
-		}
-		items[tp.idx].ResolvedPath = lite
 	}
 	return items, nil
 }
@@ -191,15 +125,15 @@ func (s *Store) GetTraceByTag(ctx context.Context, tag string) (*api.TraceDetail
 			}
 			packet.RawPath = rawPath
 		}
-		// Route resolution is global across all IATA areas, so no per-region
-		// observation lookup is needed to scope it.
-		packet.ResolvedRoute = s.resolveTraceRoute(ctx, &parsed)
+		if len(r.Iatas) > 0 {
+			packet.ResolvedRoute = s.resolveTraceRoute(ctx, &parsed, r.Iatas)
+		}
 		detail.Packets = append(detail.Packets, packet)
 	}
 	return detail, nil
 }
 
-func (s *Store) resolveTraceRoute(ctx context.Context, payload *tracePayload) []api.ResolvedHop {
+func (s *Store) resolveTraceRoute(ctx context.Context, payload *tracePayload, iatas []string) []api.ResolvedHop {
 	if payload == nil || len(payload.PathHashes) == 0 {
 		return nil
 	}
@@ -211,32 +145,48 @@ func (s *Store) resolveTraceRoute(ctx context.Context, payload *tracePayload) []
 			hashes = append(hashes, b)
 		}
 	}
-	resolved, err := s.ResolvePathHashes(ctx, hashes)
-	if err != nil {
-		return nil
+	confidenceRank := map[string]int{"none": 0, "ambiguous": 1, "high": 2}
+	type hopResult struct {
+		confidence string
+		entries    []api.ResolvedPathEntry
+	}
+	merged := make([]hopResult, len(hashes))
+	for i := range merged {
+		merged[i] = hopResult{confidence: "none"}
+	}
+	for _, iata := range iatas {
+		resolved, err := s.ResolvePathHashes(ctx, iata, hashes)
+		if err != nil {
+			continue
+		}
+		for i, hash := range hashes {
+			key := hex.EncodeToString(hash[:hashSize])
+			entries := resolved[key]
+			var confidence string
+			switch len(entries) {
+			case 0:
+				confidence = "none"
+			case 1:
+				confidence = "high"
+			default:
+				confidence = "ambiguous"
+			}
+			if confidenceRank[confidence] > confidenceRank[merged[i].confidence] {
+				merged[i] = hopResult{confidence: confidence, entries: entries}
+			}
+		}
 	}
 	route := make([]api.ResolvedHop, 0, len(hashes))
-	for i, hash := range hashes {
-		key := hex.EncodeToString(hash[:hashSize])
-		entries := resolved[key]
-		var confidence string
-		switch len(entries) {
-		case 0:
-			confidence = "none"
-		case 1:
-			confidence = "high"
-		default:
-			confidence = "ambiguous"
-		}
+	for i, hr := range merged {
 		hop := api.ResolvedHop{
-			Confidence: confidence,
-			Nodes:      make([]api.ResolvedNode, 0, len(entries)),
+			Confidence: hr.confidence,
+			Nodes:      make([]api.ResolvedNode, 0, len(hr.entries)),
 		}
 		if i < len(payload.SNRValues) {
 			snr := payload.SNRValues[i]
 			hop.SNR = &snr
 		}
-		for _, e := range entries {
+		for _, e := range hr.entries {
 			hop.Nodes = append(hop.Nodes, api.ResolvedNode{
 				ID:        e.NodeID,
 				Name:      e.Name,

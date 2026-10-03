@@ -5,6 +5,7 @@ package handlers
 
 import (
 	"encoding/hex"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/go-chi/chi/v5"
+	"github.com/jackc/pgx/v5"
 )
 
 // ChannelsRouter mounts all /channels routes onto a subrouter.
@@ -34,22 +36,22 @@ func ChannelsRouter(reader api.Reader) http.Handler {
 //	@Summary	List channels
 //	@Tags		Channels
 //	@Produce	json
-//	@Param		key	query	string	false	"Channel key filter (default known, or all for exact hash search)" Enums(known,unknown,all)
 //	@Param		hash	query		string	false	"Single-byte channel hash (hex)"
-//	@Param		iata	query		string	false	"Filter by IATA code"
-//	@Param		iatas	query		string	false	"Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ"
-//	@Param		pageCursor	query	string	false	"Opaque nextPageCursor; preserves timestamp ties and precision. Cannot be combined with a positive cursor."
-//	@Param		cursor	query		int		false	"last_seen epoch ms of last item for pagination"
-//	@Param		limit	query		int		false	"Max results (1-1000, default 50)"
+//	@Param		iata	query		string	false	"Filter by IATA code: channels MeshMapper lists there, config channels scoped to a region containing it, and Beacon-wide config channels"
+//	@Param		iatas	query		string	false	"Filter by IATA code(s), comma-separated e.g. YOW or YOW,YYZ; same membership rule as iata"
+//	@Param		keyKnown	query		bool	false	"Only channels Beacon can (true) or cannot (false) decrypt; omit for all"
+//	@Param		cursor	query		int		false	"last_seen epoch ms of last item for pagination; 0 starts from the beginning"
+//	@Param		pageCursor	query		string	false	"Opaque nextPageCursor from a previous response; preserves timestamp ties and precision. Cannot be combined with a positive cursor; cursor=0 is allowed."
+//	@Param		limit	query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
 //	@Success	200		{object}	api.ChannelPage
 //	@Failure	400		{object}	handlers.APIError
 //	@Failure	500		{object}	handlers.APIError
 //	@Router		/channels [get]
 func listChannels(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		iatas := parseIATAs(r)
@@ -62,7 +64,6 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 			}
 			cursor = c
 		}
-		var err error
 		var pageCursor *api.ChannelCursor
 		if raw := r.URL.Query().Get("pageCursor"); raw != "" {
 			if cursor > 0 {
@@ -88,18 +89,19 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 			}
 			hashHex = h
 		}
-		keyFilter := r.URL.Query().Get("key")
-		if keyFilter == "" {
-			keyFilter = "known"
-			if len(hashHex) > 0 {
-				keyFilter = "all"
+		var keyKnown *bool
+		if q := r.URL.Query(); q.Has("keyKnown") {
+			switch q.Get("keyKnown") {
+			case "true":
+				keyKnown = new(true)
+			case "false":
+				keyKnown = new(false)
+			default:
+				respondError(w, http.StatusBadRequest, "keyKnown must be true or false")
+				return
 			}
 		}
-		if keyFilter != "known" && keyFilter != "unknown" && keyFilter != "all" {
-			respondError(w, http.StatusBadRequest, "key must be known, unknown or all")
-			return
-		}
-		channels, err := reader.ListChannels(r.Context(), int32(limit), hashHex, iatas, cursor, keyFilter, pageCursor)
+		channels, err := reader.ListChannels(r.Context(), limit, hashHex, iatas, keyKnown, cursor, pageCursor)
 		if err != nil {
 			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
@@ -117,6 +119,7 @@ func listChannels(reader api.Reader) http.HandlerFunc {
 //	@Success	200			{object}	api.Channel
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	404			{object}	handlers.APIError
+//	@Failure	500			{object}	handlers.APIError
 //	@Router		/channels/{channelID} [get]
 func getChannel(reader api.Reader) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -130,8 +133,12 @@ func getChannel(reader api.Reader) http.HandlerFunc {
 			id = i
 		}
 		channel, err := reader.GetChannel(r.Context(), int32(id))
-		if err != nil {
+		switch {
+		case errors.Is(err, pgx.ErrNoRows), err == nil && channel == nil:
 			respondError(w, http.StatusNotFound, "channel not found")
+			return
+		case err != nil:
+			respondError(w, http.StatusInternalServerError, "internal server error")
 			return
 		}
 		respond(w, http.StatusOK, channel)
@@ -150,8 +157,8 @@ func getChannel(reader api.Reader) http.HandlerFunc {
 //	@Param		region		query		string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		scope		query		string	false	"Filter by transport scope name e.g. %23bc (URL-encoded #bc)"
 //	@Param		cursor	query		int		false	"Message ID of last item for pagination (results ordered newest first)"
-//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
-//	@Success	200			{object}	api.Page[api.ChannelMessage]
+//	@Param		limit		query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
+//	@Success	200			{object}	object
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/channels/{channelID}/messages [get]
@@ -166,9 +173,9 @@ func listChannelMessages(reader api.Reader) http.HandlerFunc {
 			}
 			id = i
 		}
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		var since time.Time
@@ -181,14 +188,6 @@ func listChannelMessages(reader api.Reader) http.HandlerFunc {
 			since = time.UnixMilli(ms)
 		}
 		iatas := parseIATAs(r)
-		if regionID := r.URL.Query().Get("regionId"); regionID != "" || r.URL.Query().Get("region") != "" {
-			regionIATAs, err := resolveRegionIATAs(r.Context(), regionID, r.URL.Query().Get("region"), reader)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			iatas = append(iatas, regionIATAs...)
-		}
 		var cursor int64
 		if cursorParam := r.URL.Query().Get("cursor"); cursorParam != "" {
 			c, err := strconv.ParseInt(cursorParam, 10, 64)

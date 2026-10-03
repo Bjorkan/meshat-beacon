@@ -126,7 +126,7 @@ VALUES (10,'\x01',$1,'YYZ',NOW()+interval '1 second',0,1,0,'fixture')`, id(102))
 	// Intermediate relay matching keeps its existing infrastructure-only boundary.
 	for width := 1; width <= 4; width++ {
 		hash := []byte{0xaa, 0, 0, 2}[:width]
-		resolved, err := store.ResolvePathHashes(ctx, [][]byte{hash})
+		resolved, err := store.ResolvePathHashes(ctx, "YVR", [][]byte{hash})
 		if err != nil {
 			t.Fatal(err)
 		}

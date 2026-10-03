@@ -12,8 +12,8 @@ import (
 
 // BrokerStatus is the response shape for a single MQTT broker.
 type BrokerStatus struct {
-	Name      string `json:"name" binding:"required"`
-	Connected bool   `json:"connected" binding:"required"`
+	Name      string `json:"name"`
+	Connected bool   `json:"connected"`
 }
 
 // BrokersRouter mounts all /brokers routes onto a subrouter.

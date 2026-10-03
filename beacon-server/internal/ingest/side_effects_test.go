@@ -4,18 +4,17 @@
 package ingest
 
 import (
-	"bytes"
 	"context"
 	"crypto/ed25519"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
 	"github.com/MeshCore-Beacon/beacon-server/internal/keystore"
-	"github.com/google/uuid"
 	"github.com/meshcore-go/meshcore-go"
 )
 
@@ -71,16 +70,16 @@ func buildAdvertPacketWithData(t *testing.T, data []byte, tamper bool) *meshcore
 
 func TestAdvertLocationPresence(t *testing.T) {
 	for _, tc := range []struct {
-		name            string
-		present, tamper bool
-		lat, lon        int32
+		name                   string
+		present, tamper, clear bool
+		lat, lon               int32
 	}{
-		{"ordinary location", true, false, 45000000, -75000000},
-		{"explicit reset", true, false, 0, 0},
-		{"zero latitude", true, false, 0, -75000000},
-		{"zero longitude", true, false, 45000000, 0},
-		{"no location", false, false, 0, 0},
-		{"tampered reset", true, true, 0, 0},
+		{"ordinary location", true, false, false, 45000000, -75000000},
+		{"explicit reset", true, false, true, 0, 0},
+		{"zero latitude", true, false, false, 0, -75000000},
+		{"zero longitude", true, false, false, 45000000, 0},
+		{"no location", false, false, false, 0, 0},
+		{"tampered reset", true, true, false, 0, 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			data := []byte{meshcore.AdvertTypeRepeater}
@@ -104,7 +103,10 @@ func TestAdvertLocationPresence(t *testing.T) {
 				t.Fatal("signed advert did not update the node")
 			}
 			got := store.upsertNodeParams
-			if !tc.present {
+			if got.ClearLocation != tc.clear {
+				t.Fatalf("ClearLocation = %v, want %v", got.ClearLocation, tc.clear)
+			}
+			if !tc.present || tc.clear {
 				if got.Latitude != nil || got.Longitude != nil {
 					t.Fatal("absent location became an update")
 				}
@@ -112,6 +114,58 @@ func TestAdvertLocationPresence(t *testing.T) {
 			}
 			if got.Latitude == nil || got.Longitude == nil || *got.Latitude != float64(tc.lat)/1e6 || *got.Longitude != float64(tc.lon)/1e6 {
 				t.Fatal("advertised coordinates did not reach the node update")
+			}
+		})
+	}
+}
+
+func TestAdvertClearEmitsNullLocation(t *testing.T) {
+	w, _ := newTestWorker()
+	go w.hub.Run()
+	client := w.hub.NewClient()
+	defer w.hub.Remove(client)
+	w.hub.AddScope(client, "clear", hub.Scope{Events: []hub.EventType{hub.EventNodeUpdate, hub.EventObserverStatus}})
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	waitForSummarySubscriber(t, ctx, w.hub, client)
+	for _, tc := range []struct {
+		name          string
+		present, want bool
+		lat, lon      int32
+		wantLat       string
+		wantLng       string
+	}{
+		{"explicit reset sends null", true, true, 0, 0, "null", "null"},
+		{"omission sends nothing", false, false, 0, 0, "", ""},
+		{"real location sends coordinates", true, true, 45000000, -75000000, "45", "-75"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			data := []byte{meshcore.AdvertTypeRepeater}
+			if tc.present {
+				data[0] |= meshcore.AdvertLatLonMask
+				data = binary.LittleEndian.AppendUint32(data, uint32(tc.lat))
+				data = binary.LittleEndian.AppendUint32(data, uint32(tc.lon))
+			}
+			w.handlePayloadTypeSideEffects(ctx, buildAdvertPacketWithData(t, data, false), "AAA", []byte{1}, RadioSettings{}, nil, nil, nil, 0)
+			for {
+				select {
+				case event := <-client.Send:
+					if event.Type != hub.EventNodeUpdate {
+						continue
+					}
+					payload := string(event.Payload)
+					for field, want := range map[string]string{`"lat"`: tc.wantLat, `"lng"`: tc.wantLng} {
+						if tc.want && !strings.Contains(payload, field+":"+want+",") {
+							t.Fatalf("%s != %s: %s", field, want, payload)
+						}
+						if !tc.want && strings.Contains(payload, field) {
+							t.Fatalf("%s present on omission: %s", field, payload)
+						}
+					}
+					return
+				case <-ctx.Done():
+					t.Fatal("node update not received")
+				}
 			}
 		})
 	}
@@ -125,23 +179,6 @@ func TestHandlePayloadTypeSideEffects_Advert_ValidSignature_UpsertsNode(t *testi
 
 	if db.upsertNodeCalls != 1 {
 		t.Errorf("expected UpsertNode to be called once for a validly-signed advert, got %d", db.upsertNodeCalls)
-	}
-}
-
-func TestHandlePayloadTypeSideEffects_Advert_MovedNodeInvalidatesAllNodeCaches(t *testing.T) {
-	w, db := newTestWorker()
-	db.nodeCoordinatesChanged = true
-	invalidations := 0
-	w.SetCacheInvalidators(
-		func(context.Context, uuid.UUID) {},
-		func(context.Context) { invalidations++ },
-		func(context.Context, uuid.UUID) {},
-	)
-
-	w.handlePayloadTypeSideEffects(context.Background(), buildAdvertPacket(t, false), "TEST", []byte{0x01}, RadioSettings{}, nil, nil, nil, 0)
-
-	if invalidations != 1 {
-		t.Errorf("expected one full node-cache invalidation, got %d", invalidations)
 	}
 }
 
@@ -181,7 +218,7 @@ func TestHandlePayloadTypeSideEffects_GrpTxt_KnownKey_OnlyUpsertsKeyedChannel(t 
 	psk := make([]byte, 16)
 	channelHash := byte(0x42)
 	w.keys = &mapKeys{entries: map[byte][]keystore.Entry{
-		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Public", Kind: keystore.ChannelKindPublic}},
+		channelHash: {{Key: psk, Fingerprint: []byte{0xAA}, Name: "Public", Hashtag: "public"}},
 	}}
 	packet := buildGrpTxtPacket(t, channelHash, psk)
 
@@ -260,32 +297,14 @@ func TestHandlePacket_Advert_SkipsChannelIATA(t *testing.T) {
 	if db.upsertChannelIATACalls != 0 {
 		t.Errorf("expected UpsertChannelIATA NOT to be called for a non-channel packet, got %d calls", db.upsertChannelIATACalls)
 	}
-	if db.upsertTraceIATACalls != 0 {
-		t.Errorf("expected UpsertTraceIATA NOT to be called for a non-trace packet, got %d calls", db.upsertTraceIATACalls)
-	}
-}
-
-func TestHandlePacket_Advert_ZeroHopMultibyteMode_SetsOriginCapabilities(t *testing.T) {
-	w, db := newTestWorker()
-	db.observationInserted = true
-	db.upsertNodeID = uuid.New()
-	packet := buildAdvertPacket(t, false)
-	packet.PathLength = byte((3 - 1) << 6) // mode 2: 3-byte hashes, zero accumulated hops
-
-	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, packet))
-
-	if len(db.setCapabilityCalls) != 1 {
-		t.Fatalf("expected one capability update for the advert origin, got %d", len(db.setCapabilityCalls))
-	}
-	call := db.setCapabilityCalls[0]
-	if call.nodeID != db.upsertNodeID || !call.paths || !call.traces {
-		t.Errorf("unexpected capability update: %+v", call)
+	if len(db.traceHearings) != 0 {
+		t.Errorf("expected RecordTrace NOT to be called for a non-trace packet, got %d calls", len(db.traceHearings))
 	}
 }
 
 func buildTracePacket(t *testing.T) *meshcore.Packet {
 	t.Helper()
-	payload, err := (&meshcore.Trace{Tag: 0xdeadbeef, AuthCode: 1}).ToBytes()
+	payload, err := (&meshcore.Trace{Tag: 0xdeadbeef, AuthCode: 1, PathHashes: []byte{0xaa, 0xbb}}).ToBytes()
 	if err != nil {
 		t.Fatalf("trace to bytes: %v", err)
 	}
@@ -295,263 +314,22 @@ func buildTracePacket(t *testing.T) *meshcore.Packet {
 	}
 }
 
-func TestHandlePacket_Trace_UpsertsTraceIATA(t *testing.T) {
+func TestHandlePacket_Trace_RecordsTrace(t *testing.T) {
 	w, db := newTestWorker()
 	db.observationInserted = true
+	db.packetIsNew = true
 	envelope := packetEnvelope(t, buildTracePacket(t))
 
 	w.handlePacket(context.Background(), "YOW", "0102", envelope)
+	db.packetIsNew, db.observationInserted = false, false
+	w.handlePacket(context.Background(), "YOW", "0102", envelope)
 
-	if db.upsertTraceIATACalls != 1 {
-		t.Errorf("expected UpsertTraceIATA to be called once for a stored trace, got %d", db.upsertTraceIATACalls)
+	if len(db.traceHearings) != 2 {
+		t.Fatalf("expected RecordTrace for every hearing, got %d", len(db.traceHearings))
 	}
-}
-
-// attachPath wraps an already-built packet in raw bytes carrying `hashes`
-// (each `hashSize` bytes) as its path, parsed back through PacketFromBytes so
-// the ingest code sees the header-encoded hash size/count exactly as it would
-// on the wire.
-func attachPath(t *testing.T, base *meshcore.Packet, hashSize int, hashes [][]byte) *meshcore.Packet {
-	t.Helper()
-	raw := []byte{base.Header, byte((hashSize-1)<<6 | len(hashes))}
-	for _, h := range hashes {
-		raw = append(raw, h...)
-	}
-	raw = append(raw, base.Payload...)
-	pkt, err := meshcore.PacketFromBytes(raw)
-	if err != nil {
-		t.Fatalf("parse packet: %v", err)
-	}
-	return pkt
-}
-
-// buildPathedAdvertPacket signs a repeater advert and gives it a path of
-// `count` hashes of `hashSize` bytes (0xA0, 0xA1, ... repeating per hash).
-func buildPathedAdvertPacket(t *testing.T, hashSize, count int) *meshcore.Packet {
-	t.Helper()
-	hashes := make([][]byte, count)
-	for i := range hashes {
-		hashes[i] = bytes.Repeat([]byte{byte(0xA0 + i)}, hashSize)
-	}
-	return attachPath(t, buildAdvertPacket(t, false), hashSize, hashes)
-}
-
-// A forwarded advert with 3-byte path hashes links the advertiser to its
-// first relay AND chains relay to relay — regardless of advert role, so a
-// Companion advertising through relays shows up on the map too.
-func TestHandlePacket_Advert_ThreeBytePathHashes_UpsertsOriginAndRelayChain(t *testing.T) {
-	w, db := newTestWorker()
-	db.observationInserted = true
-	origin := uuid.New()
-	db.nodeByPubkey = &origin
-	db.pathResolves = map[string][]api.ResolvedPathEntry{
-		"a0a0a0": {{NodeID: uuid.New()}},
-		"a1a1a1": {{NodeID: uuid.New()}},
-	}
-
-	packet := buildPathedAdvertPacket(t, 3, 2)
-	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, packet))
-
-	if db.upsertNeighborCalls != 2 {
-		t.Errorf("expected 2 neighbor upserts (origin->relay, relay->relay), got %d", db.upsertNeighborCalls)
-	}
-}
-
-// 1- and 2-byte path hashes are too ambiguous to hang a neighbor edge on, so
-// no edge is recorded even when the hash resolves cleanly — only 3-byte
-// packets, traces with unique hashes, or /neighbors reports confirm neighbors.
-func TestHandlePacket_Advert_ShortPathHashes_SkipNeighbor(t *testing.T) {
-	for _, hashSize := range []int{1, 2} {
-		w, db := newTestWorker()
-		db.observationInserted = true
-		origin := uuid.New()
-		db.nodeByPubkey = &origin
-		db.pathResolves = map[string][]api.ResolvedPathEntry{
-			hex.EncodeToString(bytes.Repeat([]byte{0xAB}, hashSize)): {{NodeID: uuid.New()}},
+	for _, h := range db.traceHearings {
+		if h.IATA != "YOW" || h.HeardAt.IsZero() || hex.EncodeToString(h.TraceTag) != "efbeadde" {
+			t.Errorf("unexpected hearing %+v", h)
 		}
-
-		packet := attachPath(t, buildAdvertPacket(t, false), hashSize, [][]byte{bytes.Repeat([]byte{0xAB}, hashSize)})
-		w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, packet))
-
-		if db.upsertNeighborCalls != 0 {
-			t.Errorf("hash size %d: expected 0 neighbor upserts, got %d", hashSize, db.upsertNeighborCalls)
-		}
-	}
-}
-
-// Group texts carry no sender identity, so only the relay chain is linked:
-// a 3-byte path of three hashes yields relay->relay edges, not origin edges.
-func TestHandlePacket_GrpTxt_ThreeBytePath_UpsertsRelayChain(t *testing.T) {
-	w, db := newTestWorker()
-	db.observationInserted = true
-	db.pathResolves = map[string][]api.ResolvedPathEntry{
-		"a0a0a0": {{NodeID: uuid.New()}},
-		"a1a1a1": {{NodeID: uuid.New()}},
-		"a2a2a2": {{NodeID: uuid.New()}},
-	}
-
-	packet := attachPath(t, buildGrpTxtPacket(t, 0x1a, make([]byte, 16)), 3,
-		[][]byte{{0xA0, 0xA0, 0xA0}, {0xA1, 0xA1, 0xA1}, {0xA2, 0xA2, 0xA2}})
-	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, packet))
-
-	if db.upsertNeighborCalls != 2 {
-		t.Errorf("expected 2 relay-chain neighbor upserts, got %d", db.upsertNeighborCalls)
-	}
-}
-
-// buildSNRTracePacket builds a TRACE packet whose payload carries `count`
-// path hashes of `hashSize` bytes (the trace Flags field selects the width:
-// 1<<(flags&3), so traces can use 1/2/4/8 — there is no 3) and whose path
-// carries one recorded SNR byte per consumed hop. Parsed back through
-// PacketFromBytes so the ingest code sees it exactly as on the wire.
-func buildSNRTracePacket(t *testing.T, hashSize, count int, snrs ...byte) *meshcore.Packet {
-	t.Helper()
-	var flags byte
-	for size := 1; size < hashSize; size *= 2 {
-		flags++
-	}
-	hashes := make([]byte, 0, hashSize*count)
-	for i := 0; i < count; i++ {
-		hashes = append(hashes, bytes.Repeat([]byte{byte(0xA0 + i)}, hashSize)...)
-	}
-	payload, err := (&meshcore.Trace{Tag: 0xdeadbeef, AuthCode: 1, Flags: flags, PathHashes: hashes}).ToBytes()
-	if err != nil {
-		t.Fatalf("trace to bytes: %v", err)
-	}
-	return &meshcore.Packet{
-		Header:     meshcore.MakeHeader(meshcore.RouteTypeFlood, meshcore.PayloadTypeTrace, 0),
-		PathLength: byte(len(snrs)), // size code 0 (1B entries), count = len(snrs)
-		Path:       snrs,
-		Payload:    payload,
-	}
-}
-
-// 2-byte trace hashes are accepted as neighbor evidence: each hash was
-// appended by a node that actually forwarded the trace, and the edge is only
-// recorded when the hash resolves to exactly one node — no other node it
-// could have been. The per-hop SNR measured by the receiving hop is stored.
-func TestHandlePacket_Trace_TwoByteHashes_UniqueResolution_UpsertsHopNeighbor(t *testing.T) {
-	w, db := newTestWorker()
-	db.observationInserted = true
-	db.pathResolves = map[string][]api.ResolvedPathEntry{
-		"a0a0": {{NodeID: uuid.New()}},
-		"a1a1": {{NodeID: uuid.New()}},
-	}
-
-	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, buildSNRTracePacket(t, 2, 2, 8, 12)))
-
-	if db.upsertNeighborCalls != 1 {
-		t.Errorf("expected 1 trace neighbor upsert for a uniquely-resolved 2-byte pair, got %d", db.upsertNeighborCalls)
-	}
-	if len(db.setCapabilityCalls) != 2 {
-		t.Fatalf("expected capability evidence for both trace hops, got %d calls", len(db.setCapabilityCalls))
-	}
-	for _, call := range db.setCapabilityCalls {
-		if call.paths || !call.traces {
-			t.Errorf("unexpected trace capability update: %+v", call)
-		}
-	}
-}
-
-// If a trace hash matches more than one node in the database — i.e. there IS
-// another node it could have been — the pair is skipped entirely.
-func TestHandlePacket_Trace_AmbiguousResolution_SkipsHopNeighbor(t *testing.T) {
-	w, db := newTestWorker()
-	db.observationInserted = true
-	db.pathResolves = map[string][]api.ResolvedPathEntry{
-		"a0a0": {{NodeID: uuid.New()}, {NodeID: uuid.New()}},
-		"a1a1": {{NodeID: uuid.New()}},
-	}
-
-	w.handlePacket(context.Background(), "YOW", "0102", packetEnvelope(t, buildSNRTracePacket(t, 2, 2, 8, 12)))
-
-	if db.upsertNeighborCalls != 0 {
-		t.Errorf("expected 0 trace neighbor upserts for an ambiguous hash, got %d", db.upsertNeighborCalls)
-	}
-	if len(db.setCapabilityCalls) != 0 {
-		t.Errorf("expected 0 capability updates for an ambiguous trace, got %d", len(db.setCapabilityCalls))
-	}
-}
-
-// neighborsReport builds the JSON body of a /neighbors MQTT message.
-func neighborsReport(selfScopes string, entries ...neighborReportEntry) []byte {
-	raw, err := json.Marshal(neighborReport{
-		Self: struct {
-			Scopes string `json:"scopes"`
-		}{Scopes: selfScopes},
-		Neighbors: entries,
-	})
-	if err != nil {
-		panic(err)
-	}
-	return raw
-}
-
-func coordsNode(lat, lon float64) *api.ResolvedNode {
-	return &api.ResolvedNode{Latitude: &lat, Longitude: &lon}
-}
-
-// One reported neighbor beyond LoRa range invalidates the ENTIRE report:
-// nothing at all is written from it — no observer, no region scope, no edges.
-func TestHandleNeighbors_ImpossibleDistance_IgnoresWholeReport(t *testing.T) {
-	w, db := newTestWorker()
-	w.cfg.NeighborMaxKm = 150
-	observer := uuid.MustParse("00000000-0000-0000-0000-00000000000a")
-	near := uuid.MustParse("00000000-0000-0000-0000-00000000000b")
-	far := uuid.MustParse("00000000-0000-0000-0000-00000000000c")
-	db.nodesByPubkey = map[string]uuid.UUID{
-		"aaaa": observer, // reporter
-		"bbbb": near,     // plausible neighbor
-		"cccc": far,      // impossible neighbor
-	}
-	db.nodesByIDs = map[uuid.UUID]*api.ResolvedNode{
-		observer: coordsNode(59.61, 16.54), // Västmanland
-		near:     coordsNode(59.63, 16.56), // ~2 km away
-		far:      coordsNode(55.68, 12.57), // Copenhagen, ~430 km
-	}
-
-	w.handleNeighbors(context.Background(), "VST", "aaaa", neighborsReport("SE01",
-		neighborReportEntry{PubKey: "bbbb", SNR: 6, Status: "responded"},
-		neighborReportEntry{PubKey: "cccc", SNR: -10, Status: "responded"},
-	))
-
-	if db.upsertObserverCalls != 0 {
-		t.Errorf("expected the observer upsert to be skipped, got %d", db.upsertObserverCalls)
-	}
-	if len(db.updatedScopes) != 0 {
-		t.Errorf("expected no region scope writes, got %v", db.updatedScopes)
-	}
-	if db.upsertNeighborCalls != 0 {
-		t.Errorf("expected 0 neighbor upserts, got %d", db.upsertNeighborCalls)
-	}
-}
-
-// A report whose neighbors are all within LoRa range is processed normally.
-func TestHandleNeighbors_AllInRange_ProcessesReport(t *testing.T) {
-	w, db := newTestWorker()
-	w.cfg.NeighborMaxKm = 150
-	observer := uuid.MustParse("00000000-0000-0000-0000-00000000000a")
-	near := uuid.MustParse("00000000-0000-0000-0000-00000000000b")
-	db.nodesByPubkey = map[string]uuid.UUID{
-		"aaaa": observer,
-		"bbbb": near,
-	}
-	db.nodesByIDs = map[uuid.UUID]*api.ResolvedNode{
-		observer: coordsNode(59.61, 16.54),
-		near:     coordsNode(59.63, 16.56),
-	}
-
-	w.handleNeighbors(context.Background(), "VST", "aaaa", neighborsReport("SE01",
-		neighborReportEntry{PubKey: "bbbb", SNR: 6, Status: "responded"},
-	))
-
-	if db.upsertObserverCalls != 1 {
-		t.Errorf("expected the observer upsert, got %d", db.upsertObserverCalls)
-	}
-	if len(db.updatedScopes) != 1 || db.updatedScopes[0] != "SE01" {
-		t.Errorf("expected the region scope write, got %v", db.updatedScopes)
-	}
-	if db.upsertNeighborCalls != 1 {
-		t.Errorf("expected 1 neighbor upsert, got %d", db.upsertNeighborCalls)
 	}
 }

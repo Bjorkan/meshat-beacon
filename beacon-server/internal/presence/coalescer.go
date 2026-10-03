@@ -25,13 +25,14 @@ import (
 type Store interface {
 	ingest.DB
 
-	// TouchObservers applies coalesced last_seen bumps and observation_count
-	// deltas for the given observer IDs in one statement.
-	TouchObservers(ctx context.Context, ids []uuid.UUID, seen []time.Time, counts []int32) error
+	// TouchObservers applies coalesced last_seen bumps, observation_count
+	// deltas and last_iata for the given observer IDs in one statement. An
+	// IATA only replaces one heard earlier (iataAts), so a late flush can't regress it.
+	TouchObservers(ctx context.Context, ids []uuid.UUID, seen []time.Time, counts []int32, iatas []string, iataAts []time.Time) error
 
 	// TouchObserverBrokers applies coalesced last_seen/last_packet_at bumps
 	// for the given (observer, broker) pairs in one statement.
-	TouchObserverBrokers(ctx context.Context, ids []uuid.UUID, brokers []string, seen []time.Time) error
+	TouchObserverBrokers(ctx context.Context, ids []uuid.UUID, brokers []string, seen, packets []time.Time) error
 
 	// TouchPackets applies coalesced last_heard_at bumps for the given packet
 	// hashes in one statement.
@@ -47,9 +48,13 @@ type identity struct {
 }
 
 type observerBump struct {
-	seen  time.Time
-	count int32
+	seen   time.Time
+	count  int32
+	iata   string
+	iataAt time.Time
 }
+
+type brokerBump struct{ seen, packet time.Time }
 
 type brokerKey struct {
 	id     uuid.UUID
@@ -68,7 +73,7 @@ type Coalescer struct {
 	identities     map[string]identity // pubkey -> observer row
 	dirtyObservers map[uuid.UUID]observerBump
 	knownBrokers   map[brokerKey]struct{}
-	dirtyBrokers   map[brokerKey]time.Time
+	dirtyBrokers   map[brokerKey]brokerBump
 	knownIATAs     map[string]struct{}
 	packetsSeen    map[string]time.Time // hash -> last observation
 	dirtyPackets   map[string]time.Time
@@ -86,7 +91,7 @@ func New(store Store, flushInterval, packetTTL time.Duration) *Coalescer {
 		identities:     make(map[string]identity),
 		dirtyObservers: make(map[uuid.UUID]observerBump),
 		knownBrokers:   make(map[brokerKey]struct{}),
-		dirtyBrokers:   make(map[brokerKey]time.Time),
+		dirtyBrokers:   make(map[brokerKey]brokerBump),
 		knownIATAs:     make(map[string]struct{}),
 		packetsSeen:    make(map[string]time.Time),
 		dirtyPackets:   make(map[string]time.Time),
@@ -95,13 +100,16 @@ func New(store Store, flushInterval, packetTTL time.Duration) *Coalescer {
 
 // UpsertObserver serves repeat lookups from the identity cache and records a
 // last_seen/observation_count bump instead of writing through.
-func (c *Coalescer) UpsertObserver(ctx context.Context, pubkey []byte) (uuid.UUID, string, error) {
+func (c *Coalescer) UpsertObserver(ctx context.Context, pubkey []byte, iata string) (uuid.UUID, string, error) {
 	key := string(pubkey)
 	c.mu.Lock()
 	if ident, ok := c.identities[key]; ok {
 		bump := c.dirtyObservers[ident.id]
 		bump.seen = c.now()
 		bump.count++
+		if iata != "" {
+			bump.iata, bump.iataAt = iata, bump.seen
+		}
 		c.dirtyObservers[ident.id] = bump
 		ident.seen = bump.seen
 		c.identities[key] = ident
@@ -110,7 +118,7 @@ func (c *Coalescer) UpsertObserver(ctx context.Context, pubkey []byte) (uuid.UUI
 	}
 	c.mu.Unlock()
 
-	id, name, err := c.Store.UpsertObserver(ctx, pubkey)
+	id, name, err := c.Store.UpsertObserver(ctx, pubkey, iata)
 	if err != nil {
 		return id, name, err
 	}
@@ -122,17 +130,22 @@ func (c *Coalescer) UpsertObserver(ctx context.Context, pubkey []byte) (uuid.UUI
 
 // UpsertObserverBroker writes through the first time a pair is seen and
 // records a bump afterwards.
-func (c *Coalescer) UpsertObserverBroker(ctx context.Context, observerID uuid.UUID, brokerName string) error {
+func (c *Coalescer) UpsertObserverBroker(ctx context.Context, observerID uuid.UUID, brokerName string, isPacket bool) error {
 	key := brokerKey{id: observerID, broker: brokerName}
 	c.mu.Lock()
 	if _, ok := c.knownBrokers[key]; ok {
-		c.dirtyBrokers[key] = c.now()
+		bump := c.dirtyBrokers[key]
+		bump.seen = c.now()
+		if isPacket {
+			bump.packet = bump.seen
+		}
+		c.dirtyBrokers[key] = bump
 		c.mu.Unlock()
 		return nil
 	}
 	c.mu.Unlock()
 
-	if err := c.Store.UpsertObserverBroker(ctx, observerID, brokerName); err != nil {
+	if err := c.Store.UpsertObserverBroker(ctx, observerID, brokerName, isPacket); err != nil {
 		return err
 	}
 	c.mu.Lock()
@@ -248,7 +261,7 @@ func (c *Coalescer) Flush(ctx context.Context) {
 	brokers := c.dirtyBrokers
 	packets := c.dirtyPackets
 	c.dirtyObservers = make(map[uuid.UUID]observerBump)
-	c.dirtyBrokers = make(map[brokerKey]time.Time)
+	c.dirtyBrokers = make(map[brokerKey]brokerBump)
 	c.dirtyPackets = make(map[string]time.Time)
 	cutoff := c.now().Add(-c.packetTTL)
 	for key, seen := range c.packetsSeen {
@@ -266,12 +279,14 @@ func (c *Coalescer) Flush(ctx context.Context) {
 		ids := make([]uuid.UUID, 0, len(brokers))
 		names := make([]string, 0, len(brokers))
 		seen := make([]time.Time, 0, len(brokers))
+		packetTimes := make([]time.Time, 0, len(brokers))
 		for key, ts := range brokers {
 			ids = append(ids, key.id)
 			names = append(names, key.broker)
-			seen = append(seen, ts)
+			seen = append(seen, ts.seen)
+			packetTimes = append(packetTimes, ts.packet)
 		}
-		if err := c.Store.TouchObserverBrokers(ctx, ids, names, seen); err != nil {
+		if err := c.Store.TouchObserverBrokers(ctx, ids, names, seen, packetTimes); err != nil {
 			slog.Error(fmt.Sprintf("presence: flush observer brokers failed (%d rows dropped)", len(ids)), "component", "presence", "error", err)
 		}
 	}
@@ -296,10 +311,14 @@ func (c *Coalescer) flushObservers(ctx context.Context, observers map[uuid.UUID]
 	ids := make([]uuid.UUID, 0, len(observers))
 	seen := make([]time.Time, 0, len(observers))
 	counts := make([]int32, 0, len(observers))
+	iatas := make([]string, 0, len(observers))
+	iataAts := make([]time.Time, 0, len(observers))
 	for id, bump := range observers {
 		ids = append(ids, id)
 		seen = append(seen, bump.seen)
 		counts = append(counts, bump.count)
+		iatas = append(iatas, bump.iata)
+		iataAts = append(iataAts, bump.iataAt)
 	}
-	return c.Store.TouchObservers(ctx, ids, seen, counts)
+	return c.Store.TouchObservers(ctx, ids, seen, counts, iatas, iataAts)
 }

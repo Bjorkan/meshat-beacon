@@ -19,62 +19,72 @@ func TestGetStatsOverview(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock := mockdb.NewMockQuerier(ctrl)
 
+	mock.EXPECT().GetAnalyticsRevision(gomock.Any()).Return(int64(7), nil)
+	mock.EXPECT().GetEarliestCompleteRollupHour(gomock.Any()).Return(pgtype.Timestamptz{}, nil)
+	var params sqlc.GetStatsSeriesParams
 	mock.EXPECT().
-		GetStatsOverview(gomock.Any(), []string{"YVR"}).
-		Return(sqlc.GetStatsOverviewRow{
-			TotalPackets:      100,
-			TotalObservations: 500,
-			ActiveObservers:   10,
-			ActiveIatas:       3,
-		}, nil)
+		GetStatsSeries(gomock.Any(), gomock.Any()).
+		DoAndReturn(func(_ context.Context, p sqlc.GetStatsSeriesParams) ([]sqlc.GetStatsSeriesRow, error) {
+			params = p
+			rows := []sqlc.GetStatsSeriesRow{{Status: "summary", Observations: 500, UniquePackets: 100, ActiveObservers: 10, ActiveIatas: 3}}
+			// The newest hour isn't rolled yet; the summary covers the other 23.
+			for h := p.Since.Time; h.Before(p.Until.Time); h = h.Add(time.Hour) {
+				status := "complete"
+				if h.Add(time.Hour).Equal(p.Until.Time) {
+					status = "missing"
+				}
+				rows = append(rows, sqlc.GetStatsSeriesRow{Hour: pgtype.Timestamptz{Time: h, Valid: true}, Status: status})
+			}
+			return rows, nil
+		})
 
 	store := &Store{q: mock}
 	result, err := store.GetStatsOverview(context.Background(), []string{"YVR"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.TotalPackets != 100 {
-		t.Errorf("expected TotalPackets 100, got %d", result.TotalPackets)
+	if result.TotalPackets != 100 || result.TotalObservations != 500 || result.ActiveObservers != 10 || result.ActiveIATAs != 3 {
+		t.Errorf("unexpected summary mapping: %+v", result)
 	}
-	if result.WindowHours != 24 {
-		t.Errorf("expected WindowHours 24, got %d", result.WindowHours)
+	if result.WindowHours != 23 || result.Until-result.Since != (24*time.Hour).Milliseconds() {
+		t.Errorf("window %d..%d (%d hours)", result.Since, result.Until, result.WindowHours)
+	}
+	// The window ends at the last hour that can have been rolled.
+	wantUntil := time.Now().UTC().Add(-rollupDelay).Truncate(time.Hour).Add(time.Hour)
+	if !params.Until.Time.Equal(wantUntil) || len(params.Iatas) != 1 {
+		t.Errorf("series params %+v, want until %s", params, wantUntil)
 	}
 }
 
-func TestGetStatsTopNodes_NilObservationCount(t *testing.T) {
+func TestGetStatsTopNodes_MissingNodeRow(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock := mockdb.NewMockQuerier(ctrl)
 
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	lastHeard := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
-	name := "test-node"
+	since := time.Date(2026, 1, 1, 12, 34, 0, 0, time.UTC)
 
 	mock.EXPECT().
 		GetTopNodes(gomock.Any(), sqlc.GetTopNodesParams{
-			Column1: []string{"YVR"},
-			Limit:   5,
+			Since:    pgtype.Timestamptz{Time: since.Truncate(time.Hour), Valid: true},
+			Iatas:    []string{"YVR"},
+			RowLimit: 5,
 		}).
-		Return([]sqlc.MvTopNodesByIatum{
-			{
-				NodeID:           nodeID,
-				Name:             &name,
-				NodeType:         1,
-				Iata:             "YVR",
-				ObservationCount: nil,
-				LastHeard:        lastHeard,
-			},
+		Return([]sqlc.GetTopNodesRow{
+			{NodeID: pgtype.UUID{Bytes: nodeID, Valid: true}, PublicKey: "aa", Name: "test-node", NodeType: 1, Iata: "YVR", ObservationCount: 9, LastHeard: lastHeard},
+			{PublicKey: "bb", Iata: "YVR", ObservationCount: 3, LastHeard: lastHeard},
 		}, nil)
 
 	store := &Store{q: mock}
-	items, err := store.GetStatsTopNodes(context.Background(), []string{"YVR"}, 5)
+	items, err := store.GetStatsTopNodes(context.Background(), []string{"YVR"}, since, 5)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(items))
+	if len(items) != 2 || items[0].NodeID == nil || *items[0].NodeID != nodeID || *items[0].NodeName != "test-node" {
+		t.Fatalf("unexpected first node: %+v", items)
 	}
-	if items[0].ObservationCount != 0 {
-		t.Errorf("expected ObservationCount 0 for nil, got %d", items[0].ObservationCount)
+	if items[1].NodeID != nil || items[1].NodeName != nil || items[1].PublicKey != "bb" {
+		t.Errorf("deleted node should keep its key and drop id/name: %+v", items[1])
 	}
 }
 
@@ -90,9 +100,9 @@ func TestGetStatsTopObservers_IATATypeAssertion(t *testing.T) {
 		GetStatsTopObservers(gomock.Any(), gomock.Any()).
 		Return([]sqlc.GetStatsTopObserversRow{
 			{
-				ID:               uuidToPgtype(observerID),
-				DisplayName:      &displayName,
-				ObserverType:     &obsType,
+				ID:               observerID,
+				DisplayName:      displayName,
+				ObserverType:     obsType,
 				Iata:             "YVR",
 				ObservationCount: 42,
 			},
@@ -126,8 +136,9 @@ func TestGetStatsTopAdvertisers_FloodDirectSplit(t *testing.T) {
 		GetStatsTopAdvertisers(gomock.Any(), gomock.Any()).
 		Return([]sqlc.GetStatsTopAdvertisersRow{
 			{
-				ID:                nodeID,
-				Name:              &name,
+				NodeID:            pgtype.UUID{Bytes: nodeID, Valid: true},
+				PublicKey:         "cc",
+				Name:              name,
 				NodeType:          2, // repeater
 				AdvertCount:       10,
 				FloodAdvertCount:  7,
@@ -203,7 +214,7 @@ func TestGetStatsNodeTypes_Mapping(t *testing.T) {
 	mock := mockdb.NewMockQuerier(ctrl)
 
 	mock.EXPECT().
-		GetStatsNodeTypes(gomock.Any(), gomock.Any()).
+		GetStatsNodeTypes(gomock.Any(), []string{"YVR"}).
 		Return([]sqlc.GetStatsNodeTypesRow{
 			{NodeType: 1, Count: 10},
 			{NodeType: 2, Count: 5},
@@ -227,101 +238,37 @@ func TestGetScopeStats(t *testing.T) {
 	mock := mockdb.NewMockQuerier(ctrl)
 
 	mock.EXPECT().
-		GetScopeStats(gomock.Any(), []string{"YVR"}).
+		GetScopeStats(gomock.Any(), gomock.Any()).
 		Return([]sqlc.GetScopeStatsRow{
 			{Name: "default", PacketCount: 100, ObserverCount: 5, NodeCount: 20},
+			{Name: "quiet"},
+		}, nil)
+	hour := time.Date(2026, 1, 1, 3, 0, 0, 0, time.UTC)
+	mock.EXPECT().
+		GetScopeStatsHourly(gomock.Any(), gomock.Any()).
+		Return([]sqlc.GetScopeStatsHourlyRow{
+			{Name: "default", Hour: pgtype.Timestamptz{Time: hour, Valid: true}, Packets: 60},
+			{Name: "default", Hour: pgtype.Timestamptz{Time: hour.Add(time.Hour), Valid: true}, Packets: 40},
 		}, nil)
 
 	store := &Store{q: mock}
-	items, err := store.GetScopeStats(context.Background(), []string{"YVR"})
+	items, err := store.GetScopeStats(context.Background(), []string{"YVR"}, time.Time{})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(items))
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items, got %d", len(items))
+	}
+	if h := items[0].Hourly; len(h) != 2 || h[0].Hour != hour.UnixMilli() || h[0].Packets+h[1].Packets != items[0].PacketCount {
+		t.Errorf("hourly %+v doesn't split packetCount %d", h, items[0].PacketCount)
+	}
+	if items[1].Hourly == nil || len(items[1].Hourly) != 0 {
+		t.Errorf("a scope without packets must have hourly [], got %#v", items[1].Hourly)
 	}
 	if items[0].Name != "default" {
 		t.Errorf("expected Name default, got %s", items[0].Name)
 	}
 	if items[0].PacketCount != 100 {
 		t.Errorf("expected PacketCount 100, got %d", items[0].PacketCount)
-	}
-}
-
-// A sub-hour window must not be rounded down to an empty SQL interval.
-func TestStatsPreserveSubHourWindows(t *testing.T) {
-	for _, endpoint := range []string{"observations", "payload", "observers", "advertisers", "talkers"} {
-		t.Run(endpoint, func(t *testing.T) {
-			mock := mockdb.NewMockQuerier(gomock.NewController(t))
-			check := func(interval pgtype.Interval) {
-				t.Helper()
-				if !interval.Valid || interval.Microseconds < (30*time.Minute).Microseconds() || interval.Microseconds > (31*time.Minute).Microseconds() {
-					t.Fatalf("expected a 30-minute window, got %+v", interval)
-				}
-			}
-			store := &Store{q: mock}
-			since := time.Now().Add(-30 * time.Minute)
-			ctx := context.Background()
-			var err error
-			switch endpoint {
-			case "observations":
-				mock.EXPECT().GetHourlyStats(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetHourlyStatsParams) ([]sqlc.MvHourlyIataStat, error) {
-					check(p.Column2)
-					return nil, nil
-				})
-				_, err = store.GetStatsObservations(ctx, nil, since)
-			case "payload":
-				mock.EXPECT().GetStatsPayloadBreakdown(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsPayloadBreakdownParams) ([]sqlc.GetStatsPayloadBreakdownRow, error) {
-					check(p.Column2)
-					return nil, nil
-				})
-				_, err = store.GetStatsPayloadBreakdown(ctx, nil, since)
-			case "observers":
-				mock.EXPECT().GetStatsTopObservers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopObserversParams) ([]sqlc.GetStatsTopObserversRow, error) {
-					check(p.Column1)
-					return nil, nil
-				})
-				_, err = store.GetStatsTopObservers(ctx, nil, since, 10)
-			case "advertisers":
-				mock.EXPECT().GetStatsTopAdvertisers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopAdvertisersParams) ([]sqlc.GetStatsTopAdvertisersRow, error) {
-					check(p.Column1)
-					return nil, nil
-				})
-				_, err = store.GetStatsTopAdvertisers(ctx, nil, since, 10)
-			case "talkers":
-				mock.EXPECT().GetStatsTopTalkers(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, p sqlc.GetStatsTopTalkersParams) ([]sqlc.GetStatsTopTalkersRow, error) {
-					check(p.Column1)
-					return nil, nil
-				})
-				_, err = store.GetStatsTopTalkers(ctx, nil, since, 10)
-			}
-			if err != nil {
-				t.Fatal(err)
-			}
-		})
-	}
-}
-
-func TestGetStatsClockDrift_ExcludesInvalidReadings(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-	rows := []sqlc.GetStatsClockDriftRow{}
-	for _, drift := range []int32{-2147483648, -7776001, -7776000, -600, 600, 7776000, 7776001, 2147483647} {
-		rows = append(rows, sqlc.GetStatsClockDriftRow{DeviceClockDriftSeconds: &drift, LastAdvertAt: pgtype.Timestamptz{Time: time.Now(), Valid: true}})
-	}
-	rows = append(rows, sqlc.GetStatsClockDriftRow{})
-	mock.EXPECT().GetStatsClockDrift(gomock.Any(), gomock.Any()).Return(rows, nil)
-	store := &Store{q: mock, clockDriftThreshold: 5 * time.Minute}
-	items, err := store.GetStatsClockDrift(context.Background(), nil, 10)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(items) != 4 {
-		t.Fatalf("expected four plausible readings, got %v", items)
-	}
-	for i, want := range []int{-7776000, -600, 600, 7776000} {
-		if items[i].ClockDriftSeconds != want {
-			t.Errorf("reading %d: got %d, want %d", i, items[i].ClockDriftSeconds, want)
-		}
 	}
 }

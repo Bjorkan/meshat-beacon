@@ -12,22 +12,19 @@ import (
 	"github.com/google/uuid"
 )
 
-// Page is a generic paginated response envelope used by list endpoints.
-// NextCursor is retained for legacy timestamp/ID cursors where an endpoint already exposed one.
-// NextPageToken is the preferred opaque keyset cursor for sortable lists; callers should round-trip
-// it unchanged. HasMore is true when additional results exist beyond the current page.
+// Page is a generic paginated response envelope used by all list endpoints
+// that support cursor-based pagination. NextCursor is the ID of the last item
+// returned and should be passed as the cursor param in the next request.
+// HasMore is true when additional results exist beyond the current page.
 type Page[T any] struct {
-	Items         []T     `json:"items" binding:"required"`
-	NextCursor    *int64  `json:"nextCursor,omitempty"`
-	NextPageToken *string `json:"nextPageToken,omitempty"`
-	HasMore       bool    `json:"hasMore" binding:"required"`
+	Items      []T    `json:"items"`
+	NextCursor *int64 `json:"nextCursor,omitempty"`
+	HasMore    bool   `json:"hasMore"`
 }
 
 type Reader interface {
-	// ListNodePathPackets returns unique packets with a globally unambiguous hop through nodeID.
-	// The matching observations are region-filtered; TRACE is deliberately excluded.
-	ListNodePathPackets(ctx context.Context, nodeID uuid.UUID, iatas []string, cursor *PageToken, limit int32) (Page[PacketSummary], error)
-
+	// GetRouteEvidence returns the full saved route and exact-prefix retained ordinary reports.
+	GetRouteEvidence(ctx context.Context, iata, pathKey string, query RouteEvidenceQuery) (*RouteEvidence, error)
 	// ListIATAs returns all known IATA codes with display name and coordinates.
 	// IATAs are auto-created on first packet arrival from that location.
 	ListIATAs(ctx context.Context) ([]IATA, error)
@@ -56,10 +53,11 @@ type Reader interface {
 	// ListChannels returns a paginated list of channels ordered by last seen.
 	// Includes both hashtag-derived and explicit key channels.
 	// Pass nil hash to skip hash filtering. Pass empty iatas to return all channels;
-	// IATAs must be uppercase.
+	// IATAs must be uppercase. Nil keyKnown skips the decryption-key filter.
 	// cursor is last_seen epoch ms of the last item; pass 0 to start from the beginning.
-	// keyFilter is known, unknown or all. UnknownCount ignores keyFilter and pagination.
-	ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *ChannelCursor) (ChannelPage, error)
+	// pageCursor is the precise timestamp/ID boundary; nil preserves the legacy numeric cursor.
+	// When non-nil, pageCursor takes precedence over cursor.
+	ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, keyKnown *bool, cursor int64, pageCursor *ChannelCursor) (ChannelPage, error)
 
 	// GetChannel returns full detail for a single channel by its integer ID.
 	// Returns nil, pgx.ErrNoRows if the channel is not found.
@@ -84,10 +82,11 @@ type Reader interface {
 	// ordered oldest first. Used for WS reconnect backfill.
 	ListMessagesAfterID(ctx context.Context, afterID int64, iatas []string, scope string, limit int32) ([]ChannelMessage, error)
 
-	// ListObservers returns a keyset-paginated list of observers with optional filters and ordering.
-	// LegacyCursor preserves the historical last_seen cursor for older API clients; new callers should
-	// round-trip NextPageToken because it remains stable for every supported sort.
-	ListObservers(ctx context.Context, params ObserverListParams) (Page[ObserverSummary], error)
+	// ListObservers returns a paginated list of observers with optional filters.
+	// All filter params are optional — pass empty string or nil to skip a filter.
+	// status is "online" or "offline" derived from last_status_at recency.
+	// cursor is last_seen epoch ms of the last observer; pass 0 to start from the beginning.
+	ListObservers(ctx context.Context, iatas []string, observerType, broker, status, name, scope string, cursor int64, limit int32) (Page[ObserverSummary], error)
 
 	// GetObserver returns full detail for a single observer by UUID.
 	// Returns nil, pgx.ErrNoRows if the observer is not found.
@@ -103,22 +102,21 @@ type Reader interface {
 	// GetObserverActivity returns bucketed heard-activity for an observer over the trailing window.
 	// interval >= 1h is served from the hourly rollup. Returns pgx.ErrNoRows for an unknown observer.
 	// Range and Interval on the result are left empty for the handler to fill.
-	GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*ObserverActivity, error)
+	GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration, until time.Time) (*ObserverActivity, error)
 
 	// GetObserverScopes returns the names of all transport scopes an observer has
 	// been seen forwarding packets for, ordered alphabetically.
 	GetObserverScopes(ctx context.Context, observerID uuid.UUID) ([]string, error)
 
-	// ListObserverAdverts returns advert observations newest first (descending observation ID).
-	// Pass cursor=0 for the latest page; subsequent pages contain IDs below the cursor.
+	// ListObserverAdverts returns a paginated list of advert packets heard by an observer.
+	// Pass cursor=0 to start from the beginning.
 	ListObserverAdverts(ctx context.Context, observerID uuid.UUID, cursor int64, limit int32) (Page[AdvertObservation], error)
 
-	// ListNodes returns a keyset-paginated list of nodes with optional filters and ordering.
-	// When IncludeNeighbors is true, each NodeSummary's NeighborIDs field is populated with the
-	// distinct set of neighbor node IDs (across all IATAs); otherwise it is omitted. LegacyCursor
-	// preserves the historical last_seen cursor for older API clients; new callers should round-trip
-	// NextPageToken because it remains stable for every supported sort.
-	ListNodes(ctx context.Context, params NodeListParams) (Page[NodeSummary], error)
+	// ListNodes returns a paginated list of nodes with optional filters.
+	// When includeNeighbors is true, each NodeSummary's NeighborIDs field is
+	// populated with the distinct set of neighbor node IDs (across all
+	// IATAs); otherwise it's left nil to avoid the extra aggregation.
+	ListNodes(ctx context.Context, nodeType int16, iatas []string, supportsMultibytePaths, supportsMultibyteTraces *bool, pubkey []byte, pubkeyPrefix, name, scope string, cursor int64, limit int32, includeNeighbors bool) (Page[NodeSummary], error)
 
 	// GetNode returns full detail for a single node by UUID.
 	// Returns nil, pgx.ErrNoRows if the node is not found.
@@ -126,15 +124,6 @@ type Reader interface {
 
 	// GetNodesByIDs returns a map of node ID to resolved node details for the given IDs.
 	GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map[uuid.UUID]*ResolvedNode, error)
-
-	// GetNodeIDByPubkey resolves a full node public key to its UUID.
-	// Returns nil, nil when no node carries that key.
-	GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error)
-
-	// GetNodeTypeByPubkey resolves a full node public key to its node type.
-	// Returns nil, nil when no node carries that key. Used by the repeater-only
-	// route planner to reject non-repeater endpoints with 4xx.
-	GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error)
 
 	// ListNodeObservations returns a paginated list of packet observations originating from a node.
 	// Pass cursor=0 to start from the beginning.
@@ -148,11 +137,11 @@ type Reader interface {
 	// cursor is epoch ms in either case; pass 0 to start from the beginning.
 	// payloadTypes/routeTypes/scopes are OR'd within each filter, ANDed across filters; pass
 	// nil/empty to skip a filter.
-	ListPackets(ctx context.Context, params PacketListParams) (Page[PacketSummary], error)
+	ListPackets(ctx context.Context, payloadTypes, routeTypes []int16, iatas []string, scopes []string, since, until time.Time, cursor int64, limit int32) (Page[PacketSummary], error)
 
 	// ListPacketsAfterID returns packets with observations after the given observation ID,
 	// ordered oldest first. Used for WS reconnect backfill.
-	ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32, includeResolvedPath bool) ([]PacketSummary, error)
+	ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32) ([]PacketSummary, error)
 
 	// GetPacket returns full packet detail including all observations with radio settings.
 	// Returns nil, pgx.ErrNoRows if not found.
@@ -174,6 +163,9 @@ type Reader interface {
 	// since defines the start of the window; pass zero time for default (last 7 days).
 	GetStatsObservations(ctx context.Context, iatas []string, since time.Time) ([]ObservationPoint, error)
 
+	// GetStatsSeries returns hourly rollup metrics for [since, until), both on UTC hours.
+	GetStatsSeries(ctx context.Context, since, until time.Time, iatas []string) (*StatsSeries, error)
+
 	// GetSignalStats aggregates retained reception readings in [since, until).
 	GetSignalStats(ctx context.Context, since, until time.Time, iatas []string) (*SignalStats, error)
 
@@ -187,7 +179,7 @@ type Reader interface {
 
 	// GetStatsTopNodes returns the top N nodes by observation count.
 	// Pass nil for iatas to return stats across all IATAs.
-	GetStatsTopNodes(ctx context.Context, iatas []string, limit int32) ([]TopNode, error)
+	GetStatsTopNodes(ctx context.Context, iatas []string, since time.Time, limit int32) ([]TopNode, error)
 
 	// GetStatsTopObservers returns the top N observers by observation count.
 	// Pass nil for iatas to return stats across all IATAs.
@@ -212,7 +204,7 @@ type Reader interface {
 
 	// GetScopeStats returns aggregate packet, observer and node counts per transport scope.
 	// Pass empty iatas for global totals. IATAs must be uppercase.
-	GetScopeStats(ctx context.Context, iatas []string) ([]ScopeStats, error)
+	GetScopeStats(ctx context.Context, iatas []string, since time.Time) ([]ScopeStats, error)
 
 	// GetStatsNodeTypes returns node counts grouped by type, optionally filtered by IATA.
 	GetStatsNodeTypes(ctx context.Context, iatas []string) ([]NodeTypeCount, error)
@@ -221,41 +213,26 @@ type Reader interface {
 	// Use when no geographic filter is applied — returns names only for a lightweight response.
 	GetScopeNames(ctx context.Context) ([]string, error)
 
-	// GetScopesByIATAs returns scope summaries filtered by the given IATA codes,
-	// including observer, node and IATA counts. Expands region/regionId to IATAs automatically.
-	GetScopesByIATAs(ctx context.Context, iatas []string) ([]ScopeSummary, error)
-
 	// GetScopeByName returns full detail for a single scope by its normalized name (e.g. "#bc"),
 	// including packet count, observer count, node count, and the list of IATAs it is active in.
-	// Returns nil if the scope is not found.
+	// Returns nil, pgx.ErrNoRows if the scope is not found.
 	GetScopeByName(ctx context.Context, name string) (*ScopeDetail, error)
 
-	// ListTraceTags returns a paginated list of trace tags with aggregate metadata.
-	ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]TraceTagSummary, error)
+	// ListTraceTags returns trace tags newest first, keyset-paged on (cursor ms, cursorTag hex).
+	ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, cursorTag string, limit int32) ([]TraceTagSummary, error)
 
 	// GetTraceByTag returns all packets for a given trace tag with resolved routes.
 	GetTraceByTag(ctx context.Context, tag string) (*TraceDetail, error)
 
 	// ListKnownRoutes returns known routes filtered by IATA and optional hop count.
-	ListKnownRoutes(ctx context.Context, params RouteListParams) (Page[KnownRoute], error)
+	// A nonzero cursorID breaks ties within the cursor's millisecond.
+	ListKnownRoutes(ctx context.Context, iata string, hopCount int32, cursor time.Time, cursorID int64, limit int32) ([]KnownRoute, error)
 
 	// SearchKnownRoutes returns known routes containing a path from source to destination hash.
 	SearchKnownRoutes(ctx context.Context, iata, fromHash, toHash string) ([]KnownRoute, error)
 
 	// GetNodeNeighbors returns the neighbors of a node ordered by most recently seen.
 	GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]NodeNeighbor, error)
-
-	// ListAmbiguousPrefix2 returns every 2-byte prefix claimed by more than one infra
-	// node, globally, as lowercase hex (e.g. "a3f1"). The path map uses it to decide
-	// whether a 2-byte route is safe to draw: with zero collisions in the whole
-	// database, a high-confidence 2-byte hit is as trustworthy as a 3-byte one.
-	ListAmbiguousPrefix2(ctx context.Context) ([]string, error)
-
-	// ListMeshCoreRegions returns the built-in catalogue plus region-scope values
-	// confirmed by fresh observer self-reports or neighbor OTA answers, with
-	// friendly names, parent tokens and confirmed-node counts. Tokens are normalized (lowercase, trimmed); "*"
-	// is a literal token, not a wildcard.
-	ListMeshCoreRegions(ctx context.Context) ([]MeshCoreRegion, error)
 
 	// GetKnownRoutesByNode returns all known routes in a given IATA that contain
 	// the specified node UUID anywhere in their hop sequence.
@@ -268,11 +245,4 @@ type Reader interface {
 	// SearchCrossIATARoutes finds routes that cross IATA boundaries between
 	// a source node/IATA and a destination node/IATA.
 	SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, toHash, toIATA string) ([]CrossIATARoute, error)
-
-	// PlanBestRoute computes best routes between two nodes (by UUID) over the
-	// observed neighbor graph, preferring legs with known signal strength.
-	// Returns an empty Paths slice (with Reason set) when no route exists --
-	// never an error for a merely unroutable pair. maxAlternatives caps the
-	// number of alternative paths beyond the best one.
-	PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (BestRouteResult, error)
 }

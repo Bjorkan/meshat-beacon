@@ -11,8 +11,11 @@ import (
 	"net/http/httptest"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
+	"github.com/MeshCore-Beacon/beacon-server/internal/scopestore"
+	"github.com/jackc/pgx/v5"
 )
 
 func TestGetStatsScopes_RegionErrors(t *testing.T) {
@@ -20,14 +23,14 @@ func TestGetStatsScopes_RegionErrors(t *testing.T) {
 		t.Run(query, func(t *testing.T) {
 			reader := stubReader{
 				getRegion: func(context.Context, int32) (*api.Region, error) {
-					return nil, errors.New("not found")
+					return nil, pgx.ErrNoRows
 				},
 				getRegionBySlug: func(context.Context, string) (*api.Region, error) {
-					return nil, errors.New("not found")
+					return nil, pgx.ErrNoRows
 				},
 			}
 			w := httptest.NewRecorder()
-			getStatsScopes(reader)(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?"+query, nil))
+			getStatsScopes(reader, nil)(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?"+query, nil))
 			if w.Code != http.StatusBadRequest {
 				t.Fatalf("got status %d, want 400", w.Code)
 			}
@@ -70,7 +73,7 @@ func TestGetStatsScopes_Filters(t *testing.T) {
 					}
 					return &api.Region{IATAs: []string{"YVR", "YYJ"}}, nil
 				},
-				getScopeStats: func(_ context.Context, iatas []string) ([]api.ScopeStats, error) {
+				getScopeStats: func(_ context.Context, iatas []string, _ time.Time) ([]api.ScopeStats, error) {
 					called = true
 					if !slices.Equal(iatas, tc.want) {
 						t.Fatalf("IATAs = %v, want %v", iatas, tc.want)
@@ -79,7 +82,7 @@ func TestGetStatsScopes_Filters(t *testing.T) {
 				},
 			}
 			w := httptest.NewRecorder()
-			getStatsScopes(reader)(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?"+tc.query, nil))
+			getStatsScopes(reader, testScopes(map[string][]string{"YVR": {"#test"}, "YYJ": {"#test"}}))(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?"+tc.query, nil))
 			if w.Code != http.StatusOK {
 				t.Fatalf("status = %d: %s", w.Code, w.Body.String())
 			}
@@ -103,10 +106,47 @@ func TestGetStatsScopes_Filters(t *testing.T) {
 
 func TestGetStatsScopes_ReaderError(t *testing.T) {
 	w := httptest.NewRecorder()
-	getStatsScopes(stubReader{getScopeStats: func(context.Context, []string) ([]api.ScopeStats, error) {
+	getStatsScopes(stubReader{getScopeStats: func(context.Context, []string, time.Time) ([]api.ScopeStats, error) {
 		return nil, errors.New("database unavailable")
-	}})(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?iata=YVR", nil))
+	}}, nil)(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?iata=YVR", nil))
 	if w.Code != http.StatusInternalServerError {
 		t.Fatalf("status = %d, want 500", w.Code)
+	}
+}
+
+func testScopes(byIATA map[string][]string) *scopestore.ScopeStore {
+	s := scopestore.New()
+	s.SetManualMembers(byIATA)
+	return s
+}
+
+func TestGetStatsScopes_FiltersToRegionMembers(t *testing.T) {
+	reader := stubReader{getScopeStats: func(context.Context, []string, time.Time) ([]api.ScopeStats, error) {
+		return []api.ScopeStats{{Name: "#elsewhere", PacketCount: 9}, {Name: "#on"}, {Name: "#yow", PacketCount: 4}}, nil
+	}}
+	members := testScopes(map[string][]string{"YOW": {"#yow", "#on"}})
+	for _, tc := range []struct {
+		query   string
+		members ScopeMembership
+		want    []string
+	}{
+		{"", members, []string{"#elsewhere", "#on", "#yow"}},
+		{"iata=YOW", members, []string{"#on", "#yow"}},
+		{"iata=YUL", members, []string{}},
+		{"iata=YOW", nil, []string{}},
+	} {
+		w := httptest.NewRecorder()
+		getStatsScopes(reader, tc.members)(w, httptest.NewRequest(http.MethodGet, "/stats/scopes?"+tc.query, nil))
+		var rows []api.ScopeStats
+		if err := json.Unmarshal(w.Body.Bytes(), &rows); err != nil || rows == nil {
+			t.Fatalf("%q: body %s, err %v", tc.query, w.Body.String(), err)
+		}
+		got := []string{}
+		for _, row := range rows {
+			got = append(got, row.Name)
+		}
+		if !slices.Equal(got, tc.want) {
+			t.Fatalf("%q: got %v, want %v", tc.query, got, tc.want)
+		}
 	}
 }

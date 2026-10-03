@@ -25,9 +25,9 @@ func (s *endpointRoutingDB) ResolveEndpointHashes(_ context.Context, iata string
 	}
 	return nil, nil
 }
-func (s *endpointRoutingDB) ResolvePathHashes(_ context.Context, hashes [][]byte) (map[string][]api.ResolvedPathEntry, error) {
+func (s *endpointRoutingDB) ResolvePathHashes(_ context.Context, iata string, hashes [][]byte) (map[string][]api.ResolvedPathEntry, error) {
 	for _, hash := range hashes {
-		s.paths = append(s.paths, hex.EncodeToString(hash))
+		s.paths = append(s.paths, iata+":"+hex.EncodeToString(hash))
 	}
 	return nil, nil
 }
@@ -35,6 +35,7 @@ func (s *endpointRoutingDB) ResolvePathHashes(_ context.Context, hashes [][]byte
 func TestHandlePacketSeparatesEndpointAndRelayMatching(t *testing.T) {
 	for _, kind := range []uint8{meshcore.PayloadTypeReq, meshcore.PayloadTypeResponse, meshcore.PayloadTypeTxtMsg, meshcore.PayloadTypePath} {
 		w, base := newTestWorker()
+		base.observationInserted = true
 		db := &endpointRoutingDB{stubDB: base}
 		w.db = db
 		packet := &meshcore.Packet{Header: meshcore.MakeHeader(meshcore.RouteTypeFlood, kind, 0),
@@ -43,7 +44,7 @@ func TestHandlePacketSeparatesEndpointAndRelayMatching(t *testing.T) {
 		if !reflect.DeepEqual(db.endpoints, []string{"YVR:aa", "YVR:bb"}) {
 			t.Errorf("payload %d endpoint dispatch: %v", kind, db.endpoints)
 		}
-		if !reflect.DeepEqual(db.paths, []string{"cc"}) {
+		if !reflect.DeepEqual(db.paths, []string{"YVR:cc"}) {
 			t.Errorf("payload %d relay dispatch: %v", kind, db.paths)
 		}
 	}

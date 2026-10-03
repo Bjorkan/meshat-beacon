@@ -7,6 +7,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,7 +75,7 @@ func TestListObservers_OK(t *testing.T) {
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	r := chi.NewRouter()
 	r.Get("/observers", listObservers(stubReader{
-		listObservers: func(_ context.Context, _ api.ObserverListParams) (api.Page[api.ObserverSummary], error) {
+		listObservers: func(_ context.Context, _ []string, _, _, _, _, _ string, _ int64, _ int32) (api.Page[api.ObserverSummary], error) {
 			return api.Page[api.ObserverSummary]{Items: []api.ObserverSummary{{ID: observerID}}}, nil
 		},
 	}))
@@ -195,66 +196,12 @@ func TestListObserverAdverts_InvalidUUID(t *testing.T) {
 	}
 }
 
-func TestListObservers_SortAndPageTokenPassedThrough(t *testing.T) {
-	id := uuid.MustParse("00000000-0000-0000-0000-000000000321")
-	token := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionObservers, Sort: api.ObserverSortStatus, Direction: api.SortDesc, Key: "online", ID: id})
-	var got api.ObserverListParams
-	r := chi.NewRouter()
-	r.Get("/observers", listObservers(stubReader{
-		listObservers: func(_ context.Context, params api.ObserverListParams) (api.Page[api.ObserverSummary], error) {
-			got = params
-			return api.Page[api.ObserverSummary]{}, nil
-		},
-	}))
-
-	req := httptest.NewRequest(http.MethodGet, "/observers?sort=status&direction=desc&pageToken="+token+"&scope=%23bc", nil)
-	w := httptest.NewRecorder()
-	r.ServeHTTP(w, req)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-	if got.Sort != api.ObserverSortStatus || got.Direction != api.SortDesc {
-		t.Fatalf("got sort=%q direction=%q", got.Sort, got.Direction)
-	}
-	if got.PageToken == nil || got.PageToken.ID != id || got.PageToken.Key != "online" {
-		t.Fatalf("page token not passed through: %#v", got.PageToken)
-	}
-	if got.Scope != "#bc" {
-		t.Fatalf("got scope %q, want #bc", got.Scope)
-	}
-}
-
-func TestListObservers_RejectsInvalidSortablePagination(t *testing.T) {
-	validID := uuid.MustParse("00000000-0000-0000-0000-000000000321")
-	mismatched := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionObservers, Sort: api.ObserverSortIATA, Direction: api.SortAsc, Key: "YVR", ID: validID})
-	wrongCollection := api.EncodePageToken(api.PageToken{Version: api.PageTokenVersion, Collection: api.PageCollectionNodes, Sort: api.ObserverSortStatus, Direction: api.SortDesc, Key: "online", ID: validID})
-	tests := []string{
-		"/observers?sort=bogus",
-		"/observers?direction=sideways",
-		"/observers?pageToken=not-a-token",
-		"/observers?sort=status&direction=desc&pageToken=" + mismatched,
-		"/observers?sort=status&direction=desc&pageToken=" + wrongCollection,
-		"/observers?sort=status&direction=desc&cursor=1700000000000",
-	}
-	for _, target := range tests {
-		t.Run(target, func(t *testing.T) {
-			r := chi.NewRouter()
-			r.Get("/observers", listObservers(stubReader{}))
-			w := httptest.NewRecorder()
-			r.ServeHTTP(w, httptest.NewRequest(http.MethodGet, target, nil))
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-			}
-		})
-	}
-}
-
 func TestGetObserverActivity_Defaults(t *testing.T) {
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	var gotWindow, gotInterval time.Duration
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			gotWindow, gotInterval = window, interval
 			return &api.ObserverActivity{Points: []api.ObserverActivityPoint{}}, nil
 		},
@@ -279,6 +226,14 @@ func TestGetObserverActivity_Defaults(t *testing.T) {
 	if body.Range != "24h" || body.Interval != "15m" {
 		t.Errorf("expected range 24h interval 15m, got %q/%q", body.Range, body.Interval)
 	}
+
+	skewed := time.Now().Add(time.Minute).UnixMilli()
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/observers/%s/activity?until=%d", observerID.String(), skewed), nil)
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for until within clock skew, got %d (%s)", w.Code, w.Body.String())
+	}
 }
 
 func TestGetObserverActivity_CustomRangeAndInterval(t *testing.T) {
@@ -286,7 +241,7 @@ func TestGetObserverActivity_CustomRangeAndInterval(t *testing.T) {
 	var gotWindow, gotInterval time.Duration
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			gotWindow, gotInterval = window, interval
 			return &api.ObserverActivity{Points: []api.ObserverActivityPoint{}}, nil
 		},
@@ -318,7 +273,7 @@ func TestGetObserverActivity_SubHourRangeLimit(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			t.Fatal("reader should not be called")
 			return nil, nil
 		},
@@ -340,7 +295,7 @@ func TestGetObserverActivity_SubHourRangeLimit(t *testing.T) {
 	var gotWindow, gotInterval time.Duration
 	ok := chi.NewRouter()
 	ok.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, window, interval time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			gotWindow, gotInterval = window, interval
 			return &api.ObserverActivity{Points: []api.ObserverActivityPoint{}}, nil
 		},
@@ -363,6 +318,10 @@ func TestGetObserverActivity_BadRequests(t *testing.T) {
 		query string
 	}{
 		{"invalid uuid", "not-a-uuid", ""},
+		{"bad end", "00000000-0000-0000-0000-000000000001", "?until=banana"},
+		{"negative end", "00000000-0000-0000-0000-000000000001", "?until=-1"},
+		{"duplicate end", "00000000-0000-0000-0000-000000000001", "?until=1&until=2"},
+		{"future end", "00000000-0000-0000-0000-000000000001", "?until=253402300799999"},
 		{"unparseable range", "00000000-0000-0000-0000-000000000001", "?range=banana"},
 		{"range too long", "00000000-0000-0000-0000-000000000001", "?range=721h"},
 		{"zero range", "00000000-0000-0000-0000-000000000001", "?range=0"},
@@ -373,7 +332,7 @@ func TestGetObserverActivity_BadRequests(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			r := chi.NewRouter()
 			r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-				getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+				getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 					t.Fatal("reader should not be called")
 					return nil, nil
 				},
@@ -392,7 +351,7 @@ func TestGetObserverActivity_NotFound(t *testing.T) {
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			return nil, pgx.ErrNoRows
 		},
 	}))
@@ -418,7 +377,7 @@ func TestGetObserverActivity_ReaderError(t *testing.T) {
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			return nil, errors.New("boom")
 		},
 	}))
@@ -435,7 +394,7 @@ func TestGetObserverActivity_NullsSerialise(t *testing.T) {
 	observerID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 	r := chi.NewRouter()
 	r.Get("/observers/{observerId}/activity", getObserverActivity(stubReader{
-		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration) (*api.ObserverActivity, error) {
+		getObserverActivity: func(_ context.Context, _ uuid.UUID, _, _ time.Duration, _ time.Time) (*api.ObserverActivity, error) {
 			return &api.ObserverActivity{
 				PayloadTypes: []api.PayloadBreakdownItem{},
 				Points:       []api.ObserverActivityPoint{{T: 1757376000000, Observations: 3}},

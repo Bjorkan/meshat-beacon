@@ -59,7 +59,7 @@ func TestToChannelMessage(t *testing.T) {
 	channelHash := []byte{0xab}
 	sentAt := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
 
-	msg := toChannelMessage(42, "deadbeef", channelHash, &senderName, &content, sentAt, 7)
+	msg := toChannelMessage(42, "deadbeef", channelHash, &senderName, &content, sentAt, 7, nil, nil)
 
 	if msg.ID != 42 {
 		t.Errorf("expected ID 42, got %d", msg.ID)
@@ -86,7 +86,7 @@ func TestToChannelMessage(t *testing.T) {
 
 func TestToChannelMessage_NilFields(t *testing.T) {
 	sentAt := pgtype.Timestamptz{Time: time.UnixMilli(0), Valid: true}
-	msg := toChannelMessage(1, "abc", []byte{0x01}, nil, nil, sentAt, 0)
+	msg := toChannelMessage(1, "abc", []byte{0x01}, nil, nil, sentAt, 0, nil, nil)
 	if msg.SenderName != "" {
 		t.Errorf("expected empty SenderName, got %s", msg.SenderName)
 	}
@@ -101,7 +101,7 @@ func TestResolvePathHashes_Empty(t *testing.T) {
 	// no EXPECT — sqlc should never be called
 	store := &Store{q: mock}
 
-	result, err := store.ResolvePathHashes(context.Background(), nil)
+	result, err := store.ResolvePathHashes(context.Background(), "YVR", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -116,11 +116,14 @@ func TestResolvePathHashes_DBError(t *testing.T) {
 
 	hashes := [][]byte{{0x01, 0x02}}
 	mock.EXPECT().
-		ResolvePathHashesP2(gomock.Any(), hashes).
+		ResolvePathHashesP2(gomock.Any(), sqlc.ResolvePathHashesP2Params{
+			Iata:    "YVR",
+			Column2: hashes,
+		}).
 		Return(nil, errors.New("db error"))
 
 	store := &Store{q: mock}
-	result, err := store.ResolvePathHashes(context.Background(), hashes)
+	result, err := store.ResolvePathHashes(context.Background(), "YVR", hashes)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -141,7 +144,10 @@ func TestResolvePathHashes_Mapping(t *testing.T) {
 	hashes := [][]byte{{0xab, 0xcd}}
 
 	mock.EXPECT().
-		ResolvePathHashesP2(gomock.Any(), hashes).
+		ResolvePathHashesP2(gomock.Any(), sqlc.ResolvePathHashesP2Params{
+			Iata:    "YVR",
+			Column2: hashes,
+		}).
 		Return([]sqlc.ResolvePathHashesP2Row{
 			{
 				Hash:      []byte{0xab, 0xcd},
@@ -154,7 +160,7 @@ func TestResolvePathHashes_Mapping(t *testing.T) {
 		}, nil)
 
 	store := &Store{q: mock}
-	result, err := store.ResolvePathHashes(context.Background(), hashes)
+	result, err := store.ResolvePathHashes(context.Background(), "YVR", hashes)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,74 +180,30 @@ func TestResolvePathHashes_Mapping(t *testing.T) {
 	}
 }
 
-// A neighbor edge between nodes with known coordinates further apart than the
-// direct LoRa cap is refused — MQTT-interconnected hops are not radio hops.
-func TestUpsertNodeNeighbor_DistanceCap_RefusesImpossibleLink(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	latA, lonA := 59.61, 16.54
-	latB, lonB := 55.68, 12.57 // Copenhagen: ~430 km from Västmanland
-	a := uuid.MustParse("00000000-0000-0000-0000-00000000000a")
-	b := uuid.MustParse("00000000-0000-0000-0000-00000000000b")
-
-	mock.EXPECT().
-		GetNodesByIDs(gomock.Any(), []uuid.UUID{a, b}).
-		Return([]sqlc.GetNodesByIDsRow{
-			{ID: a, Latitude: &latA, Longitude: &lonA},
-			{ID: b, Latitude: &latB, Longitude: &lonB},
-		}, nil)
-	// no EXPECT for UpsertNodeNeighbor — it must never be reached
-
-	store := &Store{q: mock, neighborMaxKm: 150}
-	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil, false, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestDeleteInBatches_StopsOnError(t *testing.T) {
+	boom := errors.New("boom")
+	calls := 0
+	err := deleteInBatches(context.Background(), 10, func(context.Context, int32) (int64, error) {
+		calls++
+		if calls == 2 {
+			return 0, boom
+		}
+		return 10, nil
+	})
+	if !errors.Is(err, boom) || calls != 2 {
+		t.Fatalf("err=%v calls=%d, want boom after 2 calls", err, calls)
 	}
 }
 
-func TestUpsertNodeNeighbor_DistanceCap_AllowsNearbyLink(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	latA, lonA := 59.61, 16.54
-	latB, lonB := 59.63, 16.56
-	a := uuid.MustParse("00000000-0000-0000-0000-00000000000a")
-	b := uuid.MustParse("00000000-0000-0000-0000-00000000000b")
-
-	mock.EXPECT().
-		GetNodesByIDs(gomock.Any(), []uuid.UUID{a, b}).
-		Return([]sqlc.GetNodesByIDsRow{
-			{ID: a, Latitude: &latA, Longitude: &lonA},
-			{ID: b, Latitude: &latB, Longitude: &lonB},
-		}, nil)
-	mock.EXPECT().
-		UpsertNodeNeighbor(gomock.Any(), sqlc.UpsertNodeNeighborParams{
-			NodeID:     a,
-			NeighborID: b,
-			Iata:       "VST",
-		}).
-		Return(nil)
-
-	store := &Store{q: mock, neighborMaxKm: 150}
-	if err := store.UpsertNodeNeighbor(context.Background(), a, b, "VST", nil, nil, false, nil); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestJSONBToAny(t *testing.T) {
-	if jsonbToAny(nil) != nil {
-		t.Error("expected nil for empty JSONB")
-	}
-	obj := jsonbToAny([]byte(`{"model":"Heltec"}`))
-	m, ok := obj.(map[string]any)
-	if !ok || m["model"] != "Heltec" {
-		t.Errorf("expected decoded object, got %#v", obj)
-	}
-	if jsonbToAny([]byte(`[1,2]`)).([]any)[0] != float64(1) {
-		t.Error("expected decoded array")
-	}
-	// Undecodable content is dropped rather than emitting invalid JSON.
-	if jsonbToAny([]byte(`{oops`)) != nil {
-		t.Error("expected nil for undecodable JSONB")
+func TestDeleteInBatches_StopsWhenCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	calls := 0
+	err := deleteInBatches(ctx, 10, func(context.Context, int32) (int64, error) {
+		calls++
+		cancel()
+		return 10, nil
+	})
+	if !errors.Is(err, context.Canceled) || calls != 1 {
+		t.Fatalf("err=%v calls=%d, want context.Canceled after 1 call", err, calls)
 	}
 }

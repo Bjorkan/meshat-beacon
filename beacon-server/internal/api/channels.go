@@ -11,26 +11,10 @@ import (
 	"time"
 )
 
-type ChannelKind string
-
-const (
-	ChannelKindPublic  ChannelKind = "public"
-	ChannelKindPrivate ChannelKind = "private"
-	ChannelKindHashtag ChannelKind = "hashtag"
-	ChannelKindUnknown ChannelKind = "unknown"
-)
-
-func ClassifyChannel(keyKnown, isHashtag, isPublic bool) ChannelKind {
-	switch {
-	case !keyKnown:
-		return ChannelKindUnknown
-	case isHashtag:
-		return ChannelKindHashtag
-	case isPublic:
-		return ChannelKindPublic
-	default:
-		return ChannelKindPrivate
-	}
+// ChannelPage adds a precise cursor while retaining the numeric cursor for older clients.
+type ChannelPage struct {
+	Page[ChannelSummary]
+	NextPageCursor *string `json:"nextPageCursor,omitempty"`
 }
 
 // ChannelCursor identifies a boundary in (last_seen DESC, id DESC) order.
@@ -72,24 +56,42 @@ func ParseChannelCursor(raw string) (*ChannelCursor, error) {
 // ChannelMessage represents a single decrypted channel message.
 // Only messages for channels with a known key are stored and returned.
 type ChannelMessage struct {
-	ID               int64  `json:"id" binding:"required"`
-	PacketHash       string `json:"packetHash" binding:"required"`       // hex-encoded packet hash for correlation with packet events
-	ChannelHash      string `json:"channelHash" binding:"required"`      // hex-encoded single-byte channel hash
-	SenderName       string `json:"senderName" binding:"required"`       // display name from the decrypted payload
-	Content          string `json:"content" binding:"required"`          // decrypted message text
-	SentAt           int64  `json:"sentAt" binding:"required"`           // epoch ms, from the sender's embedded timestamp
-	ObservationCount int64  `json:"observationCount" binding:"required"` // number of packet_observations rows for this message's packet hash
+	ID               int64              `json:"id"`
+	PacketHash       string             `json:"packetHash"`       // hex-encoded packet hash for correlation with packet events
+	ChannelHash      string             `json:"channelHash"`      // hex-encoded single-byte channel hash
+	SenderName       string             `json:"senderName"`       // display name from the decrypted payload
+	Content          string             `json:"content"`          // decrypted message text
+	SentAt           int64              `json:"sentAt"`           // epoch ms, from the sender's embedded timestamp
+	ObservationCount int64              `json:"observationCount"` // number of packet_observations rows for this message's packet hash
+	Scope            *string            `json:"scope"`            // matched scope on the first stored packet; null when none was recorded
+	ScopeStatus      ChannelScopeStatus `json:"scopeStatus" enums:"matched,unscoped,unknown,unavailable"`
+}
+
+// ChannelScopeStatus describes stored packet evidence, not a channel key or all reception paths.
+type ChannelScopeStatus string
+
+// RecordedChannelScopeStatus preserves missing capture metadata as unavailable.
+func RecordedChannelScopeStatus(name *string, transport *bool) ChannelScopeStatus {
+	if name != nil {
+		return "matched"
+	}
+	if transport == nil {
+		return "unavailable"
+	}
+	if *transport {
+		return "unknown"
+	}
+	return "unscoped"
 }
 
 // ChannelSummary is the minimal channel representation used in list responses.
 type ChannelSummary struct {
-	ID          int         `json:"id" binding:"required"`
-	Name        *string     `json:"name,omitempty"`                 // display name from config or nil
-	ChannelHash string      `json:"channelHash" binding:"required"` // hex-encoded single-byte hash
-	LastSeen    int64       `json:"lastSeen" binding:"required"`    // epoch ms, time of most recent message
-	IsHashtag   bool        `json:"isHashtag" binding:"required"`   // true if key was derived from a hashtag PSK
-	KeyKnown    bool        `json:"keyKnown" binding:"required"`    // true if Beacon has a decryption key for this channel
-	Kind        ChannelKind `json:"kind" enums:"public,private,hashtag,unknown" binding:"required"`
+	ID          int     `json:"id"`
+	Name        *string `json:"name,omitempty"` // display name from config or nil
+	ChannelHash string  `json:"channelHash"`    // hex-encoded single-byte hash
+	LastSeen    int64   `json:"lastSeen"`       // epoch ms, time of most recent message
+	IsHashtag   bool    `json:"isHashtag"`      // true if key was derived from a hashtag PSK
+	KeyKnown    bool    `json:"keyKnown"`       // true if Beacon has a decryption key for this channel
 }
 
 // Channel is the full channel representation including decryption metadata.
@@ -99,15 +101,5 @@ type Channel struct {
 	ChannelSummary
 	Hashtag        *string `json:"hashtag,omitempty"`        // tag name without # prefix; non-nil only for hashtag channels
 	KeyFingerprint *string `json:"keyFingerprint,omitempty"` // first 8 bytes of SHA256(key), hex-encoded
-	MessageCount   int64   `json:"messageCount" binding:"required"`
-}
-
-// ChannelPage contains a page of channels and the total undecryptable population
-// matching the hash/IATA filters, independent of the page cursor and key filter.
-type ChannelPage struct {
-	NextPageCursor *string          `json:"nextPageCursor,omitempty"`
-	Items          []ChannelSummary `json:"items" binding:"required"`
-	NextCursor     *int64           `json:"nextCursor" binding:"required" extensions:"x-nullable"`
-	HasMore        bool             `json:"hasMore" binding:"required"`
-	UnknownCount   int64            `json:"unknownCount" binding:"required"`
+	MessageCount   int64   `json:"messageCount"`             // lifetime count; not reduced by retention
 }

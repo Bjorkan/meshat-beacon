@@ -12,41 +12,9 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
-	"github.com/MeshCore-Beacon/beacon-server/internal/api/routeplan"
-	"github.com/MeshCore-Beacon/beacon-server/internal/config"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
-
-// RoutePlanConfig carries the planner cost model and staleness window into the
-// store. Wired from config.ResolvedConfig in main; tests construct it directly.
-type RoutePlanConfig struct {
-	Cost           routeplan.Config
-	StaleThreshold time.Duration
-}
-
-// DefaultRoutePlanConfig mirrors the server defaults for tests and callers
-// without a resolved config.
-func DefaultRoutePlanConfig() RoutePlanConfig {
-	return RoutePlanConfig{
-		Cost:           routeplan.FromResolved(config.Resolve(&config.Config{})),
-		StaleThreshold: 24 * time.Hour,
-	}
-}
-
-// SetRoutePlanConfig installs the planner cost model. Must be called before
-// PlanBestRoute; the zero value falls back to server defaults.
-func (s *Store) SetRoutePlanConfig(c RoutePlanConfig) {
-	s.routePlan = c
-	s.routePlanSet = true
-}
-
-func (s *Store) routePlanOrDefault() RoutePlanConfig {
-	if s.routePlanSet {
-		return s.routePlan
-	}
-	return DefaultRoutePlanConfig()
-}
 
 // routePathKey is the route's identity digest: md5 over the comma-joined
 // node UUIDs, matching Postgres's decode(md5(array_to_string(node_ids, ',')), 'hex').
@@ -69,41 +37,20 @@ func (s *Store) UpsertKnownRoute(ctx context.Context, nodeIDs []uuid.UUID, hashP
 	})
 }
 
-func (s *Store) ListKnownRoutes(ctx context.Context, params api.RouteListParams) (api.Page[api.KnownRoute], error) {
-	if params.Sort == "" {
-		params.Sort = api.RouteSortLastSeen
-	}
-	if params.Direction == "" {
-		params.Direction = api.SortDesc
-	}
+func (s *Store) ListKnownRoutes(ctx context.Context, iata string, hopCount int32, cursor time.Time, cursorID int64, limit int32) ([]api.KnownRoute, error) {
 	var cursorTS pgtype.Timestamptz
-	if !params.LegacyCursor.IsZero() {
-		cursorTS = pgtype.Timestamptz{Time: params.LegacyCursor, Valid: true}
-	}
-	cursorValid := params.PageToken != nil
-	var cursorKey string
-	var cursorID int64
-	if params.PageToken != nil {
-		cursorKey = params.PageToken.Key
-		cursorID = params.PageToken.NumericID
+	if !cursor.IsZero() {
+		cursorTS = pgtype.Timestamptz{Time: cursor, Valid: true}
 	}
 	sqlRows, err := s.q.ListKnownRoutes(ctx, sqlc.ListKnownRoutesParams{
-		Column1: params.IATAs,
-		Column2: params.HopCount,
+		Column1: iata,
+		Column2: hopCount,
 		Column3: cursorTS,
-		Column4: params.Sort,
-		Column5: string(params.Direction),
-		Column6: cursorValid,
-		Column7: cursorKey,
-		Column8: cursorID,
-		Limit:   params.Limit + 1,
+		Limit:   limit,
+		Column5: cursorID,
 	})
 	if err != nil {
-		return api.Page[api.KnownRoute]{}, err
-	}
-	hasMore := len(sqlRows) > int(params.Limit)
-	if hasMore {
-		sqlRows = sqlRows[:params.Limit]
+		return nil, err
 	}
 	rows := make([]knownRouteRow, len(sqlRows))
 	for i, r := range sqlRows {
@@ -112,24 +59,9 @@ func (s *Store) ListKnownRoutes(ctx context.Context, params api.RouteListParams)
 	ids := collectNodeIDs(rows)
 	nodes, err := s.GetNodesByIDs(ctx, ids)
 	if err != nil {
-		return api.Page[api.KnownRoute]{}, err
+		return nil, err
 	}
-	items := toKnownRoutes(rows, nodes)
-	var nextToken *string
-	var nextCursor *int64
-	if hasMore && len(sqlRows) > 0 {
-		last := sqlRows[len(sqlRows)-1]
-		token := api.EncodePageToken(api.PageToken{
-			Version: api.PageTokenVersion, Collection: api.PageCollectionRoutes,
-			Sort: params.Sort, Direction: params.Direction, Key: last.PageSortKey, NumericID: last.ID,
-		})
-		nextToken = &token
-		if params.Sort == api.RouteSortLastSeen && params.Direction == api.SortDesc {
-			legacy := last.LastSeen.Time.UnixMilli()
-			nextCursor = &legacy
-		}
-	}
-	return api.Page[api.KnownRoute]{Items: items, NextCursor: nextCursor, NextPageToken: nextToken, HasMore: hasMore}, nil
+	return toKnownRoutes(rows, nodes), nil
 }
 
 func (s *Store) SearchKnownRoutes(ctx context.Context, iata, fromHash, toHash string) ([]api.KnownRoute, error) {
@@ -187,6 +119,7 @@ func (s *Store) SearchKnownRoutes(ctx context.Context, iata, fromHash, toHash st
 			hops = append(hops, hop)
 		}
 		items = append(items, api.KnownRoute{
+			PathKey:          hex.EncodeToString(routePathKey(r.NodeIds)),
 			ID:               r.ID,
 			IATA:             r.Iata,
 			HopCount:         int32(len(hops)),
@@ -251,7 +184,7 @@ func (s *Store) SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, t
 	if err != nil {
 		return nil, err
 	}
-	fromResolved, err := s.ResolvePathHashes(ctx, [][]byte{fromBytes})
+	fromResolved, err := s.ResolvePathHashes(ctx, fromIATA, [][]byte{fromBytes})
 	if err != nil {
 		return nil, err
 	}
@@ -266,7 +199,7 @@ func (s *Store) SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, t
 	if err != nil {
 		return nil, err
 	}
-	toResolved, err := s.ResolvePathHashes(ctx, [][]byte{toBytes})
+	toResolved, err := s.ResolvePathHashes(ctx, toIATA, [][]byte{toBytes})
 	if err != nil {
 		return nil, err
 	}
@@ -355,19 +288,51 @@ func (s *Store) SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, t
 	return results, nil
 }
 
+// AmbiguousPrefixes is the per-IATA set of hop prefixes that resolve to more than one node.
+type AmbiguousPrefixes struct {
+	IATAs    []string
+	Lens     []int32
+	Prefixes [][]byte
+}
+
+func (s *Store) AmbiguousPrefixes(ctx context.Context) (AmbiguousPrefixes, error) {
+	rows, err := s.q.AmbiguousPrefixes(ctx)
+	if err != nil {
+		return AmbiguousPrefixes{}, err
+	}
+	amb := AmbiguousPrefixes{IATAs: make([]string, 0, len(rows)), Lens: make([]int32, 0, len(rows)), Prefixes: make([][]byte, 0, len(rows))}
+	for _, r := range rows {
+		amb.IATAs = append(amb.IATAs, r.Iata)
+		amb.Lens = append(amb.Lens, r.Len)
+		amb.Prefixes = append(amb.Prefixes, r.Prefix)
+	}
+	return amb, nil
+}
+
 // ReconfirmRoutes checks the batchSize least-recently-reconfirmed routes,
 // deleting stale or ambiguous ones and stamping the survivors.
-func (s *Store) ReconfirmRoutes(ctx context.Context, batchSize int32) error {
-	return s.q.ReconfirmRoutes(ctx, batchSize)
+func (s *Store) ReconfirmRoutes(ctx context.Context, batchSize int32, before time.Time, amb AmbiguousPrefixes) (int64, error) {
+	return s.q.ReconfirmRoutes(ctx, sqlc.ReconfirmRoutesParams{
+		BatchSize: batchSize,
+		Before:    pgtype.Timestamptz{Time: before, Valid: true},
+		AmbIata:   amb.IATAs,
+		AmbLen:    amb.Lens,
+		AmbPrefix: amb.Prefixes,
+	})
 }
+
+const routeDeleteBatch = 10000
 
 // DeleteOldRoutes prunes routes per the retention rule: unconditionally past
 // retentionCutoff, and past graceCutoff when observed fewer than minObservations times.
 func (s *Store) DeleteOldRoutes(ctx context.Context, retentionCutoff time.Time, minObservations int64, graceCutoff time.Time) error {
-	return s.q.DeleteOldRoutes(ctx, sqlc.DeleteOldRoutesParams{
-		LastSeen:         pgtype.Timestamptz{Time: retentionCutoff, Valid: true},
-		ObservationCount: minObservations,
-		LastSeen_2:       pgtype.Timestamptz{Time: graceCutoff, Valid: true},
+	return deleteInBatches(ctx, routeDeleteBatch, func(ctx context.Context, n int32) (int64, error) {
+		return s.q.DeleteOldRoutes(ctx, sqlc.DeleteOldRoutesParams{
+			RetentionCutoff: pgtype.Timestamptz{Time: retentionCutoff, Valid: true},
+			GraceCutoff:     pgtype.Timestamptz{Time: graceCutoff, Valid: true},
+			MinObservations: minObservations,
+			BatchSize:       n,
+		})
 	})
 }
 
@@ -379,188 +344,6 @@ func extractFromNode(hops []api.RouteHop, nodeID uuid.UUID) []api.RouteHop {
 		}
 	}
 	return hops
-}
-
-// PlanBestRoute serves planning requests from the Holder's in-memory routing
-// snapshot when one is installed (see RefreshRouteSnapshot); otherwise it
-// falls back to a single PostgreSQL dump (startup/tests). Endpoints are resolved by UUID (the
-// handler maps full pubkeys to IDs). Endpoint metadata is resolved
-// independently of the neighbor graph, so a known + located but isolated
-// endpoint yields "no-route" (200, empty paths) while a known endpoint
-// without coordinates yields "endpoint-missing-position" (the handler maps
-// that to 422). A pair with no connecting path also yields "no-route".
-func (s *Store) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
-	cfg := s.routePlanOrDefault()
-	if maxAlternatives < 0 {
-		maxAlternatives = 0
-	}
-	if maxAlternatives > cfg.Cost.MaxAlternatives {
-		maxAlternatives = cfg.Cost.MaxAlternatives
-	}
-	k := 1 + maxAlternatives
-	now := time.Now()
-
-	if snap := s.routeSnapshotOrNil(); snap != nil {
-		return planOnSnapshot(ctx, s, snap, cfg, fromID, toID, k, now)
-	}
-
-	rows, err := s.q.GetRoutePlanGraph(ctx)
-	if err != nil {
-		return api.BestRouteResult{}, err
-	}
-	g := routeplan.BuildGraph(rows, s.staleThresholdOrDefault(), s.neighborMaxKmOrDefault(cfg), now)
-
-	// Classify endpoints from node metadata, not from graph membership: a
-	// located node with zero neighbor rows never enters g.Nodes but must not
-	// be reported as missing its position.
-	fromLoc, toLoc, err := s.routeEndpointLocations(ctx, fromID, toID, g)
-	if err != nil {
-		return api.BestRouteResult{}, err
-	}
-	if !fromLoc || !toLoc {
-		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "endpoint-missing-position"}, nil
-	}
-
-	paths := routeplan.ShortestPaths(g, cfg.Cost, fromID, toID, k, now)
-	if len(paths) == 0 {
-		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
-	}
-	out := make([]api.PlannedRoute, 0, len(paths))
-	for _, p := range paths {
-		route, ok := toPlannedRoute(g, p, now, cfg)
-		if !ok {
-			continue
-		}
-		out = append(out, route)
-	}
-	if len(out) == 0 {
-		return api.BestRouteResult{Paths: []api.PlannedRoute{}, Reason: "no-route"}, nil
-	}
-	return api.BestRouteResult{Paths: out}, nil
-}
-
-// routeEndpointLocations reports whether each endpoint is located, resolving
-// metadata independently of the neighbor graph. A node present in the graph
-// is located by construction (BuildGraph drops unlocated rows). A node absent
-// from the graph falls back to a GetNodesByIDs lookup: known + located but
-// isolated still routes to "no-route", while unknown or unlocated yields
-// "endpoint-missing-position".
-func (s *Store) routeEndpointLocations(ctx context.Context, fromID, toID uuid.UUID, g routeplan.Graph) (bool, bool, error) {
-	_, fromInGraph := g.Nodes[fromID]
-	_, toInGraph := g.Nodes[toID]
-	if fromInGraph && toInGraph {
-		return true, true, nil
-	}
-	missing := make([]uuid.UUID, 0, 2)
-	if !fromInGraph {
-		missing = append(missing, fromID)
-	}
-	if !toInGraph && toID != fromID {
-		missing = append(missing, toID)
-	}
-	nodes, err := s.GetNodesByIDs(ctx, missing)
-	if err != nil {
-		return false, false, err
-	}
-	located := func(id uuid.UUID, inGraph bool) bool {
-		if inGraph {
-			return true
-		}
-		n := nodes[id]
-		return n != nil && n.Latitude != nil && n.Longitude != nil
-	}
-	return located(fromID, fromInGraph), located(toID, toInGraph), nil
-}
-
-func (s *Store) staleThresholdOrDefault() time.Duration {
-	if s.staleThreshold != 0 {
-		return s.staleThreshold
-	}
-	return 24 * time.Hour
-}
-
-func (s *Store) neighborMaxKmOrDefault(cfg RoutePlanConfig) float64 {
-	if cfg.Cost.MaxDistanceKm != 0 {
-		return cfg.Cost.MaxDistanceKm
-	}
-	if s.neighborMaxKm != 0 {
-		return s.neighborMaxKm
-	}
-	return 150
-}
-
-// toPlannedRoute projects one node path onto the API shape. Edges are looked
-// up from the graph (same merged values the cost used); ok=false when a leg
-// vanished, which cannot happen for paths the search just produced. The
-// neighbor badge uses the same freshness definition as the cost model
-// (IsFreshNeighbor): a stale confirmation earns neither bonus nor badge.
-// The unseen flag comes from the same merged edge the cost used
-// (Edge.Unseen): a leg no packet ever crossed in its direction.
-func toPlannedRoute(g routeplan.Graph, p routeplan.Path, now time.Time, cfg RoutePlanConfig) (api.PlannedRoute, bool) {
-	nodes := make([]api.PlannedRouteNode, 0, len(p.Nodes))
-	legs := make([]api.PlannedRouteLeg, 0, len(p.Nodes)-1)
-	hasUnmeasured := false
-	hasUnseen := false
-	hasStale := false
-	for i, id := range p.Nodes {
-		n, ok := g.Nodes[id]
-		if !ok {
-			return api.PlannedRoute{}, false
-		}
-		lat, lng := n.Lat, n.Lng
-		nodes = append(nodes, api.PlannedRouteNode{
-			ID: n.ID, PublicKey: n.Pubkey, Name: n.Name,
-			Latitude: &lat, Longitude: &lng,
-			NodeType: n.Type, NodeTypeName: api.NodeTypeName(n.Type), Stale: n.Stale,
-			SupportsMultibytePaths: n.SupportsMultibytePaths,
-		})
-		if n.Stale {
-			hasStale = true
-		}
-		if i+1 < len(p.Nodes) {
-			var found *routeplan.Edge
-			for _, e := range g.Edges[id] {
-				if e.To == p.Nodes[i+1] {
-					e := e
-					found = &e
-					break
-				}
-			}
-			if found == nil {
-				return api.PlannedRoute{}, false
-			}
-			var snr *float32
-			var snrCount int64
-			var snrSeen int64
-			if found.SNR != nil {
-				v := *found.SNR
-				snr = &v
-				snrCount = found.SNRSampleCount
-			}
-			if !found.SNRLastSeen.IsZero() {
-				snrSeen = found.SNRLastSeen.UnixMilli()
-			}
-			unmeasured := i < len(p.Unmeasured) && p.Unmeasured[i]
-			if unmeasured {
-				hasUnmeasured = true
-			}
-			unseen := i < len(p.Unseen) && p.Unseen[i]
-			if unseen {
-				hasUnseen = true
-			}
-			legs = append(legs, api.PlannedRouteLeg{
-				From: n.Pubkey, To: g.Nodes[p.Nodes[i+1]].Pubkey,
-				SNR: snr, SNRSampleCount: snrCount, SNRLastSeen: snrSeen,
-				ObservationCount: found.Observations, Unmeasured: unmeasured,
-				Neighbor: cfg.Cost.IsFreshNeighbor(*found, now),
-				Unseen:   unseen,
-			})
-		}
-	}
-	return api.PlannedRoute{
-		Nodes: nodes, Legs: legs, TotalCost: p.Cost, HopCount: len(legs),
-		HasUnmeasuredLegs: hasUnmeasured, HasUnseenLegs: hasUnseen, ContainsStaleNodes: hasStale,
-	}, true
 }
 
 // knownRouteRow normalizes the per-query sqlc row structs (identical
@@ -591,6 +374,7 @@ func toKnownRoutes(rows []knownRouteRow, nodes map[uuid.UUID]*api.ResolvedNode) 
 			hops = append(hops, hop)
 		}
 		items = append(items, api.KnownRoute{
+			PathKey:          hex.EncodeToString(routePathKey(r.NodeIds)),
 			ID:               r.ID,
 			IATA:             r.Iata,
 			HopCount:         r.HopCount,

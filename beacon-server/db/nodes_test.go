@@ -11,9 +11,7 @@ import (
 
 	sqlc "github.com/MeshCore-Beacon/beacon-server/db/sqlc"
 	mockdb "github.com/MeshCore-Beacon/beacon-server/db/sqlc/mock"
-	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/ingest"
-	"github.com/MeshCore-Beacon/beacon-server/internal/radiopreset"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.uber.org/mock/gomock"
@@ -30,10 +28,10 @@ func TestUpsertNode_WithRadio(t *testing.T) {
 
 	mock.EXPECT().
 		UpsertNode(gomock.Any(), gomock.Any()).
-		Return(sqlc.UpsertNodeRow{ID: nodeID}, nil)
+		Return(sqlc.Node{ID: nodeID}, nil)
 
 	store := &Store{q: mock}
-	id, changed, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
+	id, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
 		PublicKey: []byte{0x01},
 		NodeType:  1,
 		Name:      "test-node",
@@ -43,9 +41,6 @@ func TestUpsertNode_WithRadio(t *testing.T) {
 	}
 	if id != nodeID {
 		t.Errorf("expected ID %s, got %s", nodeID, id)
-	}
-	if changed {
-		t.Error("expected unchanged coordinates")
 	}
 }
 
@@ -59,13 +54,13 @@ func TestUpsertNode_ComputesClockDrift(t *testing.T) {
 	var captured sqlc.UpsertNodeParams
 	mock.EXPECT().
 		UpsertNode(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.UpsertNodeRow, error) {
+		DoAndReturn(func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.Node, error) {
 			captured = p
-			return sqlc.UpsertNodeRow{ID: nodeID}, nil
+			return sqlc.Node{ID: nodeID}, nil
 		})
 
 	store := &Store{q: mock}
-	_, _, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
+	_, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
 		PublicKey:       []byte{0x01},
 		NodeType:        2, // repeater
 		Name:            "test-repeater",
@@ -93,13 +88,13 @@ func TestUpsertNode_NoAdvertTimestamp_OmitsDrift(t *testing.T) {
 	var captured sqlc.UpsertNodeParams
 	mock.EXPECT().
 		UpsertNode(gomock.Any(), gomock.Any()).
-		DoAndReturn(func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.UpsertNodeRow, error) {
+		DoAndReturn(func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.Node, error) {
 			captured = p
-			return sqlc.UpsertNodeRow{ID: nodeID}, nil
+			return sqlc.Node{ID: nodeID}, nil
 		})
 
 	store := &Store{q: mock}
-	_, _, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
+	_, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
 		PublicKey: []byte{0x01},
 		NodeType:  2, // repeater, but AdvertTimestamp left zero (e.g. decode failed upstream)
 		Name:      "test-repeater",
@@ -120,10 +115,10 @@ func TestUpsertNode_WithoutRadio(t *testing.T) {
 
 	mock.EXPECT().
 		UpsertNode(gomock.Any(), gomock.Any()).
-		Return(sqlc.UpsertNodeRow{ID: nodeID, CoordinatesChanged: true}, nil)
+		Return(sqlc.Node{ID: nodeID}, nil)
 
 	store := &Store{q: mock}
-	id, changed, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
+	id, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{
 		PublicKey: []byte{0x01},
 		NodeType:  1,
 		Name:      "test-node",
@@ -133,9 +128,6 @@ func TestUpsertNode_WithoutRadio(t *testing.T) {
 	}
 	if id != nodeID {
 		t.Errorf("expected ID %s, got %s", nodeID, id)
-	}
-	if !changed {
-		t.Error("expected coordinate change to propagate from the query")
 	}
 }
 
@@ -194,10 +186,9 @@ func TestListNodes_Pagination(t *testing.T) {
 	rows := make([]sqlc.ListNodesRow, 3)
 	for i := range rows {
 		rows[i] = sqlc.ListNodesRow{
-			ID:          nodeID,
-			PublicKey:   []byte{0x01},
-			LastSeen:    lastSeen,
-			PageSortKey: "00000001700000000000",
+			ID:        nodeID,
+			PublicKey: []byte{0x01},
+			LastSeen:  lastSeen,
 		}
 	}
 
@@ -206,7 +197,7 @@ func TestListNodes_Pagination(t *testing.T) {
 		Return(rows, nil)
 
 	store := &Store{q: mock}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{IATAs: []string{"YVR"}, Limit: 2})
+	page, err := store.ListNodes(context.Background(), 0, []string{"YVR"}, nil, nil, nil, "", "", "", 0, 2, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,16 +209,6 @@ func TestListNodes_Pagination(t *testing.T) {
 	}
 	if page.NextCursor == nil {
 		t.Error("expected NextCursor to be set")
-	}
-	if page.NextPageToken == nil {
-		t.Fatal("expected NextPageToken to be set")
-	}
-	token, err := api.DecodePageToken(*page.NextPageToken)
-	if err != nil {
-		t.Fatalf("invalid NextPageToken: %v", err)
-	}
-	if token.Collection != api.PageCollectionNodes || token.Sort != api.NodeSortLastSeen || token.Direction != api.SortDesc {
-		t.Fatalf("unexpected token ordering: %#v", token)
 	}
 }
 
@@ -249,7 +230,7 @@ func TestListNodes_IATAsUnmarshal(t *testing.T) {
 		}, nil)
 
 	store := &Store{q: mock}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	page, err := store.ListNodes(context.Background(), 0, nil, nil, nil, nil, "", "", "", 0, 10, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -278,7 +259,7 @@ func TestListNodes_Stale(t *testing.T) {
 		}, nil)
 
 	store := &Store{q: mock, staleThreshold: 24 * time.Hour}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	page, err := store.ListNodes(context.Background(), 0, nil, nil, nil, nil, "", "", "", 0, 10, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -319,7 +300,7 @@ func TestListNodes_RadioStringFormatting(t *testing.T) {
 		}, nil)
 
 	store := &Store{q: mock}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	page, err := store.ListNodes(context.Background(), 0, nil, nil, nil, nil, "", "", "", 0, 10, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -339,7 +320,7 @@ func TestGetNode_LastAdvertAt(t *testing.T) {
 	lastAdvert := pgtype.Timestamptz{Time: time.UnixMilli(1700000000000), Valid: true}
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:           nodeID,
 			PublicKey:    []byte{0x01},
@@ -372,7 +353,7 @@ func TestGetNode_LastAdvertAtNil(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -401,7 +382,7 @@ func TestGetNode_Stale(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -432,7 +413,7 @@ func TestGetNode_ClockDrift_OutOfSync(t *testing.T) {
 	drift := int32(-600) // 10 minutes behind, beyond a 5m threshold
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -471,7 +452,7 @@ func TestGetNode_ClockDrift_InSync(t *testing.T) {
 	drift := int32(30) // well within a 5m threshold
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -504,7 +485,7 @@ func TestGetNode_ClockDrift_OmittedForCompanion(t *testing.T) {
 	drift := int32(-600)
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:                      nodeID,
 			PublicKey:               []byte{0x01},
@@ -536,7 +517,7 @@ func TestGetNode_ClockDrift_OmittedWhenUnmeasured(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		GetNodeByID(gomock.Any(), gomock.Any()).
+		GetNodeByID(gomock.Any(), nodeID).
 		Return(sqlc.GetNodeByIDRow{
 			ID:        nodeID,
 			PublicKey: []byte{0x01},
@@ -653,25 +634,6 @@ func TestGetNodeNeighbors_DBError(t *testing.T) {
 	}
 }
 
-func TestMergeNeighborSNR_WeightsSamplesAndTracksFreshness(t *testing.T) {
-	old := float32(-10)
-	item := api.NodeNeighbor{SNR: &old, SNRSampleCount: 3, SNRLastSeen: 1_000}
-	newValue := float32(2)
-	newSeen := pgtype.Timestamptz{Time: time.UnixMilli(2_000), Valid: true}
-
-	mergeNeighborSNR(&item, &newValue, 1, newSeen)
-
-	if item.SNR == nil || *item.SNR != -7 {
-		t.Fatalf("expected weighted SNR -7, got %v", item.SNR)
-	}
-	if item.SNRSampleCount != 4 {
-		t.Fatalf("expected four samples, got %d", item.SNRSampleCount)
-	}
-	if item.SNRLastSeen != 2_000 {
-		t.Fatalf("expected latest reliable sample timestamp, got %d", item.SNRLastSeen)
-	}
-}
-
 func TestListNodes_IncludeNeighbors_PassesFlagAndMapsIDs(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mock := mockdb.NewMockQuerier(ctrl)
@@ -680,7 +642,11 @@ func TestListNodes_IncludeNeighbors_PassesFlagAndMapsIDs(t *testing.T) {
 	neighborID := uuid.MustParse("00000000-0000-0000-0000-000000000002")
 
 	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Any()).
+		ListNodes(gomock.Any(), gomock.Eq(sqlc.ListNodesParams{
+			Column1: int16(0), Column2: nil, Column3: "any", Column4: "any",
+			Column5: nil, Column6: "", Column7: pgtype.Timestamptz{},
+			Limit: 11, Column9: "", Column10: true,
+		})).
 		Return([]sqlc.ListNodesRow{
 			{
 				ID:          nodeID,
@@ -690,7 +656,7 @@ func TestListNodes_IncludeNeighbors_PassesFlagAndMapsIDs(t *testing.T) {
 		}, nil)
 
 	store := &Store{q: mock}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10, IncludeNeighbors: true})
+	page, err := store.ListNodes(context.Background(), 0, nil, nil, nil, nil, "", "", "", 0, 10, true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -706,13 +672,17 @@ func TestListNodes_ExcludeNeighbors_LeavesIDsNil(t *testing.T) {
 	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
 
 	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Any()).
+		ListNodes(gomock.Any(), gomock.Eq(sqlc.ListNodesParams{
+			Column1: int16(0), Column2: nil, Column3: "any", Column4: "any",
+			Column5: nil, Column6: "", Column7: pgtype.Timestamptz{},
+			Limit: 11, Column9: "", Column10: false,
+		})).
 		Return([]sqlc.ListNodesRow{
 			{ID: nodeID, PublicKey: []byte{0x01}, NeighborIds: nil},
 		}, nil)
 
 	store := &Store{q: mock}
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
+	page, err := store.ListNodes(context.Background(), 0, nil, nil, nil, nil, "", "", "", 0, 10, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -734,165 +704,5 @@ func TestDeleteOldNodes(t *testing.T) {
 	store := &Store{q: mock}
 	if err := store.DeleteOldNodes(context.Background(), cutoff); err != nil {
 		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestMembershipCutoff_UsesNodeIATATTL(t *testing.T) {
-	store := &Store{nodeIATATTL: 7 * 24 * time.Hour}
-	before := time.Now()
-	cutoff := store.membershipCutoff()
-	if !cutoff.Valid {
-		t.Fatal("expected valid cutoff")
-	}
-	age := before.Sub(cutoff.Time)
-	if age < 7*24*time.Hour-time.Minute || age > 7*24*time.Hour+time.Minute {
-		t.Errorf("expected ~7d cutoff, got age %v", age)
-	}
-}
-
-func TestDeleteStaleNodeIATAs(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	cutoff := time.Now().Add(-30 * 24 * time.Hour)
-	mock.EXPECT().
-		DeleteStaleNodeIATAs(gomock.Any(), gomock.Eq(pgtype.Timestamptz{Time: cutoff, Valid: true})).
-		Return(nil)
-
-	store := &Store{q: mock}
-	if err := store.DeleteStaleNodeIATAs(context.Background(), cutoff); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func TestUpsertNode_DoesNotWrapClockDrift(t *testing.T) {
-	mock := mockdb.NewMockQuerier(gomock.NewController(t))
-	mock.EXPECT().UpsertNode(gomock.Any(), gomock.Any()).DoAndReturn(
-		func(_ context.Context, p sqlc.UpsertNodeParams) (sqlc.UpsertNodeRow, error) {
-			if p.DeviceClockDriftSeconds != nil {
-				t.Errorf("unrepresentable positive drift wrapped to %d", *p.DeviceClockDriftSeconds)
-			}
-			return sqlc.UpsertNodeRow{}, nil
-		},
-	)
-	store := &Store{q: mock}
-	_, _, err := store.UpsertNode(context.Background(), ingest.UpsertNodeParams{AdvertTimestamp: ^uint32(0)}, ingest.RadioSettings{})
-	if err != nil {
-		t.Fatal(err)
-	}
-}
-
-func TestListAmbiguousPrefix2_HexEncodes(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	mock.EXPECT().
-		ListAmbiguousPrefix2(gomock.Any()).
-		Return([][]byte{{0xa3, 0xf1}, {0x00, 0x01}}, nil)
-
-	store := &Store{q: mock}
-	got, err := store.ListAmbiguousPrefix2(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 2 || got[0] != "a3f1" || got[1] != "0001" {
-		t.Errorf("expected [a3f1 0001], got %v", got)
-	}
-}
-
-func TestListAmbiguousPrefix2_Empty(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	mock.EXPECT().
-		ListAmbiguousPrefix2(gomock.Any()).
-		Return(nil, nil)
-
-	store := &Store{q: mock}
-	got, err := store.ListAmbiguousPrefix2(context.Background())
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(got) != 0 {
-		t.Errorf("expected empty, got %v", got)
-	}
-}
-
-// testPresetCatalogue builds a minimal catalogue resolving the EU 869.618/62.5/SF8
-// triple without a network fetch.
-func testPresetCatalogue() *radiopreset.Catalogue {
-	return radiopreset.Load(context.Background(), func(ctx context.Context, url string) ([]byte, error) {
-		return []byte(`{"config":{"suggested_radio_settings":{"entries":[{"title":"EU/UK (Narrow)","frequency":"869.618","bandwidth":"62.5","spreading_factor":"8"}]}}}`), nil
-	})
-}
-
-func TestListNodes_RadioTitle(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	freq := float32(869.618)
-	bw := float32(62.5)
-	sf := int16(8)
-	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-
-	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Any()).
-		Return([]sqlc.ListNodesRow{
-			{
-				ID:           nodeID,
-				PublicKey:    []byte{0x01},
-				RadioFreqMhz: &freq,
-				RadioBwKhz:   &bw,
-				RadioSf:      &sf,
-			},
-		}, nil)
-
-	store := &Store{q: mock}
-	store.SetPresetCatalogue(testPresetCatalogue())
-
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(page.Items) != 1 {
-		t.Fatalf("expected 1 item, got %d", len(page.Items))
-	}
-	n := page.Items[0]
-	if n.Radio == nil || *n.Radio != "869.618,62.5,8" {
-		t.Errorf("expected raw radio triple, got %v", n.Radio)
-	}
-	if n.RadioTitle == nil || *n.RadioTitle != "EU/UK (Narrow)" {
-		t.Errorf("expected suggested title, got %v", n.RadioTitle)
-	}
-}
-
-func TestListNodes_RadioTitleAbsentWithoutCatalogue(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	mock := mockdb.NewMockQuerier(ctrl)
-
-	freq := float32(869.618)
-	bw := float32(62.5)
-	sf := int16(8)
-	nodeID := uuid.MustParse("00000000-0000-0000-0000-000000000001")
-
-	mock.EXPECT().
-		ListNodes(gomock.Any(), gomock.Any()).
-		Return([]sqlc.ListNodesRow{
-			{
-				ID:           nodeID,
-				PublicKey:    []byte{0x01},
-				RadioFreqMhz: &freq,
-				RadioBwKhz:   &bw,
-				RadioSf:      &sf,
-			},
-		}, nil)
-
-	store := &Store{q: mock} // no catalogue installed
-	page, err := store.ListNodes(context.Background(), api.NodeListParams{Limit: 10})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if page.Items[0].RadioTitle != nil {
-		t.Errorf("expected no title without catalogue, got %v", *page.Items[0].RadioTitle)
 	}
 }

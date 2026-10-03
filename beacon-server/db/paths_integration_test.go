@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"slices"
 	"testing"
 	"time"
 
@@ -36,11 +37,11 @@ func TestPathsPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer tx.Rollback(context.Background())
-	isolateStatsSchema(t, ctx, tx)
+	applyBaseline(t, ctx, tx)
 	_, err = tx.Exec(ctx, `
 SET LOCAL TIME ZONE 'America/Vancouver';
-CREATE TABLE packet_observations(heard_at timestamptz NOT NULL,iata char(3) NOT NULL,payload_type smallint,path_length_byte smallint NOT NULL,hash_size smallint NOT NULL,hop_count smallint NOT NULL,path_bytes bytea);
-INSERT INTO packet_observations
+CREATE TEMP TABLE fixture(heard_at timestamptz NOT NULL,iata char(3) NOT NULL,payload_type smallint,path_length_byte smallint NOT NULL,hash_size smallint NOT NULL,hop_count smallint NOT NULL,path_bytes bytea);
+INSERT INTO fixture
 SELECT CASE id WHEN 1 THEN '2026-01-01 00:30+00'::timestamptz WHEN 17 THEN '2026-01-01 04:00+00'::timestamptz WHEN 18 THEN '2026-01-01 04:30+00'::timestamptz WHEN 20 THEN '2026-01-01 03:00+00'::timestamptz
  ELSE '2026-01-01 00:30+00'::timestamptz+(id/10)*interval '2 hour'+(id%10)*interval '1 minute' END,
  iata,payload,raw,width,hops,CASE WHEN size IS NULL THEN NULL ELSE decode(repeat('ab',size),'hex') END
@@ -52,7 +53,13 @@ FROM (VALUES
  (13,'YYZ',5,0,1,0,0),(14,'YVR',16,1,1,1,1),(15,'YVR',4,63,1,63,63),
  (16,'YVR',4,149,3,21,63),(17,'YVR',4,1,1,1,1),(18,'YVR',4,1,1,1,1),
  (19,'YYJ',9,3,1,3,3),(20,'YVR',4,64,2,0,0)
-) v(id,iata,payload,raw,width,hops,size);`)
+) v(id,iata,payload,raw,width,hops,size);
+ALTER TABLE fixture ADD COLUMN n serial;
+INSERT INTO observers (id,public_key) VALUES ('00000000-0000-0000-0000-000000000001','\x01');
+INSERT INTO packets (packet_hash,payload_type,payload_version,route_type,raw_payload,raw_header,first_heard_at,last_heard_at)
+SELECT int4send(n),4,0,1,'\x00','\x00',heard_at,heard_at FROM fixture;
+INSERT INTO packet_observations (packet_hash,observer_id,heard_at,iata,payload_type,path_length_byte,hash_size,hop_count,path_bytes)
+SELECT int4send(n),'00000000-0000-0000-0000-000000000001',heard_at,iata,payload_type,path_length_byte,hash_size,hop_count,path_bytes FROM fixture;`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,8 +67,7 @@ FROM (VALUES
 	if _, err := tx.Exec(ctx, "UPDATE packet_observations SET heard_at=to_timestamp(extract(epoch FROM $1::timestamptz)+extract(epoch FROM heard_at)-extract(epoch FROM '2026-01-01 00:00+00'::timestamptz))", since); err != nil {
 		t.Fatal(err)
 	}
-	applyStatsMigration(t, ctx, tx, "048_mv_path_stats.sql")
-	applyStatsMigration(t, ctx, tx, "048_mv_path_stats.sql") // interrupted journal retry
+	rollTxHours(t, ctx, tx)
 	store := &Store{q: sqlc.New(tx)}
 	until := since.Add(4 * time.Hour)
 	for _, mode := range []string{"force_custom_plan", "force_generic_plan"} {
@@ -107,8 +113,30 @@ FROM (VALUES
 			})
 		}
 	}
+	// The longest routed path per hour; hours with only empty, TRACE or invalid paths report 0.
+	for _, tc := range []struct {
+		iatas []string
+		want  []int32
+	}{
+		{nil, []int32{32, 63, 0}},
+		{[]string{"YVR", "YYJ"}, []int32{32, 63, 0}},
+		{[]string{"YYJ"}, []int32{2, 0}},
+		{[]string{"YYZ"}, []int32{0}},
+	} {
+		got, err := store.GetPathStats(ctx, since, until, tc.iatas)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var max []int32
+		for _, h := range got.Hourly {
+			max = append(max, h.MaxEntries)
+		}
+		if !slices.Equal(max, tc.want) {
+			t.Errorf("maxEntries for %v = %v, want %v", tc.iatas, max, tc.want)
+		}
+	}
 	w := httptest.NewRecorder()
-	handlers.StatsRouter(store).ServeHTTP(w, httptest.NewRequest("GET", fmt.Sprintf("/paths?since=%d&until=%d&iatas=YVR", since.UnixMilli()+123, until.UnixMilli()+123), nil).WithContext(ctx))
+	handlers.StatsRouter(store, handlers.StatsOptions{}).ServeHTTP(w, httptest.NewRequest("GET", fmt.Sprintf("/paths?since=%d&until=%d&iatas=YVR", since.UnixMilli()+123, until.UnixMilli()+123), nil).WithContext(ctx))
 	var response api.PathStats
 	if err := json.Unmarshal(w.Body.Bytes(), &response); err != nil || w.Code != 200 || response.Receptions != 14 || response.Hashed != 5 {
 		t.Fatalf("HTTP %d: %s (%v)", w.Code, w.Body.String(), err)
@@ -116,16 +144,19 @@ FROM (VALUES
 	if _, err = tx.Exec(ctx, "TRUNCATE packet_observations"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO packet_observations SELECT $1::timestamptz+interval '1 hour','YVR',4,i,(i>>6)+1,i&63,decode(repeat('ab',((i>>6)+1)*(i&63)),'hex') FROM generate_series(0,255)i;`, since); err != nil {
+	if _, err = tx.Exec(ctx, `INSERT INTO packets (packet_hash,payload_type,payload_version,route_type,raw_payload,raw_header,first_heard_at,last_heard_at)
+SELECT int4send(1000+i),4,0,1,'\x00','\x00',$1,$1 FROM generate_series(0,255)i`, since); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = tx.Exec(ctx, `INSERT INTO packet_observations (packet_hash,observer_id,heard_at,iata,payload_type,path_length_byte,hash_size,hop_count,path_bytes)
+SELECT int4send(1000+i),'00000000-0000-0000-0000-000000000001',$1::timestamptz+interval '1 hour','YVR',4,i,(i>>6)+1,i&63,decode(repeat('ab',((i>>6)+1)*(i&63)),'hex') FROM generate_series(0,255)i;`, since); err != nil {
 		t.Fatal(err)
 	}
 	stale, err := store.GetPathStats(ctx, since, until, nil)
 	if err != nil || stale.Receptions != 18 {
 		t.Fatalf("snapshot lost: %+v %v", stale, err)
 	}
-	if err := store.RefreshPathStats(ctx); err != nil {
-		t.Fatal(err)
-	}
+	rollTxHours(t, ctx, tx)
 	got, err := store.GetPathStats(ctx, since, until, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -153,9 +184,7 @@ FROM (VALUES
 	if _, err = tx.Exec(ctx, "TRUNCATE packet_observations"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.RefreshPathStats(ctx); err != nil {
-		t.Fatal(err)
-	}
+	rollTxHours(t, ctx, tx)
 	got, err = store.GetPathStats(ctx, since, until, nil)
 	if err != nil || got.Receptions != 0 || got.Hourly == nil || got.PathLengths == nil || len(got.HashWidths) != 3 {
 		t.Fatalf("empty: %+v %v", got, err)

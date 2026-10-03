@@ -31,6 +31,7 @@ func (s *Store) GetPathStats(ctx context.Context, since, until time.Time, iatas 
 			}
 			point := &stats.Hourly[len(stats.Hourly)-1]
 			point.Receptions += row.Receptions
+			point.MaxEntries = max(point.MaxEntries, row.MaxEntries)
 			switch row.Category {
 			case 0:
 				switch row.HashBytes {
@@ -72,5 +73,3 @@ func (s *Store) GetPathStats(ctx context.Context, since, until time.Time, iatas 
 	}
 	return stats, nil
 }
-
-func (s *Store) RefreshPathStats(ctx context.Context) error { return s.q.RefreshPathStats(ctx) }

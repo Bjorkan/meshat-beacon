@@ -50,16 +50,10 @@ func TestAccountsPostgres(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer pool.Close()
-	sql, err := migrationFiles.ReadFile("migrations/046_accounts.sql")
-	if err != nil {
+	if err := RunMigrations(ctx, pool); err != nil {
 		t.Fatal(err)
 	}
-	for i := 0; i < 2; i++ {
-		if err := applyMigration(ctx, pool, string(sql)); err != nil {
-			t.Fatal(err)
-		}
-	}
-	store := New(pool, 0, 0, 150, 7*24*time.Hour, 7*24*time.Hour)
+	store := New(pool, 0, 0)
 	items, err := store.ListAccounts(ctx)
 	if err != nil || items == nil || len(items) != 0 {
 		t.Fatal("empty list", err)

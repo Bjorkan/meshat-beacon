@@ -37,8 +37,8 @@ func MessagesRouter(reader api.Reader) http.Handler {
 //	@Param		region		query		string	false	"Filter by region slug, expands to member IATAs"
 //	@Param		scope		query		string	false	"Filter by transport scope name e.g. %23bc (URL-encoded #bc)"
 //	@Param		cursor	query		int		false	"Message ID of last item for pagination (results ordered newest first)"
-//	@Param		limit		query		int		false	"Max results (1-1000, default 50)"
-//	@Success	200			{object}	api.Page[api.ChannelMessage]
+//	@Param		limit		query		int		false	"Max results (default 50); must be positive, values above 200 are clamped" minimum(1) maximum(200)
+//	@Success	200			{object}	object
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
 //	@Router		/messages [get]
@@ -60,9 +60,9 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 			}
 			id = i
 		}
-		limit, limitErr := parseResultLimit(r, 50)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 50)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		var since time.Time
@@ -84,16 +84,7 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 			cursor = c
 		}
 		iatas := parseIATAs(r)
-		if regionID := r.URL.Query().Get("regionId"); regionID != "" || r.URL.Query().Get("region") != "" {
-			regionIATAs, err := resolveRegionIATAs(r.Context(), regionID, r.URL.Query().Get("region"), reader)
-			if err != nil {
-				respondError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-			iatas = append(iatas, regionIATAs...)
-		}
 		scope := r.URL.Query().Get("scope")
-		var err error
 		var messages api.Page[api.ChannelMessage]
 		if channelHashParam != "" {
 			hashHex, decodeErr := hex.DecodeString(channelHashParam)
@@ -130,7 +121,7 @@ func listMessages(reader api.Reader) http.HandlerFunc {
 //	@Param		region		query		string	false	"Filter by region slug"
 //	@Param		regionId	query		int		false	"Filter by region ID"
 //	@Param		scope		query		string	false	"Filter by transport scope name"
-//	@Param		limit		query		int		false	"Max results (1-1000, default 100)"
+//	@Param		limit		query		int		false	"Max results (default 100); must be positive, values above 200 are clamped" minimum(1) maximum(200)
 //	@Success	200			{object}	[]api.ChannelMessage
 //	@Failure	400			{object}	handlers.APIError
 //	@Failure	500			{object}	handlers.APIError
@@ -147,16 +138,16 @@ func listMessagesBackfill(reader api.Reader) http.HandlerFunc {
 			respondError(w, http.StatusBadRequest, "afterId must be an integer")
 			return
 		}
-		limit, limitErr := parseResultLimit(r, 100)
-		if limitErr != nil {
-			respondError(w, http.StatusBadRequest, limitErr.Error())
+		limit, err := parseLimit(r, 100)
+		if err != nil {
+			respondError(w, http.StatusBadRequest, err.Error())
 			return
 		}
 		iatas := parseIATAs(r)
 		if regionIDStr := r.URL.Query().Get("regionId"); regionIDStr != "" || r.URL.Query().Get("region") != "" {
 			regionIATAs, err := resolveRegionIATAs(r.Context(), r.URL.Query().Get("regionId"), r.URL.Query().Get("region"), reader)
 			if err != nil {
-				respondError(w, http.StatusBadRequest, err.Error())
+				respondRegionError(w, err)
 				return
 			}
 			iatas = append(iatas, regionIATAs...)

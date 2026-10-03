@@ -7,12 +7,10 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"github.com/MeshCore-Beacon/beacon-server/internal/hub"
-	"github.com/google/uuid"
 	"github.com/meshcore-go/meshcore-go"
 )
 
@@ -23,6 +21,8 @@ type UpsertNodeParams struct {
 	NodeType  uint8 // 1=companion, 2=repeater, 3=room server
 	Latitude  *float64
 	Longitude *float64
+	// ClearLocation drops the stored position; set by an explicit 0/0 advert.
+	ClearLocation bool
 	// AdvertTimestamp is the device's self-reported wall-clock time (epoch seconds) from the
 	// signed advert body. Used to derive clock drift for repeaters/room servers; see
 	// api.Node.ClockDriftSeconds.
@@ -36,16 +36,27 @@ type InsertChannelMessageParams struct {
 	SenderName string
 	Content    string
 	SentAt     time.Time
+	Historical bool // backfilled: its hours may already be rolled, so queue them for a re-roll
+}
+
+// InsertedChannelMessage is returned only for a new message, using its stored packet evidence.
+type InsertedChannelMessage struct {
+	ID          int64
+	Scope       *string
+	ScopeStatus api.ChannelScopeStatus
 }
 
 // channelMessageEvent is the JSON payload for a channelMessage WS event.
 type channelMessageEvent struct {
-	ChannelID   int    `json:"channelId"`
-	ChannelHash string `json:"channelHash"` // hex-encoded single byte
-	PacketHash  string `json:"packetHash"`  // hex-encoded
-	SenderName  string `json:"senderName"`
-	Content     string `json:"content"`
-	SentAt      int64  `json:"sentAt"` // epoch ms
+	ID          int64                  `json:"id"`
+	ChannelID   int                    `json:"channelId"`
+	ChannelHash string                 `json:"channelHash"` // hex-encoded single byte
+	PacketHash  string                 `json:"packetHash"`  // hex-encoded
+	SenderName  string                 `json:"senderName"`
+	Content     string                 `json:"content"`
+	SentAt      int64                  `json:"sentAt"` // epoch ms
+	Scope       *string                `json:"scope"`
+	ScopeStatus api.ChannelScopeStatus `json:"scopeStatus" enums:"matched,unscoped,unknown,unavailable"`
 }
 
 // nodeUpdateEvent is the JSON payload for a nodeUpdate WS event.
@@ -56,8 +67,8 @@ type nodeUpdateEvent struct {
 	NodeType     uint8          `json:"nodeType"`
 	NodeTypeName string         `json:"nodeTypeName"`
 	IATA         string         `json:"iata"`
-	Lat          *float64       `json:"lat,omitempty"`
-	Lng          *float64       `json:"lng,omitempty"`
+	Lat          **float64      `json:"lat,omitempty"` // Omitted keeps the client's position; explicit null clears it.
+	Lng          **float64      `json:"lng,omitempty"`
 	IsObserver   bool           `json:"isObserver"`
 	IATAs        []api.NodeIATA `json:"iatas"`
 	DefaultScope *string        `json:"defaultScope,omitempty"`
@@ -83,8 +94,10 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 			return
 		}
 		var lat, lon *float64
-		// Presence, not value: an explicit 0/0 advert resets the stored location.
-		if advert.Flags()&meshcore.AdvertLatLonMask != 0 {
+		present := advert.Flags()&meshcore.AdvertLatLonMask != 0
+		// Presence decides: omitted keeps the stored position, an explicit 0/0 clears it.
+		cleared := present && advert.AppData().Lat == 0 && advert.AppData().Lon == 0
+		if present && !cleared {
 			la := float64(advert.AppData().Lat) / 1e6
 			lo := float64(advert.AppData().Lon) / 1e6
 			lat = &la
@@ -92,54 +105,51 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		}
 		params := UpsertNodeParams{
 			PublicKey:       advert.PublicKey.PublicKeyBytes(),
-			Name:            strings.ToValidUTF8(advert.AppData().Name, "\uFFFD"),
+			Name:            cleanText(advert.AppData().Name),
 			NodeType:        advert.Type(),
 			Latitude:        lat,
 			Longitude:       lon,
+			ClearLocation:   cleared,
 			AdvertTimestamp: advert.Timestamp,
 		}
 		var nodeRadio RadioSettings
 		if packet.PathHashCount() == 0 {
 			nodeRadio = radio
 		}
-		nodeID, coordinatesChanged, err := w.db.UpsertNode(ctx, params, nodeRadio)
+		nodeID, err := w.db.UpsertNode(ctx, params, nodeRadio)
 		if err != nil {
 			w.log.Error("db: upsert node failed", "error", err)
 			return
-		}
-		// The signed advert identifies its origin exactly. Its configured path hash width
-		// is therefore capability evidence even when the advert was heard with zero hops.
-		w.runCapabilityDetection(ctx, packet.PayloadType(), packet.PathHashSize(), []uuid.UUID{nodeID})
-		// Resolve owners learned before this node's first advert, and invalidate
-		// existing relationships too because this advert may rename the owner node.
-		ownerObservers, ownerErr := w.db.ReconcileObserverOwners(ctx, nodeID)
-		if ownerErr != nil {
-			w.log.Error("owner reconciliation failed", "error", ownerErr)
-		} else if w.onObserverUpsert != nil {
-			for _, id := range ownerObservers {
-				w.onObserverUpsert(ctx, id)
-			}
 		}
 		// invalidate cache for this node
 		if w.onNodeUpsert != nil {
 			w.onNodeUpsert(ctx, nodeID)
 		}
-		if coordinatesChanged && w.onNodeMoved != nil {
-			w.onNodeMoved(ctx)
+		// record advertiser neighbors
+		// if the advert was forwarded, the first hop is a neighbor
+		if packet.PathHashCount() > 0 && (advert.Type() == meshcore.AdvertTypeRepeater || advert.Type() == meshcore.AdvertTypeRoom) {
+			firstHop := packet.PathHashes()
+			if len(firstHop) > 0 {
+				resolved, err := w.db.ResolvePathHashes(ctx, iata, firstHop[:1])
+				if err == nil {
+					key := hex.EncodeToString(firstHop[0])
+					if entries := resolved[key]; len(entries) == 1 {
+						if err := w.db.UpsertNodeNeighbor(ctx, nodeID, entries[0].NodeID, iata, nil, nil); err != nil {
+							w.log.Error("failed to upsert node neighbor", "error", err)
+						}
+					}
+				}
+			}
 		}
-		// Advertiser neighbor edges (origin -> first relay) are derived
-		// generically from 3-byte path hashes in handlePacket, for every
-		// packet type and advert role.
-		//
-		// Zero-hop reception is recorded here instead: the observer's own RX
-		// SNR of directly hearing this repeater/room advertiser is real radio
-		// adjacency, so it becomes a node_neighbors edge. Skipped if the
-		// observer has no node row yet (hasn't advertised itself).
+		// record observer neighbors
+		// if heard directly (zero-hop), record the observer's own RX SNR
+		// of hearing this advertiser as a node_neighbors edge. Skipped if
+		// the observer has no node row yet (hasn't advertised itself).
 		if packet.PathHashCount() == 0 && (advert.Type() == meshcore.AdvertTypeRepeater || advert.Type() == meshcore.AdvertTypeRoom) {
 			observerNodeID, oErr := w.db.GetNodeByPubkey(ctx, observerPubkey)
 			if oErr == nil && observerNodeID != nodeID {
 				snr := rxSNR
-				if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, nodeID, iata, &snr, nil, true, hashWidthExact()); err != nil {
+				if err := w.db.UpsertNodeNeighbor(ctx, observerNodeID, nodeID, iata, &snr, nil); err != nil {
 					w.log.Error("failed to upsert observer-advert neighbor", "error", err)
 				}
 			}
@@ -170,18 +180,19 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		evt := nodeUpdateEvent{
 			NodeID:       nodeID.String(),
 			PublicKey:    pubkeyHex,
-			Name:         advert.AppData().Name,
+			Name:         cleanText(advert.AppData().Name),
 			NodeType:     advert.Type(),
 			NodeTypeName: api.NodeTypeName(int16(advert.Type())),
 			IATA:         iata,
-			Lat:          lat,
-			Lng:          lon,
 			IsObserver:   isObserver,
 			IATAs:        []api.NodeIATA{{IATA: iata, LastHeard: time.Now().UnixMilli()}},
 			DefaultScope: defaultScope,
 			Radio:        radioStr,
 		}
-		if w.cfg.LocalBorders != nil && (lat != nil || advert.Type() != meshcore.AdvertTypeRepeater) {
+		if present {
+			evt.Lat, evt.Lng = &lat, &lon
+		}
+		if w.cfg.LocalBorders != nil && (present || advert.Type() != meshcore.AdvertTypeRepeater) {
 			foreign := w.cfg.LocalBorders.PossiblyForeign(int16(advert.Type()), lat, lon)
 			evt.PossiblyForeign = &foreign
 		}
@@ -196,7 +207,7 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 		}
 		channelHashBytes := []byte{grpTxt.ChannelHash}
 
-		result, err := DecryptGroupText(ctx, w.db, w.keys, packetHash, packet.Payload)
+		result, err := DecryptGroupText(ctx, w.db, w.keys, packetHash, packet.Payload, false)
 		if err != nil {
 			w.log.Error("decrypt group text failed", "error", err)
 			return
@@ -210,13 +221,16 @@ func (w *Worker) handlePayloadTypeSideEffects(ctx context.Context, packet *meshc
 			return
 		}
 
-		if result.NewMessage {
+		if result.Message != nil {
 			evt := channelMessageEvent{
+				ID:          result.Message.ID,
+				Scope:       result.Message.Scope,
+				ScopeStatus: result.Message.ScopeStatus,
 				ChannelID:   result.ChannelID,
 				ChannelHash: hex.EncodeToString(channelHashBytes),
 				PacketHash:  hex.EncodeToString(packetHash),
-				SenderName:  strings.ReplaceAll(strings.ToValidUTF8(result.Payload.Sender, "\uFFFD"), "\x00", ""),
-				Content:     strings.ReplaceAll(strings.ToValidUTF8(result.Payload.Text, "\uFFFD"), "\x00", ""),
+				SenderName:  cleanText(result.Payload.Sender),
+				Content:     cleanText(result.Payload.Text),
 				SentAt:      time.Unix(int64(result.Payload.Timestamp), 0).UnixMilli(),
 			}
 			w.broadcast(hub.EventChannelMessage, iata, 0, fmt.Sprintf("%02x", grpTxt.ChannelHash), evt)

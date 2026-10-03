@@ -65,21 +65,21 @@ INSERT INTO packet_observations(id,packet_hash,observer_id,iata,heard_at,path_le
 		return page
 	}
 	page := request("limit=50")
-	if len(page.Items) != 2 || page.Items[0].ID != 2 || page.Items[1].ID != 1 {
+	if len(page.Items) != 2 || page.Items[0].ID != 1 || page.Items[1].ID != 2 {
 		t.Fatal("missing-origin advert was not preserved in the ordered page")
 	}
-	if key := page.Items[1].NodePublicKey; key == nil || *key != "" {
+	if key := page.Items[0].NodePublicKey; key == nil || *key != "" {
 		t.Errorf("missing origin key = %v, want an empty string", key)
 	}
-	if key := page.Items[0].NodePublicKey; key == nil || *key != strings.Repeat("01", 32) {
+	if key := page.Items[1].NodePublicKey; key == nil || *key != strings.Repeat("01", 32) {
 		t.Error("known origin key changed")
 	}
 	first := request("limit=1")
-	if !first.HasMore || first.NextCursor == nil || *first.NextCursor != 2 {
+	if !first.HasMore || first.NextCursor == nil || *first.NextCursor != 1 {
 		t.Fatal("missing-origin advert broke the cursor")
 	}
-	last := request("limit=1&cursor=2")
-	if len(last.Items) != 1 || last.Items[0].ID != 1 || last.HasMore {
+	last := request("limit=1&cursor=1")
+	if len(last.Items) != 1 || last.Items[0].ID != 2 || last.HasMore {
 		t.Fatal("continuing after the missing-origin advert lost the known advert")
 	}
 }

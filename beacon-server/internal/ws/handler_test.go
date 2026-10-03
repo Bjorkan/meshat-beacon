@@ -6,7 +6,6 @@ package ws
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,145 +16,184 @@ import (
 	"github.com/coder/websocket"
 )
 
-func TestHandlerConcurrentEventsAndReplies(t *testing.T) {
+func TestAllowedOrigins(t *testing.T) {
+	wildcard := []string{"https://*.example.com"}
+	apexAndWildcard := []string{"https://example.com", "https://*.example.com"}
+	for _, tc := range []struct {
+		name    string
+		allowed []string
+		origin  string
+		wantOK  bool
+	}{
+		{"no origin header", nil, "", true},
+		{"foreign origin by default", nil, "https://example.com", false},
+		{"listed origin", []string{"https://example.com"}, "https://example.com", true},
+		{"listed origin, other case", []string{"https://example.com"}, "https://Example.com", true},
+		{"scheme mismatch", []string{"https://example.com"}, "http://example.com", false},
+		{"port mismatch", []string{"https://example.com"}, "https://example.com:8443", false},
+		{"unlisted origin", []string{"https://example.com"}, "https://other.example", false},
+		{"wildcard subdomain", wildcard, "https://sub.example.com", true},
+		{"wildcard deeper subdomain", wildcard, "https://a.b.example.com", true},
+		{"wildcard other case", wildcard, "https://SUB.Example.com", true},
+		{"wildcard apex", wildcard, "https://example.com", false},
+		{"wildcard lookalike", wildcard, "https://evilexample.com", false},
+		{"wildcard suffix host", wildcard, "https://example.com.evil.net", false},
+		{"wildcard scheme mismatch", wildcard, "http://sub.example.com", false},
+		{"wildcard port mismatch", wildcard, "https://sub.example.com:8443", false},
+		{"apex and wildcard, apex", apexAndWildcard, "https://example.com", true},
+		{"apex and wildcard, subdomain", apexAndWildcard, "https://sub.example.com", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(Handler(hub.New(), nil, 5, 100, tc.allowed))
+			t.Cleanup(server.Close)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			header := http.Header{}
+			if tc.origin != "" {
+				header.Set("Origin", tc.origin)
+			}
+			conn, resp, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), &websocket.DialOptions{HTTPHeader: header})
+			if tc.wantOK {
+				if err != nil {
+					t.Fatalf("dial: %v", err)
+				}
+				conn.CloseNow()
+				return
+			}
+			if err == nil {
+				conn.CloseNow()
+				t.Fatal("expected handshake to be refused")
+			}
+			if resp == nil || resp.StatusCode != http.StatusForbidden {
+				t.Fatalf("expected 403, got %v (%v)", resp, err)
+			}
+		})
+	}
+}
+
+func TestConfigureIncludeObserverKey(t *testing.T) {
 	h := hub.New()
 	go h.Run()
-	server := httptest.NewServer(Handler(h, nil, 5, 60))
-	defer server.Close()
+	server := httptest.NewServer(Handler(h, nil, 5, 100, nil))
+	t.Cleanup(server.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer conn.CloseNow()
-	read := func() map[string]any {
+
+	read := func(conn *websocket.Conn) map[string]json.RawMessage {
 		t.Helper()
 		_, data, err := conn.Read(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var msg map[string]any
+		var msg map[string]json.RawMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			t.Fatal(err)
 		}
 		return msg
 	}
-	if msg := read(); msg["type"] != "hello" {
-		t.Fatalf("hello = %v", msg)
-	}
-	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"subscribe","scope":{}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if msg := read(); msg["type"] != "subscribed" {
-		t.Fatalf("subscribe = %v", msg)
-	}
-	// configure waits for the hub to apply the preceding subscription.
-	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"configure"}`)); err != nil {
-		t.Fatal(err)
-	}
-	if msg := read(); msg["type"] != "configured" {
-		t.Fatalf("configure = %v", msg)
-	}
-	for i := 0; i < 20; i++ {
-		h.Broadcast(hub.Event{Type: hub.EventNodeUpdate, Payload: json.RawMessage(`{}`)})
-		if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"ping"}`)); err != nil {
+	send := func(conn *websocket.Conn, msg string) {
+		t.Helper()
+		if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
 			t.Fatal(err)
 		}
-		seen := map[string]bool{}
-		for j := 0; j < 2; j++ {
-			seen[read()["type"].(string)] = true
+	}
+	connect := func(configure string) *websocket.Conn {
+		t.Helper()
+		conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
+		if err != nil {
+			t.Fatal(err)
 		}
-		if !seen["event"] || !seen["pong"] {
-			t.Fatalf("responses = %v", seen)
+		t.Cleanup(func() { conn.CloseNow() })
+		read(conn) // hello
+		if configure != "" {
+			send(conn, configure)
+			reply := read(conn)
+			if string(reply["type"]) != `"configured"` || string(reply["includeObserverKey"]) != "true" || string(reply["resolvePath"]) != "false" {
+				t.Fatalf("unexpected configured reply: %v", reply)
+			}
 		}
+		send(conn, `{"v":1,"type":"subscribe","id":"s","scope":{}}`)
+		read(conn) // subscribed
+		return conn
+	}
+
+	plain := connect("")
+	keyed := connect(`{"v":1,"type":"configure","id":"c","includeObserverKey":true}`)
+	time.Sleep(20 * time.Millisecond) // let the hub apply both subscriptions
+	h.Broadcast(hub.Event{
+		Type:           hub.EventPacketObservation,
+		Payload:        json.RawMessage(`{"variant":"base"}`),
+		PayloadWithKey: json.RawMessage(`{"variant":"key"}`),
+	})
+	if got := string(read(plain)["data"]); got != `{"variant":"base"}` {
+		t.Errorf("plain client got %s", got)
+	}
+	if got := string(read(keyed)["data"]); got != `{"variant":"key"}` {
+		t.Errorf("opted-in client got %s", got)
 	}
 }
 
-// Subscribe with a scope that only contains the retired routeTypes/observerIds dimensions:
-// the effective scope must be unrestricted (no filter is acknowledged that the hub does not
-// enforce), while recognized dimensions keep filtering.
-func TestHandlerSubscribeEffectiveScope(t *testing.T) {
+func TestConfigureIncludeRepeats(t *testing.T) {
 	h := hub.New()
 	go h.Run()
-	server := httptest.NewServer(Handler(h, nil, 5, 60))
-	defer server.Close()
+	server := httptest.NewServer(Handler(h, nil, 5, 100, nil))
+	t.Cleanup(server.Close)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.CloseNow()
-	read := func() map[string]any {
+	t.Cleanup(func() { conn.CloseNow() })
+	read := func() map[string]json.RawMessage {
 		t.Helper()
 		_, data, err := conn.Read(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		var msg map[string]any
+		var msg map[string]json.RawMessage
 		if err := json.Unmarshal(data, &msg); err != nil {
 			t.Fatal(err)
 		}
 		return msg
 	}
-	if msg := read(); msg["type"] != "hello" {
-		t.Fatalf("hello = %v", msg)
-	}
-
-	// The retired fields are unknown JSON now: the ack succeeds and delivery is unrestricted,
-	// exactly as the scope's declared dimensions say (none).
-	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"subscribe","id":"r1","scope":{"routeTypes":[99],"observerIds":["zz"]}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if msg := read(); msg["type"] != "subscribed" || msg["id"] != "r1" {
-		t.Fatalf("subscribe = %v", msg)
-	}
-	h.Broadcast(hub.Event{Type: hub.EventNodeUpdate, Payload: json.RawMessage(`{}`), IATA: "YYC"})
-	if msg := read(); msg["type"] != "event" {
-		t.Fatalf("expected unrestricted delivery, got %v", msg)
-	}
-
-	// A recognized dimension is enforced: a restrictive iatas scope stops non-matching events.
-	if err := conn.Write(ctx, websocket.MessageText, []byte(`{"type":"subscribe","id":"r2","scope":{"iatas":["YVR"]}}`)); err != nil {
-		t.Fatal(err)
-	}
-	if msg := read(); msg["type"] != "subscribed" || msg["id"] != "r2" {
-		t.Fatalf("subscribe = %v", msg)
-	}
-	h.Broadcast(hub.Event{Type: hub.EventNodeUpdate, Payload: json.RawMessage(`{}`), IATA: "YYC"})
-	h.Broadcast(hub.Event{Type: hub.EventNodeUpdate, Payload: json.RawMessage(`{}`), IATA: "YVR"})
-	if msg := read(); msg["type"] != "event" {
-		t.Fatalf("expected the YVR event, got %v", msg)
-	}
-}
-
-func TestWriteMessageTimesOutForStalledClient(t *testing.T) {
-	result := make(chan error, 1)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		conn, err := websocket.Accept(w, r, nil)
-		if err != nil {
-			result <- err
-			return
+	send := func(msg string) {
+		t.Helper()
+		if err := conn.Write(ctx, websocket.MessageText, []byte(msg)); err != nil {
+			t.Fatal(err)
 		}
-		defer conn.CloseNow()
-		// Larger than the socket buffers: a peer that never reads stalls this write.
-		result <- writeMessage(r.Context(), conn, make([]byte, 16<<20))
-	}))
-	defer server.Close()
-	ctx, cancel := context.WithTimeout(context.Background(), writeTimeout+5*time.Second)
-	defer cancel()
-	conn, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(server.URL, "http"), nil)
-	if err != nil {
-		t.Fatal(err)
 	}
-	defer conn.CloseNow()
-	select {
-	case err := <-result:
-		if !errors.Is(err, context.DeadlineExceeded) {
-			t.Fatalf("write error = %v, want deadline exceeded", err)
+	configure := func(msg, want string) {
+		t.Helper()
+		send(msg)
+		if reply := read(); string(reply["type"]) != `"configured"` || string(reply["includeRepeats"]) != want {
+			t.Fatalf("configured reply: %v", reply)
 		}
-	case <-ctx.Done():
-		t.Fatal("write did not honor its timeout")
+		time.Sleep(20 * time.Millisecond) // let the hub apply it
+	}
+	// Each repeat is followed by a normal marker, so a skipped repeat shows up as the marker.
+	next := func() string {
+		t.Helper()
+		h.BroadcastRepeat(hub.Event{Type: hub.EventPacketObservation, Payload: json.RawMessage(`"repeat"`)})
+		h.Broadcast(hub.Event{Type: hub.EventPacketObservation, Payload: json.RawMessage(`"marker"`)})
+		got := string(read()["data"])
+		if got == `"repeat"` {
+			read() // marker
+		}
+		return got
+	}
+
+	read() // hello
+	configure(`{"v":1,"type":"configure","id":"c","includeRepeats":true}`, "true")
+	send(`{"v":1,"type":"subscribe","id":"s","scope":{}}`)
+	read() // subscribed
+	time.Sleep(20 * time.Millisecond)
+	if got := next(); got != `"repeat"` {
+		t.Fatalf("opted-in client got %s", got)
+	}
+	configure(`{"v":1,"type":"configure","id":"c","resolvePath":true}`, "false")
+	if got := next(); got != `"marker"` {
+		t.Fatalf("client still received a repeat after opting out: %s", got)
 	}
 }

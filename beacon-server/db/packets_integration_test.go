@@ -5,7 +5,6 @@ package db
 
 import (
 	"context"
-	"github.com/MeshCore-Beacon/beacon-server/internal/api"
 	"os"
 	"testing"
 	"time"
@@ -44,7 +43,7 @@ VALUES ('\x01', 4, 0, 1, '\x00', '\x00', NOW(), NOW())`)
 		t.Fatal(err)
 	}
 	store := &Store{q: sqlc.New(tx)}
-	page, err := store.ListPackets(ctx, api.PacketListParams{IATAs: nil, Limit: 50})
+	page, err := store.ListPackets(ctx, nil, nil, nil, nil, time.Time{}, time.Time{}, 0, 50)
 	if err != nil {
 		t.Fatalf("packet without observation must remain readable: %v", err)
 	}
@@ -57,12 +56,13 @@ VALUES ('\x01', 4, 0, 1, '\x00', '\x00', NOW(), NOW())`)
 	_, err = tx.Exec(ctx, `
 INSERT INTO observers (id, public_key) VALUES ('00000000-0000-0000-0000-000000000001', '\x02');
 INSERT INTO packet_observations (id, packet_hash, observer_id, iata, heard_at, path_length_byte, hash_size, hop_count, path_bytes)
-VALUES (1, '\x01', '00000000-0000-0000-0000-000000000001', 'YVR', NOW(), 2, 1, 2, '\x1122');`)
+VALUES (1, '\x01', '00000000-0000-0000-0000-000000000001', 'YVR', NOW(), 2, 1, 2, '\x1122');
+UPDATE packets SET observation_count = 1 WHERE packet_hash = '\x01';`)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, iatas := range [][]string{nil, {"YVR"}} {
-		page, err := store.ListPackets(ctx, api.PacketListParams{IATAs: iatas, Limit: 50})
+		page, err := store.ListPackets(ctx, nil, nil, iatas, nil, time.Time{}, time.Time{}, 0, 50)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -75,49 +75,6 @@ VALUES (1, '\x01', '00000000-0000-0000-0000-000000000001', 'YVR', NOW(), 2, 1, 2
 		}
 		if observer.PathLength.Raw != "02" || observer.PathLength.HashSize != 1 || observer.PathLength.HopCount != 2 || *observer.PathBytes != "1122" {
 			t.Fatalf("observation path changed: %+v", observer)
-		}
-	}
-	// Known regions match exact transport names. '*' is only ordinary traffic,
-	// never an unknown transport code; exercise both list query paths.
-	_, err = tx.Exec(ctx, `
-INSERT INTO transport_scopes (id, name, transport_key, key_fingerprint) VALUES (680, 'se0680', '\x00', '\x00');
-INSERT INTO packets (packet_hash, payload_type, payload_version, route_type, scope_id, raw_payload, raw_header, first_heard_at, last_heard_at) VALUES
-('\x02', 4, 0, 3, 680, '\x00', '\x00', NOW(), NOW()),
-('\x03', 4, 0, 0, NULL, '\x00', '\x00', NOW(), NOW());
-INSERT INTO packet_observations (id, packet_hash, observer_id, iata, heard_at, path_length_byte, hash_size, hop_count, path_bytes) VALUES
-(2, '\x02', '00000000-0000-0000-0000-000000000001', 'YVR', NOW(), 0, 1, 0, '\x'),
-(3, '\x03', '00000000-0000-0000-0000-000000000001', 'YVR', NOW(), 0, 1, 0, '\x');`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, iatas := range [][]string{nil, {"YVR"}} {
-		for _, tc := range []struct {
-			scopes []string
-			hashes []string
-		}{
-			{[]string{"*"}, []string{"01"}},
-			{[]string{"se0680"}, []string{"02"}},
-			{[]string{"se06"}, nil},
-			{[]string{"*", "se0680"}, []string{"01", "02"}},
-		} {
-			page, err := store.ListPackets(ctx, api.PacketListParams{IATAs: iatas, Scopes: tc.scopes, Limit: 50})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(page.Items) != len(tc.hashes) {
-				t.Fatalf("iatas=%v scopes=%v: got %+v", iatas, tc.scopes, page.Items)
-			}
-			for _, hash := range tc.hashes {
-				found := false
-				for _, packet := range page.Items {
-					if packet.PacketHash == hash {
-						found = true
-					}
-				}
-				if !found {
-					t.Fatalf("missing %s for %v/%v", hash, iatas, tc.scopes)
-				}
-			}
 		}
 	}
 }

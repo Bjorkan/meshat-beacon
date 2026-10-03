@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -17,20 +16,19 @@ import (
 )
 
 const (
-	keyIATAs            = "beacon:iatas"
-	keyIATAPrefix       = "beacon:iata:"
-	keyIATABorderPrefix = "beacon:iata:border:"
-	keyRegions          = "beacon:regions"
-	keyRegionPrefix     = "beacon:region:"
-	keyRegionSlugPrefix = "beacon:region:slug:"
-	// v2 avoids serving pre-catalogue lists and legacy #seXX names after upgrade.
-	keyScopeNames              = "beacon:scope:names:v2"
-	keyScopeStats              = "beacon:scope:stats:v2"
-	keyScopesByIATAsPrefix     = "beacon:scopes:iatas:v2:"
-	keyScopeByNamePrefix       = "beacon:scope:name:v2:"
+	keyIATAs                   = "beacon:iatas"
+	keyIATAPrefix              = "beacon:iata:"
+	keyIATABorderPrefix        = "beacon:iata:border:"
+	keyRegions                 = "beacon:regions"
+	keyRegionPrefix            = "beacon:region:"
+	keyRegionSlugPrefix        = "beacon:region:slug:"
+	keyScopeNames              = "beacon:scope:names"
+	keyScopeStats              = "beacon:scope:stats"
+	keyScopeByNamePrefix       = "beacon:scope:name:"
 	keyStatsOverviewPrefix     = "beacon:stats:overview:"
 	keyStatsObservationsPrefix = "beacon:stats:observations:"
 	keySignalStatsPrefix       = "beacon:stats:signal:"
+	keyStatsSeriesPrefix       = "beacon:stats:series:"
 	keyPathStatsPrefix         = "beacon:stats:paths:"
 	keyStatsBreakdownPrefix    = "beacon:stats:breakdown:"
 	keyStatsTopNodesPrefix     = "beacon:stats:top-nodes:"
@@ -43,10 +41,8 @@ const (
 	keyNodePrefix              = "beacon:node:"
 	keyNodeNeighborsPrefix     = "beacon:node:neighbors:"
 	keyNodesByIDsPrefix        = "beacon:nodes:ids:"
-	keyAmbiguousPrefix2        = "beacon:nodes:ambiguous-prefix2"
-	keyMeshCoreRegions         = "beacon:nodes:meshcore-regions:v2"
 	keyObserverPrefix          = "beacon:observer:"
-	keyObserverScopesPrefix    = "beacon:observer:scopes:v2:"
+	keyObserverScopesPrefix    = "beacon:observer:scopes:"
 	keyObserverActivityPrefix  = "beacon:observer:activity:"
 )
 
@@ -60,6 +56,8 @@ type CachedReader struct {
 	inner api.Reader
 	c     *Client
 	ttl   CacheTTLs
+	rev   revisionMemo
+	now   func() time.Time
 }
 
 // CacheTTLs holds the resolved per-category TTLs for the cache layer.
@@ -80,7 +78,32 @@ func NewCachedReader(inner api.Reader, c *Client, ttl CacheTTLs) api.Reader {
 		inner: inner,
 		c:     c,
 		ttl:   ttl,
+		now:   time.Now,
 	}
+}
+
+// InvalidateScopeNames makes newly committed catalogue names visible to every scope read.
+func (cr *CachedReader) InvalidateScopeNames(ctx context.Context) {
+	cr.c.del(ctx, keyScopeNames)
+	cr.c.delPrefix(ctx, keyScopeByNamePrefix)
+	cr.c.delPrefix(ctx, keyScopeStats)
+}
+
+// InvalidateIATABorder makes an imported or removed MeshMapper boundary visible.
+func (cr *CachedReader) InvalidateIATABorder(ctx context.Context, iata string) {
+	cr.c.del(ctx, keyIATABorderPrefix+iata)
+}
+
+// InvalidateIATAs makes imported MeshMapper names and locations visible to every IATA read.
+func (cr *CachedReader) InvalidateIATAs(ctx context.Context) {
+	cr.c.del(ctx, keyIATAs)
+	cr.c.delPrefix(ctx, keyIATAPrefix)
+}
+
+// InvalidateRegions makes imported MeshMapper regions visible to every region read.
+func (cr *CachedReader) InvalidateRegions(ctx context.Context) {
+	cr.c.del(ctx, keyRegions)
+	cr.c.delPrefix(ctx, keyRegionPrefix)
 }
 
 // InvalidateNode removes the cached entries for a node by UUID.
@@ -88,13 +111,6 @@ func NewCachedReader(inner api.Reader, c *Client, ttl CacheTTLs) api.Reader {
 func (cr *CachedReader) InvalidateNode(ctx context.Context, nodeID uuid.UUID) {
 	id := nodeID.String()
 	cr.c.del(ctx, keyNodePrefix+id, keyNodeNeighborsPrefix+id)
-}
-
-// InvalidateAllNodes removes node detail and neighbor entries after a location change. Neighbor
-// responses are keyed by their source node but embed the moved endpoint's coordinates, so clearing
-// only the moved node's own keys would leave stale map markers in other cached responses.
-func (cr *CachedReader) InvalidateAllNodes(ctx context.Context) {
-	cr.c.delPrefix(ctx, keyNodePrefix)
 }
 
 // InvalidateObserver removes the cached entries for an observer by UUID.
@@ -106,49 +122,49 @@ func (cr *CachedReader) InvalidateObserver(ctx context.Context, observerID uuid.
 
 // ListIATAs implements [api.Reader].
 func (cr *CachedReader) ListIATAs(ctx context.Context) ([]api.IATA, error) {
-	return getOrSet(ctx, cr.c, keyIATAs, cr.ttl.Reference, func() ([]api.IATA, error) {
+	return getOrSet(ctx, cr.c, keyIATAs, cr.ttl.Reference, func(ctx context.Context) ([]api.IATA, error) {
 		return cr.inner.ListIATAs(ctx)
 	})
 }
 
 // GetIATA implements [api.Reader].
 func (cr *CachedReader) GetIATA(ctx context.Context, iata string) (*api.IATA, error) {
-	return getOrSet(ctx, cr.c, keyIATAPrefix+iata, cr.ttl.Reference, func() (*api.IATA, error) {
+	return getOrSet(ctx, cr.c, keyIATAPrefix+iata, cr.ttl.Reference, func(ctx context.Context) (*api.IATA, error) {
 		return cr.inner.GetIATA(ctx, iata)
 	})
 }
 
 // GetIATABorder implements [api.Reader].
 func (cr *CachedReader) GetIATABorder(ctx context.Context, iata string) (json.RawMessage, error) {
-	return getOrSet(ctx, cr.c, keyIATABorderPrefix+iata, cr.ttl.Reference, func() (json.RawMessage, error) {
+	return getOrSet(ctx, cr.c, keyIATABorderPrefix+iata, cr.ttl.Reference, func(ctx context.Context) (json.RawMessage, error) {
 		return cr.inner.GetIATABorder(ctx, iata)
 	})
 }
 
 // ListRegions implements [api.Reader].
 func (cr *CachedReader) ListRegions(ctx context.Context) ([]api.RegionSummary, error) {
-	return getOrSet(ctx, cr.c, keyRegions, cr.ttl.Reference, func() ([]api.RegionSummary, error) {
+	return getOrSet(ctx, cr.c, keyRegions, cr.ttl.Reference, func(ctx context.Context) ([]api.RegionSummary, error) {
 		return cr.inner.ListRegions(ctx)
 	})
 }
 
 // GetRegion implements [api.Reader].
 func (cr *CachedReader) GetRegion(ctx context.Context, regionID int32) (*api.Region, error) {
-	return getOrSet(ctx, cr.c, fmt.Sprintf("%s%d", keyRegionPrefix, regionID), cr.ttl.Reference, func() (*api.Region, error) {
+	return getOrSet(ctx, cr.c, fmt.Sprintf("%s%d", keyRegionPrefix, regionID), cr.ttl.Reference, func(ctx context.Context) (*api.Region, error) {
 		return cr.inner.GetRegion(ctx, regionID)
 	})
 }
 
 // GetRegionBySlug implements [api.Reader].
 func (cr *CachedReader) GetRegionBySlug(ctx context.Context, slug string) (*api.Region, error) {
-	return getOrSet(ctx, cr.c, keyRegionSlugPrefix+slug, cr.ttl.Reference, func() (*api.Region, error) {
+	return getOrSet(ctx, cr.c, keyRegionSlugPrefix+slug, cr.ttl.Reference, func(ctx context.Context) (*api.Region, error) {
 		return cr.inner.GetRegionBySlug(ctx, slug)
 	})
 }
 
 // GetScopeNames implements [api.Reader].
 func (cr *CachedReader) GetScopeNames(ctx context.Context) ([]string, error) {
-	return getOrSet(ctx, cr.c, keyScopeNames, cr.ttl.Reference, func() ([]string, error) {
+	return getOrSet(ctx, cr.c, keyScopeNames, cr.ttl.Reference, func(ctx context.Context) ([]string, error) {
 		return cr.inner.GetScopeNames(ctx)
 	})
 }
@@ -157,93 +173,6 @@ func (cr *CachedReader) GetScopeNames(ctx context.Context) ([]string, error) {
 // these explicit queries should not fill the shared statistics cache.
 func (cr *CachedReader) GetObserverComparison(ctx context.Context, a, b uuid.UUID, since, until time.Time, iatas []string) (*api.ObserverComparison, error) {
 	return cr.inner.GetObserverComparison(ctx, a, b, since, until, iatas)
-}
-
-// GetScopeStats implements [api.Reader].
-func (cr *CachedReader) GetScopeStats(ctx context.Context, iatas []string) ([]api.ScopeStats, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(slices.Compact(sorted), ",")
-	}
-	return getOrSet(ctx, cr.c, keyScopeStats+":"+segment, cr.ttl.Reference, func() ([]api.ScopeStats, error) {
-		return cr.inner.GetScopeStats(ctx, iatas)
-	})
-}
-
-// GetScopesByIATAs implements [api.Reader].
-func (cr *CachedReader) GetScopesByIATAs(ctx context.Context, iatas []string) ([]api.ScopeSummary, error) {
-	sorted := make([]string, len(iatas))
-	copy(sorted, iatas)
-	sort.Strings(sorted)
-	key := keyScopesByIATAsPrefix + strings.Join(sorted, ",")
-	return getOrSet(ctx, cr.c, key, cr.ttl.Reference, func() ([]api.ScopeSummary, error) {
-		return cr.inner.GetScopesByIATAs(ctx, iatas)
-	})
-}
-
-// GetScopeByName implements [api.Reader].
-func (cr *CachedReader) GetScopeByName(ctx context.Context, name string) (*api.ScopeDetail, error) {
-	return getOrSet(ctx, cr.c, keyScopeByNamePrefix+name, cr.ttl.Reference, func() (*api.ScopeDetail, error) {
-		return cr.inner.GetScopeByName(ctx, name)
-	})
-}
-
-// GetStatsOverview implements [api.Reader].
-func (cr *CachedReader) GetStatsOverview(ctx context.Context, iatas []string) (*api.StatsOverview, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s", keyStatsOverviewPrefix, segment)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() (*api.StatsOverview, error) {
-		return cr.inner.GetStatsOverview(ctx, iatas)
-	})
-}
-
-// GetStatsObservations implements [api.Reader].
-func (cr *CachedReader) GetStatsObservations(ctx context.Context, iatas []string, since time.Time) ([]api.ObservationPoint, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d", keyStatsObservationsPrefix, segment, since.UnixMilli())
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.ObservationPoint, error) {
-		return cr.inner.GetStatsObservations(ctx, iatas, since)
-	})
-}
-
-// GetStatsPayloadBreakdown implements [api.Reader].
-func (cr *CachedReader) GetStatsPayloadBreakdown(ctx context.Context, iatas []string, since time.Time) ([]api.PayloadBreakdownItem, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d", keyStatsBreakdownPrefix, segment, since.UnixMilli())
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.PayloadBreakdownItem, error) {
-		return cr.inner.GetStatsPayloadBreakdown(ctx, iatas, since)
-	})
-}
-
-// GetStatsTopNodes implements [api.Reader].
-func (cr *CachedReader) GetStatsTopNodes(ctx context.Context, iatas []string, limit int32) ([]api.TopNode, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d", keyStatsTopNodesPrefix, segment, limit)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.TopNode, error) {
-		return cr.inner.GetStatsTopNodes(ctx, iatas, limit)
-	})
 }
 
 // GetStatsNodeTypes implements [api.Reader].
@@ -255,36 +184,8 @@ func (cr *CachedReader) GetStatsNodeTypes(ctx context.Context, iatas []string) (
 		segment = strings.Join(sorted, ",")
 	}
 	key := fmt.Sprintf("%s%s", keyStatsNodeTypes, segment)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.NodeTypeCount, error) {
+	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func(ctx context.Context) ([]api.NodeTypeCount, error) {
 		return cr.inner.GetStatsNodeTypes(ctx, iatas)
-	})
-}
-
-// GetStatsTopObservers implements [api.Reader].
-func (cr *CachedReader) GetStatsTopObservers(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopObserver, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d:%d", keyStatsTopObsPrefix, segment, since.UnixMilli(), limit)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.TopObserver, error) {
-		return cr.inner.GetStatsTopObservers(ctx, iatas, since, limit)
-	})
-}
-
-// GetStatsTopAdvertisers implements [api.Reader].
-func (cr *CachedReader) GetStatsTopAdvertisers(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopAdvertiser, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d:%d", keyStatsTopAdvPrefix, segment, since.UnixMilli(), limit)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.TopAdvertiser, error) {
-		return cr.inner.GetStatsTopAdvertisers(ctx, iatas, since, limit)
 	})
 }
 
@@ -297,22 +198,8 @@ func (cr *CachedReader) GetStatsClockDrift(ctx context.Context, iatas []string, 
 		segment = strings.Join(sorted, ",")
 	}
 	key := fmt.Sprintf("%s%s:%d", keyStatsClockDriftPrefix, segment, limit)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.ClockDriftEntry, error) {
+	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func(ctx context.Context) ([]api.ClockDriftEntry, error) {
 		return cr.inner.GetStatsClockDrift(ctx, iatas, limit)
-	})
-}
-
-// GetStatsTopTalkers implements [api.Reader].
-func (cr *CachedReader) GetStatsTopTalkers(ctx context.Context, iatas []string, since time.Time, limit int32) ([]api.TopTalker, error) {
-	segment := "all"
-	if len(iatas) > 0 {
-		sorted := append([]string(nil), iatas...)
-		sort.Strings(sorted)
-		segment = strings.Join(sorted, ",")
-	}
-	key := fmt.Sprintf("%s%s:%d:%d", keyStatsTopTalkersPrefix, segment, since.UnixMilli(), limit)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.TopTalker, error) {
-		return cr.inner.GetStatsTopTalkers(ctx, iatas, since, limit)
 	})
 }
 
@@ -325,21 +212,21 @@ func (cr *CachedReader) GetRadioPresets(ctx context.Context, preset string, iata
 		segment = strings.Join(sorted, ",")
 	}
 	key := fmt.Sprintf("%s%s:%s", keyRadioPresetsPrefix, preset, segment)
-	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func() ([]api.RadioPreset, error) {
+	return getOrSet(ctx, cr.c, key, cr.ttl.Stats, func(ctx context.Context) ([]api.RadioPreset, error) {
 		return cr.inner.GetRadioPresets(ctx, preset, iatas)
 	})
 }
 
 // GetNode implements [api.Reader].
 func (cr *CachedReader) GetNode(ctx context.Context, nodeID uuid.UUID) (*api.Node, error) {
-	return getOrSet(ctx, cr.c, keyNodePrefix+nodeID.String(), cr.ttl.Nodes, func() (*api.Node, error) {
+	return getOrSet(ctx, cr.c, keyNodePrefix+nodeID.String(), cr.ttl.Nodes, func(ctx context.Context) (*api.Node, error) {
 		return cr.inner.GetNode(ctx, nodeID)
 	})
 }
 
 // GetNodeNeighbors implements [api.Reader].
 func (cr *CachedReader) GetNodeNeighbors(ctx context.Context, nodeID uuid.UUID) ([]api.NodeNeighbor, error) {
-	return getOrSet(ctx, cr.c, keyNodeNeighborsPrefix+nodeID.String(), cr.ttl.Nodes, func() ([]api.NodeNeighbor, error) {
+	return getOrSet(ctx, cr.c, keyNodeNeighborsPrefix+nodeID.String(), cr.ttl.Nodes, func(ctx context.Context) ([]api.NodeNeighbor, error) {
 		return cr.inner.GetNodeNeighbors(ctx, nodeID)
 	})
 }
@@ -352,40 +239,21 @@ func (cr *CachedReader) GetNodesByIDs(ctx context.Context, ids []uuid.UUID) (map
 	}
 	sort.Strings(strs)
 	key := keyNodesByIDsPrefix + strings.Join(strs, ",")
-	return getOrSet(ctx, cr.c, key, cr.ttl.Nodes, func() (map[uuid.UUID]*api.ResolvedNode, error) {
+	return getOrSet(ctx, cr.c, key, cr.ttl.Nodes, func(ctx context.Context) (map[uuid.UUID]*api.ResolvedNode, error) {
 		return cr.inner.GetNodesByIDs(ctx, ids)
-	})
-}
-
-// ListAmbiguousPrefix2 implements [api.Reader]. The set changes only when nodes
-// advertise (new short IDs) or are deleted, same cadence as node detail —
-// but a stale "no collisions" answer would draw a route that is actually
-// ambiguous, so this uses the stats TTL (short) rather than the nodes TTL.
-func (cr *CachedReader) ListAmbiguousPrefix2(ctx context.Context) ([]string, error) {
-	return getOrSet(ctx, cr.c, keyAmbiguousPrefix2, cr.ttl.Stats, func() ([]string, error) {
-		return cr.inner.ListAmbiguousPrefix2(ctx)
-	})
-}
-
-// ListMeshCoreRegions implements [api.Reader]. Confirmed MeshCore Region
-// values shift with /neighbors traffic, so the stats TTL (short) applies —
-// the map selector should follow the data closely, not lag behind it.
-func (cr *CachedReader) ListMeshCoreRegions(ctx context.Context) ([]api.MeshCoreRegion, error) {
-	return getOrSet(ctx, cr.c, keyMeshCoreRegions, cr.ttl.Stats, func() ([]api.MeshCoreRegion, error) {
-		return cr.inner.ListMeshCoreRegions(ctx)
 	})
 }
 
 // GetObserver implements [api.Reader].
 func (cr *CachedReader) GetObserver(ctx context.Context, observerID uuid.UUID) (*api.Observer, error) {
-	return getOrSet(ctx, cr.c, keyObserverPrefix+observerID.String(), cr.ttl.Observers, func() (*api.Observer, error) {
+	return getOrSet(ctx, cr.c, keyObserverPrefix+observerID.String(), cr.ttl.Observers, func(ctx context.Context) (*api.Observer, error) {
 		return cr.inner.GetObserver(ctx, observerID)
 	})
 }
 
 // GetObserverScopes implements [api.Reader].
 func (cr *CachedReader) GetObserverScopes(ctx context.Context, observerID uuid.UUID) ([]string, error) {
-	return getOrSet(ctx, cr.c, keyObserverScopesPrefix+observerID.String(), cr.ttl.Observers, func() ([]string, error) {
+	return getOrSet(ctx, cr.c, keyObserverScopesPrefix+observerID.String(), cr.ttl.Observers, func(ctx context.Context) ([]string, error) {
 		return cr.inner.GetObserverScopes(ctx, observerID)
 	})
 }
@@ -401,10 +269,13 @@ func (cr *CachedReader) GetObserverTelemetryBucketed(ctx context.Context, observ
 }
 
 // GetObserverActivity implements [api.Reader].
-func (cr *CachedReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration) (*api.ObserverActivity, error) {
-	key := keyObserverActivityPrefix + observerID.String() + ":" + window.String() + ":" + interval.String()
-	return getOrSet(ctx, cr.c, key, observerActivityTTL, func() (*api.ObserverActivity, error) {
-		return cr.inner.GetObserverActivity(ctx, observerID, window, interval)
+func (cr *CachedReader) GetObserverActivity(ctx context.Context, observerID uuid.UUID, window, interval time.Duration, until time.Time) (*api.ObserverActivity, error) {
+	if !until.IsZero() {
+		until = until.UTC().Truncate(interval)
+	}
+	key := keyObserverActivityPrefix + observerID.String() + ":" + window.String() + ":" + interval.String() + ":" + until.UTC().Format(time.RFC3339Nano)
+	return getOrSet(ctx, cr.c, key, observerActivityTTL, func(ctx context.Context) (*api.ObserverActivity, error) {
+		return cr.inner.GetObserverActivity(ctx, observerID, window, interval, until)
 	})
 }
 
@@ -434,8 +305,8 @@ func (cr *CachedReader) GetCrossIATANeighbors(ctx context.Context, nodeID uuid.U
 }
 
 // ListChannels implements [api.Reader].
-func (cr *CachedReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, cursor int64, keyFilter string, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
-	return cr.inner.ListChannels(ctx, limit, hash, iatas, cursor, keyFilter, pageCursor)
+func (cr *CachedReader) ListChannels(ctx context.Context, limit int32, hash []byte, iatas []string, keyKnown *bool, cursor int64, pageCursor *api.ChannelCursor) (api.ChannelPage, error) {
+	return cr.inner.ListChannels(ctx, limit, hash, iatas, keyKnown, cursor, pageCursor)
 }
 
 // ListChannelMessages implements [api.Reader].
@@ -454,8 +325,8 @@ func (cr *CachedReader) ListMessagesAfterID(ctx context.Context, afterID int64, 
 }
 
 // ListNodes implements [api.Reader].
-func (cr *CachedReader) ListNodes(ctx context.Context, params api.NodeListParams) (api.Page[api.NodeSummary], error) {
-	return cr.inner.ListNodes(ctx, params)
+func (cr *CachedReader) ListNodes(ctx context.Context, nodeType int16, iatas []string, supportsMultibytePaths, supportsMultibyteTraces *bool, pubkey []byte, pubkeyPrefix, name, scope string, cursor int64, limit int32, includeNeighbors bool) (api.Page[api.NodeSummary], error) {
+	return cr.inner.ListNodes(ctx, nodeType, iatas, supportsMultibytePaths, supportsMultibyteTraces, pubkey, pubkeyPrefix, name, scope, cursor, limit, includeNeighbors)
 }
 
 // ListNodeObservations implements [api.Reader].
@@ -464,8 +335,8 @@ func (cr *CachedReader) ListNodeObservations(ctx context.Context, nodeID uuid.UU
 }
 
 // ListObservers implements [api.Reader].
-func (cr *CachedReader) ListObservers(ctx context.Context, params api.ObserverListParams) (api.Page[api.ObserverSummary], error) {
-	return cr.inner.ListObservers(ctx, params)
+func (cr *CachedReader) ListObservers(ctx context.Context, iatas []string, observerType, broker, status, name, scope string, cursor int64, limit int32) (api.Page[api.ObserverSummary], error) {
+	return cr.inner.ListObservers(ctx, iatas, observerType, broker, status, name, scope, cursor, limit)
 }
 
 // ListObserverAdverts implements [api.Reader].
@@ -474,18 +345,18 @@ func (cr *CachedReader) ListObserverAdverts(ctx context.Context, observerID uuid
 }
 
 // ListPackets implements [api.Reader].
-func (cr *CachedReader) ListPackets(ctx context.Context, params api.PacketListParams) (api.Page[api.PacketSummary], error) {
-	return cr.inner.ListPackets(ctx, params)
+func (cr *CachedReader) ListPackets(ctx context.Context, payloadTypes, routeTypes []int16, iatas []string, scopes []string, since, until time.Time, cursor int64, limit int32) (api.Page[api.PacketSummary], error) {
+	return cr.inner.ListPackets(ctx, payloadTypes, routeTypes, iatas, scopes, since, until, cursor, limit)
 }
 
 // ListPacketsAfterID implements [api.Reader].
-func (cr *CachedReader) ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32, includeResolvedPath bool) ([]api.PacketSummary, error) {
-	return cr.inner.ListPacketsAfterID(ctx, afterObservationID, payloadType, routeType, iatas, scope, limit, includeResolvedPath)
+func (cr *CachedReader) ListPacketsAfterID(ctx context.Context, afterObservationID int64, payloadType, routeType int16, iatas []string, scope string, limit int32) ([]api.PacketSummary, error) {
+	return cr.inner.ListPacketsAfterID(ctx, afterObservationID, payloadType, routeType, iatas, scope, limit)
 }
 
 // ListKnownRoutes implements [api.Reader].
-func (cr *CachedReader) ListKnownRoutes(ctx context.Context, params api.RouteListParams) (api.Page[api.KnownRoute], error) {
-	return cr.inner.ListKnownRoutes(ctx, params)
+func (cr *CachedReader) ListKnownRoutes(ctx context.Context, iata string, hopCount int32, cursor time.Time, cursorID int64, limit int32) ([]api.KnownRoute, error) {
+	return cr.inner.ListKnownRoutes(ctx, iata, hopCount, cursor, cursorID, limit)
 }
 
 // SearchKnownRoutes implements [api.Reader].
@@ -493,36 +364,17 @@ func (cr *CachedReader) SearchKnownRoutes(ctx context.Context, iata, fromHash, t
 	return cr.inner.SearchKnownRoutes(ctx, iata, fromHash, toHash)
 }
 
+// Precise cursor/window combinations are intentionally passed through, like route lists.
+func (cr *CachedReader) GetRouteEvidence(ctx context.Context, iata, key string, query api.RouteEvidenceQuery) (*api.RouteEvidence, error) {
+	return cr.inner.GetRouteEvidence(ctx, iata, key, query)
+}
+
 // SearchCrossIATARoutes implements [api.Reader].
 func (cr *CachedReader) SearchCrossIATARoutes(ctx context.Context, fromHash, fromIATA, toHash, toIATA string) ([]api.CrossIATARoute, error) {
 	return cr.inner.SearchCrossIATARoutes(ctx, fromHash, fromIATA, toHash, toIATA)
 }
 
-// PlanBestRoute implements [api.Reader]. Route planning is graph-global and
-// request-specific, so it bypasses the cache and always hits the store.
-func (cr *CachedReader) PlanBestRoute(ctx context.Context, fromID, toID uuid.UUID, maxAlternatives int) (api.BestRouteResult, error) {
-	return cr.inner.PlanBestRoute(ctx, fromID, toID, maxAlternatives)
-}
-
-// GetNodeIDByPubkey implements [api.Reader]. Single-key lookups are cheap and
-// feed route planning; bypass the cache like the planner itself.
-func (cr *CachedReader) GetNodeIDByPubkey(ctx context.Context, pubkey []byte) (*uuid.UUID, error) {
-	return cr.inner.GetNodeIDByPubkey(ctx, pubkey)
-}
-
-// GetNodeTypeByPubkey implements [api.Reader]. Bypasses the cache like the
-// other single-key route-planning lookup.
-func (cr *CachedReader) GetNodeTypeByPubkey(ctx context.Context, pubkey []byte) (*int16, error) {
-	return cr.inner.GetNodeTypeByPubkey(ctx, pubkey)
-}
-
 // ListTraceTags implements [api.Reader].
-func (cr *CachedReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, limit int32) ([]api.TraceTagSummary, error) {
-	return cr.inner.ListTraceTags(ctx, iatas, scope, traceType, since, until, cursor, limit)
-}
-
-// Traversal history resolves confidence on every request so a new hash collision
-// cannot leave stale node attribution in a cached page.
-func (cr *CachedReader) ListNodePathPackets(ctx context.Context, id uuid.UUID, iatas []string, cursor *api.PageToken, limit int32) (api.Page[api.PacketSummary], error) {
-	return cr.inner.ListNodePathPackets(ctx, id, iatas, cursor, limit)
+func (cr *CachedReader) ListTraceTags(ctx context.Context, iatas []string, scope, traceType string, since, until time.Time, cursor time.Time, cursorTag string, limit int32) ([]api.TraceTagSummary, error) {
+	return cr.inner.ListTraceTags(ctx, iatas, scope, traceType, since, until, cursor, cursorTag, limit)
 }
