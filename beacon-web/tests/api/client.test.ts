@@ -1,38 +1,18 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  getPackets,
-  getPacketDetail,
-  getNode,
-  getObserver,
-  getObserverTelemetry,
-  getNodesPage,
-  getObserversPage,
-  getScopes,
-  getKnownRoutesPage,
-  searchKnownRoutes,
-  getChannels,
-  getChannelMessagesPage,
-  getTraces,
-  getTraceDetail,
-  getStatsOverview,
-  getTopObservers,
-  getTopAdvertisers,
-  getTopTalkers,
-  getStatsNodeTypes,
-  getClockDrift,
-  getIataBorder,
-} from '../../src/api/client';
-import type { Feature, Polygon } from 'geojson';
-import type { NodeSummary } from '../../src/features/nodes/types';
-import type { ObserverSummary } from '../../src/features/observers/types';
-import type { ChannelMessage, ChannelSummary } from '../../src/features/channels/types';
-import type { KnownRoute, TraceTagSummary, TraceDetail } from '../../src/types/api';
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getPackets, getNodesPage, getObserversPage, getScopes, getKnownRoutesPage, searchKnownRoutes, getChannels, getChannelMessagesPage, getTraces, getTraceDetail, getStatsSeries, getTopObservers, getTopAdvertisers, getTopTalkers, getStatsNodeTypes, getClockDrift, getIataBorder, getObserverActivity, isNotFound } from "../../src/api/client";
+import type { Feature, Polygon } from "geojson";
+import type { NodeSummary } from "../../src/features/nodes/types";
+import type { ObserverSummary } from "../../src/features/observers/types";
+import type { ChannelMessage, ChannelSummary } from "../../src/features/channels/types";
+import type { KnownRoute, TraceTagSummary, TraceDetail } from "../../src/types/api";
+import { getRateLimitedUntil, noteRequestOk } from "../../src/api/rate-limit";
+import { RATE_LIMIT_DEFAULT_MS } from "../../src/lib/constants";
 
 // Capture the URL the client fetches and hand back a canned CursorPage.
 function mockFetchOnce(body: unknown): () => string {
-  let calledUrl = '';
+  let calledUrl = "";
   vi.stubGlobal(
-    'fetch',
+    "fetch",
     vi.fn(async (url: string) => {
       calledUrl = url;
       return { ok: true, json: async () => body } as Response;
@@ -43,346 +23,289 @@ function mockFetchOnce(body: unknown): () => string {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  vi.useRealTimers();
+  noteRequestOk();
 });
 
-describe('getPackets', () => {
-  it('forwards plural filters as comma-separated values (routeType 0 survives, scope is encoded)', async () => {
+describe("getPackets", () => {
+  it("forwards plural filters as comma-separated values (routeType 0 survives, scope is encoded)", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
-    await getPackets(['YOW'], {
-      payloadTypes: [2, 4],
-      routeTypes: [0],
-      observers: ['observer-1', 'observer-2'],
-      scopes: ['#bc', '#west'],
-      search: 'hello',
-      searchField: 'payload',
-    });
+    await getPackets(["YOW"], { payloadTypes: [2, 4], routeTypes: [0], scopes: ["#bc", "#west"] });
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/packets');
-    expect(url.searchParams.get('payloadTypes')).toBe('2,4');
-    expect(url.searchParams.get('routeTypes')).toBe('0'); // single value 0 survives
-    expect(url.searchParams.get('observers')).toBe('observer-1,observer-2');
-    expect(url.searchParams.get('scopes')).toBe('#bc,#west');
-    expect(url.searchParams.get('q')).toBe('hello');
-    expect(url.searchParams.get('searchField')).toBe('payload');
+    expect(url.pathname).toContain("/packets");
+    expect(url.searchParams.get("payloadTypes")).toBe("2,4");
+    expect(url.searchParams.get("routeTypes")).toBe("0"); // single value 0 survives
+    expect(url.searchParams.get("scopes")).toBe("#bc,#west");
   });
 
-  it('opts into resolved path enrichment only when requested', async () => {
+  it("omits the filter params when none are given", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
-    await getPackets(['YOW'], { includeResolvedPath: true });
-
-    expect(new URL(getUrl()).searchParams.get('include')).toBe('resolvedPath');
-  });
-
-  it('omits the filter params when none are given', async () => {
-    const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
-
-    await getPackets(['YOW'], { cursor: 100 });
+    await getPackets(["YOW"], { cursor: 100 });
 
     const url = new URL(getUrl());
-    expect(url.searchParams.has('payloadTypes')).toBe(false);
-    expect(url.searchParams.has('routeTypes')).toBe(false);
-    expect(url.searchParams.has('observers')).toBe(false);
-    expect(url.searchParams.has('scopes')).toBe(false);
-    expect(url.searchParams.has('q')).toBe(false);
-    expect(url.searchParams.has('searchField')).toBe(false);
-    expect(url.searchParams.get('cursor')).toBe('100');
-    expect(url.searchParams.get('limit')).toBe('50');
+    expect(url.searchParams.has("payloadTypes")).toBe(false);
+    expect(url.searchParams.has("routeTypes")).toBe(false);
+    expect(url.searchParams.has("scopes")).toBe(false);
+    expect(url.searchParams.get("cursor")).toBe("100");
+    expect(url.searchParams.get("limit")).toBe("50");
   });
 });
 
-describe('getNodesPage', () => {
+describe("getNodesPage", () => {
   const node: NodeSummary = {
-    id: 'n1',
-    publicKey: 'pk',
+    id: "n1",
+    publicKey: "pk",
     nodeType: 1,
-    nodeTypeName: 'repeater',
-    name: 'Node 1',
+    nodeTypeName: "repeater",
+    name: "Node 1",
     lat: 1,
     lng: 2,
     iatas: [],
   };
 
-  it('hits /nodes with cursor + limit and returns the full cursor page', async () => {
+  it("hits /nodes with cursor + limit and returns the full cursor page", async () => {
     const getUrl = mockFetchOnce({ items: [node], nextCursor: 4242, hasMore: true });
 
-    const page = await getNodesPage(['YYZ'], { cursor: 100 });
+    const page = await getNodesPage(["YYZ"], { cursor: 100 });
 
     const url = getUrl();
-    expect(url).toContain('/nodes');
-    expect(url).toContain('iatas=YYZ');
-    expect(url).toContain('cursor=100');
-    expect(url).toContain('limit=50');
+    expect(url).toContain("/nodes");
+    expect(url).toContain("iatas=YYZ");
+    expect(url).toContain("cursor=100");
+    expect(url).toContain("limit=50");
     expect(page).toEqual({ items: [node], nextCursor: 4242, hasMore: true });
   });
 
-  it('omits cursor on the first page and defaults the limit to 50', async () => {
+  it("omits cursor on the first page and defaults the limit to 50", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
     await getNodesPage(undefined);
 
     const url = getUrl();
-    expect(url).not.toContain('cursor=');
-    expect(url).toContain('limit=50');
+    expect(url).not.toContain("cursor=");
+    expect(url).toContain("limit=50");
   });
 
-  it('forwards the pubkeyPrefix search param', async () => {
+  it("forwards the pubkeyPrefix search param", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
-    await getNodesPage(['YYZ'], { pubkeyPrefix: 'a1b2' });
+    await getNodesPage(["YYZ"], { pubkeyPrefix: "a1b2" });
 
     const url = getUrl();
-    expect(url).toContain('/nodes');
-    expect(url).toContain('pubkeyPrefix=a1b2');
+    expect(url).toContain("/nodes");
+    expect(url).toContain("pubkeyPrefix=a1b2");
   });
 
-  it('forwards opaque page token and server sort without a legacy cursor', async () => {
-    const getUrl = mockFetchOnce({ items: [], nextPageToken: 'next-token', hasMore: true });
-
-    const page = await getNodesPage(['YYZ'], {
-      pageToken: 'opaque-token',
-      sort: 'neighbors',
-      direction: 'desc',
-    });
-
-    const url = new URL(getUrl());
-    expect(url.searchParams.get('pageToken')).toBe('opaque-token');
-    expect(url.searchParams.get('sort')).toBe('neighbors');
-    expect(url.searchParams.get('direction')).toBe('desc');
-    expect(url.searchParams.has('cursor')).toBe(false);
-    expect(page.nextPageToken).toBe('next-token');
-  });
-
-  it('forwards the Nodes-table filters (type maps to typeName, multibyte flags)', async () => {
+  it("forwards the Nodes-table filters (type maps to typeName, multibyte flags)", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
-    await getNodesPage(['YYZ'], {
-      type: 'repeater',
-      name: 'alpha',
-      supportsMultibytePaths: 'true',
-      supportsMultibyteTraces: 'false',
-      scope: '#west',
+    await getNodesPage(["YYZ"], {
+      type: "repeater",
+      name: "alpha",
+      supportsMultibytePaths: "true",
+      supportsMultibyteTraces: "false",
     });
 
     const url = getUrl();
-    expect(url).toContain('typeName=repeater');
-    expect(url).toContain('name=alpha');
-    expect(url).toContain('supportsMultibytePaths=true');
-    expect(url).toContain('supportsMultibyteTraces=false');
-    expect(new URL(url).searchParams.get('scope')).toBe('#west');
-    expect(url).not.toContain('type='); // server param is typeName, not type
+    expect(url).toContain("typeName=repeater");
+    expect(url).toContain("name=alpha");
+    expect(url).toContain("supportsMultibytePaths=true");
+    expect(url).toContain("supportsMultibyteTraces=false");
+    expect(url).not.toContain("type="); // server param is typeName, not type
   });
 });
 
-describe('getScopes', () => {
-  it('hits /scopes with no params and returns the scope-name array', async () => {
-    const getUrl = mockFetchOnce(['#bc', '#west']);
+describe("getScopes", () => {
+  it("hits /scopes with no params and returns the scope-name array", async () => {
+    const getUrl = mockFetchOnce(["#bc", "#west"]);
 
     const scopes = await getScopes();
 
     const url = getUrl();
-    expect(url).toContain('/scopes');
-    expect(url).not.toContain('?'); // no query params on the authoritative list
-    expect(scopes).toEqual(['#bc', '#west']);
+    expect(url).toContain("/scopes");
+    expect(url).not.toContain("?"); // no query params on the authoritative list
+    expect(scopes).toEqual(["#bc", "#west"]);
+  });
+
+  it("asks for the selected region's scopes by IATA", async () => {
+    const getUrl = mockFetchOnce(["#yow"]);
+
+    await getScopes(["YOW", "YYZ"]);
+
+    expect(new URL(getUrl()).searchParams.get("iatas")).toBe("YOW,YYZ");
   });
 });
 
-describe('getKnownRoutesPage', () => {
+describe("getKnownRoutesPage", () => {
   const route: KnownRoute = {
     id: 7,
-    iata: 'YYC',
+    iata: "YYC",
     hopCount: 1,
-    hops: [{ nodeId: 'n1', hashBytes: 'be' }],
+    hops: [{ nodeId: "n1", hashBytes: "be" }],
     firstSeen: 1,
     lastSeen: 2,
   };
 
-  it('hits /routes and forwards region, sort and keyset pagination', async () => {
-    const getUrl = mockFetchOnce({ items: [route], nextPageToken: null, hasMore: false });
+  it("hits /routes, forwards iata/hopCount/cursor/cursorId/limit", async () => {
+    const getUrl = mockFetchOnce([route]);
 
-    await getKnownRoutesPage({
-      iatas: ['YYC', 'YVR'],
-      hopCount: 1,
-      pageToken: 'next',
-      sort: 'hops',
-      direction: 'asc',
-      limit: 50,
-    });
+    await getKnownRoutesPage({ iata: "YYC", hopCount: 1, cursor: { lastSeen: 1234, id: 7 }, limit: 50 });
 
     const url = getUrl();
-    expect(url).toContain('/routes');
-    expect(url).toContain('iatas=YYC%2CYVR');
-    expect(url).toContain('hopCount=1');
-    expect(url).toContain('pageToken=next');
-    expect(url).toContain('sort=hops');
-    expect(url).toContain('direction=asc');
-    expect(url).toContain('limit=50');
+    expect(url).toContain("/routes");
+    expect(url).toContain("iata=YYC");
+    expect(url).toContain("hopCount=1");
+    expect(url).toContain("cursor=1234");
+    expect(url).toContain("cursorId=7");
+    expect(url).toContain("limit=50");
   });
 
-  it('omits pageToken on the first page and defaults the limit to 50', async () => {
-    const getUrl = mockFetchOnce({ items: [], nextPageToken: null, hasMore: false });
+  it("omits cursor on the first page and defaults the limit to 50", async () => {
+    const getUrl = mockFetchOnce([]);
 
     await getKnownRoutesPage();
 
     const url = getUrl();
-    expect(url).toContain('/routes');
-    expect(url).not.toContain('pageToken=');
-    expect(url).toContain('limit=50');
-    expect(url).not.toContain('iata=');
-    expect(url).not.toContain('hopCount=');
+    expect(url).toContain("/routes");
+    expect(url).not.toContain("cursor=");
+    expect(url).toContain("limit=50");
+    expect(url).not.toContain("iata=");
+    expect(url).not.toContain("hopCount=");
   });
 
-  it("preserves the server's opaque next-page token", async () => {
-    mockFetchOnce({ items: [{ ...route, lastSeen: 9 }], nextPageToken: 'opaque', hasMore: true });
+  it("wraps a full page: nextCursor is the last route's lastSeen and id", async () => {
+    mockFetchOnce([{ ...route, lastSeen: 9 }]);
 
+    // a page that fills the limit means there may be more; the id breaks lastSeen ties
     const page = await getKnownRoutesPage({ limit: 1 });
 
     expect(page.items).toHaveLength(1);
     expect(page.hasMore).toBe(true);
-    expect(page.nextPageToken).toBe('opaque');
+    expect(page.nextCursor).toEqual({ lastSeen: 9, id: 7 });
   });
 
-  it('returns a completed server page unchanged', async () => {
-    mockFetchOnce({ items: [route], nextPageToken: null, hasMore: false });
+  it("wraps a short page: nextCursor null, hasMore false", async () => {
+    mockFetchOnce([route]);
 
     const page = await getKnownRoutesPage({ limit: 50 });
 
     expect(page.items).toEqual([route]);
     expect(page.hasMore).toBe(false);
-    expect(page.nextPageToken).toBeNull();
+    expect(page.nextCursor).toBeNull();
   });
 });
 
-describe('searchKnownRoutes', () => {
-  it('hits /routes/search with the required iata/from/to', async () => {
+describe("searchKnownRoutes", () => {
+  it("hits /routes/search with the required iata/from/to", async () => {
     const getUrl = mockFetchOnce([]);
 
-    await searchKnownRoutes('YYC', '6d', 'be');
+    await searchKnownRoutes("YYC", "6d", "be");
 
     const url = getUrl();
-    expect(url).toContain('/routes/search');
-    expect(url).toContain('iata=YYC');
-    expect(url).toContain('from=6d');
-    expect(url).toContain('to=be');
+    expect(url).toContain("/routes/search");
+    expect(url).toContain("iata=YYC");
+    expect(url).toContain("from=6d");
+    expect(url).toContain("to=be");
   });
 });
 
-describe('getChannels', () => {
+describe("getChannels", () => {
+  it.each([1234, "v1:1700000000000123:50"])("sends cursor %s using the compatible parameter", async (cursor) => {
+    const getUrl = mockFetchOnce({ items: [], hasMore: false });
+    await getChannels({ cursor });
+    const params = new URL(getUrl()).searchParams;
+    expect(params.get(typeof cursor === "string" ? "pageCursor" : "cursor")).toBe(String(cursor));
+    expect(params.has(typeof cursor === "string" ? "cursor" : "pageCursor")).toBe(false);
+  });
+
   const channel: ChannelSummary = {
     id: 1,
-    name: 'Public',
-    channelHash: '8b',
+    name: "Public",
+    channelHash: "8b",
     lastSeen: 1000,
+    isHashtag: false,
     keyKnown: true,
-    kind: 'public',
   };
 
-  it('sends a single-IATA region as the singular iata param the server honors', async () => {
-    const getUrl = mockFetchOnce({
-      items: [channel],
-      unknownCount: 57,
-      hasMore: false,
-      nextCursor: null,
-    });
+  it("sends a single-IATA region as the singular iata param the server honors", async () => {
+    const page = { items: [channel], nextCursor: 900, hasMore: true };
+    const getUrl = mockFetchOnce(page);
 
-    const channels = await getChannels({ iatas: ['YYZ'] });
+    const channels = await getChannels({ iatas: ["YYZ"] });
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/channels');
-    expect(url.searchParams.get('iata')).toBe('YYZ');
-    expect(url.searchParams.has('iatas')).toBe(false);
-    expect(channels).toEqual({
-      items: [channel],
-      unknownCount: 57,
-      hasMore: false,
-      nextCursor: null,
-    });
+    expect(url.pathname).toContain("/channels");
+    expect(url.searchParams.get("iata")).toBe("YYZ");
+    expect(url.searchParams.has("iatas")).toBe(false);
+    expect(channels).toEqual(page);
   });
 
-  it('keeps the comma-joined iatas param for multi-IATA regions', async () => {
-    const getUrl = mockFetchOnce({ items: [], unknownCount: 0, hasMore: false, nextCursor: null });
+  it("keeps the comma-joined iatas param for multi-IATA regions", async () => {
+    const getUrl = mockFetchOnce({ items: [] });
 
-    await getChannels({ iatas: ['YOW', 'YYZ'] });
+    await getChannels({ iatas: ["YOW", "YYZ"] });
 
     const url = new URL(getUrl());
-    expect(url.searchParams.get('iatas')).toBe('YOW,YYZ');
-    expect(url.searchParams.has('iata')).toBe(false);
+    expect(url.searchParams.get("iatas")).toBe("YOW,YYZ");
+    expect(url.searchParams.has("iata")).toBe(false);
   });
 
-  it('omits both iata params for all regions', async () => {
-    const getUrl = mockFetchOnce({ items: [], unknownCount: 0, hasMore: false, nextCursor: null });
+  it.each([true, false])("sends keyKnown=%s and omits it when unset", async (keyKnown) => {
+    const getUrl = mockFetchOnce({ items: [] });
+    await getChannels({ keyKnown });
+    expect(new URL(getUrl()).searchParams.get("keyKnown")).toBe(String(keyKnown));
+    const getUnset = mockFetchOnce({ items: [] });
+    await getChannels();
+    expect(new URL(getUnset()).searchParams.has("keyKnown")).toBe(false);
+  });
+
+  it("omits both iata params for all regions", async () => {
+    const getUrl = mockFetchOnce({ items: [] });
 
     await getChannels();
 
     const url = new URL(getUrl());
-    expect(url.searchParams.has('iata')).toBe(false);
-    expect(url.searchParams.has('iatas')).toBe(false);
-  });
-
-  it('preserves cursor, key diagnostics, hash and aggregate metadata', async () => {
-    const getUrl = mockFetchOnce({ items: [], unknownCount: 80, hasMore: true, nextCursor: 100 });
-    const page = await getChannels({ hash: 'ab', key: 'unknown', cursor: 200, limit: 2 });
-    const url = new URL(getUrl());
-    expect(url.searchParams.get('hash')).toBe('ab');
-    expect(url.searchParams.get('key')).toBe('unknown');
-    expect(url.searchParams.get('cursor')).toBe('200');
-    expect(page).toEqual({ items: [], unknownCount: 80, hasMore: true, nextCursor: 100 });
-  });
-
-  it('rejects a generated response that omits a required UI contract field', async () => {
-    mockFetchOnce({
-      items: [{ id: 1, name: 'Public', channelHash: '8b', lastSeen: 1000, isHashtag: false }],
-    });
-
-    await expect(getChannels()).rejects.toThrow(
-      'Invalid ChannelSummary response: missing keyKnown',
-    );
-  });
-
-  it('rejects a generated response without semantic channel classification', async () => {
-    mockFetchOnce({
-      items: [{ id: 1, name: 'Public', channelHash: '8b', lastSeen: 1000, keyKnown: true }],
-    });
-
-    await expect(getChannels()).rejects.toThrow('Invalid ChannelSummary response: missing kind');
+    expect(url.searchParams.has("iata")).toBe(false);
+    expect(url.searchParams.has("iatas")).toBe(false);
   });
 });
 
-describe('getChannelMessagesPage', () => {
+describe("getChannelMessagesPage", () => {
   const msg: ChannelMessage = {
     id: 12,
-    packetHash: 'ab',
-    channelHash: 'cd',
-    senderName: 'alice',
-    content: 'hi',
+    packetHash: "ab",
+    channelHash: "cd",
+    senderName: "alice",
+    content: "hi",
     sentAt: 1000,
   };
 
-  it('hits /channels/{id}/messages and forwards iatas/cursor/limit', async () => {
+  it("hits /channels/{id}/messages and forwards iatas/cursor/limit", async () => {
     const getUrl = mockFetchOnce({ items: [msg] });
 
-    await getChannelMessagesPage(3, { iatas: ['YYZ'], cursor: 99, limit: 50 });
+    await getChannelMessagesPage(3, { iatas: ["YYZ"], cursor: 99, limit: 50 });
 
     const url = getUrl();
-    expect(url).toContain('/channels/3/messages');
-    expect(url).toContain('iatas=YYZ');
-    expect(url).toContain('cursor=99');
-    expect(url).toContain('limit=50');
+    expect(url).toContain("/channels/3/messages");
+    expect(url).toContain("iatas=YYZ");
+    expect(url).toContain("cursor=99");
+    expect(url).toContain("limit=50");
   });
 
-  it('omits cursor on the first page and defaults the limit to 50', async () => {
+  it("omits cursor on the first page and defaults the limit to 50", async () => {
     const getUrl = mockFetchOnce({ items: [] });
 
     await getChannelMessagesPage(3);
 
     const url = getUrl();
-    expect(url).not.toContain('cursor=');
-    expect(url).toContain('limit=50');
+    expect(url).not.toContain("cursor=");
+    expect(url).toContain("limit=50");
   });
 
-  it('wraps a full page: nextCursor is the last (oldest) message id', async () => {
+  it("wraps a full page: nextCursor is the last (oldest) message id", async () => {
     mockFetchOnce({ items: [{ ...msg, id: 5 }] });
 
     const page = await getChannelMessagesPage(3, { limit: 1 });
@@ -392,7 +315,7 @@ describe('getChannelMessagesPage', () => {
     expect(page.nextCursor).toBe(5);
   });
 
-  it('wraps a short page: nextCursor null, hasMore false', async () => {
+  it("wraps a short page: nextCursor null, hasMore false", async () => {
     mockFetchOnce({ items: [msg] });
 
     const page = await getChannelMessagesPage(3, { limit: 50 });
@@ -403,184 +326,174 @@ describe('getChannelMessagesPage', () => {
   });
 });
 
-describe('getTraces', () => {
+describe("getTraces", () => {
   const tag: TraceTagSummary = {
-    traceTag: '04dc2b04',
+    traceTag: "04dc2b04",
     firstHeardAt: 1,
     lastHeardAt: 2,
     packetCount: 1,
     iataCount: 1,
   };
 
-  it('hits /traces with comma-joined iatas + scope/limit and returns the bare array', async () => {
+  it("hits /traces with comma-joined iatas + scope/limit and returns the bare array", async () => {
     const getUrl = mockFetchOnce([tag]);
 
-    const traces = await getTraces(['YOW', 'YYZ'], { scope: '#bc', limit: 200 });
+    const traces = await getTraces(["YOW", "YYZ"], { scope: "#bc", limit: 200 });
 
     const url = getUrl();
-    expect(url).toContain('/traces');
-    expect(url).toContain('iatas=YOW%2CYYZ');
-    expect(url).toContain('scope=%23bc');
-    expect(url).toContain('limit=200');
+    expect(url).toContain("/traces");
+    expect(url).toContain("iatas=YOW%2CYYZ");
+    expect(url).toContain("scope=%23bc");
+    expect(url).toContain("limit=200");
     expect(traces).toEqual([tag]);
   });
 
-  it('omits iatas for all regions', async () => {
+  it("omits iatas for all regions", async () => {
     const getUrl = mockFetchOnce([]);
 
     await getTraces(undefined);
 
     const url = getUrl();
-    expect(url).toContain('/traces');
-    expect(url).not.toContain('iatas=');
+    expect(url).toContain("/traces");
+    expect(url).not.toContain("iatas=");
   });
 });
 
-describe('getTraceDetail', () => {
-  it('hits /traces/{tag} and returns the detail', async () => {
-    const detail: TraceDetail = { traceTag: '04dc2b04', packets: [] };
+describe("getTraceDetail", () => {
+  it("hits /traces/{tag} and returns the detail", async () => {
+    const detail: TraceDetail = { traceTag: "04dc2b04", packets: [] };
     const getUrl = mockFetchOnce(detail);
 
-    const result = await getTraceDetail('04dc2b04');
+    const result = await getTraceDetail("04dc2b04");
 
-    expect(getUrl()).toContain('/traces/04dc2b04');
+    expect(getUrl()).toContain("/traces/04dc2b04");
     expect(result).toEqual(detail);
   });
 });
 
-describe('getObserversPage', () => {
-  const observer: ObserverSummary = { id: 'o1', iata: 'YYZ', status: 'online' };
+describe("getObserversPage", () => {
+  const observer: ObserverSummary = { id: "o1", iata: "YYZ", status: "online" };
 
-  it('hits /observers with cursor + limit and returns the full cursor page', async () => {
+  it("hits /observers with cursor + limit and returns the full cursor page", async () => {
     const getUrl = mockFetchOnce({ items: [observer], nextCursor: 99, hasMore: true });
 
-    const page = await getObserversPage(['YYZ'], { cursor: 7 });
+    const page = await getObserversPage(["YYZ"], { cursor: 7 });
 
     const url = getUrl();
-    expect(url).toContain('/observers');
-    expect(url).toContain('iatas=YYZ');
-    expect(url).toContain('cursor=7');
-    expect(url).toContain('limit=50');
+    expect(url).toContain("/observers");
+    expect(url).toContain("iatas=YYZ");
+    expect(url).toContain("cursor=7");
+    expect(url).toContain("limit=50");
     expect(page).toEqual({ items: [observer], nextCursor: 99, hasMore: true });
   });
 
-  it('forwards the Observers-table filters and omits cursor on the first page', async () => {
+  it("forwards the Observers-table filters and omits cursor on the first page", async () => {
     const getUrl = mockFetchOnce({ items: [], nextCursor: null, hasMore: false });
 
-    await getObserversPage(undefined, {
-      status: 'online',
-      type: 'rak',
-      name: 'north',
-      scope: '#west',
-    });
+    await getObserversPage(undefined, { status: "online", type: "rak", broker: "b1", name: "north" });
 
     const url = getUrl();
-    expect(url).not.toContain('cursor=');
-    expect(url).toContain('status=online');
-    expect(url).toContain('type=rak');
-    expect(url).toContain('name=north');
-    expect(new URL(url).searchParams.get('scope')).toBe('#west');
-  });
-
-  it('forwards opaque page token and server sort', async () => {
-    const getUrl = mockFetchOnce({ items: [], nextPageToken: 'observer-next', hasMore: true });
-
-    const page = await getObserversPage(undefined, {
-      pageToken: 'observer-token',
-      sort: 'status',
-      direction: 'asc',
-    });
-
-    const url = new URL(getUrl());
-    expect(url.searchParams.get('pageToken')).toBe('observer-token');
-    expect(url.searchParams.get('sort')).toBe('status');
-    expect(url.searchParams.get('direction')).toBe('asc');
-    expect(url.searchParams.has('cursor')).toBe(false);
-    expect(page.nextPageToken).toBe('observer-next');
+    expect(url).not.toContain("cursor=");
+    expect(url).toContain("status=online");
+    expect(url).toContain("type=rak");
+    expect(url).toContain("broker=b1");
+    expect(url).toContain("name=north");
   });
 });
 
-describe('stats endpoints', () => {
+describe("stats endpoints", () => {
   it("joins the region's IATAs into the iatas param", async () => {
-    const getUrl = mockFetchOnce({ totalPackets: 0 });
+    const getUrl = mockFetchOnce({ hours: [] });
 
-    await getStatsOverview(['YOW', 'YYZ']);
+    await getStatsSeries(0, 1000, ["YOW", "YYZ"]);
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/stats/overview');
-    expect(url.searchParams.get('iatas')).toBe('YOW,YYZ');
+    expect(url.pathname).toContain("/stats/series");
+    expect(url.searchParams.get("iatas")).toBe("YOW,YYZ");
   });
 
-  it('omits iatas for all regions and still forwards the rest', async () => {
+  it("omits iatas for all regions and still forwards the rest", async () => {
     const getUrl = mockFetchOnce([]);
 
     await getTopObservers(undefined, 1700000000000, 15);
 
     const url = new URL(getUrl());
-    expect(url.searchParams.has('iatas')).toBe(false);
-    expect(url.searchParams.get('since')).toBe('1700000000000');
-    expect(url.searchParams.get('limit')).toBe('15');
+    expect(url.searchParams.has("iatas")).toBe(false);
+    expect(url.searchParams.get("since")).toBe("1700000000000");
+    expect(url.searchParams.get("limit")).toBe("15");
   });
 
-  it('hits /stats/top-advertisers with iatas/since/limit', async () => {
+  it("hits /stats/top-advertisers with iatas/since/limit", async () => {
     const getUrl = mockFetchOnce([]);
 
-    await getTopAdvertisers(['YOW', 'YYZ'], 1700000000000, 10);
+    await getTopAdvertisers(["YOW", "YYZ"], 1700000000000, 10);
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/stats/top-advertisers');
-    expect(url.searchParams.get('iatas')).toBe('YOW,YYZ');
-    expect(url.searchParams.get('since')).toBe('1700000000000');
-    expect(url.searchParams.get('limit')).toBe('10');
+    expect(url.pathname).toContain("/stats/top-advertisers");
+    expect(url.searchParams.get("iatas")).toBe("YOW,YYZ");
+    expect(url.searchParams.get("since")).toBe("1700000000000");
+    expect(url.searchParams.get("limit")).toBe("10");
   });
 
-  it('hits /stats/top-talkers with iatas/since/limit', async () => {
+  it("hits /stats/top-talkers with iatas/since/limit", async () => {
     const getUrl = mockFetchOnce([]);
 
-    await getTopTalkers(['YOW'], 1700000000000, 8);
+    await getTopTalkers(["YOW"], 1700000000000, 8);
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/stats/top-talkers');
-    expect(url.searchParams.get('iatas')).toBe('YOW');
-    expect(url.searchParams.get('since')).toBe('1700000000000');
-    expect(url.searchParams.get('limit')).toBe('8');
+    expect(url.pathname).toContain("/stats/top-talkers");
+    expect(url.searchParams.get("iatas")).toBe("YOW");
+    expect(url.searchParams.get("since")).toBe("1700000000000");
+    expect(url.searchParams.get("limit")).toBe("8");
   });
 
   it("hits /stats/node-types with the region's IATAs", async () => {
-    const getUrl = mockFetchOnce([{ nodeType: 2, nodeTypeName: 'repeater', count: 12 }]);
+    const getUrl = mockFetchOnce([{ nodeType: 2, nodeTypeName: "repeater", count: 12 }]);
 
-    await getStatsNodeTypes(['YOW', 'YYZ']);
+    await getStatsNodeTypes(["YOW", "YYZ"]);
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/stats/node-types');
-    expect(url.searchParams.get('iatas')).toBe('YOW,YYZ');
+    expect(url.pathname).toContain("/stats/node-types");
+    expect(url.searchParams.get("iatas")).toBe("YOW,YYZ");
   });
 
-  it('hits /stats/clock-drift with iatas/limit', async () => {
+  it("sends an empty region as region= so the server returns zeros instead of every IATA", async () => {
     const getUrl = mockFetchOnce([]);
 
-    await getClockDrift(['YOW', 'YYZ'], 100);
+    await getStatsNodeTypes({ region: "empty-region" });
 
     const url = new URL(getUrl());
-    expect(url.pathname).toContain('/stats/clock-drift');
-    expect(url.searchParams.get('iatas')).toBe('YOW,YYZ');
-    expect(url.searchParams.get('limit')).toBe('100');
+    expect(url.searchParams.get("region")).toBe("empty-region");
+    expect(url.searchParams.has("iatas")).toBe(false);
+  });
+
+  it("hits /stats/clock-drift with iatas/limit", async () => {
+    const getUrl = mockFetchOnce([]);
+
+    await getClockDrift(["YOW", "YYZ"], 100);
+
+    const url = new URL(getUrl());
+    expect(url.pathname).toContain("/stats/clock-drift");
+    expect(url.searchParams.get("iatas")).toBe("YOW,YYZ");
+    expect(url.searchParams.get("limit")).toBe("100");
   });
 });
 
-describe('getIataBorder', () => {
+describe("getIataBorder", () => {
   // this endpoint can 204 (empty body) or send a literal `null`, so mock the status explicitly
   function mockStatus(status: number, body: unknown): () => string {
-    let calledUrl = '';
+    let calledUrl = "";
     vi.stubGlobal(
-      'fetch',
+      "fetch",
       vi.fn(async (url: string) => {
         calledUrl = url;
         return {
           ok: status >= 200 && status < 300,
           status,
+          statusText: "status",
+          headers: new Headers(),
           json: async () => {
-            if (status === 204) throw new Error('no body to parse');
+            if (status === 204) throw new Error("no body to parse");
             return body;
           },
         } as Response;
@@ -590,180 +503,146 @@ describe('getIataBorder', () => {
   }
 
   const feature: Feature<Polygon> = {
-    type: 'Feature',
+    type: "Feature",
     properties: {},
-    geometry: {
-      type: 'Polygon',
-      coordinates: [
-        [
-          [0, 0],
-          [1, 0],
-          [1, 1],
-          [0, 0],
-        ],
-      ],
-    },
+    geometry: { type: "Polygon", coordinates: [[[0, 0], [1, 0], [1, 1], [0, 0]]] },
   };
 
-  it('requests /iatas/{iata}/border', async () => {
+  it("requests /iatas/{iata}/border", async () => {
     const getUrl = mockStatus(200, feature);
-    await getIataBorder('YOW');
-    expect(new URL(getUrl()).pathname).toContain('/iatas/YOW/border');
+    await getIataBorder("YOW");
+    expect(new URL(getUrl()).pathname).toContain("/iatas/YOW/border");
   });
 
-  it('returns null for a 204 (no border configured) without parsing a body', async () => {
+  it("returns null for a 204 (no border configured) without parsing a body", async () => {
     mockStatus(204, undefined);
-    await expect(getIataBorder('YOW')).resolves.toBeNull();
+    await expect(getIataBorder("YOW")).resolves.toBeNull();
   });
 
-  it('treats a literal null body as no border', async () => {
+  it("treats a literal null body as no border", async () => {
     mockStatus(200, null);
-    await expect(getIataBorder('YOW')).resolves.toBeNull();
+    await expect(getIataBorder("YOW")).resolves.toBeNull();
   });
 
-  it('returns the GeoJSON Feature when a border exists', async () => {
+  it("returns the GeoJSON Feature when a border exists", async () => {
     mockStatus(200, feature);
-    await expect(getIataBorder('YOW')).resolves.toEqual(feature);
+    await expect(getIataBorder("YOW")).resolves.toEqual(feature);
+  });
+
+  it("surfaces a 429 with the same ApiError shape as request()", async () => {
+    mockStatus(429, { error: { code: "rate_limited", message: "slow down" } });
+    const err = await getIataBorder("YOW").catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: "ApiError", status: 429, code: "rate_limited" });
   });
 });
 
-describe('generated-model domain adapters', () => {
-  it('normalizes omitted node values while preserving false, zero and nested link metrics', async () => {
-    mockFetchOnce({
-      id: 'node',
-      publicKey: 'ab',
-      nodeType: 2,
-      nodeTypeName: 'REPEATER',
-      iatas: [],
-      knownNeighborCount: 1,
-      isObserver: false,
-      stale: false,
-      lat: 0,
-      neighbors: [],
-      neighborLinks: [{ nodeId: 'peer', snr: 0, snrSampleCount: 1 }],
-      firstSeen: 0,
-      lastSeen: 1,
-      supportsMultibytePaths: false,
-      supportsMultibyteTraces: true,
-    });
-    const node = await getNode('node');
-    expect(node).toMatchObject({
-      name: null,
-      lat: 0,
-      lng: null,
-      metadata: null,
-      locationSource: null,
-      lastAdvertAt: null,
-      minFirmwareVersion: null,
-      supportsMultibytePaths: false,
-      neighborLinks: [{ nodeId: 'peer', snr: 0, snrSampleCount: 1 }],
-    });
-  });
-
-  it('keeps optional observer owner references and narrows dynamic status metadata', async () => {
-    const ownerNode = { id: 'owner', name: 'Owner', publicKey: 'ab' };
-    mockFetchOnce({
-      id: 'observer',
-      iata: 'YVR',
-      status: 'online',
-      publicKey: 'cd',
-      firstSeen: 1,
-      lastSeen: 2,
-      observationCount: 0,
-      brokers: [],
-      ownerNode,
-      statusMetadata: { stats: { noise_floor: -110 } },
-    });
-    expect(await getObserver('observer')).toMatchObject({
-      ownerNode,
-      statusMetadata: { stats: { noise_floor: -110 } },
-    });
-    mockFetchOnce({ statusMetadata: ['invalid'] });
-    await expect(getObserver('observer')).rejects.toThrow(
-      'Invalid Observer.statusMetadata response',
+describe("error responses", () => {
+  function mockError(status: number, body: unknown, headers: Record<string, string> = {}) {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status,
+        statusText: "status",
+        headers: new Headers(headers),
+        json: async () => body,
+      }) as unknown as Response),
     );
+  }
+  const limited = { error: { code: "rate_limited", message: "slow down" } };
+
+  it("a 429 throws an ApiError carrying status, code and retryAfterMs from the header", async () => {
+    mockError(429, limited, { "Retry-After": "12" });
+    const err = await getScopes().catch((e: unknown) => e);
+    expect(err).toMatchObject({ name: "ApiError", status: 429, code: "rate_limited", retryAfterMs: 12_000 });
   });
 
-  it('keeps parsed JSON payloads and normalizes null propagation time', async () => {
-    mockFetchOnce({
-      parsedPayload: { type: 'advert', name: 'Relay' },
-      observations: [{ id: 1, propagationTimeMs: null }],
-      resolvedRoute: [{ confidence: 'none', nodes: [] }],
-    });
-    expect(await getPacketDetail('ab')).toMatchObject({
-      parsedPayload: { type: 'advert', name: 'Relay' },
-      observations: [{ id: 1, propagationTimeMs: undefined }],
-      resolvedRoute: [{ confidence: 'none', nodes: [] }],
-    });
-    mockFetchOnce({ parsedPayload: [1, 2, 3], observations: [] });
-    await expect(getPacketDetail('ab')).rejects.toThrow('Invalid Packet.parsedPayload response');
+  it("a 429 without Retry-After leaves retryAfterMs undefined", async () => {
+    mockError(429, limited);
+    const err = await getScopes().catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 429, retryAfterMs: undefined });
   });
 
-  it('turns absent telemetry measurements into gaps and keeps real zeroes', async () => {
-    mockFetchOnce({
-      range: '24h',
-      interval: '1h',
-      points: [{ t: 1, batteryMv: 0, airtimeRxSecs: 0 }],
-    });
-    expect(await getObserverTelemetry('observer', '24h')).toEqual({
-      range: '24h',
-      interval: '1h',
-      points: [
-        {
-          t: 1,
-          batteryMv: 0,
-          airtimeRxSecs: 0,
-          airtimeTxSecs: null,
-          noiseFloorDb: null,
-          uptimeSeconds: null,
-          queueLength: null,
-          receiveErrors: null,
-        },
-      ],
-    });
+  it("a 429 marks the app rate-limited for Retry-After", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    mockError(429, limited, { "Retry-After": "12" });
+    await getScopes().catch(() => {});
+    expect(getRateLimitedUntil()).toBe(1_012_000);
   });
 
-  it('normalizes absent legacy cursors without losing opaque pagination tokens', async () => {
-    mockFetchOnce({ items: [], hasMore: true, nextPageToken: 'opaque' });
-    expect(await getKnownRoutesPage()).toEqual({
-      items: [],
-      hasMore: true,
-      nextCursor: null,
-      nextPageToken: 'opaque',
-    });
+  it("a 429 without the header uses the default window", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(1_000_000);
+    mockError(429, limited);
+    await getScopes().catch(() => {});
+    expect(getRateLimitedUntil()).toBe(1_000_000 + RATE_LIMIT_DEFAULT_MS);
   });
 
-  it('rejects the filtered scope response shape when fetching the names-only contract', async () => {
-    mockFetchOnce([{ name: '#region', nodeCount: 1 }]);
-    await expect(getScopes()).rejects.toThrow('Invalid scope names response');
+  it("the next successful request clears the rate-limited state", async () => {
+    mockError(429, limited);
+    await getScopes().catch(() => {});
+    expect(getRateLimitedUntil()).not.toBeNull();
+
+    mockFetchOnce([]);
+    await getScopes();
+    expect(getRateLimitedUntil()).toBeNull();
   });
 
-  it('rejects a malformed GeoJSON border instead of asserting its type', async () => {
-    mockFetchOnce({
-      type: 'Feature',
-      properties: {},
-      geometry: { type: 'Polygon', coordinates: [[['wrong', 0]]] },
-    });
-    await expect(getIataBorder('YVR')).rejects.toThrow('Invalid IATA border response');
+  it("a plain 500 is not treated as rate limiting", async () => {
+    mockError(500, { error: { code: "internal", message: "boom" } });
+    const err = await getScopes().catch((e: unknown) => e);
+    expect(err).toMatchObject({ status: 500, code: "internal" });
+    expect(getRateLimitedUntil()).toBeNull();
   });
 });
 
-it('retains precise channel cursors and known/unknown filters together', async () => {
-  const getUrl = mockFetchOnce({
-    items: [],
-    unknownCount: 42,
-    hasMore: true,
-    nextCursor: 123,
-    nextPageCursor: 'next-precise',
+describe("getObserverActivity", () => {
+  it("requests the observer's heard-activity series for a range and bucket interval", async () => {
+    const getUrl = mockFetchOnce({ range: "24h", interval: "15m", radio: null, payloadTypes: [], points: [] });
+
+    await getObserverActivity("obs-1", "24h", "15m");
+
+    const url = new URL(getUrl());
+    expect(url.pathname).toContain("/observers/obs-1/activity");
+    expect(url.searchParams.get("range")).toBe("24h");
+    expect(url.searchParams.get("interval")).toBe("15m");
   });
-  const result = await getChannels({
-    iatas: ['STO', 'GOT'],
-    key: 'unknown',
-    pageCursor: 'previous-precise',
+});
+
+describe("isNotFound", () => {
+  it("is true only for a 404 from the API", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+        headers: new Headers(),
+        json: async () => ({ error: { code: "not_found", message: "no such observer" } }),
+      })),
+    );
+
+    const err = await getObserverActivity("obs-1", "24h", "15m").catch((e: unknown) => e);
+
+    expect(isNotFound(err)).toBe(true);
+    expect(isNotFound(new Error("network down"))).toBe(false);
   });
-  const url = new URL(getUrl());
-  expect(url.searchParams.get('pageCursor')).toBe('previous-precise');
-  expect(url.searchParams.get('key')).toBe('unknown');
-  expect(url.searchParams.get('iatas')).toBe('STO,GOT');
-  expect(result).toMatchObject({ unknownCount: 42, nextPageCursor: 'next-precise', hasMore: true });
+});
+
+describe("a region with no IATAs", () => {
+  it("returns empty results without asking the server, which would answer for every IATA", async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    const empty = { items: [], nextCursor: null, hasMore: false };
+
+    await expect(getPackets([])).resolves.toEqual(empty);
+    await expect(getNodesPage([])).resolves.toEqual(empty);
+    await expect(getObserversPage([])).resolves.toEqual(empty);
+    await expect(getChannels({ iatas: [] })).resolves.toEqual(empty);
+    await expect(getChannelMessagesPage(1, { iatas: [] })).resolves.toEqual(empty);
+    await expect(getTraces([])).resolves.toEqual([]);
+    await expect(getScopes([])).resolves.toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

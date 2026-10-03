@@ -1,182 +1,80 @@
-import { ForeignNodeBadge } from './ForeignNodeBadge';
-import { nodeSortId } from './node-sort';
-import { nodeTypeLabel } from '../../lib/node-types';
-import { useCallback, useMemo, useState } from 'react';
-import { type TFunction } from 'i18next';
-import { useTranslation } from 'react-i18next';
-import { nodeQueries } from '../../api/queries';
-import { useRegion } from '../../hooks/useRegion';
-import { useScopes } from '../../hooks/useScopes';
-import { useTick } from '../../hooks/useTick';
-import { useInfinitePages } from '../../hooks/useInfinitePages';
-import { formatHex, timeAgoMs, formatRadioWithTitle } from '../../lib/formatters';
-import { Badge } from '../../components/Badge';
-import { Tooltip } from '../../components/Tooltip';
-import { ObserverIcon } from '../../components/ObserverIcon';
-import {
-  DataTable,
-  type Column,
-  type MobileSortOption,
-  type SortState,
-} from '../../components/DataTable';
-import { LoadingPill } from '../../components/LoadingPill';
-import { NodeFilterBar, type MultibyteFilter } from './NodeFilterBar';
-import { nodeSearchParams } from './node-search';
-import type { NodeSummary } from './types';
+import { useState, useCallback, useMemo } from "react";
+import { useTranslation } from "react-i18next";
+import { useQueryClient, type InfiniteData } from "@tanstack/react-query";
+import { getNodesPage } from "../../api/client";
+import { useRegion } from "../../hooks/useRegion";
+import { useScopes } from "../../hooks/useScopes";
+import { useTick } from "../../hooks/useTick";
+import { useInfinitePages } from "../../hooks/useInfinitePages";
+import { patchInfinitePages } from "../../lib/infinite-pages";
+import { useWsNodeUpdateHandler } from "../../hooks/useWsHandlers";
+import { formatHex, timeAgoParts, formatRadio } from "../../lib/formatters";
+import { hasMapLocation } from "../map/location";
+import { Badge } from "../../components/Badge";
+import { Tooltip } from "../../components/Tooltip";
+import { ObserverIcon } from "../../components/ObserverIcon";
+import { DataTable, type Column } from "../../components/DataTable";
+import { LoadingPill } from "../../components/LoadingPill";
+import { NodeFilterBar, type MultibyteFilter } from "./NodeFilterBar";
+import { nodeSearchParams } from "./node-search";
+import { patchNodeSummary } from "./node-updates";
+import { ForeignNodeBadge } from "./ForeignNodeBadge";
+import type { TFunction } from "i18next";
+import type { NodeSummary, NodeIATA } from "./types";
+import type { CursorPage } from "../../types/api";
+import type { WsManager } from "../../api/ws-manager";
+import type { WsNodeUpdate } from "../../types/ws";
 
 const nodeId = (n: NodeSummary) => n.id; // stable id accessor for the paged hook's dedup
 
-export interface NodeTableViewState {
-  typeFilter: string;
-  pathsFilter: MultibyteFilter;
-  tracesFilter: MultibyteFilter;
-  scopeFilter: string;
-  sort: SortState;
-  search: string;
-  searchField: string;
+// Cell and card renderers can't call hooks, so the computed "last heard" label gets its own component.
+function IataBadge({ entry }: { entry: NodeIATA }) {
+  const { t } = useTranslation();
+  const { count, unit } = timeAgoParts(entry.lastHeard);
+  const ago = t("timestamp.ago", { duration: t(`timestamp.unit.${unit}`, { count }) });
+  return (
+    <Tooltip label={t("nodes.lastHeard", { ago })}>
+      <Badge variant="default">{entry.iata}</Badge>
+    </Tooltip>
+  );
 }
 
 interface NodeTableProps {
+  wsManager: WsManager;
+  // shared with the Map tab (lifted to AppInner) so the detail panel persists across tab switches
   selectedNodeId: string | null;
   onSelectNode: (id: string | null) => void;
-  viewState: NodeTableViewState;
-  onViewStateChange: (patch: Partial<NodeTableViewState>, options?: { replace?: boolean }) => void;
-  onRowIntent?: (id: string) => void;
-}
-
-function nodeColumns(t: TFunction): Column<NodeSummary>[] {
-  return [
-    {
-      id: 'name',
-      header: 'Name',
-      size: 40,
-      label: t('entities.name'),
-      sortValue: (node) => node.name ?? formatHex(node.id),
-      cell: (node) => (
-        <span className={`truncate ${node.name ? 'text-text-normal' : 'text-text-dim italic'}`}>
-          {node.name ?? formatHex(node.id)}
-          <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
-        </span>
-      ),
-    },
-    {
-      id: 'type',
-      header: 'Type',
-      label: t('entities.type'),
-      sortValue: (node) => node.nodeTypeName,
-      cell: (node) => (
-        <Badge variant="default">
-          {node.isObserver && (
-            <Tooltip label={t('entities.observer')} className="mr-1">
-              <ObserverIcon />
-            </Tooltip>
-          )}
-          {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}
-        </Badge>
-      ),
-    },
-    {
-      id: 'radio',
-      header: 'Radio',
-      size: 12,
-      label: t('entities.radio'),
-      className: 'text-text-muted',
-      sortValue: (node) => formatRadioWithTitle(node.radio, node.radioTitle)?.label ?? null,
-      cell: (node) => {
-        const formatted = formatRadioWithTitle(node.radio, node.radioTitle);
-        return formatted ? (
-          <span title={formatted.title}>{formatted.label}</span>
-        ) : (
-          <span className="text-text-dim">—</span>
-        );
-      },
-    },
-    {
-      id: 'iatas',
-      header: 'IATAs',
-      label: t('entities.iatas'),
-      cell: (node) =>
-        node.iatas && node.iatas.length > 0 ? (
-          <div className="flex flex-wrap gap-1">
-            {node.iatas.map((entry) => (
-              <Tooltip
-                key={entry.iata}
-                label={t('entities.lastHeardAgo', { age: timeAgoMs(entry.lastHeard) })}
-              >
-                <Badge variant="default">{entry.iata}</Badge>
-              </Tooltip>
-            ))}
-          </div>
-        ) : (
-          <span className="text-text-dim">—</span>
-        ),
-    },
-    {
-      id: 'neighbors',
-      header: 'Neighbors',
-      size: 8,
-      label: t('entities.neighbors'),
-      className: 'text-text-muted',
-      sortValue: (node) => node.knownNeighborCount,
-      cell: (node) =>
-        node.knownNeighborCount > 0 ? (
-          node.knownNeighborCount.toLocaleString()
-        ) : (
-          <span className="text-text-dim">—</span>
-        ),
-    },
-    {
-      id: 'location',
-      header: 'Location',
-      label: t('entities.location'),
-      className: 'text-text-muted',
-      cell: (node) =>
-        node.lat != null && node.lng != null
-          ? `${node.lat.toFixed(2)}, ${node.lng.toFixed(2)}`
-          : '—',
-    },
-  ];
 }
 
 function renderNodeCard(node: NodeSummary, t: TFunction) {
-  const location =
-    node.lat != null && node.lng != null ? `${node.lat.toFixed(2)}, ${node.lng.toFixed(2)}` : null;
+  const location = hasMapLocation(node)
+    ? `${node.lat.toFixed(2)}, ${node.lng.toFixed(2)}`
+    : null;
   return (
     <div className="flex flex-col gap-1.5 font-mono text-xs">
       <div className="flex items-center justify-between gap-2">
-        <span
-          className={`flex-1 min-w-0 truncate ${node.name ? 'text-text-normal' : 'text-text-dim italic'}`}
-        >
+        <span className={`flex-1 min-w-0 truncate ${node.name ? "text-text-normal" : "text-text-dim italic"}`}>
           {node.name ?? formatHex(node.id)}
-          <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
         </span>
         <span className="shrink-0">
           <Badge variant="default">
             {node.isObserver && (
-              <Tooltip label={t('entities.observer')} className="mr-1">
-                <ObserverIcon />
-              </Tooltip>
+              <Tooltip label={t("nodes.observer")} className="mr-1"><ObserverIcon /></Tooltip>
             )}
-            {nodeTypeLabel(node.nodeTypeName, t('options.unknown'))}
+            {node.nodeTypeName}
           </Badge>
         </span>
       </div>
       <div className="flex items-center gap-2 text-text-muted">
-        <span>{formatRadioWithTitle(node.radio, node.radioTitle)?.label ?? '—'}</span>
+        <span>{formatRadio(node.radio) ?? "—"}</span>
         {location && <span>· {location}</span>}
-        {node.knownNeighborCount > 0 && (
-          <span>· {t('entities.neighborCount', { count: node.knownNeighborCount })}</span>
-        )}
+        {node.knownNeighborCount > 0 && <span>· {t("nodes.neighbors", { count: node.knownNeighborCount, formatted: node.knownNeighborCount.toLocaleString() })}</span>}
       </div>
+      <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
       {node.iatas && node.iatas.length > 0 && (
         <div className="flex flex-wrap gap-1">
           {node.iatas.map((entry) => (
-            <Tooltip
-              key={entry.iata}
-              label={t('entities.lastHeardAgo', { age: timeAgoMs(entry.lastHeard) })}
-            >
-              <Badge variant="default">{entry.iata}</Badge>
-            </Tooltip>
+            <IataBadge key={entry.iata} entry={entry} />
           ))}
         </div>
       )}
@@ -184,178 +82,170 @@ function renderNodeCard(node: NodeSummary, t: TFunction) {
   );
 }
 
-export function NodeTable({
-  selectedNodeId,
-  onSelectNode,
-  viewState,
-  onViewStateChange,
-  onRowIntent,
-}: NodeTableProps) {
+export function NodeTable({ wsManager, selectedNodeId, onSelectNode }: NodeTableProps) {
   const { t } = useTranslation();
-  const [optionalColumns, setOptionalColumns] = useState({ radio: false, neighbors: false });
-  const { iatas, regionKey } = useRegion();
-  const { typeFilter, pathsFilter, tracesFilter, scopeFilter, sort, search, searchField } =
-    viewState;
+  const { iatas, regionKey, isResolved } = useRegion();
+  const queryClient = useQueryClient();
+  const [typeFilter, setTypeFilter] = useState("");
+  const [pathsFilter, setPathsFilter] = useState<MultibyteFilter>("");
+  const [tracesFilter, setTracesFilter] = useState<MultibyteFilter>("");
+  const [scopeFilter, setScopeFilter] = useState(""); // "" = Any; applied client-side over the loaded set
+  const [search, setSearch] = useState("");
+  const [searchField, setSearchField] = useState("name");
+
+  const columns = useMemo<Column<NodeSummary>[]>(() => [
+    {
+      id: "name",
+      header: t("nodes.colName"),
+      sortValue: (node) => node.name ?? formatHex(node.id),
+      cell: (node) => (
+        <span className={`truncate ${node.name ? "text-text-normal" : "text-text-dim italic"}`}>
+          {node.name ?? formatHex(node.id)}
+        </span>
+      ),
+    },
+    {
+      id: "type",
+      header: t("nodes.colType"),
+      sortValue: (node) => node.nodeTypeName,
+      cell: (node) => (
+        <div className="flex flex-wrap gap-1">
+          <Badge variant="default">
+            {node.isObserver && (
+              <Tooltip label={t("nodes.observer")} className="mr-1"><ObserverIcon /></Tooltip>
+            )}
+            {node.nodeTypeName}
+          </Badge>
+          <ForeignNodeBadge possiblyForeign={node.possiblyForeign} />
+        </div>
+      ),
+    },
+    {
+      id: "radio",
+      header: t("nodes.colRadio"),
+      className: "text-text-muted",
+      sortValue: (node) => formatRadio(node.radio) ?? null,
+      cell: (node) => formatRadio(node.radio) ?? "—",
+    },
+    {
+      id: "areas",
+      header: t("nodes.colAreas"),
+      cell: (node) =>
+        node.iatas && node.iatas.length > 0 ? (
+          <div className="flex flex-wrap gap-1">
+            {node.iatas.map((entry) => (
+              <IataBadge key={entry.iata} entry={entry} />
+            ))}
+          </div>
+        ) : (
+          <span className="text-text-dim">—</span>
+        ),
+    },
+    {
+      id: "neighbors",
+      header: t("nodes.colNeighbors"),
+      className: "text-text-muted",
+      sortValue: (node) => node.knownNeighborCount,
+      cell: (node) => node.knownNeighborCount.toLocaleString(),
+    },
+    {
+      id: "location",
+      header: t("nodes.colLocation"),
+      className: "text-text-muted",
+      cell: (node) =>
+        hasMapLocation(node)
+          ? `${node.lat.toFixed(2)}, ${node.lng.toFixed(2)}`
+          : "—",
+    },
+  ], [t]);
 
   useTick();
 
   // switching the field flips what the box means (a name vs a hex prefix), so stale text mustn't carry over
-  const handleSearchFieldChange = useCallback(
-    (field: string) => {
-      onViewStateChange({ searchField: field, search: '' });
-    },
-    [onViewStateChange],
-  );
+  const handleSearchFieldChange = useCallback((field: string) => {
+    setSearchField(field);
+    setSearch("");
+  }, []);
 
   // derive the actual server params (name vs pubkeyPrefix, hex-guarded) and key the query on THOSE,
   // so toggling the field with an empty box is a no-op and a name never gets sent as a hex prefix
-  const { name: nameParam, pubkeyPrefix: pubkeyPrefixParam } = nodeSearchParams(
-    searchField,
-    search,
+  const { name: nameParam, pubkeyPrefix: pubkeyPrefixParam } = nodeSearchParams(searchField, search);
+
+  const queryKey = useMemo(
+    () => ["nodes", regionKey, typeFilter, pathsFilter, tracesFilter, nameParam, pubkeyPrefixParam],
+    [regionKey, typeFilter, pathsFilter, tracesFilter, nameParam, pubkeyPrefixParam],
   );
 
-  const serverSort = nodeSortId(sort.columnId);
-
-  const listOptions = useMemo(
-    () =>
-      nodeQueries.list({
-        regionKey,
-        iatas,
-        type: typeFilter,
+  // page the region's nodes 50 at a time (filters stay server-side, in the query key); rows stream
+  // in as each batch lands. Loads once per filter set — WS updates keep them live, no 30s refetch.
+  const { items: nodes, loadedCount, isPaging, isError, isLoading } = useInfinitePages<NodeSummary>({
+    queryKey,
+    queryFn: (cursor) =>
+      getNodesPage(iatas, {
+        cursor,
+        type: typeFilter || undefined,
         name: nameParam,
         pubkeyPrefix: pubkeyPrefixParam,
         supportsMultibytePaths: pathsFilter || undefined,
         supportsMultibyteTraces: tracesFilter || undefined,
-        scope: scopeFilter || undefined,
-        sort: serverSort,
-        direction: sort.direction,
       }),
-    [
-      regionKey,
-      iatas,
-      typeFilter,
-      nameParam,
-      pubkeyPrefixParam,
-      pathsFilter,
-      tracesFilter,
-      scopeFilter,
-      serverSort,
-      sort.direction,
-    ],
-  );
-
-  // Page the region's nodes 50 at a time. Filtering and ordering are server-side, so every page is
-  // globally sorted without eagerly downloading the rest of the result set.
-  const {
-    items: nodes,
-    loadedCount,
-    isPaging,
-    isError,
-    isLoading,
-    loadMore,
-  } = useInfinitePages<NodeSummary, string | number | undefined>({
-    options: listOptions,
     getId: nodeId,
-    auto: false,
+    keepPrevious: true,
+    enabled: isResolved !== false,
   });
 
-  const scopeOptions = useScopes();
-  // Keep sparse diagnostics available on demand. An active deep-linked sort always reveals
-  // its column, so the ordering has a visible explanation even on first load.
-  const columns = useMemo(
-    () =>
-      nodeColumns(t).map((column) => ({
-        ...column,
-        hidden:
-          column.id !== undefined &&
-          column.id in optionalColumns &&
-          !optionalColumns[column.id as keyof typeof optionalColumns] &&
-          sort.columnId !== column.id,
-      })),
-    [t, optionalColumns, sort.columnId],
+  const scopeOptions = useScopes(scopeFilter);
+
+  const displayNodes = useMemo(
+    () => (scopeFilter ? nodes.filter((n) => n.defaultScope === scopeFilter) : nodes),
+    [nodes, scopeFilter],
   );
-  // Only sortings with clear user-facing meaning become mobile actions; Type/Radio stay
-  // desktop-only rather than exposing lexical implementation orderings as detached actions.
-  const mobileSortOptions = useMemo<MobileSortOption[]>(
-    () => [
-      { id: 'name-asc', label: t('sort.nameAZ'), sort: { columnId: 'name', direction: 'asc' } },
-      { id: 'name-desc', label: t('sort.nameZA'), sort: { columnId: 'name', direction: 'desc' } },
-      {
-        id: 'neighbors-most',
-        label: t('sort.mostNeighbors'),
-        sort: { columnId: 'neighbors', direction: 'desc' },
-      },
-      {
-        id: 'neighbors-fewest',
-        label: t('sort.fewestNeighbors'),
-        sort: { columnId: 'neighbors', direction: 'asc' },
-      },
-    ],
-    [t],
+
+  const handleNodeUpdate = useCallback(
+    (data: WsNodeUpdate["data"]) => {
+      queryClient.setQueryData<InfiniteData<CursorPage<NodeSummary>>>(queryKey, (old) =>
+        patchInfinitePages(old, (items) => patchNodeSummary(items, data) ?? items),
+      );
+      if (selectedNodeId === data.nodeId) {
+        queryClient.invalidateQueries({ queryKey: ["node", data.nodeId] });
+      }
+    },
+    [queryClient, queryKey, selectedNodeId],
   );
+
+  useWsNodeUpdateHandler(wsManager, handleNodeUpdate);
 
   return (
     <div className="flex flex-1 min-h-0">
       <div className="relative flex flex-col flex-1 min-w-0">
         <NodeFilterBar
           search={search}
-          onSearchChange={(value) => onViewStateChange({ search: value }, { replace: true })}
+          onSearchChange={setSearch}
           searchField={searchField}
           onSearchFieldChange={handleSearchFieldChange}
           typeFilter={typeFilter}
-          onTypeChange={(value) => onViewStateChange({ typeFilter: value })}
+          onTypeChange={setTypeFilter}
           pathsFilter={pathsFilter}
-          onPathsChange={(value) => onViewStateChange({ pathsFilter: value })}
+          onPathsChange={setPathsFilter}
           tracesFilter={tracesFilter}
-          onTracesChange={(value) => onViewStateChange({ tracesFilter: value })}
+          onTracesChange={setTracesFilter}
           scopeFilter={scopeFilter}
-          onScopeChange={(value) => onViewStateChange({ scopeFilter: value })}
+          onScopeChange={setScopeFilter}
           scopeOptions={scopeOptions}
         />
 
-        <div className="hidden shrink-0 flex-wrap items-center gap-4 border-b border-border px-4 py-2 font-mono text-xs text-text-muted lg:flex">
-          <span>{t('entities.optionalColumns')}</span>
-          {(['radio', 'neighbors'] as const).map((header) => (
-            <label key={header} className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={optionalColumns[header] || sort.columnId === header}
-                onChange={(event) => {
-                  const checked = event.target.checked;
-                  setOptionalColumns((prev) => ({ ...prev, [header]: checked }));
-                  if (!checked && sort.columnId === header)
-                    onViewStateChange({ sort: { columnId: 'name', direction: 'asc' } });
-                }}
-              />
-              {t(header === 'radio' ? 'entities.radio' : 'entities.neighbors')}
-            </label>
-          ))}
-        </div>
-
         <DataTable
           columns={columns}
-          rows={nodes}
+          rows={displayNodes}
           rowKey={(n) => n.id}
           selectedKey={selectedNodeId}
           onSelect={onSelectNode}
-          onRowIntent={onRowIntent}
-          isLoading={isLoading}
-          emptyLabel={t('entities.noNodes')}
-          sort={sort}
-          onSortChange={(value) => onViewStateChange({ sort: value })}
-          sortMode="server"
-          mobileSortOptions={mobileSortOptions}
-          virtualize
-          onEndReached={loadMore}
+          isLoading={isLoading || isResolved === false}
+          emptyLabel={t("nodes.empty")}
+          defaultSort={{ id: "name" }}
           renderCard={(node) => renderNodeCard(node, t)}
         />
-        <LoadingPill
-          loading={isPaging}
-          error={isError}
-          count={loadedCount}
-          noun={t('entities.nodes')}
-          position="bottom-3 right-3"
-        />
+        <LoadingPill loading={isPaging} error={isError} count={loadedCount} noun="nodes" position="bottom-3 right-3" />
       </div>
     </div>
   );

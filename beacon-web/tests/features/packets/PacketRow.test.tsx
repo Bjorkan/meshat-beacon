@@ -1,32 +1,42 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { PacketRow } from '../../../src/features/packets/PacketRow';
-import type { PacketSummary } from '../../../src/types/api';
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { PacketRow } from "../../../src/features/packets/PacketRow";
+import i18n from "../../../src/i18n";
+import type { PacketSummary } from "../../../src/types/api";
 
-const packet: PacketSummary = {
-  packetHash: 'AA11BB22',
-  payloadType: 1,
-  payloadTypeName: 'ADVERT',
-  routeType: 1,
-  routeTypeName: 'FLOOD',
-  firstHeardAt: 1700000000,
-  lastHeardAt: 1700000000,
-  observationCount: 3,
-};
+const pkt = (over: Partial<PacketSummary> = {}): PacketSummary => ({
+  packetHash: "AA11", payloadType: 1, payloadTypeName: "ADVERT",
+  routeType: 1, routeTypeName: "FLOOD",
+  firstHeardAt: 1700000000, lastHeardAt: 1700000002, observationCount: 2, ...over,
+});
 
-describe('PacketRow', () => {
-  it('uses a native disclosure button and lets the whole card toggle it', () => {
+const tokens = (el: Element) => (el.getAttribute("class") ?? "").split(/\s+/);
+
+describe("PacketRow", () => {
+  // expanded card loses its bottom radius so the expansion below reads as the same card unfolding
+  it("squares its bottom corners while expanded", () => {
+    const { container } = render(<PacketRow packet={pkt()} expanded onToggle={() => {}} />);
+    expect(tokens(container.firstElementChild!)).toContain("rounded-b-none");
+  });
+
+  it("keeps rounded corners while collapsed", () => {
+    const { container } = render(<PacketRow packet={pkt()} expanded={false} onToggle={() => {}} />);
+    expect(tokens(container.firstElementChild!)).not.toContain("rounded-b-none");
+  });
+
+  it("toggles on click", () => {
     const onToggle = vi.fn();
-    const { rerender } = render(<PacketRow packet={packet} expanded={false} onToggle={onToggle} />);
-    const button = screen.getByRole('button');
-    expect(button.tagName).toBe('BUTTON');
-    expect(button).toHaveAttribute('type', 'button');
-    expect(button).toHaveAttribute('aria-expanded', 'false');
-    expect(button).not.toHaveAttribute('aria-pressed');
-    fireEvent.click(screen.getByText('×3'));
-    expect(onToggle).toHaveBeenCalledOnce();
-    rerender(<PacketRow packet={packet} expanded onToggle={onToggle} />);
-    expect(button).toHaveAttribute('aria-expanded', 'true');
-    expect(button).toHaveAttribute('aria-controls', 'packet-expansion-AA11BB22');
+    render(<PacketRow packet={pkt()} expanded={false} onToggle={onToggle} />);
+    fireEvent.click(screen.getByText("AA11"));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("PacketRow in French", () => {
+  it("translates the observer count label and unknown route", async () => {
+    await i18n.changeLanguage("fr");
+    render(<PacketRow packet={pkt({ routeTypeName: "" })} expanded={false} onToggle={() => {}} />);
+    expect(screen.getByLabelText("Reçu par 2 observateurs")).toBeInTheDocument();
+    expect(screen.getByText("Inconnu")).toBeInTheDocument();
   });
 });

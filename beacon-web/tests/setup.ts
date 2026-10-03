@@ -1,11 +1,7 @@
-import '@testing-library/jest-dom/vitest';
-import i18n from '../src/i18n';
-import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
-
-// Production defaults to Swedish (src/i18n.ts), but the component suites assert on English copy.
-// Pin the test language to English up front; tests that exercise language switching set their own.
-await i18n.changeLanguage('en');
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach, vi } from "vitest";
+import i18n from "../src/i18n";
 
 // jsdom doesn't implement matchMedia. Provide a default stub so components that read media queries
 // mount as "desktop" by default — a hover-capable pointer, not below the mobile width. Individual
@@ -25,22 +21,25 @@ if (!window.matchMedia) {
   }));
 }
 
-// Radix floating primitives observe their trigger/content geometry. jsdom has no layout engine, so
-// a no-op observer is sufficient for interaction tests while production uses the browser native API.
-class ResizeObserverMock implements ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+// Node 26 exposes `localStorage` as undefined without `--localstorage-file`, shadowing jsdom's.
+if (!globalThis.localStorage) {
+  const store = new Map<string, string>();
+  Object.defineProperty(globalThis, "localStorage", {
+    value: {
+      getItem: (key: string) => (store.has(key) ? store.get(key)! : null),
+      setItem: (key: string, value: string) => store.set(key, String(value)),
+      removeItem: (key: string) => store.delete(key),
+      clear: () => store.clear(),
+      key: (index: number) => Array.from(store.keys())[index] ?? null,
+      get length() { return store.size; },
+    },
+    configurable: true,
+    writable: true,
+  });
 }
-globalThis.ResizeObserver = ResizeObserverMock;
 
-// Radix DismissableLayer uses PointerEvent/capture APIs that jsdom does not expose.
-window.PointerEvent = MouseEvent as typeof PointerEvent;
-HTMLElement.prototype.hasPointerCapture = () => false;
-HTMLElement.prototype.setPointerCapture = () => {};
-HTMLElement.prototype.releasePointerCapture = () => {};
-HTMLElement.prototype.scrollIntoView = () => {};
-
-afterEach(() => {
+afterEach(async () => {
   cleanup();
+  await i18n.changeLanguage("en");
+  try { localStorage.clear(); } catch { /* stubbed per-test */ }
 });

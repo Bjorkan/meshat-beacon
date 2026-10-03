@@ -1,30 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
-import { CopyButton } from '../../src/components/CopyButton';
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { CopyButton } from "../../src/components/CopyButton";
+import i18n from "../../src/i18n";
 
 const writeText = vi.fn();
 
 beforeEach(() => {
-  Object.defineProperty(navigator, 'clipboard', {
+  Object.defineProperty(navigator, "clipboard", {
     value: { writeText },
     writable: true,
     configurable: true,
   });
-  writeText.mockReset().mockResolvedValue(undefined);
+  writeText.mockClear();
 });
 
-describe('CopyButton', async () => {
-  it("shows the default 'Copy' label", async () => {
+describe("CopyButton", () => {
+  it("shows the default 'Copy' label", () => {
     render(<CopyButton value="deadbeef" />);
-    expect(screen.getByRole('button')).toHaveTextContent('Copy');
+    expect(screen.getByRole("button")).toHaveTextContent("Copy");
   });
 
-  it('writes the full value to the clipboard on click', async () => {
-    const key = '0123456789abcdef0123456789abcdef';
+  it("writes the full value to the clipboard on click", () => {
+    const key = "0123456789abcdef0123456789abcdef";
     render(<CopyButton value={key} />);
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button'));
-    });
+    fireEvent.click(screen.getByRole("button"));
     expect(writeText).toHaveBeenCalledWith(key);
   });
 
@@ -32,66 +31,51 @@ describe('CopyButton', async () => {
     vi.useFakeTimers();
     try {
       render(<CopyButton value="deadbeef" />);
-      const button = screen.getByRole('button');
-      await act(async () => {
-        fireEvent.click(button);
-      });
-      expect(button).toHaveTextContent('Copied');
+      const button = screen.getByRole("button");
+      fireEvent.click(button);
+      await act(async () => {});
+      expect(button).toHaveTextContent("Copied");
       act(() => {
         vi.advanceTimersByTime(1500);
       });
-      expect(button).toHaveTextContent('Copy');
+      expect(button).toHaveTextContent("Copy");
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('uses the provided aria-label for the accessible name', async () => {
+  it("uses the provided aria-label for the accessible name", () => {
     render(<CopyButton value="deadbeef" ariaLabel="Copy public key" />);
-    expect(screen.getByRole('button', { name: 'Copy public key' })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy public key" })).toBeInTheDocument();
   });
 
-  it('applies the action variant', async () => {
-    render(<CopyButton value="deadbeef" variant="action" />);
-    expect(screen.getByRole('button')).toHaveClass(
-      'rounded-full',
-      'px-3',
-      'font-sans',
-      'text-xs',
-      'tracking-normal',
-      'normal-case',
-      'focus-visible:outline-2',
-      'focus-visible:outline-primary',
-    );
+  it("defaults to French labels in French", async () => {
+    await i18n.changeLanguage("fr");
+    render(<CopyButton value="deadbeef" />);
+    const button = screen.getByRole("button", { name: "Copier" });
+    fireEvent.click(button);
+    await act(async () => {});
+    expect(button).toHaveTextContent("Copié");
   });
-});
 
-it('reports clipboard denial and can retry successfully', async () => {
-  writeText.mockRejectedValueOnce(new Error('permission denied'));
-  render(<CopyButton value="abc" />);
-  await act(async () => {
-    fireEvent.click(screen.getByRole('button'));
+  it("doesn't claim success when the clipboard API is missing (plain http)", async () => {
+    Object.defineProperty(navigator, "clipboard", { value: undefined, writable: true, configurable: true });
+    render(<CopyButton value="deadbeef" />);
+    const button = screen.getByRole("button");
+    fireEvent.click(button);
+    await act(async () => {});
+    expect(button).not.toHaveTextContent("Copied");
+    expect(button).toHaveTextContent("Copy failed");
   });
-  expect(screen.getByRole('button')).toHaveTextContent('Copy failed');
-  expect(screen.queryByText('Copied')).not.toBeInTheDocument();
-  await act(async () => {
-    fireEvent.click(screen.getByRole('button'));
-  });
-  expect(screen.getByRole('button')).toHaveTextContent('Copied');
-});
 
-it('does not report success while the clipboard write is pending', async () => {
-  let resolve!: () => void;
-  writeText.mockReturnValueOnce(
-    new Promise<void>((done) => {
-      resolve = done;
-    }),
-  );
-  render(<CopyButton value="abc" />);
-  fireEvent.click(screen.getByRole('button'));
-  expect(screen.queryByText('Copied')).not.toBeInTheDocument();
-  await act(async () => {
-    resolve();
+  it("shows 'Copied' only once the write resolves, and a failure when it rejects", async () => {
+    let reject!: (e: Error) => void;
+    writeText.mockReturnValueOnce(new Promise((_, r) => (reject = r)));
+    render(<CopyButton value="deadbeef" />);
+    const button = screen.getByRole("button");
+    fireEvent.click(button);
+    expect(button).not.toHaveTextContent("Copied");
+    await act(async () => reject(new Error("denied")));
+    expect(button).toHaveTextContent("Copy failed");
   });
-  expect(screen.getByRole('button')).toHaveTextContent('Copied');
 });

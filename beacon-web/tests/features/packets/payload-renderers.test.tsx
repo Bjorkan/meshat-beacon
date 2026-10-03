@@ -1,291 +1,209 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { PayloadBreakdown } from '../../../src/features/packets/payload-renderers';
-import { formatAbsolute, timeAgoMs } from '../../../src/lib/formatters';
-import type { ResolvedHop } from '../../../src/types/api';
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import { PayloadBreakdown } from "../../../src/features/packets/payload-renderers";
+import { formatAbsolute, timeAgoMs } from "../../../src/lib/formatters";
+import type { ResolvedHop } from "../../../src/types/api";
 
 const tracePayload = {
-  type: 'TRACE',
+  type: "TRACE",
   flags: 0,
-  pathHashes: ['ab', 'cd'],
+  pathHashes: ["ab", "cd"],
   snrValues: [-5, -8],
 };
 
 const resolvedRoute: ResolvedHop[] = [
-  { confidence: 'high', nodes: [{ id: 'n1', publicKey: 'abcdef00', name: 'Node A' }] },
-  {
-    confidence: 'ambiguous',
-    nodes: [
-      { id: 'n2', publicKey: '11' },
-      { id: 'n3', publicKey: '22' },
-    ],
-  },
+  { confidence: "high", nodes: [{ id: "n1", publicKey: "abcdef00", name: "Node A" }] },
+  { confidence: "ambiguous", nodes: [{ id: "n2", publicKey: "11" }, { id: "n3", publicKey: "22" }] },
 ];
 
-describe('PayloadBreakdown — trace resolvedRoute overlay', () => {
-  it('tints each trace-path hash block by its resolved confidence', () => {
+describe("PayloadBreakdown — trace resolvedRoute overlay", () => {
+  it("tints each trace-path hash block by its resolved confidence", () => {
     render(<PayloadBreakdown payload={tracePayload} resolvedRoute={resolvedRoute} />);
-    expect(screen.getByText('Node A').className).toContain('text-green'); // high name is primary
-    expect(screen.getByText('CD').className).toContain('text-warn'); // ambiguous
+    expect(screen.getByText("AB").className).toContain("text-green"); // high
+    expect(screen.getByText("CD").className).toContain("text-warn"); // ambiguous
   });
 
-  it('falls back to the plain hash badge when there is no resolvedRoute', () => {
+  it("falls back to the plain hash badge when there is no resolvedRoute", () => {
     render(<PayloadBreakdown payload={tracePayload} />);
-    expect(screen.getByText('AB').className).toContain('text-primary');
+    expect(screen.getByText("AB").className).toContain("text-primary");
   });
 
   it("makes a single-resolution hop's badge directly clickable (like other packets)", () => {
     const onViewNode = vi.fn();
-    render(
-      <PayloadBreakdown
-        payload={tracePayload}
-        resolvedRoute={resolvedRoute}
-        onViewNode={onViewNode}
-      />,
-    );
-    // hop 0 is high-confidence with one node → its human-readable name opens that node
-    fireEvent.click(screen.getByRole('button', { name: 'Node A' }));
-    expect(onViewNode).toHaveBeenCalledWith('n1');
+    render(<PayloadBreakdown payload={tracePayload} resolvedRoute={resolvedRoute} onViewNode={onViewNode} />);
+    // hop 0 is high-confidence with one node → the hash badge itself opens that node
+    fireEvent.click(screen.getByRole("button", { name: "AB" }));
+    expect(onViewNode).toHaveBeenCalledWith("n1");
     // hop 1 is ambiguous (two candidates) → not a direct button; resolved via the popover instead
-    expect(screen.queryByRole('button', { name: 'CD' })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "CD" })).not.toBeInTheDocument();
   });
 
-  it('places each SNR on the inbound edge before the hop it enters, never after it', () => {
-    // SNR[i] is hop i's reading of the link from hop i-1: the origin hop (AB) must
-    // carry no SNR edge, and the CD→EF edge must read "→ -8.00 dB → EF" in DOM order.
-    const payload = {
-      type: 'TRACE',
-      flags: 0,
-      pathHashes: ['ab', 'cd', 'ef'],
-      snrValues: [-5, -8, -9],
-    };
-    // No resolvedRoute here so hops render as their raw AB/CD/EF badges.
-    const { container } = render(<PayloadBreakdown payload={payload} />);
-    const text = container.textContent ?? '';
-    // SNR[0] (-5) belongs to no edge and is never rendered...
-    expect(screen.queryByText('-5.00 dB')).not.toBeInTheDocument();
-    // ...while SNR[1] and SNR[2] render once each, on their inbound edges.
-    expect(screen.getByText('-8.00 dB')).toBeInTheDocument();
-    expect(screen.getByText('-9.00 dB')).toBeInTheDocument();
-    // DOM order pins the edge semantics: A → SNR → B → SNR → C (issue #96).
-    const idxAB = text.indexOf('AB');
-    const idxSnr1 = text.indexOf('-8.00 dB');
-    const idxCD = text.indexOf('CD');
-    const idxSnr2 = text.indexOf('-9.00 dB');
-    const idxEF = text.indexOf('EF');
-    expect([idxAB, idxSnr1, idxCD, idxSnr2, idxEF].every((i) => i >= 0)).toBe(true);
-    expect(idxAB).toBeLessThan(idxSnr1);
-    expect(idxSnr1).toBeLessThan(idxCD);
-    expect(idxCD).toBeLessThan(idxSnr2);
-    expect(idxSnr2).toBeLessThan(idxEF);
-    // The edge exposes an accessible inbound label for the receiving hop.
-    expect(screen.getByRole('group', { name: '-8.00 dB inbound to CD' })).toBeInTheDocument();
-  });
-
-  it('renders a real 0 dB reading (not a missing-value placeholder)', () => {
-    const payload = {
-      type: 'TRACE',
-      flags: 0,
-      pathHashes: ['ab', 'cd'],
-      snrValues: [99, 0],
-    };
-    render(<PayloadBreakdown payload={payload} />);
-    expect(screen.getByText('0.00 dB')).toBeInTheDocument();
-    expect(screen.queryByText('99.00 dB')).not.toBeInTheDocument();
+  it("renders a '-' placeholder under a hop that has no SNR, so badges stay aligned", () => {
+    // 3 hashes but only 2 SNR readings → the third hop's sub-line is a placeholder
+    const payload = { type: "TRACE", flags: 0, pathHashes: ["ab", "cd", "ef"], snrValues: [-5, -8] };
+    render(<PayloadBreakdown payload={payload} resolvedRoute={resolvedRoute} />);
+    expect(screen.getByText("-")).toBeInTheDocument();
   });
 });
 
-describe('PayloadBreakdown — resolved source/destination endpoints', () => {
+describe("PayloadBreakdown — PING", () => {
+  it("renders a single-hop PING with the trace layout", () => {
+    const ping = { type: "PING", flags: 0, pathHashes: ["ab"], snrValues: [-5] };
+    render(<PayloadBreakdown payload={ping} resolvedRoute={[resolvedRoute[0]!]} />);
+    expect(screen.getByText("AB").className).toContain("text-green");
+  });
+});
+
+describe("PayloadBreakdown — resolved source/destination endpoints", () => {
   const envelope = {
-    type: 'TEXT_MESSAGE',
-    sourceHash: 'aa',
-    destinationHash: 'bb',
-    cipherMac: '0011',
-    ciphertext: 'deadbeef',
+    type: "TEXT_MESSAGE",
+    sourceHash: "aa",
+    destinationHash: "bb",
+    cipherMac: "0011",
+    ciphertext: "deadbeef",
     decrypted: null,
   };
-  const resolvedSource: ResolvedHop = {
-    confidence: 'high',
-    nodes: [{ id: 's1', publicKey: 'aa', name: 'Alice' }],
-  };
-  const resolvedDestination: ResolvedHop = {
-    confidence: 'high',
-    nodes: [{ id: 'd1', publicKey: 'bb', name: 'Bob' }],
-  };
+  const resolvedSource: ResolvedHop = { confidence: "high", nodes: [{ id: "s1", publicKey: "aa", name: "Alice" }] };
+  const resolvedDestination: ResolvedHop = { confidence: "high", nodes: [{ id: "d1", publicKey: "bb", name: "Bob" }] };
 
-  it('makes the resolved From/To hashes clickable node blocks', () => {
+  it("makes the resolved From/To hashes clickable node blocks", () => {
     const onViewNode = vi.fn();
-    render(
-      <PayloadBreakdown
-        payload={envelope}
-        resolvedSource={resolvedSource}
-        resolvedDestination={resolvedDestination}
-        onViewNode={onViewNode}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Bob' })); // To → destination node
-    expect(onViewNode).toHaveBeenCalledWith('d1');
-    fireEvent.click(screen.getByRole('button', { name: 'Alice' })); // From → source node
-    expect(onViewNode).toHaveBeenCalledWith('s1');
+    render(<PayloadBreakdown payload={envelope} resolvedSource={resolvedSource} resolvedDestination={resolvedDestination} onViewNode={onViewNode} />);
+    fireEvent.click(screen.getByRole("button", { name: "BB" })); // To → destination node
+    expect(onViewNode).toHaveBeenCalledWith("d1");
+    fireEvent.click(screen.getByRole("button", { name: "AA" })); // From → source node
+    expect(onViewNode).toHaveBeenCalledWith("s1");
   });
 
-  it('falls back to a plain hash badge when the endpoint did not resolve', () => {
+  it("falls back to a plain hash badge when the endpoint did not resolve", () => {
     render(<PayloadBreakdown payload={envelope} />);
-    expect(screen.queryByRole('button', { name: 'BB' })).not.toBeInTheDocument();
-    expect(screen.getByText('BB')).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "BB" })).not.toBeInTheDocument();
+    expect(screen.getByText("BB")).toBeInTheDocument();
   });
 
-  it('renders an unresolved (none-confidence) endpoint as a non-clickable resolved block', () => {
+  it("renders an unresolved (none-confidence) endpoint as a non-clickable resolved block", () => {
     // the backend sends resolvedSource/Destination as {confidence:"none", nodes:[]} (not omitted)
     // when a 1-byte prefix matches nothing — it must not become a clickable node, but still show the hash
-    const none: ResolvedHop = { confidence: 'none', nodes: [] };
-    render(
-      <PayloadBreakdown payload={envelope} resolvedSource={none} resolvedDestination={none} />,
-    );
-    expect(screen.queryByRole('button', { name: 'AA' })).not.toBeInTheDocument();
-    expect(screen.getByText('AA')).toBeInTheDocument();
-    expect(screen.getByText('BB')).toBeInTheDocument();
+    const none: ResolvedHop = { confidence: "none", nodes: [] };
+    render(<PayloadBreakdown payload={envelope} resolvedSource={none} resolvedDestination={none} />);
+    expect(screen.queryByRole("button", { name: "AA" })).not.toBeInTheDocument();
+    expect(screen.getByText("AA")).toBeInTheDocument();
+    expect(screen.getByText("BB")).toBeInTheDocument();
   });
 
-  it('resolves an ANON_REQUEST destination hash to a node block', () => {
+  it("resolves an ANON_REQUEST destination hash to a node block", () => {
     const onViewNode = vi.fn();
-    const anon = { type: 'ANON_REQUEST', destination: 0xbb, ephemeralPubKey: 'cc' };
-    render(
-      <PayloadBreakdown
-        payload={anon}
-        resolvedDestination={resolvedDestination}
-        onViewNode={onViewNode}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: 'Bob' }));
-    expect(onViewNode).toHaveBeenCalledWith('d1');
+    const anon = { type: "ANON_REQUEST", destination: 0xbb, ephemeralPubKey: "cc" };
+    render(<PayloadBreakdown payload={anon} resolvedDestination={resolvedDestination} onViewNode={onViewNode} />);
+    fireEvent.click(screen.getByRole("button", { name: "0xBB" }));
+    expect(onViewNode).toHaveBeenCalledWith("d1");
   });
 });
 
-describe('PayloadBreakdown — DISCOVER_REQ', () => {
+describe("PayloadBreakdown — DISCOVER_REQ", () => {
   // Backend emits DISCOVER as a top-level parsedPayload.type (not nested under CONTROL).
   // See beacon-server internal/ingest/packet.go parsedDiscoverReq.
   const reqPayload = {
-    type: 'DISCOVER_REQ',
-    raw: '0b00',
+    type: "DISCOVER_REQ",
+    raw: "0b00",
     prefixOnly: true,
     typeFilter: 0x06, // bits 1 and 2 → ADV_TYPE 1 (ChatNode) + 2 (Repeater)
-    tag: '0a0b0c0d',
+    tag: "0a0b0c0d",
     since: 1_700_000_000, // epoch seconds
   };
 
-  it('decodes the typeFilter bitfield into device-role names', () => {
+  it("decodes the typeFilter bitfield into device-role names", () => {
     render(<PayloadBreakdown payload={reqPayload} />);
-    expect(screen.getByText('ChatNode')).toBeInTheDocument();
-    expect(screen.getByText('Repeater')).toBeInTheDocument();
+    expect(screen.getByText("ChatNode")).toBeInTheDocument();
+    expect(screen.getByText("Repeater")).toBeInTheDocument();
   });
 
-  it('renders the tag as a 0x-prefixed hex value', () => {
+  it("renders the tag as a 0x-prefixed hex value", () => {
     render(<PayloadBreakdown payload={reqPayload} />);
-    expect(screen.getByText('0x0A0B0C0D')).toBeInTheDocument();
+    expect(screen.getByText("0x0A0B0C0D")).toBeInTheDocument();
   });
 });
 
-describe('PayloadBreakdown — DISCOVER_RESP', () => {
+describe("PayloadBreakdown — DISCOVER_RESP", () => {
   // See beacon-server internal/ingest/packet.go parsedDiscoverResp.
   const respPayload = {
-    type: 'DISCOVER_RESP',
-    raw: '0b01',
+    type: "DISCOVER_RESP",
+    raw: "0b01",
     nodeType: 2,
-    nodeTypeName: 'repeater',
+    nodeTypeName: "repeater",
     requestSnr: -4.5, // responder's node-to-node reading of the request, not observer reception
-    tag: '0a0b0c0d',
-    pubKey: 'abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789',
+    tag: "0a0b0c0d",
+    pubKey: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789",
     pubKeyPrefixOnly: false,
   };
 
-  it('renders the responder node type and its request SNR', () => {
+  it("renders the responder node type and its request SNR", () => {
     render(<PayloadBreakdown payload={respPayload} />);
-    expect(screen.getByText('Repeater')).toBeInTheDocument();
+    expect(screen.getByText("repeater")).toBeInTheDocument();
     expect(screen.getByText(/-4\.50/)).toBeInTheDocument();
   });
 
-  it('labels a full public key vs. an 8-byte prefix', () => {
+  it("labels a full public key vs. an 8-byte prefix", () => {
     const { unmount } = render(<PayloadBreakdown payload={respPayload} />);
-    expect(screen.getByText(/Public key/)).toBeInTheDocument();
+    expect(screen.getByText(/Public Key/)).toBeInTheDocument();
     unmount();
-    render(
-      <PayloadBreakdown
-        payload={{ ...respPayload, pubKey: 'abcdef0011223344', pubKeyPrefixOnly: true }}
-      />,
-    );
-    expect(screen.getByText(/Key prefix/)).toBeInTheDocument();
+    render(<PayloadBreakdown payload={{ ...respPayload, pubKey: "abcdef0011223344", pubKeyPrefixOnly: true }} />);
+    expect(screen.getByText(/Key Prefix/)).toBeInTheDocument();
   });
 });
 
-describe('PayloadBreakdown — GROUP_TEXT decrypted channel message', () => {
+describe("PayloadBreakdown — GROUP_TEXT decrypted channel message", () => {
   // Backend GetPacket enrichment nests decrypted:{sender,content,sentAt} (sentAt is epoch ms).
   // See beacon-server db/packets.go + internal/ingest/side_effects.go.
   // chosen so the ms reading (5:43 p.m.) and the wrong seconds reading (1:13 p.m.) differ
   const sentAt = 1_700_001_800_000; // epoch ms
   const payload = {
-    type: 'GROUP_TEXT',
-    channelHash: 'ab',
-    cipherMac: '00112233',
-    ciphertext: 'deadbeef',
-    decrypted: { sender: 'Alice', content: 'hello mesh', sentAt },
+    type: "GROUP_TEXT",
+    channelHash: "ab",
+    cipherMac: "00112233",
+    ciphertext: "deadbeef",
+    decrypted: { sender: "Alice", content: "hello mesh", sentAt },
   };
 
-  it('renders the decrypted sender and message body from content', () => {
+  it("renders the decrypted sender and message body from content", () => {
     render(<PayloadBreakdown payload={payload} />);
-    expect(screen.getByText('Alice')).toBeInTheDocument();
-    expect(screen.getByText('hello mesh')).toBeInTheDocument();
+    expect(screen.getByText("Alice")).toBeInTheDocument();
+    expect(screen.getByText("hello mesh")).toBeInTheDocument();
   });
 
-  it('formats sentAt as epoch milliseconds, not seconds', async () => {
+  it("formats sentAt as epoch milliseconds, not seconds", () => {
     render(<PayloadBreakdown payload={payload} />);
     // <Timestamp> shows a relative label; hovering reveals the absolute time in the tooltip
-    fireEvent.pointerMove(screen.getByText(`${timeAgoMs(sentAt)} ago`), { pointerType: 'mouse' });
-    expect((await screen.findByRole('tooltip')).textContent).toBe(formatAbsolute(sentAt));
+    fireEvent.mouseEnter(screen.getByText(`${timeAgoMs(sentAt)} ago`));
+    expect(screen.getByRole("tooltip").textContent).toBe(formatAbsolute(sentAt));
     // the seconds interpretation (×1000) would be a far-future date
-    expect(screen.getByRole('tooltip').textContent).not.toBe(formatAbsolute(sentAt * 1000));
+    expect(screen.getByRole("tooltip").textContent).not.toBe(formatAbsolute(sentAt * 1000));
   });
 });
 
-describe('PayloadBreakdown — multi-line message bodies', () => {
+describe("PayloadBreakdown — multi-line message bodies", () => {
   // Newlines survive the backend intact (ingest strips only NULs/invalid UTF-8), so the browser's
   // default white-space:normal was collapsing them to spaces. jsdom doesn't apply that collapsing,
   // so asserting on textContent alone can't catch the bug — the class is what pins it.
-  const body = '🟠\nDWD aktuell: WARNUNG vor GEWITTER\nDi 17:37 - Di 19:00';
+  const body = "🟠\nDWD aktuell: WARNUNG vor GEWITTER\nDi 17:37 - Di 19:00";
   // getByText normalizes whitespace by default, which would defeat the point here
   const exact = { normalizer: (s: string) => s };
 
   it.each([
-    [
-      'GROUP_TEXT',
-      { type: 'GROUP_TEXT', channelHash: 'ab', decrypted: { sender: 'Alice', content: body } },
-    ],
-    [
-      'GROUP_DATA',
-      { type: 'GROUP_DATA', channelHash: 'ab', decrypted: { sender: 'Alice', content: body } },
-    ],
-    [
-      'TEXT_MESSAGE',
-      { type: 'TEXT_MESSAGE', cipherMac: '0011', ciphertext: 'dead', decrypted: { message: body } },
-    ],
-    [
-      'RESPONSE',
-      { type: 'RESPONSE', cipherMac: '0011', ciphertext: 'dead', decrypted: { content: body } },
-    ],
-  ])('preserves linebreaks in a %s body', (_type, payload) => {
+    ["GROUP_TEXT", { type: "GROUP_TEXT", channelHash: "ab", decrypted: { sender: "Alice", content: body } }],
+    ["GROUP_DATA", { type: "GROUP_DATA", channelHash: "ab", decrypted: { sender: "Alice", content: body } }],
+    ["TEXT_MESSAGE", { type: "TEXT_MESSAGE", cipherMac: "0011", ciphertext: "dead", decrypted: { message: body } }],
+    ["RESPONSE", { type: "RESPONSE", cipherMac: "0011", ciphertext: "dead", decrypted: { content: body } }],
+  ])("preserves linebreaks in a %s body", (_type, payload) => {
     render(<PayloadBreakdown payload={payload} />);
-    expect(screen.getByText(body, exact).className).toContain('whitespace-pre-wrap');
+    expect(screen.getByText(body, exact).className).toContain("whitespace-pre-wrap");
   });
 
-  it('wraps message text at word boundaries, not mid-word', () => {
-    const payload = {
-      type: 'GROUP_TEXT',
-      channelHash: 'ab',
-      decrypted: { sender: 'Alice', content: body },
-    };
+  it("wraps message text at word boundaries, not mid-word", () => {
+    const payload = { type: "GROUP_TEXT", channelHash: "ab", decrypted: { sender: "Alice", content: body } };
     render(<PayloadBreakdown payload={payload} />);
     // break-all is for hex/pubkeys; prose should use break-words
-    expect(screen.getByText(body, exact).className).toContain('break-words');
-    expect(screen.getByText(body, exact).className).not.toContain('break-all');
+    expect(screen.getByText(body, exact).className).toContain("break-words");
+    expect(screen.getByText(body, exact).className).not.toContain("break-all");
   });
 });

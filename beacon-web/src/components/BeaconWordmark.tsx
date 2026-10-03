@@ -2,8 +2,8 @@
 // `text-primary` on the wrapper drives both the icon (currentColor) and the
 // text color, so the whole mark follows the active theme.
 
-import { BeaconLogo } from './BeaconLogo';
-import { APP_NAME } from '../lib/constants';
+import { BeaconLogo } from "./BeaconLogo";
+import { APP_NAME } from "../lib/constants";
 
 interface BeaconWordmarkProps {
   iconSize?: number;
@@ -14,16 +14,16 @@ interface BeaconWordmarkProps {
 
 export function BeaconWordmark({
   iconSize = 22,
-  textClassName = 'text-base',
+  textClassName = "text-base",
   className,
   pulse = false,
 }: BeaconWordmarkProps) {
   return (
-    <span className={`inline-flex items-center gap-2 text-primary ${className ?? ''}`}>
-      <BeaconLogo size={iconSize} pulse={pulse} className="shrink-0" />
+    <span className={`inline-flex items-center gap-2 text-primary ${className ?? ""}`}>
+      <BeaconLogo size={iconSize} pulse={pulse} />
       <span
-        className={`min-w-0 font-display font-medium tracking-[0.18em] leading-none ${textClassName}`}
-        title={APP_NAME}
+        className={`font-medium tracking-[0.18em] leading-none ${textClassName}`}
+        style={{ fontFamily: "'Chakra Petch', sans-serif" }}
       >
         {APP_NAME}
       </span>

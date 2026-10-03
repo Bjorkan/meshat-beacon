@@ -1,23 +1,14 @@
-/* eslint-disable @typescript-eslint/no-explicit-any -- inspecting ECharts option shapes */
-import { describe, it, expect } from 'vitest';
-import {
-  buildNeighbourGraph,
-  buildEgoGraph,
-  neighbourGraphOption,
-  obsColor,
-  ageOpacity,
-  nodeNameMatches,
-} from '../../../src/features/stats/neighbour-graph';
-import type { NodeSummary, NodeNeighbor } from '../../../src/features/nodes/types';
-import type { ChartColors } from '../../../src/features/stats/chartTheme';
+import { describe, it, expect } from "vitest";
+import { buildNeighbourGraph, buildEgoGraph, obsColor, ageOpacity, labelSize, nodeNameMatches } from "../../../src/features/stats/neighbour-graph";
+import type { NodeSummary, NodeNeighbor } from "../../../src/features/nodes/types";
 
 function neighbor(overrides: Partial<NodeNeighbor>): NodeNeighbor {
   return {
-    id: 'nb',
-    publicKey: 'pk',
+    id: "nb",
+    publicKey: "pk",
     nodeType: 1,
-    nodeTypeName: 'repeater',
-    iata: 'YYZ',
+    nodeTypeName: "repeater",
+    iata: "YYZ",
     observationCount: 1,
     firstSeen: 0,
     lastSeen: 0,
@@ -29,11 +20,11 @@ const DAY = 86_400_000;
 
 function node(overrides: Partial<NodeSummary>): NodeSummary {
   return {
-    id: 'n1',
-    publicKey: 'pk',
+    id: "n1",
+    publicKey: "pk",
     nodeType: 1,
-    nodeTypeName: 'repeater',
-    name: 'Node 1',
+    nodeTypeName: "repeater",
+    name: "Node 1",
     lat: 45,
     lng: -75,
     iatas: [],
@@ -43,129 +34,90 @@ function node(overrides: Partial<NodeSummary>): NodeSummary {
 }
 
 // obsColor takes explicit palette colours so the test is theme-independent.
-const C = { danger: '#ff0000', warn: '#ffff00', green: '#00ff00' };
-const COLORS: ChartColors = {
-  primary: '#3b82f6',
-  primaryDim: '#1e40af',
-  secondary: '#a78bfa',
-  cyan: '#0891b2',
-  orange: '#ea580c',
-  green: '#22c55e',
-  warn: '#f59e0b',
-  danger: '#ef4444',
-  textBright: '#fff',
-  textNormal: '#ccc',
-  textMuted: '#999',
-  textDim: '#666',
-  bgBase: '#000',
-  bgSurface: '#111',
-  bgRaised: '#222',
-  border: '#333',
-  borderSubtle: '#2a2a2a',
-  series: ['#s0'],
-};
+const C = { danger: "#ff0000", warn: "#ffff00", green: "#00ff00" };
 
-describe('buildNeighbourGraph', () => {
-  it('returns an empty graph for no nodes', () => {
-    expect(buildNeighbourGraph([], 1000)).toEqual({
-      nodes: [],
-      links: [],
-      total: 0,
-      capped: false,
-    });
+describe("buildNeighbourGraph", () => {
+  it("returns an empty graph for no nodes", () => {
+    expect(buildNeighbourGraph([], 1000)).toEqual({ nodes: [], links: [], total: 0, capped: false });
   });
 
-  it('includes unlocated nodes when they participate in a displayed edge', () => {
+  it("includes unlocated nodes (unlike the map's coordinate-gated edges)", () => {
+    const g = buildNeighbourGraph([node({ id: "a", lat: null, lng: null })], 1000);
+    expect(g.nodes).toHaveLength(1);
+    expect(g.nodes[0]!.id).toBe("a");
+  });
+
+  it("ranks by neighbour count and keeps only the top `cap`", () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'a', lat: null, lng: null, neighborIds: ['b'] }),
-        node({ id: 'b', lat: null, lng: null, neighborIds: ['a'] }),
-      ],
-      1000,
-    );
-    expect(g.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
-  });
-
-  it('drops isolated nodes with no displayed edge', () => {
-    const g = buildNeighbourGraph([node({ id: 'a', lat: null, lng: null })], 1000);
-    expect(g.nodes).toEqual([]);
-    expect(g.links).toEqual([]);
-  });
-
-  it('ranks by neighbour count and keeps only the top `cap`', () => {
-    const g = buildNeighbourGraph(
-      [
-        node({ id: 'low', knownNeighborCount: 1, neighborIds: ['mid'] }),
-        node({ id: 'high', knownNeighborCount: 5, neighborIds: ['mid'] }),
-        node({ id: 'mid', knownNeighborCount: 3, neighborIds: ['high', 'low'] }),
+        node({ id: "low", knownNeighborCount: 1 }),
+        node({ id: "high", knownNeighborCount: 5 }),
+        node({ id: "mid", knownNeighborCount: 3 }),
       ],
       2,
     );
     expect(g.total).toBe(3);
     expect(g.capped).toBe(true);
-    expect(g.nodes.map((n) => n.id)).toEqual(['high', 'mid']);
+    expect(g.nodes.map((n) => n.id)).toEqual(["high", "mid"]);
   });
 
-  it('is not capped when total <= cap', () => {
-    const g = buildNeighbourGraph(
-      [node({ id: 'a', neighborIds: ['b'] }), node({ id: 'b', neighborIds: ['a'] })],
-      5,
-    );
+  it("is not capped when total <= cap", () => {
+    const g = buildNeighbourGraph([node({ id: "a" }), node({ id: "b" })], 5);
     expect(g.capped).toBe(false);
     expect(g.total).toBe(2);
   });
 
-  it('breaks equal-degree ties by id so indices are deterministic', () => {
+  it("breaks equal-degree ties by id so indices are deterministic", () => {
     const g = buildNeighbourGraph(
-      [
-        node({ id: 'b', knownNeighborCount: 2, neighborIds: ['a'] }),
-        node({ id: 'a', knownNeighborCount: 2, neighborIds: ['b'] }),
-      ],
+      [node({ id: "b", knownNeighborCount: 2 }), node({ id: "a", knownNeighborCount: 2 })],
       5,
     );
-    expect(g.nodes.map((n) => n.id)).toEqual(['a', 'b']);
+    expect(g.nodes.map((n) => n.id)).toEqual(["a", "b"]);
   });
 
-  it('emits each undirected pair once even when both nodes list each other', () => {
+  it("emits each undirected pair once even when both nodes list each other", () => {
     const g = buildNeighbourGraph(
-      [node({ id: 'a', neighborIds: ['b'] }), node({ id: 'b', neighborIds: ['a'] })],
+      [node({ id: "a", neighborIds: ["b"] }), node({ id: "b", neighborIds: ["a"] })],
       5,
     );
     expect(g.links).toHaveLength(1);
   });
 
-  it('drops self-loops', () => {
-    const g = buildNeighbourGraph([node({ id: 'a', neighborIds: ['a'] })], 5);
+  it("drops self-loops", () => {
+    const g = buildNeighbourGraph([node({ id: "a", neighborIds: ["a"] })], 5);
     expect(g.links).toEqual([]);
   });
 
-  it('drops edges to ids outside the kept set (foreign or capped-out)', () => {
+  it("drops edges to ids outside the kept set (foreign or capped-out)", () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'keep', knownNeighborCount: 9, neighborIds: ['gone', 'foreign'] }),
-        node({ id: 'gone', knownNeighborCount: 0 }),
+        node({ id: "keep", knownNeighborCount: 9, neighborIds: ["gone", "foreign"] }),
+        node({ id: "gone", knownNeighborCount: 0 }),
       ],
       1, // only "keep" survives the cap
     );
     expect(g.links).toEqual([]);
   });
 
-  it('resolves link source/target to indices of the correct kept nodes', () => {
-    const g = buildNeighbourGraph([node({ id: 'a', neighborIds: ['b'] }), node({ id: 'b' })], 5);
+  it("resolves link source/target to indices of the correct kept nodes", () => {
+    const g = buildNeighbourGraph(
+      [node({ id: "a", neighborIds: ["b"] }), node({ id: "b" })],
+      5,
+    );
     expect(g.links).toHaveLength(1);
     const { source, target } = g.links[0]!;
     const ids = [g.nodes[source]!.id, g.nodes[target]!.id].sort();
-    expect(ids).toEqual(['a', 'b']);
+    expect(ids).toEqual(["a", "b"]);
   });
 
   it("maps node type to a category index, bucketing unknowns to 'Other'", () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'c', nodeTypeName: 'companion', neighborIds: ['r'] }),
-        node({ id: 'r', nodeTypeName: 'repeater', neighborIds: ['c', 'rs'] }),
-        node({ id: 'rs', nodeTypeName: 'room_server', neighborIds: ['r', 's'] }),
-        node({ id: 's', nodeTypeName: 'sensor', neighborIds: ['rs', 'x'] }),
-        node({ id: 'x', nodeTypeName: 'mystery', neighborIds: ['s'] }),
+        node({ id: "c", nodeTypeName: "companion" }),
+        node({ id: "r", nodeTypeName: "repeater" }),
+        node({ id: "rs", nodeTypeName: "room_server" }),
+        node({ id: "s", nodeTypeName: "sensor" }),
+        node({ id: "x", nodeTypeName: "mystery" }),
       ],
       10,
     );
@@ -173,235 +125,151 @@ describe('buildNeighbourGraph', () => {
     expect(cat).toEqual({ c: 0, r: 1, rs: 2, s: 3, x: 4 });
   });
 
-  it('derives size from retained edges and drops degree-0 isolates', () => {
+  it("sizes nodes monotonically by degree, with a floor for degree 0", () => {
     const g = buildNeighbourGraph(
       [
-        node({ id: 'hub', knownNeighborCount: 40, neighborIds: ['mid', 'leaf', 'x1', 'x2'] }),
-        node({ id: 'mid', knownNeighborCount: 8, neighborIds: ['hub'] }),
-        node({ id: 'leaf', knownNeighborCount: 0, neighborIds: ['hub'] }),
-        node({ id: 'x1', knownNeighborCount: 0, neighborIds: ['hub'] }),
-        node({ id: 'x2', knownNeighborCount: 0, neighborIds: ['hub'] }),
-        node({ id: 'isolated', knownNeighborCount: 30, neighborIds: ['missing'] }),
+        node({ id: "hub", knownNeighborCount: 40 }),
+        node({ id: "mid", knownNeighborCount: 8 }),
+        node({ id: "leaf", knownNeighborCount: 0 }),
       ],
       10,
     );
-    const ids = g.nodes.map((n) => n.id);
-    expect(ids).not.toContain('isolated');
     const size = Object.fromEntries(g.nodes.map((n) => [n.id, n.symbolSize]));
     expect(size.hub).toBeGreaterThan(size.mid!);
-    expect(size.mid).toBeGreaterThanOrEqual(size.leaf!);
+    expect(size.mid).toBeGreaterThan(size.leaf!);
     expect(size.leaf).toBeGreaterThan(0);
-    const degree = Object.fromEntries(g.nodes.map((n) => [n.id, n.degree]));
-    expect(degree).toEqual({ hub: 4, mid: 1, leaf: 1, x1: 1, x2: 1 });
   });
 
-  it('drops nodes whose only edges point outside the kept set', () => {
-    const g = buildNeighbourGraph([node({ id: 'a', neighborIds: undefined })], 5);
-    expect(g.nodes).toEqual([]);
+  it("keeps a node with no neighborIds but contributes no links", () => {
+    const g = buildNeighbourGraph([node({ id: "a", neighborIds: undefined })], 5);
+    expect(g.nodes).toHaveLength(1);
     expect(g.links).toEqual([]);
   });
 
-  it('labels at most 30 of the most connected overview nodes', () => {
-    const ids = Array.from({ length: 100 }, (_, i) => String(i));
+  it("gives busier hubs a larger label font than quieter ones", () => {
     const g = buildNeighbourGraph(
-      ids.map((id) =>
-        node({
-          id,
-          name: `Long overlapping station name ${id}`,
-          neighborIds: ids.filter((other) => other !== id),
-        }),
-      ),
-      100,
-    );
-    expect(g.nodes).toHaveLength(100);
-    expect(g.nodes.filter((n) => n.label?.show)).toHaveLength(30);
-  });
-
-  it('keeps a high-degree hub labeled when the overview exceeds the label limit', () => {
-    const leafIds = Array.from({ length: 31 }, (_, i) => `leaf-${i}`);
-    const g = buildNeighbourGraph(
-      [
-        node({ id: 'hub', neighborIds: leafIds }),
-        ...leafIds.map((id) => node({ id, neighborIds: ['hub'] })),
-      ],
-      100,
-    );
-    expect(g.nodes.find((n) => n.id === 'hub')?.label?.show).toBe(true);
-    expect(g.nodes.filter((n) => n.label?.show)).toHaveLength(30);
-  });
-
-  it('labels every node in a small overview and prioritizes the hub', () => {
-    const g = buildNeighbourGraph(
-      [
-        node({ id: 'hub', neighborIds: ['a', 'b'] }),
-        node({ id: 'a', neighborIds: ['hub'] }),
-        node({ id: 'b', neighborIds: ['hub'] }),
-      ],
+      [node({ id: "hub", knownNeighborCount: 40 }), node({ id: "small", knownNeighborCount: 2 })],
       10,
     );
-    expect(g.nodes.every((n) => n.label?.show)).toBe(true);
-    expect(g.nodes.find((n) => n.id === 'hub')?.degree).toBe(2);
-  });
-
-  it('renders only nodes that participate in a displayed edge', () => {
-    const g = buildNeighbourGraph(
-      [
-        node({ id: 'a', knownNeighborCount: 5, neighborIds: ['b'] }),
-        node({ id: 'b', knownNeighborCount: 1, neighborIds: ['a'] }),
-        node({ id: 'phantom', knownNeighborCount: 9, neighborIds: ['missing'] }),
-        node({ id: 'lone', knownNeighborCount: 2 }),
-      ],
-      10,
-    );
-    expect(g.nodes.map((n) => n.id).sort()).toEqual(['a', 'b']);
-    expect(g.links).toHaveLength(1);
-    const referenced = new Set<number>();
-    for (const l of g.links) {
-      referenced.add(l.source);
-      referenced.add(l.target);
-    }
-    expect([...referenced].sort()).toEqual(g.nodes.map((_, i) => i));
-    for (const n of g.nodes) expect(n.degree).toBeGreaterThan(0);
+    const hub = g.nodes.find((n) => n.id === "hub")!;
+    const small = g.nodes.find((n) => n.id === "small")!;
+    expect(hub.label?.show).toBe(true);
+    expect(small.label?.show).toBe(true);
+    expect(hub.label!.fontSize!).toBeGreaterThan(small.label!.fontSize!);
   });
 });
 
-describe('nodeNameMatches', () => {
-  it('matches a case-insensitive substring', () => {
-    expect(nodeNameMatches('McCall_Lake', 'call')).toBe(true);
-    expect(nodeNameMatches('YWK Repeater', 'repe')).toBe(true);
+describe("nodeNameMatches", () => {
+  it("matches a case-insensitive substring", () => {
+    expect(nodeNameMatches("McCall_Lake", "call")).toBe(true);
+    expect(nodeNameMatches("YWK Repeater", "repe")).toBe(true);
   });
-  it('does not match a missing substring', () => {
-    expect(nodeNameMatches('McCall_Lake', 'xyz')).toBe(false);
+  it("does not match a missing substring", () => {
+    expect(nodeNameMatches("McCall_Lake", "xyz")).toBe(false);
   });
-  it('treats an empty/whitespace query as no match', () => {
-    expect(nodeNameMatches('anything', '')).toBe(false);
-    expect(nodeNameMatches('anything', '   ')).toBe(false);
+  it("treats an empty/whitespace query as no match", () => {
+    expect(nodeNameMatches("anything", "")).toBe(false);
+    expect(nodeNameMatches("anything", "   ")).toBe(false);
   });
 });
 
-describe('obsColor', () => {
-  it('is red (danger) at one observation and below', () => {
-    expect(obsColor(1, C)).toBe('rgb(255, 0, 0)');
-    expect(obsColor(0, C)).toBe('rgb(255, 0, 0)');
+describe("labelSize", () => {
+  it("grows with degree and is largest at the max", () => {
+    expect(labelSize(40, 40)).toBeGreaterThan(labelSize(5, 40));
+    expect(labelSize(20, 40)).toBeGreaterThanOrEqual(labelSize(5, 40));
   });
 
-  it('saturates to green for high observation counts', () => {
-    expect(obsColor(1000, C)).toBe('rgb(0, 255, 0)');
+  it("clamps to a sane font range and survives maxDegree 0", () => {
+    expect(labelSize(0, 0)).toBeGreaterThanOrEqual(9);
+    expect(labelSize(0, 40)).toBeGreaterThanOrEqual(9);
+    expect(labelSize(1000, 1000)).toBeLessThanOrEqual(16);
+  });
+});
+
+describe("obsColor", () => {
+  it("is red (danger) at one observation and below", () => {
+    expect(obsColor(1, C)).toBe("rgb(255, 0, 0)");
+    expect(obsColor(0, C)).toBe("rgb(255, 0, 0)");
   });
 
-  it('interpolates strictly between the endpoints for mid counts', () => {
+  it("saturates to green for high observation counts", () => {
+    expect(obsColor(1000, C)).toBe("rgb(0, 255, 0)");
+  });
+
+  it("interpolates strictly between the endpoints for mid counts", () => {
     const mid = obsColor(5, C);
-    expect(mid).not.toBe('rgb(255, 0, 0)');
-    expect(mid).not.toBe('rgb(0, 255, 0)');
+    expect(mid).not.toBe("rgb(255, 0, 0)");
+    expect(mid).not.toBe("rgb(0, 255, 0)");
   });
 });
 
-describe('ageOpacity', () => {
-  it('is nearly solid for fresh links', () => {
+describe("ageOpacity", () => {
+  it("is nearly solid for fresh links", () => {
     expect(ageOpacity(0)).toBeCloseTo(0.9);
     expect(ageOpacity(-5)).toBeCloseTo(0.9); // clamped
   });
 
-  it('fades to the floor by ~4 weeks and stays there', () => {
+  it("fades to the floor by ~4 weeks and stays there", () => {
     expect(ageOpacity(28)).toBeCloseTo(0.35);
     expect(ageOpacity(56)).toBeCloseTo(0.35); // clamped
   });
 
-  it('interpolates linearly in between', () => {
+  it("interpolates linearly in between", () => {
     expect(ageOpacity(14)).toBeCloseTo(0.625);
   });
 });
 
-describe('buildEgoGraph', () => {
+describe("buildEgoGraph", () => {
   const NOW = 10 * DAY;
-  const center = { id: 'c', name: 'Center', nodeTypeName: 'companion' };
+  const center = { id: "c", name: "Center", nodeTypeName: "companion" };
 
-  it('puts the center first with its neighbours fanned out from it', () => {
-    const g = buildEgoGraph(center, [neighbor({ id: 'a' }), neighbor({ id: 'b' })], NOW);
-    expect(g.nodes.map((n) => n.id)).toEqual(['c', 'a', 'b']);
+  it("puts the center first with its neighbours fanned out from it", () => {
+    const g = buildEgoGraph(center, [neighbor({ id: "a" }), neighbor({ id: "b" })], NOW);
+    expect(g.nodes.map((n) => n.id)).toEqual(["c", "a", "b"]);
     expect(g.links).toHaveLength(2);
     expect(g.links.every((l) => l.source === 0)).toBe(true);
     expect(g.nodes[0]!.category).toBe(0); // companion
   });
 
-  it('labels the focused node and every neighbour in a small ego graph', () => {
-    const g = buildEgoGraph(center, [neighbor({ id: 'a' })], NOW);
-    expect(g.nodes.map((n) => n.label?.show)).toEqual([true, true]);
+  it("shows a label on every node", () => {
+    const g = buildEgoGraph(center, [neighbor({ id: "a" })], NOW);
+    expect(g.nodes.every((n) => n.label?.show)).toBe(true);
   });
 
-  it('limits a large ego graph to the strongest 30 labels including the center', () => {
-    const neighbors = Array.from({ length: 40 }, (_, i) =>
-      neighbor({ id: `n${String(i).padStart(2, '0')}`, observationCount: i + 1, lastSeen: i }),
-    );
-    const g = buildEgoGraph(center, neighbors, NOW);
-    const labeled = g.nodes.filter((n) => n.label?.show);
-    expect(labeled).toHaveLength(30);
-    expect(labeled.map((n) => n.id)).toContain('c');
-    expect(labeled.map((n) => n.id)).toContain('n39');
-    expect(labeled.map((n) => n.id)).not.toContain('n00');
-  });
-
-  it('folds per-iata rows: obs summed, freshest lastSeen wins', () => {
+  it("folds per-iata rows: obs summed, freshest lastSeen wins", () => {
     const g = buildEgoGraph(
       center,
       [
-        neighbor({ id: 'a', iata: 'YYZ', observationCount: 3, lastSeen: 8 * DAY }),
-        neighbor({ id: 'a', iata: 'YUL', observationCount: 5, lastSeen: 9 * DAY }),
+        neighbor({ id: "a", iata: "YYZ", observationCount: 3, lastSeen: 8 * DAY }),
+        neighbor({ id: "a", iata: "YUL", observationCount: 5, lastSeen: 9 * DAY }),
       ],
       NOW,
     );
-    expect(g.nodes.filter((n) => n.id === 'a')).toHaveLength(1);
-    const link = g.links.find((l) => g.nodes[l.target]!.id === 'a')!;
+    expect(g.nodes.filter((n) => n.id === "a")).toHaveLength(1);
+    const link = g.links.find((l) => g.nodes[l.target]!.id === "a")!;
     expect(link.obs).toBe(8);
     expect(link.ageDays).toBeCloseTo(1);
   });
 
   it("excludes the center's own rows", () => {
-    const g = buildEgoGraph(center, [neighbor({ id: 'c' })], NOW);
+    const g = buildEgoGraph(center, [neighbor({ id: "c" })], NOW);
     expect(g.nodes).toHaveLength(1);
     expect(g.links).toEqual([]);
   });
 
-  it('returns just the center when there are no neighbours', () => {
+  it("returns just the center when there are no neighbours", () => {
     const g = buildEgoGraph(center, [], NOW);
-    expect(g.nodes.map((n) => n.id)).toEqual(['c']);
+    expect(g.nodes.map((n) => n.id)).toEqual(["c"]);
     expect(g.links).toEqual([]);
   });
 
-  it('never reports a negative edge age', () => {
-    const g = buildEgoGraph(center, [neighbor({ id: 'a', lastSeen: NOW + 3 * DAY })], NOW);
+  it("never reports a negative edge age", () => {
+    const g = buildEgoGraph(center, [neighbor({ id: "a", lastSeen: NOW + 3 * DAY })], NOW);
     expect(g.links[0]!.ageDays).toBe(0);
   });
 
   it("maps a neighbour's node type to a category index", () => {
-    const g = buildEgoGraph(center, [neighbor({ id: 'a', nodeTypeName: 'sensor' })], NOW);
-    expect(g.nodes.find((n) => n.id === 'a')!.category).toBe(3);
-  });
-});
-
-describe('neighbourGraphOption', () => {
-  it('only lists categories represented by rendered nodes', () => {
-    const graph = buildNeighbourGraph(
-      [
-        node({ id: 'c', nodeTypeName: 'companion', neighborIds: ['r'] }),
-        node({ id: 'r', nodeTypeName: 'repeater', neighborIds: ['c'] }),
-      ],
-      10,
-    );
-    const option = neighbourGraphOption(graph, COLORS) as Record<string, any>;
-    expect(option.legend[0].data).toEqual(['Companion', 'Repeater']);
-    expect(option.series[0].labelLayout).toEqual({ hideOverlap: true });
-  });
-
-  it('includes Other only when an unknown node type is rendered', () => {
-    const graph = buildNeighbourGraph(
-      [
-        node({ id: 'known', nodeTypeName: 'sensor', neighborIds: ['unknown'] }),
-        node({ id: 'unknown', nodeTypeName: 'future_type', neighborIds: ['known'] }),
-      ],
-      10,
-    );
-    const option = neighbourGraphOption(graph, COLORS) as Record<string, any>;
-    expect(option.legend[0].data).toEqual(['Sensor', 'Other']);
+    const g = buildEgoGraph(center, [neighbor({ id: "a", nodeTypeName: "sensor" })], NOW);
+    expect(g.nodes.find((n) => n.id === "a")!.category).toBe(3);
   });
 });

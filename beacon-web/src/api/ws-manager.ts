@@ -1,32 +1,24 @@
-import type {
-  SubscriptionFilter,
-  WsServerMessage,
-  WsPacketObservation,
-  WsLagged,
-  WsChannelMessage,
-  WsObserverStatus,
-  WsNodeUpdate,
-} from '../types/ws';
+import type { SubscriptionFilter, WsServerMessage, WsPacketObservation, WsLagged, WsChannelMessage, WsObserverStatus, WsNodeUpdate } from "../types/ws";
 import {
   WS_PING_INTERVAL_MS,
   WS_RECONNECT_BASE_MS,
   WS_RECONNECT_MAX_MS,
   WS_RECONNECT_JITTER,
   WS_STABLE_MS,
-} from '../lib/constants';
+} from "../lib/constants";
 
 // attempt index at which the backoff first reaches WS_RECONNECT_MAX_MS
 const CAP_ATTEMPT = Math.ceil(Math.log2(WS_RECONNECT_MAX_MS / WS_RECONNECT_BASE_MS));
 
 // handler types and status
 
-export type WsStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
+export type WsStatus = "connected" | "connecting" | "disconnected" | "error";
 
-type PacketHandler = (data: WsPacketObservation['data']) => void;
+type PacketHandler = (data: WsPacketObservation["data"]) => void;
 type LaggedHandler = (data: WsLagged) => void;
-type ChannelMessageHandler = (data: WsChannelMessage['data']) => void;
-type ObserverStatusHandler = (data: WsObserverStatus['data']) => void;
-type NodeUpdateHandler = (data: WsNodeUpdate['data']) => void;
+type ChannelMessageHandler = (data: WsChannelMessage["data"]) => void;
+type ObserverStatusHandler = (data: WsObserverStatus["data"]) => void;
+type NodeUpdateHandler = (data: WsNodeUpdate["data"]) => void;
 type StatusHandler = (status: WsStatus) => void;
 
 export class WsManager {
@@ -39,21 +31,16 @@ export class WsManager {
   private subscriptionId: string | null = null;
   private lastSubscribeId: string | null = null;
   private everConnected = false;
-  private status: WsStatus = 'disconnected';
+  private status: WsStatus = "disconnected";
   private reconnectAttempt = 0;
   private openedAt: number | null = null;
   private intentionalClose = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private pingTimer: ReturnType<typeof setInterval> | null = null;
   private msgCounter = 0;
-  // Freshness of the CURRENT connection's server traffic, used by the heartbeat to decide whether
-  // pongs/events have stopped. Split from the gap timestamp below so a previous connection's
-  // staleness can never force-reconnect a healthy new socket.
-  private lastServerActivityAt: number = Date.now();
-  // When the last connection's server stream went dark (captured at every close and at
-  // disconnect()). Drives the reconnect lag notice's `since` and the "stale for Ns" badge while
-  // connecting; cleared once the new connection's hello has consumed it.
-  private gapSince: number | null = null;
+  private lastEventTimestamp: number = Date.now();
+  // liveness for the ping check; unlike lastEventTimestamp it restarts with each connection
+  private lastHeardAt: number = Date.now();
 
   private packetHandlers: PacketHandler[] = [];
   private laggedHandlers: LaggedHandler[] = [];
@@ -70,10 +57,8 @@ export class WsManager {
     return this.status;
   }
 
-  // Most recent server traffic of the current connection, or — while a reconnect is pending —
-  // when the previous connection's stream went dark.
-  getLastServerActivityAt(): number {
-    return this.gapSince ?? this.lastServerActivityAt;
+  getLastEventTimestamp(): number {
+    return this.lastEventTimestamp;
   }
 
   onPacketObservation(handler: PacketHandler): () => void {
@@ -131,12 +116,7 @@ export class WsManager {
     if (this.ws?.readyState !== WebSocket.OPEN) return;
 
     if (this.subscriptionId) {
-      this.send({
-        v: 1,
-        type: 'unsubscribe',
-        id: `unsub-${this.nextId()}`,
-        subscriptionId: this.subscriptionId,
-      });
+      this.send({ v: 1, type: "unsubscribe", id: `unsub-${this.nextId()}`, subscriptionId: this.subscriptionId });
       this.subscriptionId = null;
     }
 
@@ -157,12 +137,11 @@ export class WsManager {
     this.intentionalClose = true;
     this.reconnectAttempt = 0;
     this.openedAt = null;
-    this.gapSince = this.lastServerActivityAt; // the stream went dark here
     this.clearTimers();
     this.teardownSocket();
     this.subscriptionId = null;
     this.lastSubscribeId = null;
-    this.setStatus('disconnected');
+    this.setStatus("disconnected");
   }
 
   // exponential backoff w/ jitter to avoid thundering herd on reconnect
@@ -174,7 +153,7 @@ export class WsManager {
     this.teardownSocket();
     this.subscriptionId = null; // subscription ids are per-connection
     this.lastSubscribeId = null;
-    this.setStatus('connecting');
+    this.setStatus("connecting");
 
     this.ws = new WebSocket(this.url);
 
@@ -196,7 +175,7 @@ export class WsManager {
     this.ws.onclose = (e: CloseEvent) => {
       this.clearTimers();
       if (this.intentionalClose) {
-        this.setStatus('disconnected');
+        this.setStatus("disconnected");
         return;
       }
       // any unexpected close — including a server-sent 1000 — gets a reconnect
@@ -204,31 +183,23 @@ export class WsManager {
     };
 
     this.ws.onerror = () => {
-      this.setStatus('error');
+      this.setStatus("error");
     };
   }
 
   private handleMessage(msg: WsServerMessage): void {
     switch (msg.type) {
-      case 'hello': {
+      case "hello": {
         const isReconnect = this.everConnected;
         this.everConnected = true;
-        // the previous connection's staleness must not count against this one: a healthy socket
-        // gets a full heartbeat window before any force-reconnect
-        this.lastServerActivityAt = Date.now();
-        this.setStatus('connected');
+        this.lastHeardAt = Date.now();
+        this.setStatus("connected");
         this.startPing();
         this.sendSubscribe();
         if (this.resolvePath) this.sendConfigure(); // re-apply the connection-wide toggle
         if (isReconnect) {
           // we were dark during the outage — synthesize a lag notice so live views heal the gap
-          const notice: WsLagged = {
-            v: 1,
-            type: 'lagged',
-            droppedCount: 0,
-            since: this.gapSince ?? this.lastServerActivityAt,
-          };
-          this.gapSince = null; // consumed: the current connection owns freshness from here
+          const notice: WsLagged = { v: 1, type: "lagged", droppedCount: 0, since: this.lastEventTimestamp };
           for (const handler of this.laggedHandlers) {
             handler(notice);
           }
@@ -236,93 +207,86 @@ export class WsManager {
         break;
       }
 
-      case 'subscribed':
+      case "subscribed":
         if (msg.id === this.lastSubscribeId) {
           this.subscriptionId = msg.subscriptionId;
         } else {
           // ack for a subscribe we've since replaced — drop the server-side sub it created
-          this.send({
-            v: 1,
-            type: 'unsubscribe',
-            id: `unsub-${this.nextId()}`,
-            subscriptionId: msg.subscriptionId,
-          });
+          this.send({ v: 1, type: "unsubscribe", id: `unsub-${this.nextId()}`, subscriptionId: msg.subscriptionId });
         }
         break;
 
-      case 'configured':
+      case "configured":
         // ack for our resolvePath toggle; nothing to do beyond the server now honoring it
         break;
 
-      case 'pong':
+      case "pong":
         // a pong proves the link is alive, so it counts as recent activity
-        this.lastServerActivityAt = Date.now();
+        this.lastEventTimestamp = this.lastHeardAt = Date.now();
         break;
 
-      case 'event':
-        this.lastServerActivityAt = Date.now();
-        if (msg.event === 'packetObservation') {
+      case "event":
+        this.lastEventTimestamp = this.lastHeardAt = Date.now();
+        if (msg.event === "packetObservation") {
           for (const handler of this.packetHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === 'channelMessage') {
+        } else if (msg.event === "channelMessage") {
           for (const handler of this.channelMessageHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === 'observerStatus') {
+        } else if (msg.event === "observerStatus") {
           for (const handler of this.observerStatusHandlers) {
             handler(msg.data);
           }
-        } else if (msg.event === 'nodeUpdate') {
+        } else if (msg.event === "nodeUpdate") {
           for (const handler of this.nodeUpdateHandlers) {
             handler(msg.data);
           }
         }
         break;
 
-      case 'lagged':
+      case "lagged":
         // a lag notice is still server traffic, so it counts as recent activity
-        this.lastServerActivityAt = Date.now();
+        this.lastEventTimestamp = this.lastHeardAt = Date.now();
         for (const handler of this.laggedHandlers) {
           handler(msg);
         }
         break;
 
-      case 'error':
+      case "error":
         break;
     }
   }
 
   private sendSubscribe(): void {
-    if (!this.filter) return;
+    // any subscribe still awaiting its ack is superseded, even when nothing replaces it
+    this.lastSubscribeId = null;
+    // the server reads an empty IATA list as "all", so a region with no IATAs subscribes to nothing
+    if (!this.filter || this.filter.iatas?.length === 0) return;
     const id = `sub-${this.nextId()}`;
     this.lastSubscribeId = id;
     this.send({
       v: 1,
-      type: 'subscribe',
+      type: "subscribe",
       id,
       scope: this.filter,
     });
   }
 
   private sendConfigure(): void {
-    this.send({
-      v: 1,
-      type: 'configure',
-      id: `cfg-${this.nextId()}`,
-      resolvePath: this.resolvePath,
-    });
+    this.send({ v: 1, type: "configure", id: `cfg-${this.nextId()}`, resolvePath: this.resolvePath });
   }
 
   private startPing(): void {
     if (this.pingTimer) clearInterval(this.pingTimer); // a second hello must not double the interval
     this.pingTimer = setInterval(() => {
-      if (Date.now() - this.lastServerActivityAt > WS_PING_INTERVAL_MS * 2 + 5_000) {
+      if (Date.now() - this.lastHeardAt > WS_PING_INTERVAL_MS * 2 + 5_000) {
         // pongs stopped coming back — the link is half-open, rebuild it
         this.forceReconnect();
         return;
       }
-      this.send({ v: 1, type: 'ping', id: `p-${this.nextId()}` });
+      this.send({ v: 1, type: "ping", id: `p-${this.nextId()}` });
     }, WS_PING_INTERVAL_MS);
   }
 
@@ -335,17 +299,12 @@ export class WsManager {
   }
 
   private scheduleReconnect(closeCode?: number): void {
-    this.setStatus('connecting');
-    // the stream went dark: remember when the dying connection last had server traffic so the
-    // reconnect lag notice can report the true gap start
-    this.gapSince = this.lastServerActivityAt;
+    this.setStatus("connecting");
     // only a link that actually held resets the backoff — an accept-then-close must keep escalating
-    if (this.openedAt !== null && Date.now() - this.openedAt >= WS_STABLE_MS)
-      this.reconnectAttempt = 0;
+    if (this.openedAt !== null && Date.now() - this.openedAt >= WS_STABLE_MS) this.reconnectAttempt = 0;
     this.openedAt = null;
     // 1008 policy / 1013 try-again-later mean the server is shedding us: go straight to the longest wait
-    if (closeCode === 1008 || closeCode === 1013)
-      this.reconnectAttempt = Math.max(this.reconnectAttempt, CAP_ATTEMPT);
+    if (closeCode === 1008 || closeCode === 1013) this.reconnectAttempt = Math.max(this.reconnectAttempt, CAP_ATTEMPT);
     const base = Math.min(WS_RECONNECT_BASE_MS * 2 ** this.reconnectAttempt, WS_RECONNECT_MAX_MS);
     const jitter = base * WS_RECONNECT_JITTER * (Math.random() * 2 - 1);
     const delay = Math.max(base + jitter, 100);

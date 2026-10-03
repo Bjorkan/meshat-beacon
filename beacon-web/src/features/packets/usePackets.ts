@@ -1,17 +1,16 @@
-import { useState, useCallback, useMemo, useSyncExternalStore } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
-import { packetQueries } from '../../api/queries';
-import { useRegion } from '../../hooks/useRegion';
-import type { WsPacketObservation, WsLagged } from '../../types/ws';
-import type { PacketSummary } from '../../types/api';
-import type { PacketServerFilter } from './types';
-import { LIVE_BUFFER_CAP, MAX_INFINITE_PAGES } from '../../lib/constants';
+import { useState, useEffect, useCallback, useMemo, useSyncExternalStore } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { getPackets } from "../../api/client";
+import { isRateLimited } from "../../api/rate-limit";
+import { useRegion } from "../../hooks/useRegion";
+import type { WsPacketObservation, WsLagged } from "../../types/ws";
+import type { PacketSummary } from "../../types/api";
+import type { PacketServerFilter } from "./types";
+import { LIVE_BUFFER_CAP } from "../../lib/constants";
 
 // merge and deduplicate live + paginated packets
 
-function flattenPages(
-  data: { pages: Array<{ items: PacketSummary[] }> } | undefined,
-): PacketSummary[] {
+function flattenPages(data: { pages: Array<{ items: PacketSummary[] }> } | undefined): PacketSummary[] {
   if (!data) return [];
   return data.pages.flatMap((p) => p.items);
 }
@@ -55,11 +54,7 @@ class LivePacketStore {
     if (this.rafId !== null) return;
     this.rafId = requestAnimationFrame(() => {
       this.rafId = null;
-      this.snapshot = {
-        buffer: this.buffer,
-        acknowledgedCount: this.acknowledgedCount,
-        observersByHash: this.observersByHash,
-      };
+      this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
       for (const l of this.listeners) l();
     });
   }
@@ -109,11 +104,7 @@ class LivePacketStore {
 
   acknowledge(): void {
     this.acknowledgedCount = this.buffer.length;
-    this.snapshot = {
-      buffer: this.buffer,
-      acknowledgedCount: this.acknowledgedCount,
-      observersByHash: this.observersByHash,
-    };
+    this.snapshot = { buffer: this.buffer, acknowledgedCount: this.acknowledgedCount, observersByHash: this.observersByHash };
     for (const l of this.listeners) l();
   }
 
@@ -132,11 +123,10 @@ class LivePacketStore {
 
 // combines live WS stream with paginated history
 
-export function usePackets(
-  frozen: boolean = false,
-  serverFilter: PacketServerFilter | null = null,
-) {
-  const { iatas, regionKey } = useRegion();
+export function usePackets(frozen: boolean = false, serverFilter: PacketServerFilter | null = null) {
+  const { iatas, regionKey, isResolved } = useRegion();
+  const pending = isResolved === false;
+  const queryClient = useQueryClient();
   const [store] = useState(() => new LivePacketStore());
   const [laggedCount, setLaggedCount] = useState(0);
 
@@ -148,11 +138,10 @@ export function usePackets(
     setLaggedCount(0);
   }
 
-  const {
-    buffer: liveBuffer,
-    acknowledgedCount,
-    observersByHash,
-  } = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const { buffer: liveBuffer, acknowledgedCount, observersByHash } = useSyncExternalStore(
+    store.subscribe,
+    store.getSnapshot,
+  );
 
   // While scrolled away from the top, render a latched buffer so live prepends don't shift the
   // view; the held packets reveal when the user returns to the top. Latched by holding the last
@@ -164,7 +153,9 @@ export function usePackets(
   }
 
   const handlePacketObservation = useCallback(
-    (data: WsPacketObservation['data']) => {
+    (data: WsPacketObservation["data"]) => {
+      // the previous region's subscription can still deliver after the buffer reset
+      if (iatas && !iatas.includes(data.observation.iata)) return;
       const summary: PacketSummary = {
         packetHash: data.packetHash,
         payloadType: data.packet.payloadType,
@@ -182,7 +173,6 @@ export function usePackets(
           iata: data.observation.iata,
           pathLength: data.observation.pathLength,
           pathBytes: data.observation.pathBytes,
-          resolvedPath: data.observation.resolvedPath ?? undefined,
           // WS nulls these when the payload type carries no endpoint; the REST shape uses undefined
           resolvedSource: data.observation.resolvedSource ?? undefined,
           resolvedDestination: data.observation.resolvedDestination ?? undefined,
@@ -191,13 +181,27 @@ export function usePackets(
 
       store.pushOrUpdate(summary);
     },
-    [store],
+    [store, iatas],
   );
 
-  // QueryWsBridge owns shared history healing on lag/reconnect. This route-local callback only
-  // maintains the user-visible dropped-event counter.
-  const handleLagged = useCallback((data: WsLagged) => {
-    setLaggedCount((prev) => prev + data.droppedCount);
+  // Reset (drop to one fresh first page) instead of invalidate: an invalidate replays every cached
+  // page sequentially — up to 20 requests per lag notice during a flood. The 2-element key matches
+  // filtered variants by prefix, so those reset too.
+  const handleLagged = useCallback(
+    (data: WsLagged) => {
+      setLaggedCount((prev) => prev + data.droppedCount);
+      // while the API is throttling us the refetch would only 429; the next lag notice or remount heals it
+      if (!isRateLimited()) queryClient.resetQueries({ queryKey: ["packets", regionKey] });
+    },
+    [queryClient, regionKey],
+  );
+
+  // The WS handler is down whenever this tab is unmounted, so cached history may hide a gap right
+  // where the live buffer begins. Refresh the first page on mount to close it (prefix match:
+  // filtered variants included).
+  useEffect(() => {
+    queryClient.resetQueries({ queryKey: ["packets", regionKey] });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only; region changes refetch via the key
   }, []);
 
   const dismissLagged = useCallback(() => setLaggedCount(0), []);
@@ -206,33 +210,32 @@ export function usePackets(
     data: history,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
     isFetching,
+    isFetchingNextPage,
     isLoading,
     isError,
   } = useInfiniteQuery({
     // The unfiltered key must stay 2-element so its cached entry survives filter toggling; the
     // lagged/mount resets above match both shapes by prefix.
-    ...packetQueries.list({ regionKey, iatas, filter: serverFilter }),
-    maxPages: MAX_INFINITE_PAGES,
+    queryKey: serverFilter ? ["packets", regionKey, serverFilter] : ["packets", regionKey],
+    // first load and every scroll page are the default 50; getPackets fills in the limit
+    queryFn: ({ pageParam }) => getPackets(iatas, { cursor: pageParam, ...serverFilter }),
+    getNextPageParam: (last) => last.nextCursor ?? undefined,
+    initialPageParam: undefined as number | undefined,
+    staleTime: Infinity,
+    enabled: !pending,
   });
 
-  // WS summaries contain neither raw payload nor every observation path. During those searches the
-  // REST result is authoritative; mixing the live buffer in would create false positives/negatives.
-  const includeLiveBuffer = !serverFilter?.search || serverFilter.searchField === 'hash';
   const allPackets = useMemo(
-    () => dedup([...(includeLiveBuffer ? displayBuffer : []), ...flattenPages(history)]),
-    [displayBuffer, history, includeLiveBuffer],
+    () => dedup([...displayBuffer, ...flattenPages(history)]),
+    [displayBuffer, history],
   );
 
   const observerOptions = useMemo(() => {
     const map = new Map<string, string>();
     for (const p of allPackets) {
       if (p.latestObserver && !map.has(p.latestObserver.id)) {
-        map.set(
-          p.latestObserver.id,
-          p.latestObserver.displayName ?? p.latestObserver.id.slice(0, 8),
-        );
+        map.set(p.latestObserver.id, p.latestObserver.displayName ?? p.latestObserver.id.slice(0, 8));
       }
     }
     return Array.from(map.entries())
@@ -253,9 +256,9 @@ export function usePackets(
     acknowledgeNewPackets,
     fetchNextPage,
     hasNextPage: hasNextPage ?? false,
-    isFetchingNextPage,
     isFetching,
-    isLoading,
+    isFetchingNextPage,
+    isLoading: isLoading || pending,
     isError,
     observersByHash,
     handlePacketObservation,

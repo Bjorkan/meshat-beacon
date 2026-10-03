@@ -2,17 +2,9 @@
 // bundle only pulls the chart types + components the Stats page actually uses. We deliberately avoid
 // the `echarts-for-react` wrapper (it was hit by a supply-chain attack 2026-05-19); EChart.tsx wraps
 // the core API directly instead.
-import * as echarts from 'echarts/core';
+import * as echarts from "echarts/core";
+import { LineChart, BarChart, PieChart, GaugeChart, GraphChart, HeatmapChart } from "echarts/charts";
 import {
-  LineChart,
-  BarChart,
-  PieChart,
-  GaugeChart,
-  GraphChart,
-  HeatmapChart,
-} from 'echarts/charts';
-import {
-  AriaComponent,
   GridComponent,
   TitleComponent,
   TooltipComponent,
@@ -21,8 +13,10 @@ import {
   DataZoomComponent,
   MarkLineComponent,
   VisualMapComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
+  AriaComponent,
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+import langFR from "echarts/lib/i18n/langFR.js";
 
 echarts.use([
   LineChart,
@@ -30,7 +24,6 @@ echarts.use([
   PieChart,
   GaugeChart,
   GraphChart,
-  AriaComponent,
   HeatmapChart,
   GridComponent,
   TitleComponent,
@@ -40,9 +33,13 @@ echarts.use([
   DataZoomComponent,
   MarkLineComponent,
   VisualMapComponent,
+  AriaComponent,
   CanvasRenderer,
 ]);
 
+// time-axis month/day names; EN is built in
+echarts.registerLocale("FR", langFR);
+
 export { echarts };
 export type EChartsInstance = ReturnType<typeof echarts.init>;
-export type EChartsOption = Parameters<EChartsInstance['setOption']>[0];
+export type EChartsOption = Parameters<EChartsInstance["setOption"]>[0];

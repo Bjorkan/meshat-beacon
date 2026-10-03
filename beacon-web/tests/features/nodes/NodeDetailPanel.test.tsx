@@ -1,25 +1,16 @@
-import { ApiError } from '../../../src/api/generated/client';
-import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
-import { NodeDetailPanel } from '../../../src/features/nodes/NodeDetailPanel';
-import { getNode, getNodeObservations, getNodeNeighbors } from '../../../src/api/client';
-import type { Node, NodeNeighbor } from '../../../src/features/nodes/types';
+import { describe, expect, it, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { NodeDetailPanel } from "../../../src/features/nodes/NodeDetailPanel";
+import i18n from "../../../src/i18n";
+import { getNode, getNodeObservations, getNodeNeighbors } from "../../../src/api/client";
+import type { Node, NodeNeighbor } from "../../../src/features/nodes/types";
 
-vi.mock('../../../src/hooks/useRegion', () => ({
-  useRegion: () => ({ regionKey: '*', iatas: undefined }),
-}));
-
-vi.mock('../../../src/api/client', () => ({
-  getNodePathPackets: vi.fn().mockResolvedValue({ items: [], hasMore: false }),
+vi.mock("../../../src/api/client", () => ({
   getNode: vi.fn(),
   getNodeObservations: vi.fn(),
   getNodeNeighbors: vi.fn(),
-}));
-
-vi.mock('../../../src/features/nodes/NodeLocationMap', () => ({
-  NodeLocationMap: () => <div data-testid="node-location-map" />,
 }));
 
 const mockGetNode = vi.mocked(getNode);
@@ -27,15 +18,14 @@ const mockGetNodeObservations = vi.mocked(getNodeObservations);
 const mockGetNodeNeighbors = vi.mocked(getNodeNeighbors);
 
 const node: Node = {
-  id: 'node-self',
-  publicKey: 'a'.repeat(64),
+  id: "node-self",
+  publicKey: "aabbccddeeff",
   nodeType: 2,
-  nodeTypeName: 'REPEATER',
-  name: 'Self Node',
+  nodeTypeName: "REPEATER",
+  name: "Self Node",
   lat: null,
   lng: null,
   iatas: [],
-  knownNeighborCount: 0,
   locationSource: null,
   lastAdvertAt: null,
   supportsMultibytePaths: false,
@@ -47,34 +37,15 @@ const node: Node = {
 };
 
 function neighbor(id: string, name: string): NodeNeighbor {
-  return {
-    id,
-    name,
-    publicKey: 'b'.repeat(64),
-    nodeType: 2,
-    nodeTypeName: 'REPEATER',
-    iata: 'YVR',
-    observationCount: 5,
-    firstSeen: 1,
-    lastSeen: 2,
-  };
+  return { id, name, nodeType: 2, nodeTypeName: "REPEATER", iata: "YVR", observationCount: 5, firstSeen: 1, lastSeen: 2 };
 }
 
-function renderPanel(onViewNode = vi.fn(), onViewOnMap?: (id: string) => void) {
+function renderPanel(onViewNode = vi.fn()) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={client}>{children}</QueryClientProvider>
   );
-  render(
-    <NodeDetailPanel
-      nodeId="node-self"
-      onClose={vi.fn()}
-      onViewObserver={vi.fn()}
-      onViewNode={onViewNode}
-      onViewOnMap={onViewOnMap}
-    />,
-    { wrapper },
-  );
+  render(<NodeDetailPanel nodeId="node-self" onClose={vi.fn()} onViewObserver={vi.fn()} onViewNode={onViewNode} />, { wrapper });
   return { onViewNode };
 }
 
@@ -87,192 +58,172 @@ beforeEach(() => {
   mockGetNodeNeighbors.mockResolvedValue([]);
 });
 
-describe('NodeDetailPanel neighbors', () => {
+describe("NodeDetailPanel neighbors", () => {
   it("shows the server's possibly-foreign indication", async () => {
     mockGetNode.mockResolvedValue({ ...node, possiblyForeign: true });
     renderPanel();
-    expect(await screen.findByText('Possibly foreign')).toBeInTheDocument();
+    expect(await screen.findByText("Possibly foreign")).toBeInTheDocument();
   });
 
-  it.each([false, undefined])(
-    'does not label unflagged nodes as foreign (%s)',
-    async (possiblyForeign) => {
-      mockGetNode.mockResolvedValue({ ...node, possiblyForeign });
-      renderPanel();
-      await screen.findByText('Self Node');
-      expect(screen.queryByText('Possibly foreign')).not.toBeInTheDocument();
-    },
-  );
+  it.each([false, undefined])("does not label unflagged nodes as foreign (%s)", async (possiblyForeign) => {
+    mockGetNode.mockResolvedValue({ ...node, possiblyForeign });
+    renderPanel();
+    await screen.findByText("Self Node");
+    expect(screen.queryByText("Possibly foreign")).not.toBeInTheDocument();
+  });
   it("lists each neighbor's name in a Neighbors section", async () => {
-    mockGetNodeNeighbors.mockResolvedValue([
-      neighbor('n-1', 'Neighbor A'),
-      neighbor('n-2', 'Neighbor B'),
-    ]);
+    mockGetNodeNeighbors.mockResolvedValue([neighbor("n-1", "Neighbor A"), neighbor("n-2", "Neighbor B")]);
 
     renderPanel();
 
-    expect(await screen.findByText('Neighbors')).toBeInTheDocument();
-    expect(await screen.findByText('Neighbor A')).toBeInTheDocument();
-    expect(screen.getByText('Neighbor B')).toBeInTheDocument();
-    expect(mockGetNodeNeighbors).toHaveBeenCalledWith('node-self');
+    expect(await screen.findByText("Neighbors")).toBeInTheDocument();
+    expect(await screen.findByText("Neighbor A")).toBeInTheDocument();
+    expect(screen.getByText("Neighbor B")).toBeInTheDocument();
+    expect(mockGetNodeNeighbors).toHaveBeenCalledWith("node-self");
   });
 
-  it('navigates to a neighbor when its row is clicked', async () => {
-    mockGetNodeNeighbors.mockResolvedValue([neighbor('n-1', 'Neighbor A')]);
+  it("navigates to a neighbor when its row is clicked", async () => {
+    mockGetNodeNeighbors.mockResolvedValue([neighbor("n-1", "Neighbor A")]);
 
     const { onViewNode } = renderPanel();
 
-    fireEvent.click(await screen.findByText('Neighbor A'));
-    expect(onViewNode).toHaveBeenCalledWith('n-1');
+    fireEvent.click(await screen.findByText("Neighbor A"));
+    expect(onViewNode).toHaveBeenCalledWith("n-1");
   });
 
-  it('shows an empty state when there are no neighbors', async () => {
+  it("shows an empty state when there are no neighbors", async () => {
     mockGetNodeNeighbors.mockResolvedValue([]);
 
     renderPanel();
 
-    expect(await screen.findByText('No known neighbors')).toBeInTheDocument();
+    expect(await screen.findByText("No known neighbors")).toBeInTheDocument();
   });
 });
 
-describe('NodeDetailPanel contact QR', () => {
-  it('renders the QR and Add-as-contact action with the same contact URI', async () => {
+describe("NodeDetailPanel location", () => {
+  it("hides Lat/Lng but keeps the source for a 0/0 advert reset", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 0, lng: 0, locationSource: "advert" });
+
     renderPanel();
 
-    const qr = await screen.findByRole('img', { name: /contact QR/i });
-    expect(qr.tagName).toBe('CANVAS');
-    const action = screen.getByRole('link', { name: /Add as contact/i });
-    expect(action.getAttribute('href')).toMatch(/^meshcore:\/\/contact\/add\?/);
-    expect(action.getAttribute('href')).toContain('type=2');
-    // no node-detail Copy link action anymore
-    expect(screen.queryByRole('button', { name: /Copy node link/i })).toBeNull();
-    expect(screen.queryByRole('link', { name: /Copy node link/i })).toBeNull();
-  });
-
-  it('omits the QR for unknown node types', async () => {
-    mockGetNode.mockResolvedValue({ ...node, nodeType: 9 });
-    renderPanel();
-
-    await screen.findByText('Timestamps');
-    expect(screen.queryByRole('img', { name: /contact QR/i })).toBeNull();
-    expect(screen.queryByRole('link', { name: /Add as contact/i })).toBeNull();
+    expect(await screen.findByText("Source")).toBeInTheDocument();
+    expect(screen.queryByText("Lat")).not.toBeInTheDocument();
+    expect(screen.queryByText("Lng")).not.toBeInTheDocument();
   });
 });
 
-describe('NodeDetailPanel location', () => {
-  const located = { ...node, lat: 57.1, lng: 12.9, locationSource: 'advert' };
-
-  it('shows the mini map and a view-on-map link outside the map', async () => {
-    mockGetNode.mockResolvedValue(located);
-    const onViewOnMap = vi.fn();
-    renderPanel(vi.fn(), onViewOnMap);
-
-    await screen.findByTestId('node-location-map');
-    const link = screen.getByRole('button', { name: /view on map/i });
-    fireEvent.click(link);
-    expect(onViewOnMap).toHaveBeenCalledWith('node-self');
-  });
-
-  it('shows the mini map without a redundant navigation link on the main map', async () => {
-    mockGetNode.mockResolvedValue(located);
-    renderPanel();
-
-    await screen.findByText('Timestamps');
-    expect(await screen.findByTestId('node-location-map')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /view on map/i })).toBeNull();
-  });
-});
-
-describe('NodeDetailPanel clock drift', () => {
+describe("NodeDetailPanel clock drift", () => {
   it("shows a repeater's clock drift in amber when the server flags it out of sync", async () => {
-    mockGetNode.mockResolvedValue({
-      ...node,
-      lastAdvertAt: 2,
-      clockDriftSeconds: 432,
-      clockOutOfSync: true,
-      clockCheckedAt: 2,
-    });
+    mockGetNode.mockResolvedValue({ ...node, lastAdvertAt: 2, clockDriftSeconds: 432, clockOutOfSync: true, clockCheckedAt: 2 });
 
     renderPanel();
 
-    const drift = await screen.findByText('+7m 12s ahead');
-    expect(drift.className).toContain('text-warn');
+    const drift = await screen.findByText("+7m 12s ahead");
+    expect(drift.className).toContain("text-warn");
   });
 
-  it('shows an in-sync drift in green', async () => {
-    mockGetNode.mockResolvedValue({
-      ...node,
-      lastAdvertAt: 2,
-      clockDriftSeconds: 20,
-      clockOutOfSync: false,
-      clockCheckedAt: 2,
-    });
+  it("shows an in-sync drift in green", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lastAdvertAt: 2, clockDriftSeconds: 20, clockOutOfSync: false, clockCheckedAt: 2 });
 
     renderPanel();
 
-    const drift = await screen.findByText('+20s ahead');
-    expect(drift.className).toContain('text-green');
+    const drift = await screen.findByText("+20s ahead");
+    expect(drift.className).toContain("text-green");
   });
 
-  it('omits clock drift entirely when the node reports none', async () => {
+  it("omits clock drift entirely when the node reports none", async () => {
     renderPanel();
 
-    await screen.findByText('Timestamps');
+    await screen.findByText("Timestamps");
     expect(screen.queryByText(/Clock drift/i)).not.toBeInTheDocument();
   });
 });
 
-describe('NodeDetailPanel observation actions', () => {
-  it('renders a full-width native button and opens that observation packet', async () => {
-    mockGetNodeObservations.mockResolvedValue({
-      items: [
-        {
-          id: 12,
-          packetHash: 'abcdef12',
-          payloadType: 4,
-          payloadTypeName: 'ADVERT',
-          iata: 'YVR',
-          heardAt: 2,
-          hopCount: 1,
-        },
-      ],
-      hasMore: false,
-      nextCursor: null,
-    });
-    const analyze = vi.fn();
+describe("NodeDetailPanel View on map", () => {
+  function renderWithMap(onViewOnMap?: (lat: number, lng: number) => void) {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     render(
       <QueryClientProvider client={client}>
-        <NodeDetailPanel
-          nodeId="node-self"
-          onClose={vi.fn()}
-          onViewObserver={vi.fn()}
-          onAnalyzePacket={analyze}
-        />
+        <NodeDetailPanel nodeId="node-self" onClose={vi.fn()} onViewObserver={vi.fn()} onViewOnMap={onViewOnMap} />
       </QueryClientProvider>,
     );
-    const row = await screen.findByRole('button', { name: /ADVERT.*YVR/ });
-    expect(row).toHaveAttribute('type', 'button');
-    expect(row).toHaveClass('w-full');
-    fireEvent.click(row);
-    expect(analyze).toHaveBeenCalledWith('abcdef12');
+  }
+
+  it("sends the node's coordinates", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 45.42153, lng: -75.69719 });
+    const onViewOnMap = vi.fn();
+    renderWithMap(onViewOnMap);
+    fireEvent.click(await screen.findByRole("button", { name: "View on map" }));
+    expect(onViewOnMap).toHaveBeenCalledWith(45.42153, -75.69719);
+  });
+
+  it("is not offered for a node without a location", async () => {
+    renderWithMap(vi.fn());
+    await screen.findByText("Self Node");
+    expect(screen.queryByRole("button", { name: "View on map" })).not.toBeInTheDocument();
+  });
+
+  it("is not offered when the caller has no map to open", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 45.42153, lng: -75.69719 });
+    renderWithMap();
+    await screen.findByText("Self Node");
+    expect(screen.queryByRole("button", { name: "View on map" })).not.toBeInTheDocument();
+  });
+
+  it("shows the French label", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 45.42153, lng: -75.69719 });
+    await act(() => i18n.changeLanguage("fr"));
+    renderWithMap(vi.fn());
+    expect(await screen.findByRole("button", { name: "Voir sur la carte" })).toBeInTheDocument();
+    await act(() => i18n.changeLanguage("en"));
+  });
+
+  it("is not offered for an explicit 0/0 advert reset", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 0, lng: 0 });
+    renderWithMap(vi.fn());
+    await screen.findByText("Self Node");
+    expect(screen.queryByRole("button", { name: "View on map" })).not.toBeInTheDocument();
+  });
+
+  it("is still offered when only one axis is zero", async () => {
+    mockGetNode.mockResolvedValue({ ...node, lat: 0, lng: 10 });
+    const onViewOnMap = vi.fn();
+    renderWithMap(onViewOnMap);
+    fireEvent.click(await screen.findByRole("button", { name: "View on map" }));
+    expect(onViewOnMap).toHaveBeenCalledWith(0, 10);
   });
 });
 
-describe('NodeDetailPanel fetch failures', () => {
-  it('shows a retryable network error without claiming the entity does not exist', async () => {
-    mockGetNode.mockRejectedValueOnce(new Error('offline'));
+describe("NodeDetailPanel recent packets", () => {
+  it("labels the expiring packet list as recent packets", async () => {
     renderPanel();
-    await screen.findByRole('alert');
-    expect(screen.queryByText('Node not found')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /try again/i }));
-    await screen.findByText('Timestamps');
-    expect(screen.queryByRole('alert')).toBeNull();
+    expect(await screen.findByText("Recent packets")).toBeInTheDocument();
+    expect(await screen.findByText("No recent packets")).toBeInTheDocument();
+    expect(screen.queryByText("Observations")).not.toBeInTheDocument();
   });
-  it('keeps the not-found state for an actual 404', async () => {
-    mockGetNode.mockRejectedValueOnce(new ApiError(404, 'not_found', 'missing'));
+});
+
+describe("NodeDetailPanel in French", () => {
+  it("translates section titles, labels, yes/no and empty states", async () => {
+    mockGetNode.mockResolvedValue({ ...node, knownNeighborCount: 2, clockDriftSeconds: 20, clockOutOfSync: false, clockCheckedAt: 2 });
+    await act(() => i18n.changeLanguage("fr"));
     renderPanel();
-    await screen.findByText('Node not found');
-    expect(screen.queryByRole('alert')).toBeNull();
+
+    expect(await screen.findByText("Capacités")).toBeInTheDocument();
+    expect(screen.getByText("Détail du nœud")).toBeInTheDocument();
+    expect(screen.getByText("Chemins multi-octets")).toBeInTheDocument();
+    expect(screen.getAllByText("non")).toHaveLength(2);
+    expect(screen.getByText("+20 s en avance")).toBeInTheDocument();
+    expect(screen.getByText("Voisins (2)")).toBeInTheDocument();
+    expect(await screen.findByText("Aucun voisin connu")).toBeInTheDocument();
+    expect(screen.getByText("Aucun paquet récent")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copier la clé publique" })).toBeInTheDocument();
+  });
+
+  it("translates the possibly-foreign badge", async () => {
+    mockGetNode.mockResolvedValue({ ...node, possiblyForeign: true });
+    await act(() => i18n.changeLanguage("fr"));
+    renderPanel();
+    expect(await screen.findByText("Possiblement étranger")).toBeInTheDocument();
   });
 });

@@ -1,41 +1,24 @@
-import type { EChartsOption } from './echarts-setup';
-import { type ChartColors, tooltipStyle, withAlpha } from './chartTheme';
-import { formatCount } from '../../lib/formatters';
-import { airtimePctSeries, busyPct } from './transforms';
-import type { ActivityPoint, TelemetryPoint } from './types';
+import type { EChartsOption } from "./echarts-setup";
+import { type ChartColors, tooltipStyle, withAlpha } from "./chartTheme";
+import { formatCount } from "../../lib/formatters";
+import { airtimePctSeries, busyPct } from "./transforms";
+import type { ActivityPoint, TelemetryPoint } from "./types";
 
-const MONO = 'JetBrains Mono, monospace';
+const MONO = "JetBrains Mono, monospace";
 
-function timeAxis(c: ChartColors, range?: '24h' | '7d' | '30d') {
+function timeAxis(c: ChartColors) {
   return {
-    type: 'time' as const,
+    type: "time" as const,
     boundaryGap: false,
-    minInterval: range === '24h' ? 3600 * 1000 : 86400 * 1000,
     axisLine: { lineStyle: { color: c.border } },
-    axisLabel: {
-      color: c.textMuted,
-      fontFamily: MONO,
-      fontSize: 10,
-      hideOverlap: true,
-      // ECharts' default time formatter mixes bare day numbers with English month
-      // names at month boundaries. Keep numeric dates and include the time in
-      // the daily view so ticks on the same date remain distinguishable.
-      formatter: (value: number) => {
-        const d = new Date(value);
-        const date = `${d.getDate()}/${d.getMonth() + 1}`;
-        if (range !== '24h') return date;
-        const hours = String(d.getHours()).padStart(2, '0');
-        const minutes = String(d.getMinutes()).padStart(2, '0');
-        return `${date} ${hours}:${minutes}`;
-      },
-    },
+    axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, hideOverlap: true },
     splitLine: { show: false },
   };
 }
 
 function valueAxis(c: ChartColors, extra: Record<string, unknown> = {}) {
   return {
-    type: 'value' as const,
+    type: "value" as const,
     axisLine: { show: false },
     axisTick: { show: false },
     axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10 },
@@ -46,23 +29,18 @@ function valueAxis(c: ChartColors, extra: Record<string, unknown> = {}) {
 
 // ---- Mesh ----
 
+// null values are hours the server hasn't rolled (or never can); echarts breaks the line there.
 export function observationsAreaOption(
-  points: { hour: number; observationCount: number; uniquePackets: number }[],
+  points: { hour: number; observations: number | null; uniquePackets: number | null }[],
   c: ChartColors,
-  labels = { observations: 'Observations', uniquePackets: 'Unique packets' },
-  range?: '24h' | '7d' | '30d',
+  labels = { observations: "Observations", uniquePackets: "Unique packets" },
 ): EChartsOption {
-  const obs = points.map((p) => [p.hour, p.observationCount]);
-  const uniq = points.map((p) => [p.hour, p.uniquePackets]);
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 48, right: 14, top: 12, bottom: 24 },
-    tooltip: {
-      trigger: 'axis',
-      ...tooltipStyle(c),
-      axisPointer: { type: 'line', lineStyle: { color: c.primary } },
-    },
+    tooltip: { trigger: "axis", ...tooltipStyle(c), axisPointer: { type: "line", lineStyle: { color: c.primary } } },
     legend: {
       data: [labels.observations, labels.uniquePackets],
       right: 8,
@@ -72,24 +50,21 @@ export function observationsAreaOption(
       textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
       inactiveColor: c.textDim,
     },
-    xAxis: timeAxis(c, range),
+    xAxis: timeAxis(c),
     yAxis: valueAxis(c),
     series: [
       {
         name: labels.observations,
-        type: 'line',
+        type: "line",
         smooth: true,
-        symbol: 'none',
-        data: obs,
+        symbol: "none",
+        data: points.map((p) => [p.hour, p.observations]),
         lineStyle: { color: c.primary, width: 2 },
         itemStyle: { color: c.primary },
         areaStyle: {
           color: {
-            type: 'linear',
-            x: 0,
-            y: 0,
-            x2: 0,
-            y2: 1,
+            type: "linear",
+            x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
               { offset: 0, color: withAlpha(c.primary, 0.42) },
               { offset: 1, color: withAlpha(c.primary, 0.01) },
@@ -99,12 +74,12 @@ export function observationsAreaOption(
       },
       {
         name: labels.uniquePackets,
-        type: 'line',
+        type: "line",
         smooth: true,
-        symbol: 'none',
-        data: uniq,
-        lineStyle: { color: c.cyan, width: 1.3, type: 'dashed' },
-        itemStyle: { color: c.cyan },
+        symbol: "none",
+        data: points.map((p) => [p.hour, p.uniquePackets]),
+        lineStyle: { color: c.secondary, width: 1.3, type: "dashed" },
+        itemStyle: { color: c.secondary },
       },
     ],
   };
@@ -118,18 +93,12 @@ export function leaderboardOption(
   const hasIata = rows.some((r) => Boolean(r.iata)); // reserve room for the end-of-bar chip only when needed
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     grid: { left: gridLeft, right: hasIata ? 96 : 56, top: 6, bottom: 6 },
-    tooltip: { trigger: 'item', ...tooltipStyle(c) },
-    xAxis: {
-      type: 'value',
-      axisLabel: { show: false },
-      splitLine: { show: false },
-      axisLine: { show: false },
-      axisTick: { show: false },
-    },
+    tooltip: { trigger: "item", ...tooltipStyle(c) },
+    xAxis: { type: "value", axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: {
-      type: 'category',
+      type: "category",
       inverse: true,
       data: rows.map((r) => r.name),
       axisLine: { show: false },
@@ -140,25 +109,21 @@ export function leaderboardOption(
         color: c.textNormal,
         fontFamily: MONO,
         fontSize: 11,
-        align: 'left',
+        align: "left",
         margin: gridLeft - 10,
         width: gridLeft - 16,
-        overflow: 'truncate',
+        overflow: "truncate",
       },
     },
     series: [
       {
-        type: 'bar',
+        type: "bar",
         barMaxWidth: 22,
-        barCategoryGap: '42%',
-        data: rows.map((r) => ({
-          value: r.value,
-          iata: r.iata,
-          itemStyle: { color: r.color, borderRadius: [0, 4, 4, 0] },
-        })),
+        barCategoryGap: "42%",
+        data: rows.map((r) => ({ value: r.value, iata: r.iata, itemStyle: { color: r.color, borderRadius: [0, 4, 4, 0] } })),
         label: {
           show: true,
-          position: 'right',
+          position: "right",
           color: c.textBright,
           fontFamily: MONO,
           fontSize: 11,
@@ -173,7 +138,7 @@ export function leaderboardOption(
               color: c.primary,
               backgroundColor: withAlpha(c.primary, 0.1),
               fontFamily: MONO,
-              fontWeight: 'bold',
+              fontWeight: "bold",
               fontSize: 10,
               padding: [2, 4],
               borderRadius: 3,
@@ -190,22 +155,22 @@ export function presetBarsOption(
   rows: { name: string; nodes: number; observers: number }[],
   c: ChartColors,
   gridLeft = 172, // fits a full "910.525 · 62.5k · SF7" label
-  labels = { nodes: 'Nodes', observers: 'Observers' },
+  labels = { nodes: "Nodes", observers: "Observers" },
 ): EChartsOption {
   const totals = rows.map((r) => r.nodes + r.observers);
   const segment = (data: number[], color: string) => ({
-    type: 'bar' as const,
-    stack: 'preset',
+    type: "bar" as const,
+    stack: "preset",
     barMaxWidth: 22,
-    barCategoryGap: '42%',
+    barCategoryGap: "42%",
     data,
     itemStyle: { color },
   });
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     grid: { left: gridLeft, right: 56, top: 22, bottom: 6 },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c), axisPointer: { type: 'shadow' } },
+    tooltip: { trigger: "axis", ...tooltipStyle(c), axisPointer: { type: "shadow" } },
     legend: {
       data: [labels.nodes, labels.observers],
       right: 8,
@@ -215,15 +180,9 @@ export function presetBarsOption(
       textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
       inactiveColor: c.textDim,
     },
-    xAxis: {
-      type: 'value',
-      axisLabel: { show: false },
-      splitLine: { show: false },
-      axisLine: { show: false },
-      axisTick: { show: false },
-    },
+    xAxis: { type: "value", axisLabel: { show: false }, splitLine: { show: false }, axisLine: { show: false }, axisTick: { show: false } },
     yAxis: {
-      type: 'category',
+      type: "category",
       inverse: true,
       data: rows.map((r) => r.name),
       axisLine: { show: false },
@@ -232,30 +191,21 @@ export function presetBarsOption(
         color: c.textNormal,
         fontFamily: MONO,
         fontSize: 11,
-        align: 'left',
+        align: "left",
         margin: gridLeft - 10,
         width: gridLeft - 16,
-        overflow: 'truncate',
+        overflow: "truncate",
       },
     },
     series: [
-      {
-        name: labels.nodes,
-        ...segment(
-          rows.map((r) => r.nodes),
-          c.primary,
-        ),
-      },
+      { name: labels.nodes, ...segment(rows.map((r) => r.nodes), c.primary) },
       {
         name: labels.observers,
-        ...segment(
-          rows.map((r) => r.observers),
-          c.secondary,
-        ),
+        ...segment(rows.map((r) => r.observers), c.secondary),
         // outer segment carries the row total so it sits at the end of the whole stack
         label: {
           show: true,
-          position: 'right' as const,
+          position: "right" as const,
           color: c.textBright,
           fontFamily: MONO,
           fontSize: 11,
@@ -275,26 +225,20 @@ export function donutOption(
 ): EChartsOption {
   const centerText = {
     show: true,
-    position: 'center' as const,
+    position: "center" as const,
     formatter: `{v|${centerValue}}\n{l|${centerLabel}}`,
     rich: {
-      v: {
-        color: c.textBright,
-        fontFamily: MONO,
-        fontSize: 21,
-        fontWeight: 700 as const,
-        lineHeight: 24,
-      },
+      v: { color: c.textBright, fontFamily: MONO, fontSize: 21, fontWeight: 700 as const, lineHeight: 24 },
       l: { color: c.textMuted, fontFamily: MONO, fontSize: 9, lineHeight: 12 },
     },
   };
   return {
     animation: false,
-    backgroundColor: 'transparent',
-    tooltip: { trigger: 'item', ...tooltipStyle(c), formatter: '{b}: {c} ({d}%)' },
+    backgroundColor: "transparent",
+    tooltip: { trigger: "item", ...tooltipStyle(c), formatter: "{b}: {c} ({d}%)" },
     legend: {
-      orient: 'horizontal',
-      left: 'center',
+      orient: "horizontal",
+      left: "center",
       bottom: 4,
       itemWidth: 9,
       itemHeight: 9,
@@ -304,9 +248,9 @@ export function donutOption(
     },
     series: [
       {
-        type: 'pie',
-        radius: ['48%', '70%'],
-        center: ['50%', '46%'],
+        type: "pie",
+        radius: ["48%", "70%"],
+        center: ["50%", "46%"],
         avoidLabelOverlap: false,
         itemStyle: { borderColor: c.bgSurface, borderWidth: 2, borderRadius: 4 },
         label: { show: false },
@@ -323,68 +267,39 @@ export function donutOption(
   };
 }
 
-// Horizontal categories keep long names level. Bound the long tail to six types plus
-// Other, preserving the total without squeezing dozens of labels into one chart.
+// Vertical bars for the payload-type breakdown. Replaced the old donut: with 10+ slivers the legend
+// needed scrolling, names truncated, and thin slices couldn't be compared by eye — bars label every
+// category inline and need no legend at all.
 export function typeBarOption(
   items: { name: string; value: number; color?: string }[],
   c: ChartColors,
-  otherLabel = 'Other',
 ): EChartsOption {
-  const ranked = [...items].sort((a, b) => b.value - a.value);
-  const visible =
-    ranked.length > 7
-      ? [
-          ...ranked.slice(0, 6),
-          {
-            name: otherLabel,
-            value: ranked.slice(6).reduce((sum, item) => sum + item.value, 0),
-            color: c.textMuted,
-          },
-        ]
-      : ranked;
+  const crowded = items.length > 5;
   return {
     animation: false,
-    backgroundColor: 'transparent',
-    aria: {
-      enabled: true,
-      label: { description: items.map((item) => `${item.name}: ${item.value}`).join('; ') },
-    },
-    grid: { left: 130, right: 40, top: 8, bottom: 24 },
-    tooltip: { trigger: 'item', ...tooltipStyle(c), formatter: '{b}: {c}' },
-    xAxis: valueAxis(c),
-    yAxis: {
-      type: 'category',
-      inverse: true,
-      data: visible.map((item) => item.name),
-      axisLine: { show: false },
+    backgroundColor: "transparent",
+    grid: { left: 44, right: 10, top: 18, bottom: crowded ? 52 : 24 },
+    tooltip: { trigger: "item", ...tooltipStyle(c), formatter: "{b}: {c}" },
+    xAxis: {
+      type: "category",
+      data: items.map((it) => it.name),
+      axisLine: { lineStyle: { color: c.border } },
       axisTick: { show: false },
-      axisLabel: {
-        color: c.textNormal,
-        fontFamily: MONO,
-        fontSize: 11,
-        interval: 0,
-        width: 120,
-        overflow: 'truncate',
-      },
+      // slant only when there are enough categories for labels to collide
+      axisLabel: { color: c.textNormal, fontFamily: MONO, fontSize: 9, interval: 0, rotate: crowded ? 36 : 0, width: 92, overflow: "truncate" },
     },
+    yAxis: valueAxis(c),
     series: [
       {
-        type: 'bar',
-        barMaxWidth: 18,
-        data: visible.map((item, i) => ({
-          name: item.name,
-          value: item.value,
-          itemStyle: {
-            color: item.color ?? c.series[i % c.series.length],
-            borderRadius: [0, 3, 3, 0],
-          },
-        })),
+        type: "bar",
+        barMaxWidth: 28,
+        data: items.map((it, i) => ({ value: it.value, itemStyle: { color: it.color ?? c.series[i % c.series.length], borderRadius: [4, 4, 0, 0] } })),
         label: {
           show: true,
-          position: 'right',
+          position: "top",
           color: c.textBright,
           fontFamily: MONO,
-          fontSize: 10,
+          fontSize: 9,
           formatter: (p: { value: number }) => formatCount(p.value),
         },
       },
@@ -396,70 +311,31 @@ export function typeBarOption(
 // `t` arrives in epoch ms.
 
 function percentAxis(c: ChartColors) {
-  return valueAxis(c, {
-    axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, formatter: '{value}%' },
-  });
+  return valueAxis(c, { axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, formatter: "{value}%" } });
 }
 
-const pctLabel = (v: unknown) => (typeof v === 'number' ? `${v}%` : '—');
+const pctLabel = (v: unknown) => (typeof v === "number" ? `${v}%` : "—");
 
-export function airtimeOption(
-  points: TelemetryPoint[],
-  c: ChartColors,
-  bucketMs: number | null,
-  range?: '24h' | '7d' | '30d',
-): EChartsOption {
+export function airtimeOption(points: TelemetryPoint[], c: ChartColors, bucketMs: number | null): EChartsOption {
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 48, right: 14, top: 24, bottom: 22 },
-    legend: {
-      data: ['RX', 'TX'],
-      right: 6,
-      top: 0,
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
-    },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c), valueFormatter: pctLabel },
-    xAxis: timeAxis(c, range),
+    legend: { data: ["RX", "TX"], right: 6, top: 0, itemWidth: 10, itemHeight: 10, textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 } },
+    tooltip: { trigger: "axis", ...tooltipStyle(c), valueFormatter: pctLabel },
+    xAxis: timeAxis(c),
     yAxis: percentAxis(c),
     series: [
-      {
-        name: 'RX',
-        type: 'line',
-        stack: 'air',
-        smooth: true,
-        symbol: 'none',
-        connectNulls: true,
-        data: airtimePctSeries(points, 'airtimeRxSecs', bucketMs),
-        lineStyle: { width: 1, color: c.primary },
-        areaStyle: { color: withAlpha(c.primary, 0.35) },
-        itemStyle: { color: c.primary },
-      },
-      {
-        name: 'TX',
-        type: 'line',
-        stack: 'air',
-        smooth: true,
-        symbol: 'none',
-        connectNulls: true,
-        data: airtimePctSeries(points, 'airtimeTxSecs', bucketMs),
-        lineStyle: { width: 1, color: c.orange },
-        areaStyle: { color: withAlpha(c.orange, 0.35) },
-        itemStyle: { color: c.orange },
-      },
+      { name: "RX", type: "line", stack: "air", smooth: true, symbol: "none", connectNulls: true, data: airtimePctSeries(points, "airtimeRxSecs", bucketMs), lineStyle: { width: 1, color: c.green }, areaStyle: { color: withAlpha(c.green, 0.35) }, itemStyle: { color: c.green } },
+      { name: "TX", type: "line", stack: "air", smooth: true, symbol: "none", connectNulls: true, data: airtimePctSeries(points, "airtimeTxSecs", bucketMs), lineStyle: { width: 1, color: c.primary }, areaStyle: { color: withAlpha(c.primary, 0.35) }, itemStyle: { color: c.primary } },
     ],
   };
 }
 
 // Single-metric line chart (small multiple). `delta` charts the per-report increase of a cumulative
 // counter; `area` adds a fill (use only for counters that sit near zero, not offset ranges like dBm/V).
-function seriesData(
-  points: TelemetryPoint[],
-  accessor: (p: TelemetryPoint) => number | null,
-  delta: boolean,
-) {
+function seriesData(points: TelemetryPoint[], accessor: (p: TelemetryPoint) => number | null, delta: boolean) {
   if (!delta) return points.map((p) => [p.t, accessor(p)]);
   const out: [number, number | null][] = [];
   for (let i = 1; i < points.length; i++) {
@@ -473,49 +349,22 @@ function seriesData(
 function metricLineOption(
   points: TelemetryPoint[],
   c: ChartColors,
-  o: {
-    name: string;
-    color: string;
-    accessor: (p: TelemetryPoint) => number | null;
-    delta?: boolean;
-    area?: boolean;
-    range?: '24h' | '7d' | '30d';
-    voltage?: boolean;
-  },
+  o: { name: string; color: string; accessor: (p: TelemetryPoint) => number | null; delta?: boolean; area?: boolean },
 ): EChartsOption {
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 50, right: 14, top: 14, bottom: 22 },
-    tooltip: {
-      trigger: 'axis',
-      ...tooltipStyle(c),
-      ...(o.voltage
-        ? {
-            valueFormatter: (value: unknown) =>
-              typeof value === 'number' ? `${value.toFixed(3)} V` : '—',
-          }
-        : {}),
-    },
-    xAxis: timeAxis(c, o.range),
-    // Voltage retains a zero baseline and at least a 5 V span. Expand for higher-voltage
-    // supplies without assuming a battery chemistry or clipping their readings.
-    yAxis: valueAxis(
-      c,
-      o.voltage
-        ? {
-            min: 0,
-            max: (extent: { max: number }) => Math.max(5, Math.ceil(extent.max * 1.05)),
-            name: 'V',
-          }
-        : { scale: true },
-    ),
+    tooltip: { trigger: "axis", ...tooltipStyle(c) },
+    xAxis: timeAxis(c),
+    yAxis: valueAxis(c, { scale: true }),
     series: [
       {
         name: o.name,
-        type: 'line',
+        type: "line",
         smooth: true,
-        symbol: 'none',
+        symbol: "none",
         connectNulls: true,
         data: seriesData(points, o.accessor, o.delta ?? false),
         lineStyle: { color: o.color, width: 1.8 },
@@ -526,57 +375,18 @@ function metricLineOption(
   };
 }
 
-export const batteryOption = (
-  p: TelemetryPoint[],
-  c: ChartColors,
-  name = 'Battery V',
-  range?: '24h' | '7d' | '30d',
-) =>
-  metricLineOption(p, c, {
-    name,
-    color: c.green,
-    voltage: true,
-    accessor: (x) => (x.batteryMv == null ? null : +(x.batteryMv / 1000).toFixed(3)),
-    range,
-  });
+export const batteryOption = (p: TelemetryPoint[], c: ChartColors, name = "Battery V") =>
+  metricLineOption(p, c, { name, color: c.primary, accessor: (x) => (x.batteryMv == null ? null : +(x.batteryMv / 1000).toFixed(3)) });
 
-export const noiseFloorOption = (
-  p: TelemetryPoint[],
-  c: ChartColors,
-  name = 'Noise dBm',
-  range?: '24h' | '7d' | '30d',
-) => metricLineOption(p, c, { name, color: c.warn, accessor: (x) => x.noiseFloorDb, range });
+export const noiseFloorOption = (p: TelemetryPoint[], c: ChartColors, name = "Noise dBm") =>
+  metricLineOption(p, c, { name, color: c.warn, accessor: (x) => x.noiseFloorDb });
 
-export const queueOption = (
-  p: TelemetryPoint[],
-  c: ChartColors,
-  name = 'Queue',
-  range?: '24h' | '7d' | '30d',
-) =>
-  metricLineOption(p, c, {
-    name,
-    color: c.orange,
-    accessor: (x) => x.queueLength,
-    area: true,
-    range,
-  });
+export const queueOption = (p: TelemetryPoint[], c: ChartColors, name = "Queue") =>
+  metricLineOption(p, c, { name, color: c.secondary, accessor: (x) => x.queueLength, area: true });
 
 // receiveErrors is a cumulative counter in raw points, a per-bucket delta in bucketed ones
-export const receiveErrorsOption = (
-  p: TelemetryPoint[],
-  c: ChartColors,
-  bucketed: boolean,
-  name = 'Recv errors',
-  range?: '24h' | '7d' | '30d',
-) =>
-  metricLineOption(p, c, {
-    name,
-    color: c.danger,
-    accessor: (x) => x.receiveErrors,
-    delta: !bucketed,
-    area: true,
-    range,
-  });
+export const receiveErrorsOption = (p: TelemetryPoint[], c: ChartColors, bucketed: boolean, name = "Recv errors") =>
+  metricLineOption(p, c, { name, color: c.danger, accessor: (x) => x.receiveErrors, delta: !bucketed, area: true });
 
 // ---- Observer activity (what it heard) ----
 
@@ -595,49 +405,45 @@ function busySpanMs(t: number, intervalMs: number, w: TimeWindow): number {
   return t < w.end && t + intervalMs > w.end ? w.end - t : intervalMs;
 }
 
-export function busyOption(
-  points: ActivityPoint[],
-  c: ChartColors,
-  intervalMs: number | null,
-  w: TimeWindow,
-): EChartsOption {
-  const pct = (p: ActivityPoint) =>
-    intervalMs == null ? null : busyPct(p.airtimeMs, busySpanMs(p.t, intervalMs, w));
+export function busyOption(points: ActivityPoint[], c: ChartColors, intervalMs: number | null, w: TimeWindow, name = "Busy"): EChartsOption {
+  const pct = (p: ActivityPoint) => (intervalMs == null ? null : busyPct(p.airtimeMs, busySpanMs(p.t, intervalMs, w)));
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 48, right: 14, top: 14, bottom: 22 },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c), valueFormatter: pctLabel },
+    tooltip: { trigger: "axis", ...tooltipStyle(c), valueFormatter: pctLabel },
     xAxis: windowAxis(c, w),
     yAxis: percentAxis(c),
     series: [
       {
-        name: 'Busy',
-        type: 'line',
-        symbol: 'none',
+        name,
+        type: "line",
+        symbol: "none",
         connectNulls: false,
         data: points.map((p) => [p.t, pct(p)]),
-        lineStyle: { width: 1.5, color: c.warn },
-        areaStyle: { color: withAlpha(c.warn, 0.28) },
-        itemStyle: { color: c.warn },
+        lineStyle: { width: 1.5, color: c.green },
+        areaStyle: { color: withAlpha(c.green, 0.28) },
+        itemStyle: { color: c.green },
       },
     ],
   };
 }
 
-export function heardOption(points: ActivityPoint[], c: ChartColors, w: TimeWindow): EChartsOption {
+export function heardOption(points: ActivityPoint[], c: ChartColors, w: TimeWindow, name = "Heard"): EChartsOption {
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 48, right: 14, top: 14, bottom: 22 },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c) },
+    tooltip: { trigger: "axis", ...tooltipStyle(c) },
     xAxis: windowAxis(c, w),
     yAxis: valueAxis(c, { minInterval: 1 }),
     series: [
       {
-        name: 'Heard',
-        type: 'line',
-        symbol: 'none',
+        name,
+        type: "line",
+        symbol: "none",
         data: points.map((p) => [p.t, p.observations]),
         lineStyle: { width: 1.5, color: c.primary },
         areaStyle: { color: withAlpha(c.primary, 0.28) },
@@ -647,50 +453,21 @@ export function heardOption(points: ActivityPoint[], c: ChartColors, w: TimeWind
   };
 }
 
-const dbLabel = (v: unknown) => (typeof v === 'number' ? `${v} dB` : '—');
+const dbLabel = (v: unknown) => (typeof v === "number" ? `${v} dB` : "—");
 
-export function snrHeardOption(
-  points: ActivityPoint[],
-  c: ChartColors,
-  w: TimeWindow,
-): EChartsOption {
+export function snrHeardOption(points: ActivityPoint[], c: ChartColors, w: TimeWindow, labels = { average: "Avg", minimum: "Min" }): EChartsOption {
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    useUTC: true,
+    backgroundColor: "transparent",
     grid: { left: 54, right: 14, top: 24, bottom: 22 },
-    legend: {
-      data: ['Avg', 'Min'],
-      right: 6,
-      top: 0,
-      itemWidth: 10,
-      itemHeight: 10,
-      textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
-    },
-    tooltip: { trigger: 'axis', ...tooltipStyle(c), valueFormatter: dbLabel },
+    legend: { data: [labels.average, labels.minimum], right: 6, top: 0, itemWidth: 10, itemHeight: 10, textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 } },
+    tooltip: { trigger: "axis", ...tooltipStyle(c), valueFormatter: dbLabel },
     xAxis: windowAxis(c, w),
-    yAxis: valueAxis(c, {
-      scale: true,
-      axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, formatter: '{value} dB' },
-    }),
+    yAxis: valueAxis(c, { scale: true, axisLabel: { color: c.textMuted, fontFamily: MONO, fontSize: 10, formatter: "{value} dB" } }),
     series: [
-      {
-        name: 'Avg',
-        type: 'line',
-        symbol: 'none',
-        connectNulls: false,
-        data: points.map((p) => [p.t, p.snrAvg]),
-        lineStyle: { width: 1.8, color: c.secondary },
-        itemStyle: { color: c.secondary },
-      },
-      {
-        name: 'Min',
-        type: 'line',
-        symbol: 'none',
-        connectNulls: false,
-        data: points.map((p) => [p.t, p.snrMin]),
-        lineStyle: { width: 1, color: c.textMuted, type: 'dashed' },
-        itemStyle: { color: c.textMuted },
-      },
+      { name: labels.average, type: "line", symbol: "none", connectNulls: false, data: points.map((p) => [p.t, p.snrAvg]), lineStyle: { width: 1.8, color: c.secondary }, itemStyle: { color: c.secondary } },
+      { name: labels.minimum, type: "line", symbol: "none", connectNulls: false, data: points.map((p) => [p.t, p.snrMin]), lineStyle: { width: 1, color: c.textMuted, type: "dashed" }, itemStyle: { color: c.textMuted } },
     ],
   };
 }

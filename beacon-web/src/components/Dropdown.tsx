@@ -1,61 +1,46 @@
-import { useCallback, useState, type ReactNode } from 'react';
-import * as Popover from '@radix-ui/react-popover';
-import { useHasHover } from '../hooks/useMediaQuery';
+import { useState, useRef, useCallback, useEffect, type ReactNode } from "react";
+import { useClickOutside } from "../hooks/useClickOutside";
 
-export function Dropdown({
-  renderTrigger,
-  align = 'right',
-  width = 'w-48',
-  fullWidth = false,
-  className = '',
-  mobileViewport = false,
-  children,
-}: {
+const ALIGN_CLASS = { left: "left-0", right: "right-0", "left-below-md": "left-0 md:left-auto md:right-0" } as const;
+
+export function Dropdown({ renderTrigger, align = "right", width = "w-48", fullWidth = false, children }: {
   renderTrigger: (props: { open: boolean; toggle: () => void }) => ReactNode;
-  align?: 'left' | 'right';
+  // left-below-md: the trigger sits at the left edge of a phone row but mid-row on desktop
+  align?: "left" | "right" | "left-below-md";
   width?: string;
+  // stretch + render the panel inline (accordion) for the mobile filter sheet
   fullWidth?: boolean;
-  className?: string;
-  mobileViewport?: boolean;
   children: (close: () => void) => ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const hasHover = useHasHover();
+  const ref = useRef<HTMLDivElement>(null);
   const close = useCallback(() => setOpen(false), []);
+  const toggle = useCallback(() => setOpen((v) => !v), []);
+  useClickOutside(ref, open, close);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation(); // innermost layer wins — don't let an enclosing sheet/modal close too
+      close();
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open, close]);
 
   return (
-    <Popover.Root open={open} onOpenChange={setOpen}>
-      <div className={`relative ${fullWidth ? 'w-full' : ''} ${className}`}>
-        <Popover.Trigger asChild>
-          {renderTrigger({
-            open,
-            // Radix composes its own trigger event onto the returned button. Keeping the legacy
-            // callback as a no-op preserves call sites without toggling the controlled state twice.
-            toggle: () => undefined,
-          })}
-        </Popover.Trigger>
-      </div>
-      <Popover.Portal>
-        <Popover.Content
-          align={align === 'left' ? 'start' : 'end'}
-          sideOffset={4}
-          collisionPadding={12}
-          onOpenAutoFocus={(event) => {
-            if (!hasHover) event.preventDefault();
-          }}
-          onEscapeKeyDown={(event) => {
-            const target = event.target;
-            if (target instanceof HTMLInputElement && target.value) event.preventDefault();
-          }}
-          className={`${width} max-w-[calc(100vw-1.5rem)] ${
-            fullWidth ? 'w-[var(--radix-popover-trigger-width)]' : ''
-          } ${
-            mobileViewport ? 'max-sm:w-[calc(100vw-1.5rem)] max-sm:max-h-[calc(100dvh-4rem)]' : ''
-          } bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto focus:outline-none`}
-        >
+    <div ref={ref} className={`relative ${fullWidth ? "w-full" : ""}`}>
+      {renderTrigger({ open, toggle })}
+      {open && (
+        <div className={
+          fullWidth
+            ? "mt-1 w-full bg-bg-raised border border-border rounded-md py-1 max-h-72 overflow-y-auto"
+            : `absolute top-full mt-1 ${ALIGN_CLASS[align]} ${width} max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1 max-h-80 overflow-y-auto`
+        }>
           {children(close)}
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </div>
+      )}
+    </div>
   );
 }

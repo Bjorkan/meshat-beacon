@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { EChart } from './EChart';
-import type { EChartsInstance, EChartsOption } from './echarts-setup';
-import { nodeNameMatches, type GraphNode } from './neighbour-graph';
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import { EChart } from "./EChart";
+import type { EChartsInstance, EChartsOption } from "./echarts-setup";
+import { nodeNameMatches, type GraphNode } from "./neighbour-graph";
 
 interface Props {
   option: EChartsOption;
@@ -19,7 +19,7 @@ export function NeighbourGraph({ option, nodes, search, onSelect }: Props) {
     (chart: EChartsInstance) => {
       chartRef.current = chart;
       // clicking empty canvas returns to the full mesh
-      chart.getZr().on('click', (e: { target?: unknown }) => {
+      chart.getZr().on("click", (e: { target?: unknown }) => {
         if (!e.target) onSelect(null);
       });
     },
@@ -30,7 +30,7 @@ export function NeighbourGraph({ option, nodes, search, onSelect }: Props) {
     () => ({
       click: (p: unknown) => {
         const param = p as { dataType?: string; data?: { id?: string } };
-        if (param.dataType === 'edge') return;
+        if (param.dataType === "edge") return;
         const id = param.data?.id;
         if (id) onSelect(id);
       },
@@ -45,14 +45,13 @@ export function NeighbourGraph({ option, nodes, search, onSelect }: Props) {
     const chart = chartRef.current;
     if (!chart || chart.isDisposed()) return;
     const q = search.trim();
-    const showMatchLabels = nodes.filter((n) => nodeNameMatches(n.name, q)).length <= 5;
     const data = nodes.map((n) => {
       if (!q) return { ...n, itemStyle: { opacity: 1 }, label: n.label ?? { show: false } };
       const match = nodeNameMatches(n.name, q);
       return {
         ...n,
         itemStyle: { opacity: match ? 1 : 0.06 },
-        label: match && showMatchLabels ? { show: true, fontSize: 13 } : { show: false },
+        label: match ? { show: true, fontSize: 13 } : { show: false },
       };
     });
     chart.setOption({ series: [{ data }] }, { notMerge: false });

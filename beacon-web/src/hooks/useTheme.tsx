@@ -1,12 +1,11 @@
 /* eslint-disable react-refresh/only-export-components */
-import { readPreference, writePreference } from '../lib/storage';
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
-import { type Theme, DEFAULT_THEME_ID, loadThemes, applyTheme } from '../lib/themes';
-import { ENABLED_THEME_IDS, selectableThemes } from '../lib/constants';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { type Theme, DEFAULT_THEME_ID, loadThemes, applyTheme } from "../lib/themes";
+import { ENABLED_THEME_IDS, selectableThemes } from "../lib/constants";
 
 // loads themes from JSON, persists selection, applies CSS vars
 
-const STORAGE_KEY = 'beacon-theme';
+const STORAGE_KEY = "beacon-theme";
 
 interface ThemeCtx {
   themeId: string;
@@ -28,13 +27,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [themes, setThemes] = useState<Theme[]>([]);
   const [paletteRev, setPaletteRev] = useState(0);
   const [themeId, setThemeIdState] = useState(
-    () => readPreference(STORAGE_KEY) ?? DEFAULT_THEME_ID,
+    () => localStorage.getItem(STORAGE_KEY) ?? DEFAULT_THEME_ID,
   );
 
   useEffect(() => {
     loadThemes().then((loaded) => {
       setThemes(loaded);
-      const saved = readPreference(STORAGE_KEY);
+      const saved = localStorage.getItem(STORAGE_KEY);
       // Restrict the startup theme to the selectable set, so an allowlist can't leave the app on a
       // theme the picker won't offer (e.g. a persisted default when only MeshMapper themes are enabled).
       const selectable = selectableThemes(loaded, ENABLED_THEME_IDS);
@@ -52,7 +51,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       if (!match) return;
       applyTheme(match);
       setPaletteRev((r) => r + 1);
-      writePreference(STORAGE_KEY, id);
+      localStorage.setItem(STORAGE_KEY, id);
       setThemeIdState(id);
     },
     [themes],

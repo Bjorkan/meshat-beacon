@@ -1,168 +1,173 @@
-import { useId, useState, type ReactNode } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useTranslation } from 'react-i18next';
-import { SegmentedControl } from './SegmentedControl';
-import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from './types';
-import { MeshCoreRegionPicker } from '../../components/MeshCoreRegionPicker';
-import { meshcoreRegionQueries } from '../../api/queries';
+import { useState } from "react";
+import { useTranslation } from "react-i18next";
+import { MapStyleSwitcher } from "./MapStyleSwitcher";
+import { SegmentedControl } from "./SegmentedControl";
+import { NODE_TYPE_FILTER_OPTIONS, type NeighborLinesMode } from "./types";
+import { Section } from "../../components/DetailPanel";
+import { CopyLinkButton } from "../../components/CopyLinkButton";
+import { useIsMobile } from "../../hooks/useMediaQuery";
+
+// Open/closed state persists across sessions; no click-outside dismiss, so it stays open while you pan.
+const OPEN_STORAGE_KEY = "beacon-map-settings-open";
+
+// Swatch matching the border layer paint (secondary line over a faint fill), so the legend tracks the theme.
+function BorderLegend() {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-2.5 flex items-center gap-1.5 text-[10px] text-text-dim">
+      <span
+        className="inline-block h-2.5 w-4 rounded-sm border"
+        style={{ borderColor: "var(--palette-secondary)", backgroundColor: "var(--palette-secondary)", opacity: 0.5 }}
+      />
+      {t("map.areaOutline")}
+    </div>
+  );
+}
+
+// Legend for a selected node's coloured edges. Gradient stops mirror the map paint's log anchors
+// (red ~1, yellow ~20 at 60%, green ~150+); palette vars keep it in step with the active theme.
+function NeighborLegend() {
+  const { t } = useTranslation();
+  return (
+    <div className="mt-2.5">
+      <div className="text-[10px] text-text-dim uppercase tracking-wider mb-1">{t("map.observations")}</div>
+      <div
+        className="h-2 rounded-sm border border-border-subtle"
+        style={{ background: "linear-gradient(to right, var(--palette-danger) 0%, var(--palette-warn) 60%, var(--palette-green) 100%)" }}
+      />
+      <div className="relative h-3 mt-0.5 text-[9px] text-text-dim tabular-nums">
+        <span className="absolute left-0">1</span>
+        <span className="absolute -translate-x-1/2" style={{ left: "60%" }}>20</span>
+        <span className="absolute right-0">150+</span>
+      </div>
+      <div className="text-[9px] text-text-dim mt-1">{t("map.fainter")}</div>
+    </div>
+  );
+}
 
 interface MapSettingsPanelProps {
+  styleId: string;
+  onStyleChange: (id: string) => void;
   typeFilter: string;
   onTypeChange: (t: string) => void;
   clustered: boolean;
   onClusteredChange: (c: boolean) => void;
-  liveMode: boolean;
   neighborLines: NeighborLinesMode;
   onNeighborLinesChange: (mode: NeighborLinesMode) => void;
   borders: boolean;
   onBordersChange: (on: boolean) => void;
-  // MeshCore region token ("" = All); options combine the built-in catalogue and discovery.
-  meshcoreRegion: string;
-  onMeshcoreRegionChange: (token: string) => void;
-  children?: ReactNode;
+  // builds deep-link params for the current view, evaluated at copy time (reads the live camera)
+  buildShareParams: () => Record<string, string | null>;
 }
 
 export function MapSettingsPanel({
+  styleId,
+  onStyleChange,
   typeFilter,
   onTypeChange,
   clustered,
   onClusteredChange,
-  liveMode,
   neighborLines,
   onNeighborLinesChange,
   borders,
   onBordersChange,
-  meshcoreRegion,
-  onMeshcoreRegionChange,
-  children,
+  buildShareParams,
 }: MapSettingsPanelProps) {
   const { t } = useTranslation();
-  const panelId = useId();
-  const typeOptions = [{ value: '', label: t('common.all') }, ...NODE_TYPE_FILTER_OPTIONS];
-  const neighborOptions = [
-    { value: 'on', label: t('map.on') },
-    { value: 'selected', label: t('map.selected') },
-    { value: 'off', label: t('map.off') },
+  const isMobile = useIsMobile();
+  const on = { value: "on", label: t("map.on") };
+  const off = { value: "off", label: t("map.off") };
+  const typeOptions = [
+    { value: "", label: t("map.all") },
+    ...NODE_TYPE_FILTER_OPTIONS.map((o) => ({ value: o.value, label: t(`nodeTypes.${o.value}`, { defaultValue: o.label }) })),
   ];
-  // Built-in and discovered MeshCore regions, with confirmed-node counts.
-  const { data: meshcoreRegions } = useQuery(meshcoreRegionQueries.list());
-  const meshcoreOptions = (meshcoreRegions ?? [])
-    .map((region) => ({ value: region.token, label: `${region.token} · ${region.nodeCount}` }))
-    .filter((option) => option.value === meshcoreRegion || option.value !== '');
-  if (meshcoreRegion && !meshcoreOptions.some((option) => option.value === meshcoreRegion)) {
-    meshcoreOptions.push({ value: meshcoreRegion, label: meshcoreRegion });
-  }
-  // Start with the map visible on every visit; filter/layer preferences still live in MapView.
-  const [open, setOpen] = useState(false);
-  const filterCount = Number(Boolean(typeFilter)) + Number(Boolean(meshcoreRegion));
+  const neighborOptions = [on, { value: "selected", label: t("map.selected") }, off];
+  // collapsed by default on mobile (the card would cover the map); a saved preference still wins
+  const [open, setOpen] = useState(() => {
+    const stored = localStorage.getItem(OPEN_STORAGE_KEY);
+    return stored === null ? !isMobile : stored === "true";
+  });
+
+  const toggle = () => {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(OPEN_STORAGE_KEY, String(next));
+    } catch {
+      // private mode / quota — the toggle still works, just not persisted
+    }
+  };
 
   return (
-    <div
-      className={`relative flex min-h-0 max-h-full min-w-0 max-w-full flex-col bg-bg-raised border border-border rounded-md shadow-lg overflow-hidden font-mono ${open ? 'w-64' : 'w-fit'}`}
-    >
+    <div className="absolute top-3 left-3 z-10 w-60 max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg overflow-hidden font-mono">
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
-        aria-label={t('map.settings')}
+        onClick={toggle}
         aria-expanded={open}
-        aria-controls={panelId}
-        className="flex shrink-0 items-center justify-between gap-2 w-full px-3 py-2 text-size-11 text-text-muted hover:text-text-normal transition-colors cursor-pointer"
+        className="flex items-center justify-between w-full px-3 py-2 text-[11px] uppercase tracking-wider text-text-dim hover:text-text-normal transition-colors cursor-pointer"
       >
         <span className="flex items-center gap-1.5">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path
-              d="M2 4.5h7M2 11.5h4"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
+            <path d="M2 4.5h7M2 11.5h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
             <circle cx="12" cy="4.5" r="1.7" fill="currentColor" />
             <circle cx="9" cy="11.5" r="1.7" fill="currentColor" />
-            <path
-              d="M9 11.5h5M12 4.5h2"
-              stroke="currentColor"
-              strokeWidth="1.3"
-              strokeLinecap="round"
-            />
+            <path d="M9 11.5h5M12 4.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
-          {t('map.settings')}
+          {t("map.settings")}
         </span>
-        {filterCount > 0 && (
-          <span className="rounded-sm bg-primary/15 px-1 text-size-9 text-primary">
-            {filterCount}
-          </span>
-        )}
-        <span aria-hidden className="text-text-dim text-size-9">
-          {open ? '▾' : '▸'}
-        </span>
+        <span aria-hidden className="text-text-dim text-[9px]">{open ? "▾" : "▸"}</span>
       </button>
 
       {open && (
-        <div
-          id={panelId}
-          className="min-h-0 overflow-y-auto overscroll-contain border-t border-border-subtle"
-        >
-          <div className="space-y-2 px-3 py-2.5">
+        <div className="border-t border-border-subtle">
+          <Section title={t("map.tiles")} first>
+            <MapStyleSwitcher styleId={styleId} onChange={onStyleChange} className="w-full" />
+          </Section>
+          <Section title={t("map.nodeType")}>
             <SegmentedControl
               wrap
-              ariaLabel={t('map.nodeType')}
+              ariaLabel={t("map.nodeTypeLabel")}
               options={typeOptions}
               value={typeFilter}
               onChange={onTypeChange}
             />
-            <MeshCoreRegionPicker
-              counts
-              label={t('map.meshcoreRegion')}
-              options={meshcoreOptions}
-              selected={meshcoreRegion ? [meshcoreRegion] : []}
-              onChange={(values) => onMeshcoreRegionChange(values[0] ?? '')}
-              align="left"
-              fullWidth
-            />
-            {meshcoreRegion && (
-              <p className="text-size-10 text-text-dim">{t('map.meshcoreRegionHint')}</p>
-            )}
-          </div>
-          <div className="space-y-2 px-3 py-2.5 border-t border-border-subtle">
-            <label className="flex items-center justify-between gap-2 text-xs text-text-normal cursor-pointer">
-              {t('map.clustering')}
-              <input
-                type="checkbox"
-                role="switch"
-                checked={clustered && !liveMode}
-                disabled={liveMode}
-                onChange={(event) => onClusteredChange(event.target.checked)}
-                className="accent-primary disabled:opacity-40"
-              />
-            </label>
-            {liveMode && (
-              <p className="text-size-10 text-text-dim">{t('map.liveUnclusteredHint')}</p>
-            )}
-            <label className="flex items-center justify-between gap-2 text-xs text-text-normal cursor-pointer">
-              {t('map.iataBorders')}
-              <input
-                type="checkbox"
-                role="switch"
-                checked={borders}
-                onChange={(event) => onBordersChange(event.target.checked)}
-                className="accent-primary"
-              />
-            </label>
-          </div>
-          <div className="space-y-1.5 px-3 py-2.5 border-t border-border-subtle">
-            <div className="text-xs text-text-normal">{t('map.neighborLines')}</div>
+          </Section>
+          <Section title={t("map.clustering")}>
             <SegmentedControl
-              ariaLabel={t('map.neighborLines')}
+              ariaLabel={t("map.clustering")}
+              options={[on, off]}
+              value={clustered ? "on" : "off"}
+              onChange={(v) => onClusteredChange(v === "on")}
+              className="w-full"
+            />
+          </Section>
+          <Section title={t("map.neighborLines")}>
+            <SegmentedControl
+              ariaLabel={t("map.neighborLinesLabel")}
               options={neighborOptions}
               value={neighborLines}
               onChange={(v) => onNeighborLinesChange(v as NeighborLinesMode)}
               className="w-full"
             />
-            {liveMode && neighborLines !== 'off' && (
-              <p className="text-size-10 text-text-dim">{t('map.liveNeighborHint')}</p>
-            )}
+            {neighborLines === "selected" && <NeighborLegend />}
+          </Section>
+          <Section title={t("map.areaBorders")}>
+            <SegmentedControl
+              ariaLabel={t("map.areaBordersLabel")}
+              options={[on, off]}
+              value={borders ? "on" : "off"}
+              onChange={(v) => onBordersChange(v === "on")}
+              className="w-full"
+            />
+            {borders && <BorderLegend />}
+          </Section>
+          <div className="px-3 py-2.5 border-t border-border-subtle flex justify-end">
+            <CopyLinkButton
+              params={buildShareParams}
+              label={t("map.copyLink")}
+              ariaLabel={t("map.copyLinkLabel")}
+            />
           </div>
-          {children}
         </div>
       )}
     </div>

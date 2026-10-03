@@ -1,16 +1,16 @@
-// Page-load splash: animated Meshat radio mark over a themed backdrop, shown once
+// Page-load splash: pulsing BEACON wordmark over a themed backdrop, shown once
 // per browser session, then faded out and removed from the DOM. Set VITE_SKIP_SPLASH
 // to skip it entirely for a deployment.
 //
 // To remove the splash entirely: delete this file and remove its import +
 // <SplashScreen /> line from src/App.tsx. Nothing else references it.
 
-import { useState, useEffect } from 'react';
-import { MeshatSplashIcon } from './MeshatSplashIcon';
-import { APP_NAME, SKIP_SPLASH } from '../lib/constants';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect } from "react";
+import { useTranslation } from "react-i18next";
+import { BeaconLogo } from "./BeaconLogo";
+import { SKIP_SPLASH } from "../lib/constants";
 
-const SPLASH_KEY = 'meshat-splash-shown';
+const SPLASH_KEY = "beacon-splash-shown";
 const VISIBLE_MS = 2000;
 const FADE_MS = 400;
 
@@ -21,8 +21,8 @@ export function SplashScreen() {
   const [render, setRender] = useState(() => {
     if (SKIP_SPLASH) return false;
     try {
-      if (typeof sessionStorage === 'undefined') return false;
-      return sessionStorage.getItem(SPLASH_KEY) !== '1';
+      if (typeof sessionStorage === "undefined") return false;
+      return sessionStorage.getItem(SPLASH_KEY) !== "1";
     } catch {
       return false;
     }
@@ -32,7 +32,7 @@ export function SplashScreen() {
   useEffect(() => {
     if (!render) return;
     try {
-      sessionStorage.setItem(SPLASH_KEY, '1');
+      sessionStorage.setItem(SPLASH_KEY, "1");
     } catch {
       // sessionStorage may throw under privacy/quota limits — harmless here.
     }
@@ -50,17 +50,23 @@ export function SplashScreen() {
     <div
       aria-hidden="true"
       className={`fixed inset-0 z-[9999] flex items-center justify-center bg-bg-base transition-opacity duration-[400ms] ease-out ${
-        fading ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        fading ? "opacity-0 pointer-events-none" : "opacity-100"
       }`}
     >
-      <span className="inline-flex flex-col items-center gap-7">
-        <MeshatSplashIcon size={160} />
+      <span className="inline-flex flex-col items-center gap-7 text-primary">
+        <BeaconLogo size={160} pulse />
         <span className="inline-flex flex-col items-center gap-2.5">
-          <span className="font-sans text-text-bright text-5xl font-bold leading-none">
-            {APP_NAME}
+          <span
+            className="font-medium tracking-[0.3em] uppercase text-5xl leading-none pl-[0.3em]"
+            style={{ fontFamily: "'Chakra Petch', sans-serif" }}
+          >
+            BEACON
           </span>
-          <span className="font-display text-text-muted text-xs tracking-[0.12em]">
-            {t('app.tagline')}
+          <span
+            className="text-text-muted text-xs tracking-[0.12em]"
+            style={{ fontFamily: "'Chakra Petch', sans-serif" }}
+          >
+            {t("splash.tagline")}
           </span>
         </span>
       </span>

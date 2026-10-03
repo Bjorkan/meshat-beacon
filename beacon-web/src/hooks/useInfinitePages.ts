@@ -1,22 +1,11 @@
-import { useCallback, useEffect, useMemo } from 'react';
-import {
-  useInfiniteQuery,
-  keepPreviousData,
-  type UseInfiniteQueryOptions,
-  type InfiniteData,
-  type QueryKey,
-} from '@tanstack/react-query';
-import type { CursorPage } from '../types/api';
+import { useCallback, useEffect, useMemo } from "react";
+import { useInfiniteQuery, keepPreviousData, type QueryKey } from "@tanstack/react-query";
+import type { CursorPage } from "../types/api";
 
-interface UseInfinitePagesOptions<T, TPageParam = number | undefined> {
-  // centralized factory output (src/api/queries.ts) — key + fn + pagination mechanics in one object
-  options: UseInfiniteQueryOptions<
-    CursorPage<T>,
-    Error,
-    InfiniteData<CursorPage<T>>,
-    QueryKey,
-    TPageParam
-  >;
+interface UseInfinitePagesOptions<T, C> {
+  queryKey: QueryKey;
+  // fetch one page; cursor is the previous page's nextCursor (undefined for the first page)
+  queryFn: (cursor: C | undefined) => Promise<CursorPage<T, C>>;
   // stable id accessor for dedup — pass a module-level fn so the memo isn't rebuilt every render
   getId: (item: T) => string;
   // keep the prior key's rows on screen while a new key (e.g. a filter change) loads its first page
@@ -34,29 +23,17 @@ interface UseInfinitePagesOptions<T, TPageParam = number | undefined> {
 // load only the first page and pull the rest on demand via loadMore(). Loads once per key (staleTime
 // Infinity, no maxPages); dedupes by id because a non-unique cursor can repeat a row across a page
 // boundary. Shared by the map and the entity tables.
-export function useInfinitePages<T, TPageParam = number | undefined>({
-  options,
-  getId,
-  keepPrevious,
-  auto = true,
-  enabled = true,
-}: UseInfinitePagesOptions<T, TPageParam>) {
-  const {
-    data,
-    fetchNextPage,
-    hasNextPage,
-    isFetching,
-    isFetchingNextPage,
-    isError,
-    isFetchNextPageError,
-    isLoading,
-  } = useInfiniteQuery({
-    ...options,
-    // The factory's own enabled (e.g. the region-pending gate in queries.ts) must survive: this
-    // hook's flag can only narrow it, never widen a disabled factory back into fetching.
-    enabled: options.enabled !== false && enabled,
-    placeholderData: keepPrevious ? keepPreviousData : undefined,
-  });
+export function useInfinitePages<T, C = number>({ queryKey, queryFn, getId, keepPrevious, auto = true, enabled = true }: UseInfinitePagesOptions<T, C>) {
+  const { data, fetchNextPage, hasNextPage, isFetching, isFetchingNextPage, isError, isFetchNextPageError, isLoading } =
+    useInfiniteQuery({
+      queryKey,
+      queryFn: ({ pageParam }) => queryFn(pageParam as C | undefined),
+      getNextPageParam: (last) => last.nextCursor ?? undefined,
+      initialPageParam: undefined as C | undefined,
+      staleTime: Infinity,
+      enabled,
+      placeholderData: keepPrevious ? keepPreviousData : undefined,
+    });
 
   // Fetch the next page only when it's safe to: there's more, nothing in flight, and the last attempt
   // didn't fail. The error guard matters because a failed fetchNextPage adds no page, so hasNextPage
@@ -92,9 +69,6 @@ export function useInfinitePages<T, TPageParam = number | undefined>({
     isError: errored,
     isLoading,
     hasMore: hasNextPage && !errored,
-    // True only when the server has positively exhausted the cursor chain. Unlike hasMore, this
-    // stays false after a next-page error so callers never treat a partial result set as complete.
-    isComplete: hasNextPage === false,
     loadMore,
   };
 }

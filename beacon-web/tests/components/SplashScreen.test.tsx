@@ -1,25 +1,13 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { SplashScreen } from '../../src/components/SplashScreen';
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { SplashScreen } from "../../src/components/SplashScreen";
+import i18n from "../../src/i18n";
 
-describe('SplashScreen branding', () => {
-  beforeEach(() => {
+describe("SplashScreen", () => {
+  it("translates the tagline but keeps the brand", async () => {
     sessionStorage.clear();
-  });
-
-  it('uses the icon-only Meshat mark with outward radio waves', () => {
+    await i18n.changeLanguage("fr");
     render(<SplashScreen />);
-
-    expect(screen.getByTestId('meshat-splash-icon')).toBeInTheDocument();
-    expect(screen.getByTestId('meshat-radio-wave-inner')).toHaveClass('meshat-radio-wave-inner');
-    expect(screen.getByTestId('meshat-radio-wave-outer')).toHaveClass('meshat-radio-wave-outer');
-  });
-
-  it('calls the product Meshat.se and preserves its analyzer attribution', () => {
-    render(<SplashScreen />);
-
-    expect(screen.getByText('Meshat.se')).toBeInTheDocument();
-    expect(screen.getByText('MeshCore Network Analyzer')).toBeInTheDocument();
-    expect(screen.queryByText('BEACON')).toBeNull();
+    expect(screen.getByText("Analyseur de réseau MeshCore")).toBeInTheDocument();
   });
 });

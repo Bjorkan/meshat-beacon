@@ -32,9 +32,49 @@ export function resolveIatas(
   return [...set].sort();
 }
 
+// A selection of loaded regions with no member IATAs (and no picked IATAs) resolves like "all"; return
+// one of its slugs so callers can ask the server for that region instead of every IATA.
+export function emptyRegionSlug(
+  selection: RegionSelection,
+  regionIatas: ReadonlyMap<string, string[]>,
+): string | undefined {
+  if (isAllRegions(selection) || !selection.regions.every((slug) => regionIatas.has(slug))) return undefined;
+  return resolveIatas(selection, regionIatas) ? undefined : selection.regions[0];
+}
+
 // Stable query-key fragment for a resolved IATA list. "*" stands in for "all regions".
 export function regionKey(iatas: string[] | undefined): string {
-  return iatas && iatas.length > 0 ? iatas.join(',') : '*';
+  return iatas && iatas.length > 0 ? iatas.join(",") : "*";
+}
+
+function splitCsv(value: string | null): string[] {
+  if (!value) return [];
+  return value
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+// Read a selection from URL params. ?iata is a comma-separated IATA list, ?regions a slug list. A
+// legacy single ?region is folded in as an IATA so old shared links (?region=YVR) keep working.
+export function parseSelection(params: URLSearchParams): RegionSelection {
+  const regions = splitCsv(params.get("regions"));
+  const iatas = splitCsv(params.get("iata")).map((c) => c.toUpperCase());
+  const legacy = params.get("region")?.trim();
+  if (legacy) iatas.push(legacy.toUpperCase());
+  return { regions, iatas };
+}
+
+// Apply a selection onto a copy of the given params: set ?iata/?regions (or drop them when empty) and
+// always clear the legacy ?region. Unrelated params are left untouched.
+export function selectionToParams(selection: RegionSelection, base: URLSearchParams): URLSearchParams {
+  const next = new URLSearchParams(base);
+  if (selection.iatas.length > 0) next.set("iata", selection.iatas.join(","));
+  else next.delete("iata");
+  if (selection.regions.length > 0) next.set("regions", selection.regions.join(","));
+  else next.delete("regions");
+  next.delete("region");
+  return next;
 }
 
 export function serializeSelection(selection: RegionSelection): string {
@@ -50,8 +90,8 @@ export function deserializeSelection(raw: string | null): RegionSelection {
       parsed &&
       Array.isArray(parsed.regions) &&
       Array.isArray(parsed.iatas) &&
-      parsed.regions.every((r: unknown) => typeof r === 'string') &&
-      parsed.iatas.every((i: unknown) => typeof i === 'string')
+      parsed.regions.every((r: unknown) => typeof r === "string") &&
+      parsed.iatas.every((i: unknown) => typeof i === "string")
     ) {
       return { regions: parsed.regions, iatas: parsed.iatas };
     }
@@ -59,22 +99,4 @@ export function deserializeSelection(raw: string | null): RegionSelection {
     // fall through
   }
   return ALL_REGIONS;
-}
-
-// Normalize a selection against the configured root region: a stored selection containing only
-// the root slug means the same as the empty no-filter state (the root borrows the all-data
-// identity without converting it to a fixed IATA list), so collapse it for consistent display.
-export function normalizeSelection(
-  selection: RegionSelection,
-  rootSlug: string | null,
-): RegionSelection {
-  if (!rootSlug) return selection;
-  if (
-    selection.iatas.length === 0 &&
-    selection.regions.length === 1 &&
-    selection.regions[0] === rootSlug
-  ) {
-    return ALL_REGIONS;
-  }
-  return selection;
 }

@@ -1,13 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import {
-  intervalToMs,
-  airtimePctSeries,
-  latestAirtimePct,
-  fillActivity,
-  busyPct,
-  payloadBarItems,
-} from '../../../src/features/stats/transforms';
-import type { ActivityPoint, TelemetryPoint } from '../../../src/features/stats/types';
+import { describe, it, expect } from "vitest";
+import { intervalToMs, airtimePctSeries, latestAirtimePct, fillActivity, busyPct, payloadBarItems } from "../../../src/features/stats/transforms";
+import type { ActivityPoint, TelemetryPoint } from "../../../src/features/stats/types";
 
 const H = 3_600_000;
 
@@ -33,23 +26,23 @@ const activity = (t: number, p: Partial<ActivityPoint> = {}): ActivityPoint => (
   ...p,
 });
 
-describe('intervalToMs', () => {
-  it('parses the minute and hour intervals the server accepts', () => {
-    expect(intervalToMs('5m')).toBe(300_000);
-    expect(intervalToMs('15m')).toBe(900_000);
-    expect(intervalToMs('1h')).toBe(H);
-    expect(intervalToMs('6h')).toBe(6 * H);
-    expect(intervalToMs('24h')).toBe(24 * H);
+describe("intervalToMs", () => {
+  it("parses the minute and hour intervals the server accepts", () => {
+    expect(intervalToMs("5m")).toBe(300_000);
+    expect(intervalToMs("15m")).toBe(900_000);
+    expect(intervalToMs("1h")).toBe(H);
+    expect(intervalToMs("6h")).toBe(6 * H);
+    expect(intervalToMs("24h")).toBe(24 * H);
   });
 
-  it('is null for anything else', () => {
-    expect(intervalToMs('')).toBeNull();
-    expect(intervalToMs('1d')).toBeNull();
-    expect(intervalToMs('h')).toBeNull();
+  it("is null for anything else", () => {
+    expect(intervalToMs("")).toBeNull();
+    expect(intervalToMs("1d")).toBeNull();
+    expect(intervalToMs("h")).toBeNull();
   });
 });
 
-describe('airtimePctSeries', () => {
+describe("airtimePctSeries", () => {
   // raw points carry cumulative on-air seconds; the series is the increase as a percent of the
   // wall-clock gap between the two reports
   const raw = [
@@ -58,80 +51,49 @@ describe('airtimePctSeries', () => {
     point(3 * H, { airtimeRxSecs: 40, airtimeTxSecs: 76 }), // rx reset, tx +72 s over 2 h
   ];
 
-  it('divides each cumulative delta by the real gap to the previous report', () => {
-    expect(airtimePctSeries(raw, 'airtimeRxSecs', null)).toEqual([
-      [H, 1],
-      [3 * H, 0],
-    ]);
-    expect(airtimePctSeries(raw, 'airtimeTxSecs', null)).toEqual([
-      [H, 0],
-      [3 * H, 1],
-    ]);
+  it("divides each cumulative delta by the real gap to the previous report", () => {
+    expect(airtimePctSeries(raw, "airtimeRxSecs", null)).toEqual([[H, 1], [3 * H, 0]]);
+    expect(airtimePctSeries(raw, "airtimeTxSecs", null)).toEqual([[H, 0], [3 * H, 1]]);
   });
 
-  it('leaves a gap when either side of a delta is missing', () => {
-    const withHole = [
-      point(0, { airtimeRxSecs: 10 }),
-      point(H, { airtimeRxSecs: null }),
-      point(2 * H, { airtimeRxSecs: 82 }),
-    ];
-    expect(airtimePctSeries(withHole, 'airtimeRxSecs', null)).toEqual([
-      [H, null],
-      [2 * H, null],
-    ]);
+  it("leaves a gap when either side of a delta is missing", () => {
+    const withHole = [point(0, { airtimeRxSecs: 10 }), point(H, { airtimeRxSecs: null }), point(2 * H, { airtimeRxSecs: 82 })];
+    expect(airtimePctSeries(withHole, "airtimeRxSecs", null)).toEqual([[H, null], [2 * H, null]]);
   });
 
-  it('divides bucketed deltas by the bucket width', () => {
+  it("divides bucketed deltas by the bucket width", () => {
     const bucketed = [point(0, { airtimeRxSecs: 216 }), point(6 * H, { airtimeRxSecs: 1080 })];
-    expect(airtimePctSeries(bucketed, 'airtimeRxSecs', 6 * H)).toEqual([
-      [0, 1],
-      [6 * H, 5],
-    ]);
+    expect(airtimePctSeries(bucketed, "airtimeRxSecs", 6 * H)).toEqual([[0, 1], [6 * H, 5]]);
   });
 
-  it('rounds to three decimals so tooltips stay readable', () => {
+  it("rounds to three decimals so tooltips stay readable", () => {
     const pts = [point(0, { airtimeRxSecs: 0 }), point(H, { airtimeRxSecs: 1 })]; // 1 s / 3600 s
-    expect(airtimePctSeries(pts, 'airtimeRxSecs', null)).toEqual([[H, 0.028]]);
+    expect(airtimePctSeries(pts, "airtimeRxSecs", null)).toEqual([[H, 0.028]]);
   });
 });
 
-describe('latestAirtimePct', () => {
-  it('reports the last delta for raw points', () => {
-    const raw = [
-      point(0, { airtimeRxSecs: 10, airtimeTxSecs: 4 }),
-      point(H, { airtimeRxSecs: 46, airtimeTxSecs: 76 }),
-    ];
+describe("latestAirtimePct", () => {
+  it("reports the last delta for raw points", () => {
+    const raw = [point(0, { airtimeRxSecs: 10, airtimeTxSecs: 4 }), point(H, { airtimeRxSecs: 46, airtimeTxSecs: 76 })];
     expect(latestAirtimePct(raw, null)).toEqual({ rx: 1, tx: 2 });
   });
 
-  it('reports the last bucket for bucketed points', () => {
-    const bucketed = [
-      point(0, { airtimeRxSecs: 1, airtimeTxSecs: 1 }),
-      point(6 * H, { airtimeRxSecs: 216, airtimeTxSecs: 0 }),
-    ];
+  it("reports the last bucket for bucketed points", () => {
+    const bucketed = [point(0, { airtimeRxSecs: 1, airtimeTxSecs: 1 }), point(6 * H, { airtimeRxSecs: 216, airtimeTxSecs: 0 })];
     expect(latestAirtimePct(bucketed, 6 * H)).toEqual({ rx: 1, tx: 0 });
   });
 
-  it('is null when there is nothing to difference', () => {
+  it("is null when there is nothing to difference", () => {
     expect(latestAirtimePct([], null)).toEqual({ rx: null, tx: null });
-    expect(latestAirtimePct([point(0, { airtimeRxSecs: 10 })], null)).toEqual({
-      rx: null,
-      tx: null,
-    });
+    expect(latestAirtimePct([point(0, { airtimeRxSecs: 10 })], null)).toEqual({ rx: null, tx: null });
   });
 });
 
-describe('fillActivity', () => {
+describe("fillActivity", () => {
   const I = 900_000;
 
-  it('emits every bucket in the window, zero where the server sent nothing', () => {
-    const heard = activity(I, {
-      observations: 3,
-      airtimeMs: 1200,
-      snrAvg: 5.5,
-      snrMin: -2,
-      rssiAvg: -90,
-    });
+  it("emits every bucket in the window, zero where the server sent nothing", () => {
+    const heard = activity(I, { observations: 3, airtimeMs: 1200, snrAvg: 5.5, snrMin: -2, rssiAvg: -90 });
     const out = fillActivity([heard], I, { start: 0, end: 4 * I });
     expect(out.map((p) => p.t)).toEqual([0, I, 2 * I, 3 * I, 4 * I]);
     expect(out[1]).toEqual(heard);
@@ -139,48 +101,56 @@ describe('fillActivity', () => {
     expect(out[4]).toEqual(activity(4 * I));
   });
 
-  it('starts at the first complete bucket and ends at the one in progress', () => {
+  it("leaves hours neither the rollup nor the raw tail covered as gaps", () => {
+    const H = 3_600_000;
+    // rolled through hour 2, raw rows only from hour 5: hours 2-4 were never read
+    const out = fillActivity([activity(H, { observations: 4 })], H, { start: 0, end: 6 * H }, { rolledUntil: 2 * H, rawFrom: 5 * H });
+    expect(out.map((p) => p.observations)).toEqual([0, 4, null, null, null, 0, 0]);
+    expect(out[3]!.airtimeMs).toBeNull();
+  });
+
+  it("treats everything before the raw tail as a gap when nothing has been rolled yet", () => {
+    const H = 3_600_000;
+    const out = fillActivity([activity(4 * H, { observations: 2 })], H, { start: 0, end: 5 * H }, { rawFrom: 3 * H });
+    expect(out.map((p) => p.observations)).toEqual([null, null, null, 0, 2, 0]);
+  });
+
+  it("starts at the first complete bucket and ends at the one in progress", () => {
     // the server rounds the window start up to the next bucket, so a floored first bucket would be a fake zero
     const out = fillActivity([], I, { start: I + 1, end: 3 * I - 1 });
     expect(out.map((p) => p.t)).toEqual([2 * I]);
   });
 
-  it('keeps a server bucket newer than the window end rather than dropping it', () => {
+  it("keeps a server bucket newer than the window end rather than dropping it", () => {
     // a client clock behind the server must not hide the newest real bucket
-    const out = fillActivity([activity(3 * I, { observations: 2 })], I, {
-      start: 0,
-      end: 2 * I + 1,
-    });
+    const out = fillActivity([activity(3 * I, { observations: 2 })], I, { start: 0, end: 2 * I + 1 });
     expect(out.map((p) => p.t)).toEqual([0, I, 2 * I, 3 * I]);
     expect(out[3]!.observations).toBe(2);
   });
 
-  it('drops server points outside the window', () => {
+  it("drops server points outside the window", () => {
     const out = fillActivity([activity(9 * I, { observations: 1 })], I, { start: 0, end: 2 * I });
     expect(out.every((p) => p.observations === 0)).toBe(true);
   });
 });
 
-describe('busyPct', () => {
-  it('is the share of the bucket spent on air, to three decimals', () => {
+describe("busyPct", () => {
+  it("is the share of the bucket spent on air, to three decimals", () => {
     expect(busyPct(9_000, 900_000)).toBe(1);
     expect(busyPct(1_234, 900_000)).toBe(0.137);
   });
 
-  it('is null when the bucket could not be costed', () => {
+  it("is null when the bucket could not be costed", () => {
     expect(busyPct(null, 900_000)).toBeNull();
   });
 });
 
-describe('payloadBarItems', () => {
-  it('lowercases the type names and orders by count for the bar chart', () => {
+describe("payloadBarItems", () => {
+  it("lowercases the type names and orders by count for the bar chart", () => {
     const items = payloadBarItems([
-      { payloadType: 5, payloadTypeName: 'GRP_TXT', count: 3 },
-      { payloadType: 4, payloadTypeName: 'ADVERT', count: 9 },
+      { payloadType: 5, payloadTypeName: "GRP_TXT", count: 3 },
+      { payloadType: 4, payloadTypeName: "ADVERT", count: 9 },
     ]);
-    expect(items).toEqual([
-      { name: 'advert', value: 9 },
-      { name: 'grp_txt', value: 3 },
-    ]);
+    expect(items).toEqual([{ name: "advert", value: 9 }, { name: "grp_txt", value: 3 }]);
   });
 });

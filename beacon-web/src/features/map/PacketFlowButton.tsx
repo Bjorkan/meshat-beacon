@@ -1,24 +1,27 @@
+import { useTranslation } from "react-i18next";
+
 interface PacketFlowButtonProps {
   active: boolean;
   onToggle: () => void;
 }
 
-// Floating play/stop control for the live packet-flow animation. Off by default; when live it shows
-// a pulsing dot and accent styling. Bottom-center, clear of the corner map controls.
+// Floating play/stop control for the live packet-flow animation. Off by default; keeps an accent
+// border either way so it reads as a control, not decoration. Bottom-center, clear of the corner
+// map controls. Labelled "Live Map" to distinguish it from the header's LIVE websocket badge.
 export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
   const { t } = useTranslation();
-  const actionLabel = t(active ? 'map.stopFlow' : 'map.playFlow');
+  const label = active ? t("map.stopFlow") : t("map.playFlow");
   return (
     <button
       type="button"
       onClick={onToggle}
       aria-pressed={active}
-      aria-label={actionLabel}
-      title={actionLabel}
-      className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-md border shadow-lg font-mono text-size-11 transition-colors cursor-pointer ${
+      aria-label={label}
+      title={label}
+      className={`absolute bottom-4 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full border shadow-lg font-mono text-[11px] uppercase tracking-wider transition-colors cursor-pointer ${
         active
-          ? 'bg-primary/15 border-primary-dim text-text-bright'
-          : 'bg-bg-raised border-border text-text-dim hover:text-text-normal'
+          ? "bg-primary/15 border-primary text-text-bright"
+          : "bg-bg-raised border-primary-dim text-text-normal hover:text-text-bright hover:border-primary"
       }`}
     >
       {active ? (
@@ -31,8 +34,7 @@ export function PacketFlowButton({ active, onToggle }: PacketFlowButtonProps) {
           <path d="M2 1.5v7l6-3.5z" />
         </svg>
       )}
-      {t('map.liveTraffic')}
+      {t("map.liveMap")}
     </button>
   );
 }
-import { useTranslation } from 'react-i18next';

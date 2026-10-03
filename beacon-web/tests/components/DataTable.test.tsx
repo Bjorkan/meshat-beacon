@@ -1,13 +1,37 @@
-import { describe, expect, it, vi, afterEach } from 'vitest';
-import { Profiler } from 'react';
-import { act, render, fireEvent, screen, within } from '@testing-library/react';
-import { DataTable, type Column } from '../../src/components/DataTable';
+import { describe, expect, it, vi, afterEach } from "vitest";
+import { render, fireEvent, screen } from "@testing-library/react";
+import { DataTable, type Column } from "../../src/components/DataTable";
+
+it("keeps a stable column's default sort and focused button when its label changes", () => {
+  const data = [{ id: "a" }, { id: "b" }];
+  const translatedColumns = (header: string): Column<Row>[] => [{ id: "identity", header, cell: (r) => r.id, sortValue: (r) => r.id }];
+  const view = (header: string) => <DataTable columns={translatedColumns(header)} rows={data} rowKey={(r) => r.id} selectedKey={null} onSelect={() => {}} emptyLabel="none" defaultSort={{ id: "identity", direction: "desc" }} />;
+  const { container, rerender } = render(view("ID"));
+  const order = () => [...container.querySelectorAll("tbody tr")].map((r) => r.textContent);
+  expect(order()).toEqual(["b", "a"]);
+  const button = screen.getByRole("button", { name: /^ID\s*▼$/ });
+  button.focus();
+  rerender(view("Identifiant"));
+  expect(order()).toEqual(["b", "a"]);
+  expect(screen.getByRole("button", { name: /^Identifiant\s*▼$/ })).toBe(button);
+  expect(button).toHaveFocus();
+  fireEvent.click(button);
+  expect(order()).toEqual(["a", "b"]);
+});
+
+it("retains header-based default and user sorting for callers without column IDs", () => {
+  const { container } = render(<DataTable columns={[{ header: "ID", cell: (r: Row) => r.id, sortValue: (r) => r.id }]} rows={rows} rowKey={(r) => r.id} selectedKey={null} onSelect={() => {}} emptyLabel="none" defaultSort={{ header: "ID", direction: "desc" }} />);
+  const order = () => [...container.querySelectorAll("tbody tr")].map((r) => r.textContent);
+  expect(order()).toEqual(["b", "a"]);
+  fireEvent.click(screen.getByRole("button", { name: /^ID\s*▼$/ }));
+  expect(order()).toEqual(["a", "b"]);
+});
 
 interface Row {
   id: string;
 }
-const rows: Row[] = [{ id: 'a' }, { id: 'b' }];
-const columns: Column<Row>[] = [{ header: 'ID', cell: (r) => r.id }];
+const rows: Row[] = [{ id: "a" }, { id: "b" }];
+const columns: Column<Row>[] = [{ header: "ID", cell: (r) => r.id }];
 
 // Force the mobile media query to match so DataTable enters card mode.
 function setMobile(matches: boolean) {
@@ -28,17 +52,10 @@ afterEach(() => {
 });
 
 // jsdom does no layout, so the scroll metrics are stubbed onto the scroll container directly.
-function setScroll(
-  el: HTMLElement,
-  {
-    scrollTop,
-    clientHeight,
-    scrollHeight,
-  }: { scrollTop: number; clientHeight: number; scrollHeight: number },
-) {
-  Object.defineProperty(el, 'scrollTop', { value: scrollTop, configurable: true });
-  Object.defineProperty(el, 'clientHeight', { value: clientHeight, configurable: true });
-  Object.defineProperty(el, 'scrollHeight', { value: scrollHeight, configurable: true });
+function setScroll(el: HTMLElement, { scrollTop, clientHeight, scrollHeight }: { scrollTop: number; clientHeight: number; scrollHeight: number }) {
+  Object.defineProperty(el, "scrollTop", { value: scrollTop, configurable: true });
+  Object.defineProperty(el, "clientHeight", { value: clientHeight, configurable: true });
+  Object.defineProperty(el, "scrollHeight", { value: scrollHeight, configurable: true });
 }
 
 function renderTable(onEndReached?: () => void) {
@@ -53,11 +70,11 @@ function renderTable(onEndReached?: () => void) {
       onEndReached={onEndReached}
     />,
   );
-  return container.querySelector('.overflow-y-auto') as HTMLElement;
+  return container.querySelector(".overflow-y-auto") as HTMLElement;
 }
 
-describe('DataTable onEndReached', () => {
-  it('fires onEndReached when scrolled near the bottom', () => {
+describe("DataTable onEndReached", () => {
+  it("fires onEndReached when scrolled near the bottom", () => {
     const onEndReached = vi.fn();
     const scroller = renderTable(onEndReached);
     setScroll(scroller, { scrollTop: 400, clientHeight: 500, scrollHeight: 1000 }); // 100px from bottom
@@ -65,7 +82,7 @@ describe('DataTable onEndReached', () => {
     expect(onEndReached).toHaveBeenCalledTimes(1);
   });
 
-  it('does not fire onEndReached when far from the bottom', () => {
+  it("does not fire onEndReached when far from the bottom", () => {
     const onEndReached = vi.fn();
     const scroller = renderTable(onEndReached);
     setScroll(scroller, { scrollTop: 0, clientHeight: 500, scrollHeight: 1000 }); // 500px from bottom
@@ -74,51 +91,8 @@ describe('DataTable onEndReached', () => {
   });
 });
 
-// Pins the shared containment contract from issue #82: a desktop table wider than its container
-// scrolls inside the table's own region (both axes owned by one scroller) instead of leaking
-// horizontally to the page, and the sticky header stays inside that same scroll region.
-describe('DataTable horizontal containment', () => {
-  it('owns both overflow axes on one desktop scroll region with a sticky header inside it', () => {
-    const { container } = render(
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-      />,
-    );
-
-    const scroller = container.querySelector('.overflow-x-auto') as HTMLElement;
-    expect(scroller).not.toBeNull();
-    expect(scroller).toHaveClass('overflow-y-auto');
-    expect(scroller.querySelector('table')).not.toBeNull();
-    const header = scroller.querySelector('thead');
-    expect(header).not.toBeNull();
-    expect(header!.closest('.overflow-x-auto')).toBe(scroller);
-  });
-});
-
-describe('DataTable card mode', () => {
-  it('automatically renders labelled cards for a wide table on mobile', () => {
-    setMobile(true);
-    const { container } = render(
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-      />,
-    );
-    expect(container.querySelector('table')).toBeNull();
-    expect(screen.getAllByText('ID')).toHaveLength(2);
-    expect(screen.getByText('a')).toBeInTheDocument();
-  });
-
-  it('renders cards instead of a table when mobile and renderCard is provided', () => {
+describe("DataTable card mode", () => {
+  it("renders cards instead of a table when mobile and renderCard is provided", () => {
     setMobile(true);
     const { container } = render(
       <DataTable
@@ -131,12 +105,12 @@ describe('DataTable card mode', () => {
         renderCard={(r) => <span>card-{r.id}</span>}
       />,
     );
-    expect(container.querySelector('table')).toBeNull();
-    expect(screen.getByText('card-a')).toBeInTheDocument();
-    expect(screen.getByText('card-b')).toBeInTheDocument();
+    expect(container.querySelector("table")).toBeNull();
+    expect(screen.getByText("card-a")).toBeInTheDocument();
+    expect(screen.getByText("card-b")).toBeInTheDocument();
   });
 
-  it('still renders a table on desktop even with renderCard provided', () => {
+  it("still renders a table on desktop even with renderCard provided", () => {
     setMobile(false);
     const { container } = render(
       <DataTable
@@ -149,11 +123,11 @@ describe('DataTable card mode', () => {
         renderCard={(r) => <span>card-{r.id}</span>}
       />,
     );
-    expect(container.querySelector('table')).not.toBeNull();
-    expect(screen.queryByText('card-a')).toBeNull();
+    expect(container.querySelector("table")).not.toBeNull();
+    expect(screen.queryByText("card-a")).toBeNull();
   });
 
-  it('selects a card on click in card mode', () => {
+  it("selects a card on click in card mode", () => {
     setMobile(true);
     const onSelect = vi.fn();
     render(
@@ -167,11 +141,11 @@ describe('DataTable card mode', () => {
         renderCard={(r) => <span>card-{r.id}</span>}
       />,
     );
-    fireEvent.click(screen.getByText('card-a'));
-    expect(onSelect).toHaveBeenCalledWith('a');
+    fireEvent.click(screen.getByText("card-a"));
+    expect(onSelect).toHaveBeenCalledWith("a");
   });
 
-  it('still fires onEndReached in card mode', () => {
+  it("still fires onEndReached in card mode", () => {
     setMobile(true);
     const onEndReached = vi.fn();
     const { container } = render(
@@ -186,261 +160,9 @@ describe('DataTable card mode', () => {
         renderCard={(r) => <span>card-{r.id}</span>}
       />,
     );
-    const scroller = container.querySelector('.overflow-y-auto') as HTMLElement;
+    const scroller = container.querySelector(".overflow-y-auto") as HTMLElement;
     setScroll(scroller, { scrollTop: 400, clientHeight: 500, scrollHeight: 1000 });
     fireEvent.scroll(scroller);
     expect(onEndReached).toHaveBeenCalledTimes(1);
-  });
-
-  it('renders explicit mobile sort options and shares sort state with desktop', () => {
-    setMobile(true);
-    const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
-    const { container } = render(
-      <DataTable
-        columns={[{ header: 'ID', cell: (r: Row) => r.id, sortValue: (r: Row) => r.id }]}
-        rows={unsorted}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-        mobileSortOptions={[
-          { id: 'az', label: 'Name A–Z', sort: { columnId: 'ID', direction: 'asc' } },
-          { id: 'za', label: 'Name Z–A', sort: { columnId: 'ID', direction: 'desc' } },
-        ]}
-      />,
-    );
-
-    // explicit labels, no generic arrow chips
-    expect(screen.getByRole('button', { name: 'Name A–Z' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Name Z–A' })).toBeInTheDocument();
-    expect(screen.queryByText('▲')).toBeNull();
-    expect(screen.queryByText('▼')).toBeNull();
-
-    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
-      'b',
-      'a',
-    ]);
-    fireEvent.click(screen.getByRole('button', { name: 'Name A–Z' }));
-    expect(screen.getByRole('button', { name: 'Name A–Z' })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    );
-    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
-      'a',
-      'b',
-    ]);
-  });
-
-  it('shows no mobile sort bar when no explicit options are given', () => {
-    setMobile(true);
-    render(
-      <DataTable
-        columns={[{ header: 'ID', cell: (r: Row) => r.id, sortValue: (r: Row) => r.id }]}
-        rows={[{ id: 'b' }, { id: 'a' }]}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-      />,
-    );
-    // a new sortable desktop column must not create a mobile action by itself
-    expect(screen.queryByLabelText(/Sort/)).toBeNull();
-  });
-
-  it('keeps TanStack sorting available above the mobile cards', () => {
-    setMobile(true);
-    const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
-    const { container } = render(
-      <DataTable
-        columns={[{ header: 'ID', cell: (r: Row) => r.id, sortValue: (r: Row) => r.id }]}
-        rows={unsorted}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-        mobileSortOptions={[
-          { id: 'az', label: 'Name A–Z', sort: { columnId: 'ID', direction: 'asc' } },
-        ]}
-      />,
-    );
-
-    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
-      'b',
-      'a',
-    ]);
-    fireEvent.click(within(screen.getByLabelText(/Sort/)).getByRole('button', { name: /A–Z/ }));
-    expect([...container.querySelectorAll('dd')].map((cell) => cell.textContent)).toEqual([
-      'a',
-      'b',
-    ]);
-  });
-});
-
-describe('DataTable controlled sorting', () => {
-  const sortableColumns: Column<Row>[] = [
-    { header: 'ID', cell: (r) => r.id, sortValue: (r) => r.id },
-  ];
-
-  it('keeps server page order while a global sort is incomplete, then sorts the complete set', () => {
-    setMobile(false);
-    const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
-    const props = {
-      columns: sortableColumns,
-      rows: unsorted,
-      rowKey: (r: Row) => r.id,
-      selectedKey: null,
-      onSelect: () => {},
-      emptyLabel: 'none',
-      sort: { columnId: 'ID', direction: 'asc' as const },
-      onSortChange: () => {},
-    };
-    const { container, rerender } = render(<DataTable {...props} sortReady={false} />);
-
-    const cellText = () => [...container.querySelectorAll('tbody td')].map((td) => td.textContent);
-    expect(cellText()).toEqual(['b', 'a']);
-    expect(screen.getByRole('button', { name: /ID/ })).toHaveAttribute('aria-busy', 'true');
-
-    rerender(<DataTable {...props} sortReady />);
-    expect(cellText()).toEqual(['a', 'b']);
-    expect(screen.getByRole('button', { name: /ID/ })).not.toHaveAttribute('aria-busy');
-  });
-
-  it('keeps API order in server mode while preserving sortable header controls', () => {
-    setMobile(false);
-    const onSortChange = vi.fn();
-    const unsorted: Row[] = [{ id: 'b' }, { id: 'a' }];
-    const { container } = render(
-      <DataTable
-        columns={sortableColumns}
-        rows={unsorted}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-        sort={{ columnId: 'ID', direction: 'asc' }}
-        onSortChange={onSortChange}
-        sortMode="server"
-      />,
-    );
-
-    expect([...container.querySelectorAll('tbody td')].map((td) => td.textContent)).toEqual([
-      'b',
-      'a',
-    ]);
-    fireEvent.click(screen.getByRole('button', { name: /ID/ }));
-    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'ID', direction: 'desc' });
-  });
-
-  it('reports sort changes to a controlled caller instead of mutating local state', () => {
-    setMobile(false);
-    const onSortChange = vi.fn();
-    render(
-      <DataTable
-        columns={sortableColumns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-        sort={{ columnId: '', direction: 'asc' }}
-        onSortChange={onSortChange}
-      />,
-    );
-    fireEvent.click(screen.getByRole('button', { name: /ID/ }));
-    expect(onSortChange).toHaveBeenCalledWith({ columnId: 'ID', direction: 'asc' });
-  });
-});
-
-describe('DataTable hidden sort columns', () => {
-  it.each([false, true])('keeps sort-only values out of the layout (mobile=%s)', (mobile) => {
-    setMobile(mobile);
-    const { container } = render(
-      <DataTable
-        columns={[
-          { header: 'ID', cell: (r: Row) => r.id },
-          { header: '__rank', hidden: true, cell: () => null, sortValue: (r: Row) => r.id },
-        ]}
-        rows={rows}
-        rowKey={(r) => r.id}
-        selectedKey={null}
-        onSelect={() => {}}
-        emptyLabel="none"
-        defaultSort={{ columnId: '__rank', direction: 'desc' }}
-      />,
-    );
-    expect(screen.queryByText(/__rank/)).not.toBeInTheDocument();
-    const cells = container.querySelectorAll(mobile ? 'dd' : 'tbody td');
-    expect([...cells].map((cell) => cell.textContent)).toEqual(['b', 'a']);
-  });
-});
-
-describe('DataTable stable sort identity', () => {
-  it.each([false, true])('preserves sorting when display headers change (mobile=%s)', (mobile) => {
-    setMobile(mobile);
-    const props = {
-      rows,
-      rowKey: (r: Row) => r.id,
-      selectedKey: null,
-      onSelect: vi.fn(),
-      emptyLabel: 'none',
-      defaultSort: { columnId: 'identity', direction: 'desc' as const },
-      mobileSortOptions: [
-        { id: 'az', label: 'Name A–Z', sort: { columnId: 'identity', direction: 'asc' as const } },
-      ],
-    };
-    const cols = (header: string): Column<Row>[] => [
-      { id: 'identity', header, cell: (r) => r.id, sortValue: (r) => r.id },
-      { id: 'extra', header: 'Extra sortable column', cell: () => null, sortValue: (r) => r.id },
-    ];
-    const { container, rerender } = render(<DataTable {...props} columns={cols('Original')} />);
-    const order = () =>
-      [...container.querySelectorAll(mobile ? 'dd:nth-child(2)' : 'tbody tr td:first-child')]
-        .map((cell) => cell.textContent)
-        .filter(Boolean);
-    expect(order()).toEqual(['b', 'a']);
-    rerender(<DataTable {...props} columns={cols('Renamed')} />);
-    expect(order()).toEqual(['b', 'a']);
-    fireEvent.click(screen.getByRole('button', { name: mobile ? 'Name A–Z' : /Renamed/ }));
-    expect(order()).toEqual(['a', 'b']);
-    if (mobile) {
-      const options = within(screen.getByLabelText('Sort')).getAllByRole('button');
-      expect(options).toHaveLength(1);
-      expect(options[0]).toHaveAttribute('aria-pressed', 'true');
-    }
-  });
-});
-
-describe('DataTable loading transitions', () => {
-  it('settles after populated rows become undefined while the next filter loads', async () => {
-    let commits = 0;
-    const onRender = () => {
-      // Fail deterministically instead of letting a microtask reset loop hang the runner.
-      if (++commits > 20) throw new Error('DataTable entered an unbounded render loop');
-    };
-    function table(data: Row[] | undefined, isLoading = false) {
-      return (
-        <Profiler id="table" onRender={onRender}>
-          <DataTable
-            columns={columns}
-            rows={data}
-            rowKey={(row) => row.id}
-            selectedKey={null}
-            onSelect={() => {}}
-            emptyLabel="none"
-            isLoading={isLoading}
-            defaultSort={{ columnId: 'ID' }}
-          />
-        </Profiler>
-      );
-    }
-    const { rerender } = render(table(rows));
-    await act(async () => {});
-    rerender(table(undefined, true));
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    });
-    expect(commits).toBeLessThan(10);
-    rerender(table([{ id: 'filtered' }]));
-    expect(screen.getByText('filtered')).toBeInTheDocument();
   });
 });

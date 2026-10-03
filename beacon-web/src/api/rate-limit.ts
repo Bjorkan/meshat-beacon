@@ -1,4 +1,4 @@
-import { RATE_LIMIT_DEFAULT_MS, RATE_LIMIT_MAX_MS } from '../lib/constants';
+import { RATE_LIMIT_DEFAULT_MS, RATE_LIMIT_MAX_MS } from "../lib/constants";
 
 // Kept free of client.ts imports so tests that mock the client with partial factories stay valid.
 
@@ -22,63 +22,29 @@ export function parseRetryAfter(header: string | null): number | undefined {
 export function shouldRetryQuery(failureCount: number, error: unknown): boolean {
   if (failureCount >= 2) return false;
   const status = (error as { status?: unknown } | null)?.status;
-  if (typeof status === 'number' && status >= 400 && status < 500) return false;
+  if (typeof status === "number" && status >= 400 && status < 500) return false;
   return true;
 }
 
 // App-wide "the API is throttling us" flag: fed by the fetch wrapper, read by the header badge.
-// The absolute Retry-After deadline owns expiry — parallel requests complete out of order, so a
-// generic 2xx response can never prove an earlier backoff instruction no longer applies.
 
 let limitedUntil: number | null = null;
-let expiryTimer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
 
 function notify(): void {
   for (const listener of listeners) listener();
 }
 
-// Self-validating: only the deadline it was scheduled for may clear the state, so a stale timer
-// from an earlier window can never cancel a newer, longer backoff.
-function scheduleExpiry(): void {
-  if (expiryTimer) clearTimeout(expiryTimer);
-  expiryTimer = null;
-  if (limitedUntil === null) return;
-  const deadline = limitedUntil;
-  expiryTimer = setTimeout(
-    () => {
-      expiryTimer = null;
-      if (limitedUntil === deadline) {
-        limitedUntil = null;
-        notify();
-      }
-    },
-    Math.max(0, deadline - Date.now()),
-  );
-}
-
 export function noteRateLimited(retryAfterMs: number = RATE_LIMIT_DEFAULT_MS): void {
   const until = Date.now() + retryAfterMs;
   if (limitedUntil !== null && until <= limitedUntil) return;
   limitedUntil = until;
-  scheduleExpiry();
   notify();
 }
 
-// A 2xx cannot shorten an active server-directed backoff; it only clears state that has already
-// expired (as a fallback for a throttled expiry timer).
 export function noteRequestOk(): void {
-  if (limitedUntil === null || Date.now() < limitedUntil) return;
+  if (limitedUntil === null) return;
   limitedUntil = null;
-  scheduleExpiry();
-  notify();
-}
-
-// Test/diagnostic reset: unconditionally clears the deadline.
-export function resetRateLimit(): void {
-  if (limitedUntil === null && expiryTimer === null) return;
-  limitedUntil = null;
-  scheduleExpiry();
   notify();
 }
 

@@ -1,17 +1,15 @@
-import { useMemo } from 'react';
-import { useTheme } from '../../hooks/useTheme';
-import { nodeTypeColor as semanticNodeTypeColor } from '../node-type-colors';
+import { useMemo } from "react";
+import { useTheme } from "../../hooks/useTheme";
 
-// Data colors keep their meaning across themes, including monochrome brand palettes.
-// Axes, labels, surfaces and tooltips still follow the active theme. ECharts paints to canvas,
-// so useChartColors re-reads those CSS tokens whenever a palette is applied.
+// ECharts paints to a canvas and can't inherit our CSS variables, so we read the active palette's
+// resolved `--color-*` tokens (defined in index.css `@theme`, which always resolve — palette value or
+// fallback) and hand them to the option builders. `useChartColors()` re-reads whenever a palette is
+// applied (initial saved-theme load and every switch), so charts always match the active theme.
 
 export interface ChartColors {
   primary: string;
   primaryDim: string;
   secondary: string;
-  cyan: string;
-  orange: string;
   green: string;
   warn: string;
   danger: string;
@@ -24,7 +22,7 @@ export interface ChartColors {
   bgRaised: string;
   border: string;
   borderSubtle: string;
-  // Distinct categorical hues for donuts and multi-series charts.
+  // categorical palette for donuts / multi-series, derived from the theme so it stays on-brand.
   series: string[];
 }
 
@@ -36,19 +34,15 @@ type RGB = [number, number, number];
 
 function parseColor(c: string): RGB {
   const s = c.trim();
-  if (s.startsWith('#')) {
+  if (s.startsWith("#")) {
     let h = s.slice(1);
-    if (h.length === 3)
-      h = h
-        .split('')
-        .map((ch) => ch + ch)
-        .join('');
+    if (h.length === 3) h = h.split("").map((ch) => ch + ch).join("");
     const n = parseInt(h, 16);
     return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
   }
   const m = s.match(/rgba?\(([^)]+)\)/i);
   if (m && m[1]) {
-    const parts = m[1].split(',').map((p) => parseFloat(p) || 0);
+    const parts = m[1].split(",").map((p) => parseFloat(p) || 0);
     return [parts[0] ?? 0, parts[1] ?? 0, parts[2] ?? 0];
   }
   return [128, 128, 128];
@@ -68,26 +62,33 @@ export function blend(a: string, b: string, t = 0.5): string {
 
 export function readChartColors(): ChartColors {
   const c = {
-    primary: '#3B82F6', // received traffic / nodes
-    primaryDim: '#1D4ED8',
-    secondary: '#8B5CF6', // SNR / observers
-    cyan: '#0891B2', // RSSI / unique packets
-    orange: '#EA580C', // transmitted traffic / queues
-    green: '#16A34A', // battery / available samples / shared reception
-    warn: '#D97706', // noise / channel load
-    danger: '#EF4444', // errors
-    textBright: readVar('--color-text-bright') || '#FAFAFA',
-    textNormal: readVar('--color-text-normal') || '#A1A1AA',
-    textMuted: readVar('--color-text-muted') || '#73737B',
-    textDim: readVar('--color-text-dim') || '#5F5F65',
-    bgBase: readVar('--color-bg-base') || '#09090B',
-    bgSurface: readVar('--color-bg-surface') || '#111114',
-    bgRaised: readVar('--color-bg-raised') || '#1A1A1F',
-    border: readVar('--color-border') || '#27272A',
-    borderSubtle: readVar('--color-border-subtle') || '#1E1E22',
+    primary: readVar("--color-primary") || "#3B82F6",
+    primaryDim: readVar("--color-primary-dim") || "#1D4ED8",
+    secondary: readVar("--color-secondary") || "#A78BFA",
+    green: readVar("--color-green") || "#22C55E",
+    warn: readVar("--color-warn") || "#EAB308",
+    danger: readVar("--color-danger") || "#EF4444",
+    textBright: readVar("--color-text-bright") || "#FAFAFA",
+    textNormal: readVar("--color-text-normal") || "#A1A1AA",
+    textMuted: readVar("--color-text-muted") || "#73737B",
+    textDim: readVar("--color-text-dim") || "#5F5F65",
+    bgBase: readVar("--color-bg-base") || "#09090B",
+    bgSurface: readVar("--color-bg-surface") || "#111114",
+    bgRaised: readVar("--color-bg-raised") || "#1A1A1F",
+    border: readVar("--color-border") || "#27272A",
+    borderSubtle: readVar("--color-border-subtle") || "#1E1E22",
   };
-  // Do not derive categories from brand colors: primary, secondary and green can all be green.
-  const series = [c.primary, c.secondary, c.cyan, c.warn, c.green, c.orange, '#DB2777', '#64748B'];
+  // 8 categorical colors blended from the palette so any theme stays cohesive.
+  const series = [
+    c.primary,
+    c.green,
+    c.secondary,
+    c.warn,
+    c.danger,
+    c.primaryDim,
+    blend(c.primary, c.secondary),
+    blend(c.green, c.warn),
+  ];
   return { ...c, series };
 }
 
@@ -101,8 +102,14 @@ export function useChartColors(): ChartColors {
 
 // Per-device-type colour, shared by the Mesh "Node types" donut and the neighbour graph so the two
 // views stay in sync. Unknown types fall back to a dim primary.
-export function nodeTypeColor(typeName: string): string {
-  return semanticNodeTypeColor(typeName);
+export function nodeTypeColor(typeName: string, c: ChartColors): string {
+  switch (typeName) {
+    case "companion": return c.primary;
+    case "repeater": return c.green;
+    case "room_server": return c.secondary;
+    case "sensor": return c.warn;
+    default: return c.primaryDim;
+  }
 }
 
 // A reusable ECharts tooltip style block bound to the active palette.
@@ -112,6 +119,6 @@ export function tooltipStyle(c: ChartColors) {
     borderColor: c.border,
     borderWidth: 1,
     padding: [7, 11] as [number, number],
-    textStyle: { color: c.textBright, fontFamily: 'JetBrains Mono, monospace', fontSize: 11 },
+    textStyle: { color: c.textBright, fontFamily: "JetBrains Mono, monospace", fontSize: 11 },
   };
 }

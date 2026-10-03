@@ -6,39 +6,25 @@ before opening a PR.
 
 ---
 
-## Before you start
-
-**Open or comment on an issue before starting work.** This avoids duplicate
-effort and lets maintainers flag if something is already in progress or out of
-scope. For small bug fixes a brief comment is fine; for larger features please
-discuss the approach first.
-
-**One thing per PR.** Each pull request should cover one logical change — a bug
-fix, a new component, a refactor, a new test. PRs that touch many unrelated
-parts of the codebase are hard to review and hard to revert if something goes
-wrong.
-
-**No fully AI-generated contributions.** We welcome developers who use AI tools
-to assist their work, but PRs should reflect the author's own understanding and
-judgement. PRs that appear to be unreviewed AI output may be closed without
-further comment.
-
----
-
-## Branches
-
-- `main` — stable releases only, protected. Feature branches (`feat/*`,
-  `fix/*`) branch from `main` and target `main` via pull request.
-  (There is no `dev` branch in this monorepo; earlier revisions of this file
-  referenced one. Do not create it solely on the basis of stale docs.)
-
 ## Workflow
 
-1. Fork or create a branch from `main`
-2. Make your changes
-3. Run the checklist below
-4. Open a pull request against `main` with a clear description of what changed
-   and why, referencing any related issues
+Branches, the pull request flow, commit message format and the release process are the same
+for every Beacon repo and live in
+[beacon-docs/CONTRIBUTING.md](https://github.com/MeshCore-Beacon/beacon-docs/blob/main/CONTRIBUTING.md).
+In short: open or comment on an issue first, branch from `dev`, keep each PR to one change,
+write conventional commit messages, and open the PR against `dev`. Running this app against a
+local beacon-server is described there too.
+
+Before opening a PR here:
+
+```
+npm run build    # the real typecheck (tsc -b && vite build); must pass
+npm run lint     # eslint; no errors
+npm test         # vitest; all tests pass
+```
+
+`npm run build` is the only real typecheck. `tsc --noEmit` is a no-op because the root
+`tsconfig.json` has `files: []`.
 
 ---
 
@@ -52,39 +38,28 @@ npm run dev             # Vite dev server at http://localhost:5173
 
 beacon-web is the frontend for [beacon-server](https://github.com/MeshCore-Beacon/beacon-server),
 which is the source of truth for every API, packet, and WebSocket shape.
-Frontend types must mirror the server contract — read it before guessing a
+Frontend types must mirror the server contract; read it before guessing a
 payload shape.
-
----
-
-## Checklist before opening a PR
-
-```
-npm run build    # the real typecheck (tsc -b && vite build) — must pass
-npm run lint     # eslint — no errors
-npm test         # vitest — all tests pass
-```
-
-Note: `npm run build` is the only real typecheck. `tsc --noEmit` is a no-op
-because the root `tsconfig.json` has `files: []`.
 
 ---
 
 ## Code style
 
-- TypeScript strict — no `any` escape hatches without good reason
+- TypeScript strict; no `any` escape hatches without good reason
 - Follow the existing patterns in each feature before introducing new ones
 - Reuse existing components, hooks, and theme tokens rather than adding new ones
 - Keep components small and single-purpose
-- Comments state the non-obvious _why_ in one terse line; a wrong comment is
+- Comments state the non-obvious *why* in one terse line; a wrong comment is
   worse than none
-- See [.claude/CLAUDE.md](.claude/CLAUDE.md) for the full project conventions
 
 ---
 
 ## Tests
 
-- **Practice TDD for bugfixes and features** — write the failing test first,
+For UI text, follow the [translation guide](docs/translations.md). Add English
+catalog keys and translate display labels without changing route/data identifiers.
+
+- **Practice TDD for bugfixes and features**: write the failing test first,
   watch it fail, then implement.
 - Tests live in a top-level `tests/` tree that mirrors `src/` (e.g.
   `tests/lib/formatters.test.ts`, `tests/features/map/...`). Import source via
@@ -96,48 +71,21 @@ because the root `tsconfig.json` has `files: []`.
 
 ---
 
-## Browser layout tests
-
-From `beacon-web`, install the browsers once with `npx playwright install chromium firefox`, then
-run `npm run test:browser`. Playwright builds and previews production assets and supplies mocked
-API/WebSocket responses; no running backend is needed. The trace detail suite checks
-column alignment, path containment, compact containers, keyboard navigation and touch
-interaction. The 200-row filter suite runs in Chromium and Firefox and covers responsiveness,
-loading, history and scrolling. Screenshots, timing attachments and failure traces are
-written to `test-results/`. See [browser profiling](tests/browser/README.md) for the
-performance regression workflow.
-
-## Commit messages
-
-Use the conventional commits format:
-
-```
-feat(map): frame selection via fitBounds over member airports
-fix(packets): dedupe live and historical merge by packetHash
-refactor(hooks): collapse useWsStatus into useWsHandlers
-test(formatters): add coverage for coordinate display
-chore: bump tanstack/react-query
-docs: expand CONTRIBUTING.md
-```
-
-Scopes are optional but helpful. Common scopes mirror the feature folders:
-`packets`, `nodes`, `observers`, `channels`, `map`, `stats`.
-
----
-
 ## Project structure
 
 ```
 src/
-  api/          — typed REST client and WebSocket manager (singleton)
-  components/    — shared UI primitives (DataTable, DetailPanel, Badge, …)
-  features/      — one folder per domain: packets, nodes, observers, channels,
-                   map, stats — each with its components, types.ts, and hooks
-  hooks/         — shared hooks (useRegion, useTheme, useWsHandlers, …)
-  lib/           — constants, formatters, theme utilities
-  types/         — REST shapes (api.ts), enums (enums.ts), WS union (ws.ts)
-  App.tsx        — providers, routing, region watcher, WS init
-  main.tsx       — entry point
+  api/            typed REST client and WebSocket manager (singleton)
+  components/      shared UI primitives (DataTable, DetailPanel, Badge, …)
+  features/        one folder per domain (packets, nodes, observers, channels,
+                   map, routes, traces, stats), each with its components,
+                   types.ts, and hooks
+  hooks/           shared hooks (useRegion, useTheme, useWsHandlers, …)
+  i18n/            i18next setup and locale catalogs
+  lib/             constants, formatters, theme utilities
+  types/           REST shapes (api.ts), enums (enums.ts), WS union (ws.ts)
+  App.tsx          providers, routing, region watcher, WS init
+  main.tsx         entry point
 ```
 
 Key patterns to understand before contributing:
@@ -147,8 +95,9 @@ Key patterns to understand before contributing:
 - **Live + historical merge:** the WebSocket pushes into a capped live buffer;
   history comes from cursor-paginated `useInfiniteQuery`. A `useMemo` merges and
   dedupes by `packetHash`.
-- **Filters are client-side**, applied in a `useMemo` over the cached region
-  dataset — they are not part of the query key, so toggling is instant.
+- **Packet filters:** payload-type, route-type and scope filters go to the
+  server and into the query key, so paging covers the full filtered history.
+  The observer filter and hash/path search stay client-side in a `useMemo`.
 - **Payload rendering** switches on `parsedPayload.type` in
   `features/packets/payload-renderers.tsx`. When the server adds a payload type,
   add a matching renderer.
@@ -157,8 +106,11 @@ Key patterns to understand before contributing:
 
 ## Releases
 
-Merges from `dev` to `main` are done by maintainers and represent a versioned
-release. Do not open PRs directly against `main`.
+The flow is in
+[Releases and versioning](https://github.com/MeshCore-Beacon/beacon-docs/blob/main/docs/releases.md#cutting-a-release).
+The web-specific step is bumping `version` in `package.json`.
+
+---
 
 ## Recognition
 

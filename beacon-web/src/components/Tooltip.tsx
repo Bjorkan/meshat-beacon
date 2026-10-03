@@ -1,84 +1,82 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
-import * as TooltipPrimitive from '@radix-ui/react-tooltip';
-import * as Popover from '@radix-ui/react-popover';
-import { useHasHover } from '../hooks/useMediaQuery';
+import { useState, useRef, useEffect, useLayoutEffect, type MouseEvent as ReactMouseEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
+import { useHasHover } from "../hooks/useMediaQuery";
 
-const contentClass =
-  'z-50 whitespace-nowrap rounded border border-border bg-bg-raised px-2 py-1 font-mono text-size-11 text-text-normal shadow-lg';
-
-const SharedTooltipContext = createContext(false);
-
-export function TooltipProvider({ children }: { children: ReactNode }) {
-  return (
-    <SharedTooltipContext value={true}>
-      <TooltipPrimitive.Provider delayDuration={0} skipDelayDuration={0}>
-        {children}
-      </TooltipPrimitive.Provider>
-    </SharedTooltipContext>
-  );
-}
-
-interface TooltipProps {
-  label: ReactNode;
-  children: ReactNode;
-  className?: string;
-}
-
-export function Tooltip(props: TooltipProps) {
-  const shared = useContext(SharedTooltipContext);
-  // App shares one provider. Isolated consumers (tests/embeds) remain self-contained.
-  return shared ? (
-    <TooltipContent {...props} />
-  ) : (
-    <TooltipProvider>
-      <TooltipContent {...props} />
-    </TooltipProvider>
-  );
-}
-
-function TooltipContent({ label, children, className = '' }: TooltipProps) {
+// Portals to <body> with fixed positioning so overflow parents (the data tables) can't clip it.
+// Hover reveals with a mouse; on touch it toggles on tap and dismisses on an outside tap.
+export function Tooltip({ label, children, className = "", wrap = false }: { label: ReactNode; children: ReactNode; className?: string; wrap?: boolean }) {
   const hasHover = useHasHover();
-  const [touchOpen, setTouchOpen] = useState(false);
-  const trigger = <span className={`inline-flex whitespace-nowrap ${className}`}>{children}</span>;
+  const ref = useRef<HTMLSpanElement>(null);
+  const tipRef = useRef<HTMLSpanElement>(null);
+  const [anchor, setAnchor] = useState<DOMRect | null>(null);
+  const [pos, setPos] = useState<{ left: number; top: number }>({ left: 0, top: 0 });
 
-  // Touch has no hover state, so a Radix Popover preserves Beacon's tap-to-inspect behavior.
-  if (!hasHover) {
-    return (
-      <Popover.Root open={touchOpen} onOpenChange={setTouchOpen}>
-        <Popover.Trigger asChild onClick={(event) => event.stopPropagation()}>
-          {trigger}
-        </Popover.Trigger>
-        <Popover.Portal>
-          <Popover.Content
-            role="tooltip"
-            side="top"
-            sideOffset={6}
-            collisionPadding={6}
-            onPointerDownOutside={() => setTouchOpen(false)}
-            className={contentClass}
-          >
-            {label}
-            <Popover.Arrow className="fill-bg-raised" />
-          </Popover.Content>
-        </Popover.Portal>
-      </Popover.Root>
-    );
+  function show() {
+    const rect = ref.current?.getBoundingClientRect();
+    if (rect) setAnchor(rect);
+  }
+  const hide = () => setAnchor(null);
+
+  // touch: tap toggles; stopPropagation so a badge tap doesn't also hit the row/button it sits in
+  function toggle(e: ReactMouseEvent) {
+    e.stopPropagation();
+    setAnchor((a) => (a ? null : ref.current?.getBoundingClientRect() ?? null));
   }
 
+  // A fixed-position tip would detach from its target on scroll/resize, so close it rather than track.
+  useEffect(() => {
+    if (!anchor) return;
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [anchor]);
+
+  // touch: a tap outside the trigger dismisses the tip
+  useEffect(() => {
+    if (!anchor || hasHover) return;
+    function onDown(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setAnchor(null);
+    }
+    document.addEventListener("pointerdown", onDown, true);
+    return () => document.removeEventListener("pointerdown", onDown, true);
+  }, [anchor, hasHover]);
+
+  // Center above the target, then clamp on-screen and flip below if it would clip the top edge.
+  useLayoutEffect(() => {
+    if (!anchor || !tipRef.current) return;
+    const { offsetWidth: w, offsetHeight: h } = tipRef.current;
+    const m = 6;
+    const left = Math.min(Math.max(anchor.left + anchor.width / 2 - w / 2, m), window.innerWidth - w - m);
+    const above = anchor.top - m - h;
+    setPos({ left, top: above >= m ? above : anchor.bottom + m });
+  }, [anchor]);
+
   return (
-    <TooltipPrimitive.Root>
-      <TooltipPrimitive.Trigger asChild>{trigger}</TooltipPrimitive.Trigger>
-      <TooltipPrimitive.Portal>
-        <TooltipPrimitive.Content
-          side="top"
-          sideOffset={6}
-          collisionPadding={6}
-          className={contentClass}
-        >
-          {label}
-          <TooltipPrimitive.Arrow className="fill-bg-raised" />
-        </TooltipPrimitive.Content>
-      </TooltipPrimitive.Portal>
-    </TooltipPrimitive.Root>
+    <span
+      ref={ref}
+      onMouseEnter={hasHover ? show : undefined}
+      onMouseLeave={hasHover ? hide : undefined}
+      onClick={hasHover ? undefined : toggle}
+      onFocus={hasHover ? show : undefined}
+      onBlur={hasHover ? hide : undefined}
+      className={`inline-flex ${className}`}
+    >
+      {children}
+      {anchor &&
+        createPortal(
+          <span
+            ref={tipRef}
+            role="tooltip"
+            style={{ left: pos.left, top: pos.top }}
+            className={`fixed z-50 pointer-events-none ${wrap ? "max-w-xs whitespace-normal leading-relaxed" : "whitespace-nowrap"} rounded border border-border bg-bg-raised px-2 py-1 font-mono text-[11px] text-text-normal shadow-lg`}
+          >
+            {label}
+          </span>,
+          document.body,
+        )}
+    </span>
   );
 }

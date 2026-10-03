@@ -1,12 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
-import { useTranslation } from 'react-i18next';
-import * as Popover from '@radix-ui/react-popover';
-import { useHasHover } from '../hooks/useMediaQuery';
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 interface Option {
   value: string;
   label: string;
-  disabled?: boolean;
 }
 
 interface MultiSelectDropdownProps {
@@ -15,154 +13,160 @@ interface MultiSelectDropdownProps {
   selected: string[];
   onChange: (selected: string[]) => void;
   searchable?: boolean;
-  align?: 'left' | 'right';
-  fullWidth?: boolean;
+  align?: "left" | "right";
+  fullWidth?: boolean; // stretch + inline panel for the mobile filter sheet
 }
 
-export function MultiSelectDropdown({
-  label,
-  options,
-  selected,
-  onChange,
-  searchable,
-  align = 'left',
-  fullWidth = false,
-}: MultiSelectDropdownProps) {
+// checkbox dropdown with optional search filter
+
+export function MultiSelectDropdown({ label, options, selected, onChange, searchable, align = "left", fullWidth = false }: MultiSelectDropdownProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState('');
+  const [filter, setFilter] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
-  const hasHover = useHasHover();
+
   const showSearch = searchable ?? options.length > 6;
-  const count = selected.length;
+
+  const closeDropdown = useCallback(() => setOpen(false), []);
+  useClickOutside(ref, open, closeDropdown);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleKey(e: KeyboardEvent) {
+      if (e.key !== "Escape") return;
+      e.stopPropagation(); // the filter sheet listens on window; only the dropdown should close
+      setOpen(false);
+    }
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open]);
+
+  useEffect(() => {
+    if (open && showSearch) {
+      inputRef.current?.focus();
+    }
+  }, [open, showSearch]);
+
   const filtered = useMemo(() => {
-    const query = filter.toLowerCase();
-    return query ? options.filter((option) => option.label.toLowerCase().includes(query)) : options;
+    if (!filter) return options;
+    const q = filter.toLowerCase();
+    return options.filter((o) => o.label.toLowerCase().includes(q));
   }, [options, filter]);
 
+  const count = selected.length;
+
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={(next) => {
-        setOpen(next);
-        if (!next) setFilter('');
-      }}
-    >
-      <Popover.Trigger asChild>
-        <button
-          type="button"
-          className={`flex items-center gap-1.5 text-size-11 px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-primary ${
-            fullWidth ? 'w-full justify-between' : ''
-          } ${
-            count > 0
-              ? 'border-primary-dim bg-primary/6 text-primary'
-              : 'border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal'
-          }`}
-        >
-          {label}
-          <span
-            className={`text-size-9 px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? 'bg-primary/15' : 'invisible'}`}
-          >
-            {count || 0}
-          </span>
-          <span className="text-text-dim text-size-9">▾</span>
-        </button>
-      </Popover.Trigger>
-      <Popover.Portal>
-        <Popover.Content
-          align={align === 'right' ? 'end' : 'start'}
-          sideOffset={4}
-          collisionPadding={12}
-          onOpenAutoFocus={(event) => {
-            if (!showSearch) return;
-            event.preventDefault();
-            if (hasHover) inputRef.current?.focus();
-          }}
-          onEscapeKeyDown={(event) => {
-            if (!filter) return;
-            event.preventDefault();
-            setFilter('');
-          }}
-          className={`${fullWidth ? 'w-[var(--radix-popover-trigger-width)]' : 'w-52'} max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1 focus:outline-none`}
-        >
+    <div ref={ref} className={`relative ${fullWidth ? "w-full" : ""}`}>
+      <button
+        type="button"
+        className={`flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-sm border font-mono cursor-pointer transition-all ${
+          fullWidth ? "w-full justify-between" : ""
+        } ${
+          count > 0
+            ? "border-primary-dim bg-primary/6 text-primary"
+            : "border-border bg-bg-surface text-text-muted hover:border-text-dim hover:text-text-normal"
+        }`}
+        onClick={() => {
+          setOpen((prev) => {
+            if (prev) setFilter("");
+            return !prev;
+          });
+        }}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        {label}
+        <span className={`text-[9px] px-1 rounded-sm min-w-[1ch] text-center ${count > 0 ? "bg-primary/15" : "invisible"}`}>
+          {count || 0}
+        </span>
+        <span className="text-text-dim text-[9px]">{fullWidth && open ? "▴" : "▾"}</span>
+      </button>
+
+      {open && (
+        <div className={
+          fullWidth
+            ? "mt-1 w-full bg-bg-raised border border-border rounded-md py-1"
+            : `absolute top-full mt-1 w-52 ${align === "right" ? "right-0" : "left-0"} max-w-[calc(100vw-1.5rem)] bg-bg-raised border border-border rounded-md shadow-lg z-50 py-1`
+        }>
           {showSearch && (
             <div className="px-2 pb-1">
               <input
                 ref={inputRef}
                 type="text"
                 value={filter}
-                onChange={(event) => setFilter(event.target.value)}
-                placeholder={t('filters.filterPlaceholder')}
-                className="w-full text-size-11 font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={t("common.filterPlaceholder")}
+                className="w-full text-[11px] font-mono bg-bg-surface border border-border rounded px-2 py-1 text-text-bright placeholder:text-text-dim"
               />
             </div>
           )}
+
           <div className="flex items-center gap-1 px-2 py-1 border-b border-border-subtle mb-1">
             <button
               type="button"
-              className={
-                count === options.length
-                  ? 'text-primary text-size-11 font-mono'
-                  : 'text-text-muted hover:text-text-normal text-size-11 font-mono'
-              }
-              onClick={() =>
-                onChange(options.filter((option) => !option.disabled).map((option) => option.value))
-              }
+              className={`text-[11px] font-mono transition-colors ${
+                count === options.length ? "text-primary" : "text-text-muted hover:text-text-normal"
+              }`}
+              onClick={() => onChange(options.map((o) => o.value))}
             >
-              {t('common.all')}
+              {t("common.all")}
             </button>
-            <span className="text-border text-size-11">·</span>
+            <span className="text-border text-[11px]">·</span>
             <button
               type="button"
-              className={
-                count === 0
-                  ? 'text-primary text-size-11 font-mono'
-                  : 'text-text-muted hover:text-text-normal text-size-11 font-mono'
-              }
+              className={`text-[11px] font-mono transition-colors ${
+                count === 0 ? "text-primary" : "text-text-muted hover:text-text-normal"
+              }`}
               onClick={() => onChange([])}
             >
-              {t('common.none')}
+              {t("common.none")}
             </button>
           </div>
-          <div className="max-h-64 overflow-y-auto" aria-label={label}>
-            {filtered.map((option) => {
-              const checked = selected.includes(option.value);
+
+          <div className="max-h-64 overflow-y-auto" role="listbox" aria-multiselectable="true">
+            {filtered.map((opt) => {
+              const isSelected = selected.includes(opt.value);
               return (
-                <label
-                  key={option.value}
+                <button
+                  key={opt.value}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   className={`w-full flex items-center gap-2 px-2.5 py-1 text-left text-xs font-mono transition-colors ${
-                    option.disabled
-                      ? 'opacity-40'
-                      : checked
-                        ? 'text-text-bright bg-primary/10 cursor-pointer'
-                        : 'text-text-muted hover:text-text-normal hover:bg-text-normal/3 cursor-pointer'
+                    isSelected
+                      ? "text-text-bright bg-primary/10"
+                      : "text-text-muted hover:text-text-normal hover:bg-text-normal/3"
                   }`}
-                >
-                  <input
-                    type="checkbox"
-                    disabled={option.disabled}
-                    checked={checked}
-                    onChange={() =>
-                      onChange(
-                        checked
-                          ? selected.filter((value) => value !== option.value)
-                          : [...selected, option.value],
-                      )
+                  onClick={() => {
+                    if (isSelected) {
+                      onChange(selected.filter((v) => v !== opt.value));
+                    } else {
+                      onChange([...selected, opt.value]);
                     }
-                    className="accent-primary"
-                  />
-                  {option.label}
-                </label>
+                  }}
+                >
+                  <span className={`w-3 h-3 rounded-sm border flex items-center justify-center shrink-0 ${
+                    isSelected
+                      ? "border-primary bg-primary/20"
+                      : "border-border"
+                  }`}>
+                    {isSelected && (
+                      <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                        <path d="M1.5 4L3 5.5L6.5 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" className="text-primary" />
+                      </svg>
+                    )}
+                  </span>
+                  {opt.label}
+                </button>
               );
             })}
             {filtered.length === 0 && (
-              <div className="px-2.5 py-2 text-size-11 font-mono text-text-dim">
-                {t('common.noMatches')}
-              </div>
+              <div className="px-2.5 py-2 text-[11px] font-mono text-text-dim">{t("common.noMatches")}</div>
             )}
           </div>
-        </Popover.Content>
-      </Popover.Portal>
-    </Popover.Root>
+        </div>
+      )}
+    </div>
   );
 }

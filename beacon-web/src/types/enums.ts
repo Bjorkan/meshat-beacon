@@ -19,19 +19,19 @@ export const PayloadType = {
 export type PayloadTypeValue = (typeof PayloadType)[keyof typeof PayloadType];
 
 export const PAYLOAD_TYPE_NAMES: Record<PayloadTypeValue, string> = {
-  [PayloadType.REQUEST]: 'REQ',
-  [PayloadType.RESPONSE]: 'RESPONSE',
-  [PayloadType.TEXT]: 'TXT_MSG',
-  [PayloadType.ACK]: 'ACK',
-  [PayloadType.ADVERT]: 'ADVERT',
-  [PayloadType.GROUP_TEXT]: 'GRP_TXT',
-  [PayloadType.GROUP_DATA]: 'GRP_DATA',
-  [PayloadType.ANON_REQ]: 'ANON_REQ',
-  [PayloadType.PATH]: 'PATH',
-  [PayloadType.TRACE]: 'TRACE',
-  [PayloadType.MULTI_PART]: 'MULTI_PART',
-  [PayloadType.CONTROL]: 'CONTROL',
-  [PayloadType.CUSTOM]: 'CUSTOM',
+  [PayloadType.REQUEST]: "REQ",
+  [PayloadType.RESPONSE]: "RESPONSE",
+  [PayloadType.TEXT]: "TXT_MSG",
+  [PayloadType.ACK]: "ACK",
+  [PayloadType.ADVERT]: "ADVERT",
+  [PayloadType.GROUP_TEXT]: "GRP_TXT",
+  [PayloadType.GROUP_DATA]: "GRP_DATA",
+  [PayloadType.ANON_REQ]: "ANON_REQ",
+  [PayloadType.PATH]: "PATH",
+  [PayloadType.TRACE]: "TRACE",
+  [PayloadType.MULTI_PART]: "MULTI_PART",
+  [PayloadType.CONTROL]: "CONTROL",
+  [PayloadType.CUSTOM]: "CUSTOM",
 };
 
 // routing modes (header bits 1-0) and path confidence
@@ -45,19 +45,11 @@ export const RouteType = {
 
 export type RouteTypeValue = (typeof RouteType)[keyof typeof RouteType];
 
-// Short display names for the narrow packet-table Route column (the server sends
-// full names like TRANSPORT_FLOOD in routeTypeName, which ellipsizes at 5.75rem).
-export function shortRouteTypeName(name: string | undefined): string {
-  if (name === 'TRANSPORT_FLOOD') return 'T_FLOOD';
-  if (name === 'TRANSPORT_DIRECT') return 'T_DIRECT';
-  return name ?? '';
-}
-
 export const ROUTE_TYPE_NAMES: Record<RouteTypeValue, string> = {
-  [RouteType.TRANSPORT_FLOOD]: 'TRANSPORT_FLOOD',
-  [RouteType.FLOOD]: 'FLOOD',
-  [RouteType.DIRECT]: 'DIRECT',
-  [RouteType.TRANSPORT_DIRECT]: 'TRANSPORT_DIRECT',
+  [RouteType.TRANSPORT_FLOOD]: "TRANSPORT_FLOOD",
+  [RouteType.FLOOD]: "FLOOD",
+  [RouteType.DIRECT]: "DIRECT",
+  [RouteType.TRANSPORT_DIRECT]: "TRANSPORT_DIRECT",
 };
 
-export type PathConfidence = import('../api/generated/models').ResolvedHop['confidence'];
+export type PathConfidence = "high" | "ambiguous" | "none";

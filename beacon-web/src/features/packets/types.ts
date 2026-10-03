@@ -1,6 +1,6 @@
-import type { PayloadTypeValue, RouteTypeValue } from '../../types/enums';
+import type { PayloadTypeValue, RouteTypeValue } from "../../types/enums";
 
-export type SearchField = 'hash' | 'path' | 'payload';
+export type SearchField = "hash" | "path" | "payload";
 
 export interface PacketFilterState {
   payloadTypes: PayloadTypeValue[];
@@ -15,10 +15,7 @@ export interface PacketFilterState {
 export interface PacketServerFilter {
   payloadTypes?: number[];
   routeTypes?: number[];
-  observers?: string[];
   scopes?: string[];
-  search?: string;
-  searchField?: SearchField;
 }
 
 export const EMPTY_FILTERS: PacketFilterState = {
@@ -26,6 +23,6 @@ export const EMPTY_FILTERS: PacketFilterState = {
   routeTypes: [],
   observers: [],
   scopes: [],
-  search: '',
-  searchField: 'hash',
+  search: "",
+  searchField: "hash",
 };

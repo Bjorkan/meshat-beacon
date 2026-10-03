@@ -1,14 +1,9 @@
-import { SNR_STOPS } from './signal';
-
 // hex and time display helpers
+
+import i18n from "../i18n";
 
 export function formatHex(hex: string): string {
   return hex.slice(0, 8).toUpperCase();
-}
-
-// Compact node identity: the first three bytes, while callers retain the full key for diagnostics.
-export function formatNodePrefix(publicKey: string): string {
-  return publicKey.slice(0, 6).toUpperCase();
 }
 
 // The single absolute timestamp format used across the app: local YYYY-MM-DD HH:MM:SS (24h). Pass
@@ -16,46 +11,51 @@ export function formatNodePrefix(publicKey: string): string {
 // Rendered via the <Timestamp> component (relative text, this on hover) — see components/Timestamp.tsx.
 export function formatAbsolute(epochMs: number, opts?: { ms?: boolean }): string {
   const d = new Date(epochMs);
-  const pad = (n: number, len = 2) => String(n).padStart(len, '0');
+  const pad = (n: number, len = 2) => String(n).padStart(len, "0");
   const base =
     `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ` +
     `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
   return opts?.ms ? `${base}.${pad(d.getMilliseconds(), 3)}` : base;
 }
 
+// The UTC counterpart to formatAbsolute, for charts/tables anchored to server-side hour/minute
+// boundaries rather than the viewer's local time.
+export function formatUtc(epochMs: number, opts?: { seconds?: boolean; timeOnly?: boolean }): string {
+  const iso = new Date(epochMs).toISOString();
+  const date = iso.slice(0, 10), time = iso.slice(11, opts?.seconds ? 19 : 16);
+  return opts?.timeOnly ? time : `${date} ${time}`;
+}
+
 // signal quality and radio metric formatting
 
-export type SignalLevel = 'good' | 'mid' | 'bad';
+export type SignalLevel = "good" | "mid" | "bad";
 
 export const SIGNAL_LEVEL_CLASSES: Record<SignalLevel, string> = {
-  good: 'text-green',
-  mid: 'text-warn',
-  bad: 'text-danger',
+  good: "text-green",
+  mid: "text-warn",
+  bad: "text-danger",
 };
 
-// LoRa link-budget semantics (shared with the map's SNR_STOPS): usable signal lives
-// roughly between -20 and +10 dB, so the old >=5/>=10 cutoffs painted healthy
-// positive links red. Aligned: green >= 5, yellow >= -5, red below.
 export const SIGNAL_LEVEL_BORDER_CLASSES: Record<SignalLevel, string> = {
-  good: 'border-l-green',
-  mid: 'border-l-warn',
-  bad: 'border-l-danger',
+  good: "border-l-green",
+  mid: "border-l-warn",
+  bad: "border-l-danger",
 };
 
 export function snrLevel(snr: number | null | undefined): SignalLevel | null {
-  if (snr == null || !Number.isFinite(snr)) return null;
-  if (snr >= SNR_STOPS.green) return 'good';
-  if (snr >= SNR_STOPS.warn) return 'mid';
-  return 'bad';
+  if (snr == null) return null;
+  if (snr >= 10) return "good";
+  if (snr >= 5) return "mid";
+  return "bad";
 }
 
 export function formatSnr(snr: number | null | undefined): string {
-  if (snr == null) return '—';
+  if (snr == null) return "—";
   return snr.toFixed(2);
 }
 
 export function formatPropagation(ms: number | null | undefined): string {
-  if (ms == null) return '—';
+  if (ms == null) return "—";
   return `${(ms / 1000).toFixed(3)}s`;
 }
 
@@ -63,40 +63,25 @@ export function formatUptime(seconds: number): string {
   const d = Math.floor(seconds / 86400);
   const h = Math.floor((seconds % 86400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h ${m}m`;
-  if (h > 0) return `${h}h ${m}m`;
-  return `${m}m`;
+  const unit = (u: "d" | "h" | "m", count: number) => i18n.t(`timestamp.unit.${u}`, { count });
+  if (d > 0) return `${unit("d", d)} ${unit("h", h)} ${unit("m", m)}`;
+  if (h > 0) return `${unit("h", h)} ${unit("m", m)}`;
+  return unit("m", m);
 }
 
 // Signed device-clock drift for the node detail, e.g. "+42s ahead", "-1h 1m behind", "in sync".
 // formatUptime floors to whole minutes and is unsigned, so it can't render sub-minute drift.
 // +ve = device clock ahead of the server (matches clockDriftSeconds).
-// Beyond 90 days the reading is almost certainly a bad advert timestamp, not a real drift:
-// callers should treat it as invalid (see MAX_PLAUSIBLE_CLOCK_DRIFT_S).
-export const MAX_PLAUSIBLE_CLOCK_DRIFT_S = 90 * 86400;
-
-export function isPlausibleClockDrift(seconds: number): boolean {
-  return Number.isFinite(seconds) && Math.abs(seconds) <= MAX_PLAUSIBLE_CLOCK_DRIFT_S;
-}
-
-export function formatClockDrift(
-  seconds: number,
-  labels: { inSync: string; ahead: string; behind: string; invalid?: string } = {
-    inSync: 'in sync',
-    ahead: 'ahead',
-    behind: 'behind',
-  },
-): string {
-  if (!isPlausibleClockDrift(seconds)) return labels.invalid ?? '—';
+export function formatClockDrift(seconds: number, labels = { inSync: "in sync", ahead: "ahead", behind: "behind" }): string {
   if (seconds === 0) return labels.inSync;
   const dir = seconds > 0 ? labels.ahead : labels.behind;
-  const sign = seconds > 0 ? '+' : '-';
+  const sign = seconds > 0 ? "+" : "-";
   const s = Math.abs(seconds);
-  const d = Math.floor(s / 86400);
-  const h = Math.floor((s % 86400) / 3600);
+  const h = Math.floor(s / 3600);
   const m = Math.floor((s % 3600) / 60);
   const sec = s % 60;
-  const mag = d > 0 ? `${d}d ${h}h` : h > 0 ? `${h}h ${m}m` : m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  const unit = (u: "h" | "m" | "s", count: number) => i18n.t(`timestamp.unit.${u}`, { count });
+  const mag = h > 0 ? `${unit("h", h)} ${unit("m", m)}` : m > 0 ? `${unit("m", m)} ${unit("s", sec)}` : unit("s", sec);
   return `${sign}${mag} ${dir}`;
 }
 
@@ -106,45 +91,48 @@ export function formatBattery(volts: number): string {
 
 // Compact large counts for KPI/stat displays: 932 -> "932", 14732 -> "14.7k", 8_900_000 -> "8.9M".
 export function formatCount(n: number | null | undefined): string {
-  if (n == null) return '—';
+  if (n == null) return "—";
   if (Math.abs(n) < 1000) return String(n);
-  const fmt = (div: number, suffix: string) =>
-    `${(n / div).toFixed(1).replace(/\.0$/, '')}${suffix}`;
+  const fmt = (div: number, suffix: string) => `${(n / div).toFixed(1).replace(/\.0$/, "")}${suffix}`;
   // pick the unit from the rounded value so 999_999 rolls to "1M" instead of "1000k"
   const fits = (div: number) => Math.abs(Math.round((n / div) * 10)) < 10_000;
-  if (fits(1_000)) return fmt(1_000, 'k');
-  if (fits(1_000_000)) return fmt(1_000_000, 'M');
-  return fmt(1_000_000_000, 'B');
+  if (fits(1_000)) return fmt(1_000, "k");
+  if (fits(1_000_000)) return fmt(1_000_000, "M");
+  return fmt(1_000_000_000, "B");
 }
 
 // Average count per day over a window, e.g. 340 adverts across 7d -> "49/d". Sub-ten rates keep one
 // decimal so a handful of events over a long window doesn't round away to "0/d".
 export function formatRatePerDay(count: number | null | undefined, windowMs: number): string {
-  if (count == null || !Number.isFinite(count)) return '—';
+  if (count == null || !Number.isFinite(count)) return "—";
   const days = windowMs / 86_400_000;
   const rate = days > 0 ? count / days : 0;
   const shown = rate >= 10 ? formatCount(Math.round(rate)) : String(Math.round(rate * 10) / 10);
-  return `${shown}/d`;
+  return i18n.t("units.perDay", { value: shown });
 }
 
+export type TimeAgoUnit = "s" | "m" | "h" | "d";
+
 // clamp negative values from clock skew
-export function timeAgoMs(epochMs: number): string {
+export function timeAgoParts(epochMs: number): { count: number; unit: TimeAgoUnit } {
   const seconds = Math.max(0, Math.floor((Date.now() - epochMs) / 1000));
-  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 60) return { count: seconds, unit: "s" };
   const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m`;
+  if (minutes < 60) return { count: minutes, unit: "m" };
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  if (hours < 24) return { count: hours, unit: "h" };
+  return { count: Math.floor(hours / 24), unit: "d" };
+}
+
+// Compact English "7d" matching Timestamp's English relative phrasing; kept for tests that assert
+// against it, not used by app code (see timeAgoParts for the i18n path).
+export function timeAgoMs(epochMs: number): string {
+  const { count, unit } = timeAgoParts(epochMs);
+  return `${count}${unit}`;
 }
 
 // One radio config format for every panel ("915 MHz · SF11 · 250 kHz · CR 4/5"); unknown or zero parts drop out.
-export function formatRadioParts(r: {
-  freqMhz?: number | null;
-  sf?: number | null;
-  bwKhz?: number | null;
-  cr?: number | null;
-}): string | null {
+export function formatRadioParts(r: { freqMhz?: number | null; sf?: number | null; bwKhz?: number | null; cr?: number | null }): string | null {
   const known = (v: number | null | undefined): v is number => v != null && v > 0;
   const parts = [
     known(r.freqMhz) && `${r.freqMhz} MHz`,
@@ -152,31 +140,16 @@ export function formatRadioParts(r: {
     known(r.bwKhz) && `${r.bwKhz} kHz`,
     known(r.cr) && `CR 4/${r.cr}`,
   ].filter(Boolean) as string[];
-  return parts.length > 0 ? parts.join(' · ') : null;
+  return parts.length > 0 ? parts.join(" · ") : null;
 }
 
 // Node/observer summaries carry radio as a compact "freq,bw,sf" string (e.g. "915,250,11"); the
 // compact string carries no coding rate, so there's no "CR 4/x" segment.
 export function formatRadio(radio: string | null | undefined): string | null {
   if (!radio) return null;
-  const [freq, bw, sf] = radio.split(',');
+  const [freq, bw, sf] = radio.split(",");
   if (!freq || !bw || !sf) return radio; // unexpected shape — show it raw rather than hide it
-  const f = Number(freq),
-    b = Number(bw),
-    s = Number(sf);
+  const f = Number(freq), b = Number(bw), s = Number(sf);
   if (Number.isNaN(f) || Number.isNaN(b) || Number.isNaN(s)) return radio; // non-numeric — show raw, not "NaN MHz"
   return formatRadioParts({ freqMhz: f, sf: s, bwKhz: b });
-}
-
-// Radio cell label: the MeshCore suggested-settings title when the backend resolved one
-// (e.g. "EU/UK (Narrow)"), else the raw formatted triple. Keeps the raw params as the
-// tooltip title so diagnostics stay one hover away.
-export function formatRadioWithTitle(
-  radio: string | null | undefined,
-  radioTitle?: string | null,
-): { label: string; title?: string } | null {
-  const raw = formatRadio(radio);
-  if (raw == null) return null;
-  if (radioTitle) return { label: radioTitle, title: raw };
-  return { label: raw };
 }

@@ -1,21 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import {
-  nodesToFeatureCollection,
-  filterByNodeType,
-  buildNeighborEdges,
-  buildFocusedNeighborEdges,
-  buildFocusedNeighborPoints,
-  neighborRenderMode,
-} from '../../../src/features/map/node-geojson';
-import type { NodeSummary, NodeNeighbor } from '../../../src/features/nodes/types';
+import { describe, it, expect } from "vitest";
+import { nodesToFeatureCollection, filterByNodeType, buildNeighborEdges, neighborFocusIds, buildFocusedNeighborEdges } from "../../../src/features/map/node-geojson";
+import type { NodeSummary, NodeNeighbor } from "../../../src/features/nodes/types";
 
 function node(overrides: Partial<NodeSummary>): NodeSummary {
   return {
-    id: 'n1',
-    publicKey: 'pk',
+    id: "n1",
+    publicKey: "pk",
     nodeType: 1,
-    nodeTypeName: 'repeater',
-    name: 'Node 1',
+    nodeTypeName: "repeater",
+    name: "Node 1",
     lat: 45,
     lng: -75,
     iatas: [],
@@ -23,354 +16,232 @@ function node(overrides: Partial<NodeSummary>): NodeSummary {
   };
 }
 
-describe('nodesToFeatureCollection', () => {
-  it('returns an empty FeatureCollection for no nodes', () => {
+describe("nodesToFeatureCollection", () => {
+  it("returns an empty FeatureCollection for no nodes", () => {
     const fc = nodesToFeatureCollection([]);
-    expect(fc.type).toBe('FeatureCollection');
+    expect(fc.type).toBe("FeatureCollection");
     expect(fc.features).toEqual([]);
   });
 
-  it('maps a located node to a Point feature in [lng, lat] order', () => {
+  it("maps a located node to a Point feature in [lng, lat] order", () => {
     const fc = nodesToFeatureCollection([node({ lat: 45.3, lng: -75.6 })]);
     expect(fc.features).toHaveLength(1);
-    expect(fc.features[0]!.geometry).toEqual({ type: 'Point', coordinates: [-75.6, 45.3] });
+    expect(fc.features[0]!.geometry).toEqual({ type: "Point", coordinates: [-75.6, 45.3] });
   });
 
-  it('keeps whole-degree coordinates intact (the API sends decimal degrees, never microdegrees)', () => {
+  it("keeps whole-degree coordinates intact (the API sends decimal degrees, never microdegrees)", () => {
     const fc = nodesToFeatureCollection([node({ lat: 51, lng: -114 })]);
     expect(fc.features[0]!.geometry.coordinates).toEqual([-114, 51]);
   });
 
-  it('carries id/name/nodeTypeName/isObserver as feature properties', () => {
+  it("carries id/name/nodeTypeName/isObserver as feature properties", () => {
     const fc = nodesToFeatureCollection([
-      node({ id: 'abc', name: 'Relay A', nodeType: 2, nodeTypeName: 'sensor' }),
+      node({ id: "abc", name: "Relay A", nodeType: 2, nodeTypeName: "sensor" }),
     ]);
     expect(fc.features[0]!.properties).toEqual({
-      id: 'abc',
-      name: 'Relay A',
-      nodeTypeName: 'sensor',
+      id: "abc",
+      name: "Relay A",
+      nodeTypeName: "sensor",
       isObserver: false,
-      markerImage: 'node-pill:sensor:0:PK',
     });
   });
 
-  it('defaults isObserver to false and reflects it when set', () => {
+  it("defaults isObserver to false and reflects it when set", () => {
     const fc = nodesToFeatureCollection([
-      node({ id: 'plain' }),
-      node({ id: 'obs', isObserver: true }),
+      node({ id: "plain" }),
+      node({ id: "obs", isObserver: true }),
     ]);
     expect(fc.features[0]!.properties.isObserver).toBe(false);
     expect(fc.features[1]!.properties.isObserver).toBe(true);
   });
 
-  it('drops nodes missing lat or lng', () => {
+  it("drops nodes missing lat or lng", () => {
     const fc = nodesToFeatureCollection([
-      node({ id: 'a', lat: null, lng: -75 }),
-      node({ id: 'b', lat: 45, lng: null }),
-      node({ id: 'c', lat: 45, lng: -75 }),
+      node({ id: "a", lat: null, lng: -75 }),
+      node({ id: "b", lat: 45, lng: null }),
+      node({ id: "c", lat: 45, lng: -75 }),
     ]);
-    expect(fc.features.map((f) => f.properties.id)).toEqual(['c']);
+    expect(fc.features.map((f) => f.properties.id)).toEqual(["c"]);
   });
 
-  it('omits explicit 0/0 location resets', () => {
-    const fc = nodesToFeatureCollection([node({ id: 'z', lat: 0, lng: 0 })]);
-    expect(fc.features).toHaveLength(0);
+  it("omits location resets and unusable coordinates", () => {
+    const positions = [[0, 0], [-0, 0], [NaN, 10], [10, Infinity], [91, 20], [-91, 20], [10, 181], [10, -181]];
+    expect(nodesToFeatureCollection(positions.map(([lat, lng], i) => node({ id: String(i), lat, lng }))).features).toEqual([]);
   });
 
-  it('passes decimal coordinates through untouched (api/nodes.go sends *float64 degrees)', () => {
+  it("keeps valid equator, prime-meridian and boundary locations", () => {
+    const positions = [[0, -75], [45, 0], [90, 180], [-90, -180]];
+    const fc = nodesToFeatureCollection(positions.map(([lat, lng], i) => node({ id: String(i), lat, lng })));
+    expect(fc.features.map((f) => f.geometry.coordinates)).toEqual([[-75, 0], [0, 45], [180, 90], [-180, -90]]);
+  });
+
+  it("passes decimal coordinates through untouched (api/nodes.go sends *float64 degrees)", () => {
     const fc = nodesToFeatureCollection([node({ lat: 49.28, lng: -123.12 })]);
     expect(fc.features[0]!.geometry.coordinates).toEqual([-123.12, 49.28]);
   });
 });
 
-describe('buildNeighborEdges', () => {
-  const a = node({ id: 'a', lat: 45, lng: -75, neighborIds: ['b', 'c'] });
-  const b = node({ id: 'b', lat: 46, lng: -76, neighborIds: ['a'] });
-  const c = node({ id: 'c', lat: 47, lng: -77, neighborIds: ['a'] });
+describe("buildNeighborEdges", () => {
+  const a = node({ id: "a", lat: 45, lng: -75, neighborIds: ["b", "c"] });
+  const b = node({ id: "b", lat: 46, lng: -76, neighborIds: ["a"] });
+  const c = node({ id: "c", lat: 47, lng: -77, neighborIds: ["a"] });
 
-  it('emits one undirected edge per neighbor pair (a<->b counted once) in [lng, lat] order', () => {
-    const fc = buildNeighborEdges([a, b], 'on', null);
-    expect(fc.type).toBe('FeatureCollection');
+  it("emits one undirected edge per neighbor pair (a<->b counted once) in [lng, lat] order", () => {
+    const fc = buildNeighborEdges([a, b], "on", null);
+    expect(fc.type).toBe("FeatureCollection");
     expect(fc.features).toHaveLength(1);
     expect(fc.features[0]!.geometry).toEqual({
-      type: 'LineString',
-      coordinates: [
-        [-75, 45],
-        [-76, 46],
-      ],
+      type: "LineString",
+      coordinates: [[-75, 45], [-76, 46]],
     });
   });
 
-  it('skips neighbor ids absent from the set or without coordinates', () => {
-    const lonely = node({ id: 'a', lat: 45, lng: -75, neighborIds: ['ghost'] });
-    const noCoord = node({ id: 'b', lat: null, lng: null, neighborIds: ['a'] });
-    expect(buildNeighborEdges([lonely, noCoord], 'on', null).features).toEqual([]);
+  it("skips neighbor ids absent from the set or without coordinates", () => {
+    const lonely = node({ id: "a", lat: 45, lng: -75, neighborIds: ["ghost"] });
+    const noCoord = node({ id: "b", lat: null, lng: null, neighborIds: ["a"] });
+    expect(buildNeighborEdges([lonely, noCoord], "on", null).features).toEqual([]);
   });
 
   it("in 'selected' mode keeps only edges incident to the selected node", () => {
-    const fc = buildNeighborEdges([a, b, c], 'selected', 'b');
+    const fc = buildNeighborEdges([a, b, c], "selected", "b");
     expect(fc.features).toHaveLength(1); // only a<->b
     expect(fc.features[0]!.properties.selected).toBe(true);
   });
 
   it("in 'on' mode emits all edges and flags those incident to the selected node", () => {
-    const fc = buildNeighborEdges([a, b, c], 'on', 'b');
+    const fc = buildNeighborEdges([a, b, c], "on", "b");
     expect(fc.features).toHaveLength(2); // a<->b and a<->c
     expect(fc.features.filter((f) => f.properties.selected)).toHaveLength(1); // a<->b
   });
 
-  it('ignores a node that lists itself as a neighbor (no zero-length edge)', () => {
-    const selfRef = node({ id: 'a', lat: 45, lng: -75, neighborIds: ['a', 'b'] });
-    const fc = buildNeighborEdges([selfRef, b], 'on', null);
+  it("ignores a node that lists itself as a neighbor (no zero-length edge)", () => {
+    const selfRef = node({ id: "a", lat: 45, lng: -75, neighborIds: ["a", "b"] });
+    const fc = buildNeighborEdges([selfRef, b], "on", null);
     expect(fc.features).toHaveLength(1); // a<->b only, not a<->a
   });
 
-  it('carries bulk aggregate SNR onto ambient full-map edges, including zero', () => {
-    const withQuality = node({
-      id: 'a',
-      neighborIds: ['b'],
-      neighborLinks: [
-        { nodeId: 'b', snr: 0, snrSampleCount: 7, snrLastSeen: Date.now() - 86400000 },
-      ],
-    });
-    const fc = buildNeighborEdges([withQuality, b], 'on', null);
-    expect(fc.features[0]!.properties).toMatchObject({
-      snr: 0,
-      snrSampleCount: 7,
-    });
-    expect(fc.features[0]!.properties.ageDays).toBeGreaterThan(0.9);
-  });
-
-  it('leaves ambient edges without reliable samples unqualified for the blue fallback', () => {
-    const withoutQuality = node({
-      id: 'a',
-      neighborLinks: [{ nodeId: 'b', snrSampleCount: 0 }],
-    });
-    const fc = buildNeighborEdges([withoutQuality, b], 'on', null);
-    expect(fc.features[0]!.properties.snr).toBeUndefined();
-  });
-
-  it('combines reliable samples reported in both directions of an undirected edge', () => {
-    const forward = node({
-      id: 'a',
-      neighborLinks: [{ nodeId: 'b', snr: -10, snrSampleCount: 3, snrLastSeen: 1_000 }],
-    });
-    const reverse = node({
-      id: 'b',
-      neighborLinks: [{ nodeId: 'a', snr: 2, snrSampleCount: 1, snrLastSeen: 2_000 }],
-    });
-
-    const fc = buildNeighborEdges([forward, reverse], 'on', null);
-
-    expect(fc.features).toHaveLength(1);
-    expect(fc.features[0]!.properties.snr).toBe(-7);
-    expect(fc.features[0]!.properties.snrSampleCount).toBe(4);
+  it("omits both directions of neighbour edges to reset or invalid locations", () => {
+    const valid = node({ id: "a", neighborIds: ["reset", "invalid"] });
+    const reset = node({ id: "reset", lat: 0, lng: 0, neighborIds: ["a"] });
+    const invalid = node({ id: "invalid", lat: 91, lng: 10, neighborIds: ["a"] });
+    for (const mode of ["on", "selected"] as const) {
+      expect(buildNeighborEdges([valid, reset, invalid], mode, "a").features).toEqual([]);
+    }
+    expect(neighborFocusIds([valid, reset, invalid], "a")).toBeNull();
+    expect(neighborFocusIds([valid, reset, invalid], "reset")).toBeNull();
   });
 });
 
-describe('buildFocusedNeighborEdges', () => {
-  const DAY = 86400000;
-  const NOW = 1000 * DAY;
-  const sel = node({ id: 'a', lat: 45, lng: -75 });
-  function nb(o: Partial<NodeNeighbor>): NodeNeighbor {
-    return {
-      id: 'b',
-      publicKey: 'pk',
-      nodeType: 2,
-      nodeTypeName: 'repeater',
-      iata: 'YOW',
-      observationCount: 10,
-      firstSeen: 0,
-      lastSeen: NOW,
-      lat: 46,
-      lng: -76,
-      ...o,
-    };
-  }
+describe("neighborFocusIds", () => {
+  const a = node({ id: "a", lat: 45, lng: -75, neighborIds: ["b", "c"] });
+  const b = node({ id: "b", lat: 46, lng: -76, neighborIds: ["a"] });
+  const c = node({ id: "c", lat: 47, lng: -77, neighborIds: ["a"] });
 
-  it('omits SNR with zero reliable samples, including duplicate IATA rows', () => {
-    const edges = buildFocusedNeighborEdges(
-      sel,
-      [nb({ snr: 5, snrSampleCount: 0 }), nb({ snr: 0, snrSampleCount: 0 })],
-      NOW,
-    );
-    expect(edges.features[0]!.properties.snr).toBeUndefined();
-    expect(edges.features[0]!.properties.snrSampleCount).toBeUndefined();
-    const reliable = buildFocusedNeighborEdges(
-      sel,
-      [nb({ snr: 5, snrSampleCount: 0 }), nb({ snr: 0, snrSampleCount: 2 })],
-      NOW,
-    );
-    expect(reliable.features[0]!.properties.snr).toBe(0);
-    expect(reliable.features[0]!.properties.snrSampleCount).toBe(2);
+  const sorted = (ids: string[] | null) => (ids ? [...ids].sort() : ids);
+
+  it("returns null when nothing is selected", () => {
+    expect(neighborFocusIds([a, b, c], null)).toBeNull();
   });
 
-  it('returns empty when nothing is selected', () => {
+  it("includes the selected node and its located neighbors", () => {
+    expect(sorted(neighborFocusIds([a, b, c], "a"))).toEqual(["a", "b", "c"]);
+  });
+
+  it("treats neighbor links as undirected (a node listing the selection counts)", () => {
+    // b lists a; c does not list b, so only a<->b makes c irrelevant to b's focus set
+    expect(sorted(neighborFocusIds([a, b, c], "b"))).toEqual(["a", "b"]);
+  });
+
+  it("skips neighbor ids that are absent or unlocated", () => {
+    const noCoord = node({ id: "c", lat: null, lng: null, neighborIds: ["a"] });
+    expect(sorted(neighborFocusIds([a, b, noCoord], "a"))).toEqual(["a", "b"]);
+  });
+
+  it("returns null when the selected node is unlocated (no marker to keep lit)", () => {
+    const unlocated = node({ id: "a", lat: null, lng: null, neighborIds: ["b"] });
+    expect(neighborFocusIds([unlocated, b], "a")).toBeNull();
+  });
+
+  it("returns null when the selected node has no located neighbors", () => {
+    const lonely = node({ id: "x", lat: 45, lng: -75, neighborIds: ["ghost"] });
+    expect(neighborFocusIds([lonely, b], "x")).toBeNull();
+  });
+});
+
+describe("buildFocusedNeighborEdges", () => {
+  const DAY = 86400000;
+  const NOW = 1000 * DAY;
+  const sel = node({ id: "a", lat: 45, lng: -75 });
+  function nb(o: Partial<NodeNeighbor>): NodeNeighbor {
+    return { id: "b", publicKey: "pk", nodeType: 2, nodeTypeName: "repeater", iata: "YOW", observationCount: 10, firstSeen: 0, lastSeen: NOW, lat: 46, lng: -76, ...o };
+  }
+
+  it("returns empty when nothing is selected", () => {
     expect(buildFocusedNeighborEdges(null, [nb({})], NOW).features).toEqual([]);
   });
 
-  it('returns empty when the selected node has no coordinates', () => {
-    expect(
-      buildFocusedNeighborEdges(node({ id: 'a', lat: null, lng: null }), [nb({})], NOW).features,
-    ).toEqual([]);
+  it("returns empty when the selected node has no coordinates", () => {
+    expect(buildFocusedNeighborEdges(node({ id: "a", lat: null, lng: null }), [nb({})], NOW).features).toEqual([]);
   });
 
-  it('draws one edge selected->neighbor with obs, in [lng, lat] order', () => {
-    const fc = buildFocusedNeighborEdges(
-      sel,
-      [nb({ id: 'b', lat: 46, lng: -76, observationCount: 42, lastSeen: NOW })],
-      NOW,
-    );
+  it("draws one edge selected->neighbor with obs, in [lng, lat] order", () => {
+    const fc = buildFocusedNeighborEdges(sel, [nb({ id: "b", lat: 46, lng: -76, observationCount: 42, lastSeen: NOW })], NOW);
     expect(fc.features).toHaveLength(1);
-    expect(fc.features[0]!.geometry.coordinates).toEqual([
-      [-75, 45],
-      [-76, 46],
-    ]);
+    expect(fc.features[0]!.geometry.coordinates).toEqual([[-75, 45], [-76, 46]]);
     expect(fc.features[0]!.properties.obs).toBe(42);
-    expect(fc.features[0]!.properties.neighborId).toBe('b');
     expect(fc.features[0]!.properties.selected).toBe(true);
     expect(fc.features[0]!.properties.ageDays).toBe(0);
   });
 
-  it('computes ageDays from lastSeen relative to now', () => {
-    const fc = buildFocusedNeighborEdges(sel, [nb({ id: 'b', lastSeen: NOW - 3 * DAY })], NOW);
+  it("computes ageDays from lastSeen relative to now", () => {
+    const fc = buildFocusedNeighborEdges(sel, [nb({ id: "b", lastSeen: NOW - 3 * DAY })], NOW);
     expect(fc.features[0]!.properties.ageDays).toBeCloseTo(3);
   });
 
   it("aggregates a neighbor's per-iata rows: sums obs, keeps the freshest lastSeen", () => {
-    const fc = buildFocusedNeighborEdges(
-      sel,
-      [
-        nb({ id: 'b', iata: 'YOW', observationCount: 30, lastSeen: NOW - 5 * DAY }),
-        nb({ id: 'b', iata: 'YYZ', observationCount: 12, lastSeen: NOW - 1 * DAY }),
-      ],
-      NOW,
-    );
+    const fc = buildFocusedNeighborEdges(sel, [
+      nb({ id: "b", iata: "YOW", observationCount: 30, lastSeen: NOW - 5 * DAY }),
+      nb({ id: "b", iata: "YYZ", observationCount: 12, lastSeen: NOW - 1 * DAY }),
+    ], NOW);
     expect(fc.features).toHaveLength(1);
     expect(fc.features[0]!.properties.obs).toBe(42);
-    expect(fc.features[0]!.properties.neighborId).toBe('b');
     expect(fc.features[0]!.properties.ageDays).toBeCloseTo(1);
   });
 
-  it('skips neighbors without coordinates and any self-referential row', () => {
-    const fc = buildFocusedNeighborEdges(
-      sel,
-      [
-        nb({ id: 'b', lat: undefined, lng: undefined }),
-        nb({ id: 'a', lat: 45, lng: -75 }), // self — no zero-length edge
-        nb({ id: 'c', lat: 47, lng: -77, observationCount: 5 }),
-      ],
-      NOW,
-    );
+  it("skips neighbors without coordinates and any self-referential row", () => {
+    const fc = buildFocusedNeighborEdges(sel, [
+      nb({ id: "b", lat: undefined, lng: undefined }),
+      nb({ id: "a", lat: 45, lng: -75 }), // self — no zero-length edge
+      nb({ id: "c", lat: 47, lng: -77, observationCount: 5 }),
+    ], NOW);
     expect(fc.features.map((f) => f.properties.obs)).toEqual([5]);
   });
-});
 
-describe('buildFocusedNeighborPoints', () => {
-  it('deduplicates IATA rows, omits unlocated/self neighbors and keeps click identity', () => {
-    const points = buildFocusedNeighborPoints('selected', [
-      {
-        id: 'n1',
-        name: 'Neighbor',
-        publicKey: 'a',
-        nodeType: 2,
-        nodeTypeName: 'repeater',
-        lat: 57.7,
-        lng: 11.9,
-        iata: 'GOT',
-        observationCount: 1,
-        firstSeen: 0,
-        lastSeen: 1,
-      },
-      {
-        id: 'n1',
-        name: 'Neighbor',
-        publicKey: 'a',
-        nodeType: 2,
-        nodeTypeName: 'repeater',
-        lat: 57.7,
-        lng: 11.9,
-        iata: 'STO',
-        observationCount: 1,
-        firstSeen: 0,
-        lastSeen: 1,
-      },
-      {
-        id: 'selected',
-        name: 'Self',
-        publicKey: 'b',
-        nodeType: 2,
-        nodeTypeName: 'repeater',
-        lat: 57.7,
-        lng: 11.9,
-        iata: 'GOT',
-        observationCount: 1,
-        firstSeen: 0,
-        lastSeen: 1,
-      },
-      {
-        id: 'missing',
-        name: 'Missing',
-        publicKey: 'c',
-        nodeType: 2,
-        nodeTypeName: 'sensor',
-        iata: 'GOT',
-        observationCount: 1,
-        firstSeen: 0,
-        lastSeen: 1,
-      },
-    ]);
-    expect(points.features).toEqual([
-      {
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [11.9, 57.7] },
-        properties: { id: 'n1', name: 'Neighbor', nodeTypeName: 'repeater' },
-      },
-    ]);
+  it("omits reset and invalid locations from focused edges", () => {
+    const candidates = [nb({ id: "reset", lat: 0, lng: 0 }), nb({ id: "invalid", lat: 10, lng: Infinity }), nb({ id: "valid", lat: 0, lng: 15 })];
+    expect(buildFocusedNeighborEdges(sel, candidates, NOW).features.map((f) => f.geometry.coordinates)).toEqual([[[-75, 45], [15, 0]]]);
+    expect(buildFocusedNeighborEdges(node({ lat: 0, lng: 0 }), [nb({})], NOW).features).toEqual([]);
   });
 });
 
-describe('neighborRenderMode', () => {
-  it('shows the ambient mesh only for On without a selection in normal mode', () => {
-    expect(neighborRenderMode('on', null, false)).toBe('ambient');
-    expect(neighborRenderMode('selected', null, false)).toBe('off');
-    expect(neighborRenderMode('off', null, false)).toBe('off');
-  });
-
-  it('always focuses a selected node when neighbor lines are visible', () => {
-    expect(neighborRenderMode('on', 'n1', false)).toBe('focused');
-    expect(neighborRenderMode('selected', 'n1', false)).toBe('focused');
-    expect(neighborRenderMode('off', 'n1', false)).toBe('off');
-  });
-
-  it('suppresses ambient neighbor noise in Live but keeps selected-node inspection', () => {
-    expect(neighborRenderMode('on', null, true)).toBe('off');
-    expect(neighborRenderMode('selected', null, true)).toBe('off');
-    expect(neighborRenderMode('on', 'n1', true)).toBe('focused');
-  });
-});
-
-describe('filterByNodeType', () => {
+describe("filterByNodeType", () => {
   const fc = nodesToFeatureCollection([
-    node({ id: 'r1', nodeTypeName: 'repeater' }),
-    node({ id: 'c1', nodeTypeName: 'companion' }),
-    node({ id: 'r2', nodeTypeName: 'repeater' }),
+    node({ id: "r1", nodeTypeName: "repeater" }),
+    node({ id: "c1", nodeTypeName: "companion" }),
+    node({ id: "r2", nodeTypeName: "repeater" }),
   ]);
 
-  it('returns all features (same reference) for an empty type = All', () => {
-    expect(filterByNodeType(fc, '')).toBe(fc);
+  it("returns all features (same reference) for an empty type = All", () => {
+    expect(filterByNodeType(fc, "")).toBe(fc);
   });
 
-  it('keeps only features matching the given type', () => {
-    expect(filterByNodeType(fc, 'repeater').features.map((f) => f.properties.id)).toEqual([
-      'r1',
-      'r2',
-    ]);
+  it("keeps only features matching the given type", () => {
+    expect(filterByNodeType(fc, "repeater").features.map((f) => f.properties.id)).toEqual(["r1", "r2"]);
   });
 
-  it('returns an empty collection when nothing matches', () => {
-    const out = filterByNodeType(fc, 'sensor');
-    expect(out.type).toBe('FeatureCollection');
+  it("returns an empty collection when nothing matches", () => {
+    const out = filterByNodeType(fc, "sensor");
+    expect(out.type).toBe("FeatureCollection");
     expect(out.features).toEqual([]);
   });
 });

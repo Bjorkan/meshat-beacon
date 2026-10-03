@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
-import { ResolvedHopBlock } from '../../../src/features/packets/PathData';
-import type { ResolvedHop } from '../../../src/types/api';
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import { ResolvedHopBlock } from "../../../src/features/packets/PathData";
+import i18n from "../../../src/i18n";
+import type { ResolvedHop } from "../../../src/types/api";
 
 // mobile/touch == no hover-capable pointer; desktop == has hover. Interaction modality keys off
 // (hover: hover), not viewport width.
@@ -21,67 +22,90 @@ function setMobile(mobile: boolean) {
 afterEach(() => vi.restoreAllMocks());
 
 const singleHop: ResolvedHop = {
-  confidence: 'high',
-  nodes: [{ id: 'node-1', name: 'Repeater A', publicKey: 'deadbeefcafe' }],
+  confidence: "high",
+  nodes: [{ id: "node-1", name: "Repeater A", publicKey: "deadbeefcafe" }],
 };
 
-describe('ResolvedHopBlock per-hop SNR', () => {
-  it('shows the formatted SNR in the popover when the hop carries one', () => {
+describe("ResolvedHopBlock per-hop SNR", () => {
+  it("shows the formatted SNR in the popover when the hop carries one", () => {
     setMobile(true);
     render(<ResolvedHopBlock hop={{ ...singleHop, snr: 10.75 }} label="ABC1" />);
-    fireEvent.click(screen.getByText('Repeater A'));
+    fireEvent.click(screen.getByText("ABC1"));
     expect(screen.getByText(/SNR/)).toBeInTheDocument();
-    expect(screen.getByText('Hash ABC1')).toBeInTheDocument();
-    expect(screen.getByText('10.75')).toBeInTheDocument();
+    expect(screen.getByText("10.75")).toBeInTheDocument();
   });
 
-  it('shows no SNR line when the hop has none', () => {
+  it("shows no SNR line when the hop has none", () => {
     setMobile(true);
     render(<ResolvedHopBlock hop={singleHop} label="ABC1" />);
-    fireEvent.click(screen.getByText('Repeater A'));
+    fireEvent.click(screen.getByText("ABC1"));
     expect(screen.queryByText(/SNR/)).not.toBeInTheDocument();
   });
 });
 
-describe('ResolvedHopBlock (desktop)', () => {
-  it('opens the node directly when the single-match block is clicked', () => {
-    setMobile(false);
-    const onViewNode = vi.fn();
-    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
-    fireEvent.click(screen.getByText('Repeater A'));
-    expect(onViewNode).toHaveBeenCalledWith('node-1');
+describe("ResolvedHopBlock tooltip", () => {
+  it("relies on its popover rather than a native title", () => {
+    const { container } = render(<ResolvedHopBlock hop={singleHop} label="ABC1" />);
+    expect(container.querySelector("[title]")).toBeNull();
   });
 });
 
-describe('ResolvedHopBlock (mobile)', () => {
-  it('reveals the name popover on tap instead of navigating', () => {
+describe("ResolvedHopBlock unresolved popover", () => {
+  const noMatchHop: ResolvedHop = { confidence: "none", nodes: [] };
+
+  it("shows the same no-resolution message PacketEndpoints uses", () => {
+    setMobile(true);
+    render(<ResolvedHopBlock hop={noMatchHop} label="ABC1" />);
+    fireEvent.click(screen.getByText("ABC1"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("No path resolution available");
+  });
+
+  it("translates it to French", async () => {
+    setMobile(true);
+    await act(() => i18n.changeLanguage("fr"));
+    render(<ResolvedHopBlock hop={noMatchHop} label="ABC1" />);
+    fireEvent.click(screen.getByText("ABC1"));
+    expect(screen.getByRole("tooltip")).toHaveTextContent("Aucune résolution de chemin disponible");
+    await act(() => i18n.changeLanguage("en"));
+  });
+});
+
+describe("ResolvedHopBlock (desktop)", () => {
+  it("opens the node directly when the single-match block is clicked", () => {
+    setMobile(false);
+    const onViewNode = vi.fn();
+    render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
+    fireEvent.click(screen.getByText("ABC1"));
+    expect(onViewNode).toHaveBeenCalledWith("node-1");
+  });
+});
+
+describe("ResolvedHopBlock (mobile)", () => {
+  it("reveals the name popover on tap instead of navigating", () => {
     setMobile(true);
     const onViewNode = vi.fn();
     render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
 
-    fireEvent.click(screen.getByText('Repeater A'));
+    fireEvent.click(screen.getByText("ABC1"));
     // popover shows the resolved name, and we did NOT jump straight into the node
-    const popover = screen.getByRole('tooltip');
-    expect(within(popover).getByText('Repeater A')).toBeInTheDocument();
+    expect(screen.getByText("Repeater A")).toBeInTheDocument();
     expect(onViewNode).not.toHaveBeenCalled();
   });
 
-  it('opens the node when the name in the popover is tapped', () => {
+  it("opens the node when the name in the popover is tapped", () => {
     setMobile(true);
     const onViewNode = vi.fn();
     render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
 
-    fireEvent.click(screen.getByText('Repeater A'));
-    fireEvent.click(
-      within(screen.getByRole('tooltip')).getByRole('button', { name: 'Repeater A' }),
-    );
-    expect(onViewNode).toHaveBeenCalledWith('node-1');
+    fireEvent.click(screen.getByText("ABC1"));
+    fireEvent.click(screen.getByText("Repeater A"));
+    expect(onViewNode).toHaveBeenCalledWith("node-1");
   });
 
   // A touch device wider than the mobile breakpoint (a tablet, or Chrome's device emulation, which
   // reports no hover even at tablet widths) must still tap-to-toggle — not hover — so the popover
   // doesn't dismiss before the resolved name can be tapped. Modality keys off (hover: hover), not width.
-  it('taps to open on a hover-less device even at desktop width', () => {
+  it("taps to open on a hover-less device even at desktop width", () => {
     window.matchMedia = vi.fn().mockImplementation((query: string) => ({
       matches: false, // no hover, and not below the mobile width
       media: query,
@@ -95,28 +119,8 @@ describe('ResolvedHopBlock (mobile)', () => {
     const onViewNode = vi.fn();
     render(<ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />);
 
-    fireEvent.click(screen.getByText('Repeater A'));
-    expect(within(screen.getByRole('tooltip')).getByText('Repeater A')).toBeInTheDocument();
+    fireEvent.click(screen.getByText("ABC1"));
+    expect(screen.getByText("Repeater A")).toBeInTheDocument();
     expect(onViewNode).not.toHaveBeenCalled();
-  });
-});
-
-describe('ResolvedHopBlock inside a modal', () => {
-  it('keeps the interactive popover inside the dialog pointer and focus boundary', () => {
-    setMobile(true);
-    const onViewNode = vi.fn();
-    render(
-      <div role="dialog" aria-label="Analyzer">
-        <div className="overflow-hidden">
-          <ResolvedHopBlock hop={singleHop} label="ABC1" onViewNode={onViewNode} />
-        </div>
-      </div>,
-    );
-    fireEvent.click(screen.getByText('Repeater A'));
-    const dialog = screen.getByRole('dialog', { name: 'Analyzer' });
-    const popover = within(dialog).getByRole('tooltip');
-    expect(popover.parentElement).toBe(dialog);
-    fireEvent.click(within(popover).getByRole('button', { name: 'Repeater A' }));
-    expect(onViewNode).toHaveBeenCalledWith('node-1');
   });
 });

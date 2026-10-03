@@ -1,37 +1,36 @@
-import type { ResolvedHop } from '../../types/api';
-import { hasMapLocation } from './location';
+import type { ResolvedHop } from "../../types/api";
+import { hasMapLocation } from "./location";
 
 // Pure helpers for drawing a packet's path — the live flow animation (modelled on MeshMapper's
 // LiveViz) and the path map share them. No maplibre import, so they stay unit-testable; the hook
 // owns the layers, the rAF loop, and the node flashes.
 
-// The full chain for one observation: source → relay hops → destination. Both maps plot one marker
-// per hop, so an ambiguous endpoint (a 1-byte prefix matching several candidate nodes) would force
-// us to guess which node actually sent or received the packet — only plot endpoints the backend
-// resolved unambiguously. Relay hops carry no such gate; they fall back to their first located
-// candidate. WS types the endpoints nullable where REST leaves them optional, hence both here.
+// The full chain for one observation: source → relay hops → destination. An ambiguous endpoint
+// (a 1-byte prefix matching several candidate nodes) would force us to guess which node sent or
+// received the packet, so only plot endpoints the backend resolved unambiguously.
 export function packetChain(
   source: ResolvedHop | null | undefined,
   path: ResolvedHop[],
   destination: ResolvedHop | null | undefined,
 ): ResolvedHop[] {
-  const confident = (hop: ResolvedHop | null | undefined) =>
-    hop?.confidence === 'high' ? hop : undefined;
-  return [confident(source), ...path, confident(destination)].filter(
-    (hop): hop is ResolvedHop => hop != null,
-  );
+  const confident = (hop: ResolvedHop | null | undefined) => (hop?.confidence === "high" ? hop : undefined);
+  return [confident(source), ...path, confident(destination)].filter((hop): hop is ResolvedHop => hop != null);
 }
 
-// The located nodes on a packet's resolved path — first candidate per hop, deduped by id. The dot
-// rides these coords and flashes each node as it crosses.
-export function resolvedPathNodes(
-  resolvedPath: ResolvedHop[],
-): { id: string; lng: number; lat: number }[] {
+export function locatedHopNode(hop: ResolvedHop) {
+  if (hop.confidence !== "high" || hop.nodes.length !== 1) return undefined;
+  const node = hop.nodes[0]!;
+  return hasMapLocation({ lat: node.latitude, lng: node.longitude }) ? node : undefined;
+}
+
+// Animate only a completely located, unambiguous chain; skipping a hop would invent a link.
+export function resolvedPathNodes(resolvedPath: ResolvedHop[]): { id: string; lng: number; lat: number }[] {
   const seen = new Set<string>();
   const out: { id: string; lng: number; lat: number }[] = [];
   for (const hop of resolvedPath) {
-    const node = hop.nodes.find((n) => hasMapLocation({ lat: n.latitude, lng: n.longitude }));
-    if (node && !seen.has(node.id)) {
+    const node = locatedHopNode(hop);
+    if (!node) return [];
+    if (!seen.has(node.id)) {
       seen.add(node.id);
       out.push({ id: node.id, lng: node.longitude!, lat: node.latitude! });
     }
@@ -59,29 +58,4 @@ export function trailCoords(coords: [number, number][], headT: number): [number,
   for (let s = 0; s <= seg && s < coords.length; s++) out.push(coords[s]!);
   out.push(posAtHop(coords, headT));
   return out;
-}
-
-// Direct LoRa sanity cap, matching the backend's neighbor rule: a leg longer
-// than this is an MQTT interconnect stitching regions together, not a radio hop.
-export const MAX_HOP_KM = 150;
-
-// Great-circle distance between two [lng, lat] coordinates, in km.
-export function haversineKm(a: [number, number], b: [number, number]): number {
-  const rad = Math.PI / 180;
-  const phi1 = a[1] * rad;
-  const phi2 = b[1] * rad;
-  const dPhi = (b[1] - a[1]) * rad;
-  const dLambda = (b[0] - a[0]) * rad;
-  const h = Math.sin(dPhi / 2) ** 2 + Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
-  return 6371 * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
-}
-
-// A path is only worth drawing when every consecutive hop pair is within direct
-// LoRa range — one impossible leg means the packet teleported across a region
-// boundary via an MQTT interconnect, and the "path" isn't a radio path at all.
-export function pathWithinLoRaRange(coords: [number, number][]): boolean {
-  for (let i = 1; i < coords.length; i++) {
-    if (haversineKm(coords[i - 1]!, coords[i]!) > MAX_HOP_KM) return false;
-  }
-  return true;
 }

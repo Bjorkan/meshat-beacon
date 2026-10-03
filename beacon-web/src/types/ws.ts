@@ -1,46 +1,49 @@
-import type { ChannelMessage } from '../features/channels/types';
-import type { NodeIATA } from '../features/nodes/types';
-import type { PathLength, ResolvedHop } from './api';
+import type { ChannelMessage } from "../features/channels/types";
+import type { NodeIATA } from "../features/nodes/types";
+import type { PathLength, ResolvedHop } from "./api";
 
 // individual server-sent message shapes
 
 export interface WsHello {
   v: 1;
-  type: 'hello';
+  type: "hello";
   serverTime: number;
   connectionId: string;
 }
 
 export interface WsSubscribed {
   v: 1;
-  type: 'subscribed';
+  type: "subscribed";
   id: string;
   subscriptionId: string;
 }
 
 export interface WsUnsubscribed {
   v: 1;
-  type: 'unsubscribed';
+  type: "unsubscribed";
   id: string;
 }
 
 export interface WsPong {
   v: 1;
-  type: 'pong';
+  type: "pong";
   id: string;
 }
 
 export interface WsConfigured {
   v: 1;
-  type: 'configured';
+  type: "configured";
   id: string;
   resolvePath: boolean;
+  // echoed by servers that support these opt-ins; we never set them
+  includeObserverKey?: boolean;
+  includeRepeats?: boolean;
 }
 
 export interface WsPacketObservation {
   v: 1;
-  type: 'event';
-  event: 'packetObservation';
+  type: "event";
+  event: "packetObservation";
   data: {
     packetHash: string;
     packet: {
@@ -52,10 +55,13 @@ export interface WsPacketObservation {
       observationCount: number;
       scope?: string; // matched transport scope name; omitted when none matched
       summary?: string;
+      // later hearing over a new path, only sent to configure{includeRepeats}; observationCount is 0
+      isRepeat?: boolean;
     };
     observation: {
       observerId: string;
       observerName: string;
+      observerPublicKey?: string; // only with configure{includeObserverKey}
       iata: string;
       heardAt: number;
       rssi: number;
@@ -75,8 +81,8 @@ export interface WsPacketObservation {
 
 export interface WsObserverStatus {
   v: 1;
-  type: 'event';
-  event: 'observerStatus';
+  type: "event";
+  event: "observerStatus";
   data: {
     observerId: string;
     displayName: string;
@@ -93,8 +99,8 @@ export interface WsObserverStatus {
 
 export interface WsNodeUpdate {
   v: 1;
-  type: 'event';
-  event: 'nodeUpdate';
+  type: "event";
+  event: "nodeUpdate";
   data: {
     nodeId: string;
     publicKey: string;
@@ -104,9 +110,9 @@ export interface WsNodeUpdate {
     // Omitted leaves the prior verdict unchanged; null clears an unknown/reset position.
     possiblyForeign?: boolean | null;
     iata: string;
-    // decimal degrees, same as REST /nodes (api/nodes.go serializes *float64 degrees to both)
-    lat?: number;
-    lng?: number;
+    // decimal degrees as in REST /nodes; omitted keeps the prior position, null clears it (explicit 0/0 advert)
+    lat?: number | null;
+    lng?: number | null;
     isObserver: boolean;
     iatas: NodeIATA[];
     defaultScope?: string;
@@ -116,14 +122,14 @@ export interface WsNodeUpdate {
 
 export interface WsChannelMessage {
   v: 1;
-  type: 'event';
-  event: 'channelMessage';
+  type: "event";
+  event: "channelMessage";
   data: ChannelMessage;
 }
 
 export interface WsLagged {
   v: 1;
-  type: 'lagged';
+  type: "lagged";
   droppedCount: number;
   since: number;
   lastObservationId?: number; // declared in the protocol but not sent today
@@ -131,7 +137,7 @@ export interface WsLagged {
 
 export interface WsError {
   v: 1;
-  type: 'error';
+  type: "error";
   code: string;
   message: string;
 }
@@ -151,14 +157,15 @@ export type WsServerMessage =
   | WsLagged
   | WsError;
 
-// client-sent subscription filter. Only the dimensions the server enforces are advertised:
-// routeTypes/observerIds were never applied by the hub (a subscribed ack silently ignored
-// them) and are intentionally not part of the contract until implemented end-to-end.
+// client-sent subscription filter
+
 export interface SubscriptionFilter {
   iatas?: string[];
   regionIds?: string[];
   regionSlugs?: string[];
   payloadTypes?: number[];
+  routeTypes?: number[];
   channelHashes?: string[];
+  observerIds?: string[];
   events?: string[];
 }

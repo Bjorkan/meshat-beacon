@@ -1,19 +1,18 @@
-import { useTranslation } from 'react-i18next';
-import { useRef, useCallback, useLayoutEffect } from 'react';
-import { useVirtualizer } from '@tanstack/react-virtual';
-import type { PacketSummary } from '../../types/api';
-import { PacketTableHeader } from './PacketTableHeader';
-import { PacketTableRow } from './PacketTableRow';
-import { PacketRow } from './PacketRow';
-import { PacketExpansion } from './PacketExpansion';
-import { useFreshHashes } from './useFreshHashes';
-import { useIsMobile } from '../../hooks/useMediaQuery';
-import { GRID_MIN_WIDTH } from './packet-grid';
+import { useRef, useCallback, useLayoutEffect } from "react";
+import { useVirtualizer } from "@tanstack/react-virtual";
+import { useTranslation } from "react-i18next";
+import type { PacketSummary } from "../../types/api";
+import { PacketTableHeader } from "./PacketTableHeader";
+import { PacketTableRow } from "./PacketTableRow";
+import { PacketRow } from "./PacketRow";
+import { PacketExpansion } from "./PacketExpansion";
+import { useFreshHashes } from "./useFreshHashes";
+import { useIsMobile } from "../../hooks/useMediaQuery";
 import {
   SCROLL_TOP_THRESHOLD_PX,
   SCROLL_BOTTOM_THRESHOLD_PX,
   SCROLL_REVEAL_EPSILON_PX,
-} from '../../lib/constants';
+} from "../../lib/constants";
 
 interface PacketVirtualListProps {
   packets: PacketSummary[];
@@ -25,7 +24,7 @@ interface PacketVirtualListProps {
   expandedHash: string | null;
   onToggleExpand: (hash: string) => void;
   // only the expanded row renders an expansion, so these need no hash argument
-  onOpenAnalyzer: () => void;
+  onOpenAnalyzer: (observationId?: number) => void;
   onViewPath: () => void;
   selectedObservationId: number | null;
   onSelectObservation: (id: number) => void;
@@ -49,19 +48,15 @@ export function PacketVirtualList({
 }: PacketVirtualListProps) {
   const { t } = useTranslation();
   const parentRef = useRef<HTMLDivElement>(null);
-  const expansionRef = useRef<HTMLDivElement>(null);
-  const revealedHashRef = useRef<string | null>(null);
   const freshHashes = useFreshHashes(packets);
   const isMobile = useIsMobile();
   const atTopRef = useRef(true);
   const prevFirstKeyRef = useRef<string | undefined>(packets[0]?.packetHash);
 
-  // React Compiler deliberately skips components using TanStack Virtual's imperative API.
-  // eslint-disable-next-line react-hooks/incompatible-library
   const virtualizer = useVirtualizer({
     count: packets.length,
     getScrollElement: () => parentRef.current,
-    // a collapsed row: one grid line on desktop, a taller card below lg. Expanded rows are remeasured.
+    // a collapsed row: one grid line on desktop, a taller card below md. Expanded rows are remeasured.
     estimateSize: () => (isMobile ? 64 : 37),
     overscan: 10,
     getItemKey: (index) => packets[index]?.packetHash ?? index,
@@ -95,121 +90,72 @@ export function PacketVirtualList({
     const firstChanged = firstKey !== prevFirstKeyRef.current;
     prevFirstKeyRef.current = firstKey;
     if (firstChanged && atTopRef.current) {
-      virtualizer.scrollToIndex(0, { align: 'start' });
+      virtualizer.scrollToIndex(0, { align: "start" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fires on packet-list change; virtualizer is stable
   }, [packets]);
 
-  // Reveal the first useful portion once, after the expanded virtual row has been measured.
-  // Scroll only this list (the shell already excludes bottom navigation), and never follow
-  // subsequent telemetry updates or force an already-visible expansion to the top.
-  useLayoutEffect(() => {
-    if (!expandedHash) {
-      revealedHashRef.current = null;
-      return;
-    }
-    if (!isMobile || revealedHashRef.current === expandedHash) return;
-    const parent = parentRef.current;
-    const expansion = expansionRef.current;
-    if (!parent || !expansion) return;
-    const viewport = parent.getBoundingClientRect();
-    const detail = expansion.getBoundingClientRect();
-    if (viewport.height === 0 || detail.height === 0) return;
-    revealedHashRef.current = expandedHash;
-    const preview = Math.min(detail.height, 192, viewport.height);
-    const delta =
-      detail.top < viewport.top
-        ? detail.top - viewport.top
-        : Math.max(0, detail.top + preview - viewport.bottom);
-    if (delta !== 0) {
-      parent.scrollTop += delta;
-      handleScroll();
-    }
-  });
-
   return (
     <div
       ref={parentRef}
-      className={`flex-1 overflow-y-auto pb-10${isMobile ? ' px-4' : ' overflow-x-auto'}`}
+      className="flex-1 overflow-y-auto px-4 pb-10"
       onScroll={handleScroll}
     >
-      {/* Desktop grids own their horizontal overflow here: the wrapper holds the header and the
-          virtualized rows at the grid's real minimum width so a narrowed container scrolls this
-          region instead of clipping columns or widening the page. One wrapper (not separate
-          header/body scrollers) keeps the sticky header and rows aligned while scrolled.
-          The scroll region itself stays edge-to-edge (no dead gutter — see #76); the deliberate
-          content gutter lives inside header/rows via PACKET_TABLE_X_PADDING, matching the
-          toolbar above, so backgrounds and separators terminate at the true surface edge. */}
+      <PacketTableHeader />
       <div
-        className={isMobile ? undefined : 'min-w-(--packet-grid-min-width)'}
-        style={
-          isMobile
-            ? undefined
-            : ({ '--packet-grid-min-width': GRID_MIN_WIDTH } as React.CSSProperties)
-        }
+        style={{ height: virtualizer.getTotalSize(), position: "relative" }}
       >
-        <PacketTableHeader />
-        <div
-          className="relative h-(--packet-list-height)"
-          style={
-            {
-              '--packet-list-height': `${virtualizer.getTotalSize()}px`,
-            } as React.CSSProperties
-          }
-        >
-          {virtualizer.getVirtualItems().map((virtualRow) => {
-            const packet = packets[virtualRow.index];
-            if (!packet) return null;
-            const expanded = expandedHash === packet.packetHash;
-            return (
-              <div
-                key={packet.packetHash}
-                data-index={virtualRow.index}
-                data-testid={`packet-item-${packet.packetHash}`}
-                ref={virtualizer.measureElement}
-                className="absolute left-0 top-0 w-full translate-y-(--packet-row-start)"
-                style={
-                  {
-                    '--packet-row-start': `${virtualRow.start}px`,
-                  } as React.CSSProperties
-                }
-              >
-                {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
-                <div className={isMobile ? 'pt-1.5' : ''}>
-                  {isMobile ? (
-                    <PacketRow
-                      packet={packet}
-                      expanded={expanded}
-                      isFresh={freshHashes.has(packet.packetHash)}
-                      onToggle={() => onToggleExpand(packet.packetHash)}
-                    />
-                  ) : (
-                    <PacketTableRow
-                      packet={packet}
-                      expanded={expanded}
-                      isFresh={freshHashes.has(packet.packetHash)}
-                      onToggle={() => onToggleExpand(packet.packetHash)}
-                    />
-                  )}
-                  {expanded && (
-                    <div ref={expansionRef}>
-                      <PacketExpansion
-                        packet={packet}
-                        onOpenAnalyzer={onOpenAnalyzer}
-                        onViewPath={onViewPath}
-                        selectedObservationId={selectedObservationId}
-                        onSelectObservation={onSelectObservation}
-                      />
-                    </div>
-                  )}
-                </div>
+        {virtualizer.getVirtualItems().map((virtualRow) => {
+          const packet = packets[virtualRow.index];
+          if (!packet) return null;
+          const expanded = expandedHash === packet.packetHash;
+          return (
+            <div
+              key={packet.packetHash}
+              data-index={virtualRow.index}
+              data-testid={`packet-item-${packet.packetHash}`}
+              ref={virtualizer.measureElement}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                transform: `translateY(${virtualRow.start}px)`,
+              }}
+            >
+              {/* cards need breathing room; table rows butt up so the whole strip is a click target */}
+              <div className={isMobile ? "pt-1.5" : ""}>
+                {isMobile ? (
+                  <PacketRow
+                    packet={packet}
+                    expanded={expanded}
+                    isFresh={freshHashes.has(packet.packetHash)}
+                    onToggle={() => onToggleExpand(packet.packetHash)}
+                  />
+                ) : (
+                  <PacketTableRow
+                    packet={packet}
+                    expanded={expanded}
+                    isFresh={freshHashes.has(packet.packetHash)}
+                    onToggle={() => onToggleExpand(packet.packetHash)}
+                  />
+                )}
+                {expanded && (
+                  <PacketExpansion
+                    packet={packet}
+                    onOpenAnalyzer={onOpenAnalyzer}
+                    onViewPath={onViewPath}
+                    selectedObservationId={selectedObservationId}
+                    onSelectObservation={onSelectObservation}
+                  />
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
       {packets.length === 0 && (
-        <p className="py-4 text-center text-xs text-text-muted">{t('packets.noMatchingLoaded')}</p>
+        <p className="py-4 text-center text-xs font-mono text-text-muted">{t("packetList.noMatching")}</p>
       )}
       {hasNextPage && (
         <div className="flex justify-center py-4">
@@ -217,9 +163,9 @@ export function PacketVirtualList({
             type="button"
             disabled={isFetching}
             onClick={() => fetchNextPage()}
-            className="rounded border border-border px-3 py-2 text-xs text-text-normal disabled:opacity-40"
+            className="rounded border border-border px-3 py-1.5 text-xs font-mono text-text-normal hover:bg-text-normal/3 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            {isFetching ? t('packets.loadingOlder') : t('packets.loadOlder')}
+            {isFetching ? t("packetList.loadingPackets") : t("packetList.loadOlder")}
           </button>
         </div>
       )}

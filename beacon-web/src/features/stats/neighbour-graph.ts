@@ -1,11 +1,11 @@
-import type { NodeSummary, NodeNeighbor } from '../nodes/types';
-import { NODE_TYPE_NAMES, NODE_TYPES, nodeTypeLabel } from '../../lib/node-types';
-import { blend, nodeTypeColor, tooltipStyle, withAlpha, type ChartColors } from './chartTheme';
-import { OBS_STOPS, AGE } from '../map/neighbor-thresholds';
-import type { EChartsOption } from './echarts-setup';
-import type { TFunction } from 'i18next';
+import type { TFunction } from "i18next";
+import type { NodeSummary, NodeNeighbor } from "../nodes/types";
+import { NODE_TYPE_NAMES, NODE_TYPES } from "../../lib/node-types";
+import { blend, nodeTypeColor, tooltipStyle, withAlpha, type ChartColors } from "./chartTheme";
+import { OBS_STOPS, AGE } from "../map/neighbor-thresholds";
+import type { EChartsOption } from "./echarts-setup";
 
-const MONO = 'JetBrains Mono, monospace';
+const MONO = "JetBrains Mono, monospace";
 
 // Pure, render-free transform from the region's nodes into an ECharts force-graph shape. Kept
 // maplibre- and echarts-free so it stays unit-testable (mirrors features/map/node-geojson.ts).
@@ -37,85 +37,69 @@ export interface NeighbourGraph {
 const OTHER_CATEGORY = NODE_TYPE_NAMES.length;
 const MIN_SIZE = 6;
 const MAX_SIZE = 34;
-const MAX_PERSISTENT_LABELS = 30;
+const HUB_LABELS = 30; // only the biggest hubs get a persistent label, else 1000 nodes are a text wall
+const MIN_LABEL = 9;
+const MAX_LABEL = 16;
+
 // Case-insensitive substring match for the graph search; an empty query matches nothing.
 export function nodeNameMatches(name: string, query: string): boolean {
   const q = query.trim().toLowerCase();
   return q.length > 0 && name.toLowerCase().includes(q);
 }
 
+// Busier hubs get a louder label; sqrt so a few giant hubs don't dwarf the rest of the labelled set.
+export function labelSize(degree: number, maxDegree: number): number {
+  if (maxDegree <= 0) return MIN_LABEL;
+  const t = Math.sqrt(degree) / Math.sqrt(maxDegree);
+  return Math.round(MIN_LABEL + (MAX_LABEL - MIN_LABEL) * t);
+}
+
 // Keep the top-`cap` most-connected nodes and their internal edges. Unlike the map's edge builder we
 // do NOT require coordinates — the graph is non-geographic, so unlocated nodes belong here too.
-// Full-graph invariant: every rendered node participates in at least one rendered edge. Retained
-// degree/sizing/labels are derived from the displayed edges, not the stored knownNeighborCount.
 export function buildNeighbourGraph(nodes: NodeSummary[], cap: number): NeighbourGraph {
   const total = nodes.length;
   // rank by neighbour count, id tie-break so the kept set + indices are stable across re-renders
   const ranked = [...nodes].sort(
-    (a, b) =>
-      b.knownNeighborCount - a.knownNeighborCount || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    (a, b) => b.knownNeighborCount - a.knownNeighborCount || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
   );
   const kept = ranked.slice(0, cap);
   const capped = total > kept.length;
 
   const indexById = new Map<string, number>();
   kept.forEach((n, i) => indexById.set(n.id, i));
+  const maxDegree = kept.reduce((m, n) => Math.max(m, n.knownNeighborCount), 0);
 
-  const seen = new Set<string>();
-  const keptLinks: [string, string][] = [];
-  for (const n of kept) {
-    if (!n.neighborIds) continue;
-    for (const otherId of n.neighborIds) {
-      if (otherId === n.id) continue; // no self-loops
-      if (!indexById.has(otherId)) continue; // skip edges to capped-out / foreign nodes
-      const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
-      if (seen.has(key)) continue; // undirected — one line per pair
-      seen.add(key);
-      keptLinks.push([n.id, otherId]);
-    }
-  }
-
-  // Retained degree from displayed edges only; isolates (stored count > 0 but no visible edge)
-  // are phantom dots — drop them so every rendered node has degree > 0.
-  const retainedDegree = new Map<string, number>();
-  for (const [a, b] of keptLinks) {
-    retainedDegree.set(a, (retainedDegree.get(a) ?? 0) + 1);
-    retainedDegree.set(b, (retainedDegree.get(b) ?? 0) + 1);
-  }
-  const participants = kept.filter((n) => (retainedDegree.get(n.id) ?? 0) > 0);
-
-  const participantIndex = new Map<string, number>();
-  participants.forEach((n, i) => participantIndex.set(n.id, i));
-  const maxDegree = participants.reduce((m, n) => Math.max(m, retainedDegree.get(n.id) ?? 0), 0);
-  const labeledIds = new Set(
-    [...participants]
-      .sort(
-        (a, b) =>
-          (retainedDegree.get(b.id) ?? 0) - (retainedDegree.get(a.id) ?? 0) ||
-          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-      )
-      .slice(0, MAX_PERSISTENT_LABELS)
-      .map((n) => n.id),
-  );
-
-  const graphNodes: GraphNode[] = participants.map((n) => {
+  const graphNodes: GraphNode[] = kept.map((n, i) => {
     const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(n.nodeTypeName);
-    const degree = retainedDegree.get(n.id) ?? 0;
     return {
       id: n.id,
       name: n.name ?? n.id.slice(0, 6),
       category: cat === -1 ? OTHER_CATEGORY : cat,
       nodeTypeName: n.nodeTypeName,
-      degree,
-      symbolSize: symbolSize(degree, maxDegree),
-      label: { show: labeledIds.has(n.id) },
+      degree: n.knownNeighborCount,
+      symbolSize: symbolSize(n.knownNeighborCount, maxDegree),
+      label:
+        i < HUB_LABELS && n.knownNeighborCount > 0
+          ? { show: true, fontSize: labelSize(n.knownNeighborCount, maxDegree) }
+          : undefined,
     };
   });
 
-  const links: GraphLink[] = keptLinks.map(([a, b]) => ({
-    source: participantIndex.get(a)!,
-    target: participantIndex.get(b)!,
-  }));
+  const seen = new Set<string>();
+  const links: GraphLink[] = [];
+  for (const n of kept) {
+    if (!n.neighborIds) continue;
+    const from = indexById.get(n.id)!;
+    for (const otherId of n.neighborIds) {
+      if (otherId === n.id) continue; // no self-loops
+      const to = indexById.get(otherId);
+      if (to === undefined) continue; // skip edges to capped-out / foreign nodes
+      const key = n.id < otherId ? `${n.id}|${otherId}` : `${otherId}|${n.id}`;
+      if (seen.has(key)) continue; // undirected — one line per pair
+      seen.add(key);
+      links.push({ source: from, target: to });
+    }
+  }
 
   return { nodes: graphNodes, links, total, capped };
 }
@@ -144,14 +128,7 @@ export function ageOpacity(ageDays: number): number {
 const CENTER_SIZE = 30;
 const NEIGHBOUR_SIZE = 14;
 
-function egoNode(
-  id: string,
-  name: string | null,
-  nodeTypeName: string,
-  size: number,
-  degree: number,
-  showLabel: boolean,
-): GraphNode {
+function egoNode(id: string, name: string | null, nodeTypeName: string, size: number, degree: number): GraphNode {
   const cat = (NODE_TYPE_NAMES as readonly string[]).indexOf(nodeTypeName);
   return {
     id,
@@ -160,7 +137,7 @@ function egoNode(
     nodeTypeName,
     degree,
     symbolSize: size,
-    label: { show: showLabel },
+    label: { show: true },
   };
 }
 
@@ -172,10 +149,7 @@ export function buildEgoGraph(
   neighbors: NodeNeighbor[],
   now: number,
 ): NeighbourGraph {
-  const folded = new Map<
-    string,
-    { name: string | null; nodeTypeName: string; obs: number; lastSeen: number }
-  >();
+  const folded = new Map<string, { name: string | null; nodeTypeName: string; obs: number; lastSeen: number }>();
   for (const nb of neighbors) {
     if (nb.id === center.id) continue;
     const prev = folded.get(nb.id);
@@ -183,47 +157,26 @@ export function buildEgoGraph(
       prev.obs += nb.observationCount;
       prev.lastSeen = Math.max(prev.lastSeen, nb.lastSeen);
     } else {
-      folded.set(nb.id, {
-        name: nb.name ?? null,
-        nodeTypeName: nb.nodeTypeName,
-        obs: nb.observationCount,
-        lastSeen: nb.lastSeen,
-      });
+      folded.set(nb.id, { name: nb.name ?? null, nodeTypeName: nb.nodeTypeName, obs: nb.observationCount, lastSeen: nb.lastSeen });
     }
   }
 
-  const labeledNeighborIds = new Set(
-    [...folded]
-      .sort(
-        ([aId, a], [bId, b]) =>
-          b.obs - a.obs || b.lastSeen - a.lastSeen || (aId < bId ? -1 : aId > bId ? 1 : 0),
-      )
-      .slice(0, MAX_PERSISTENT_LABELS - 1)
-      .map(([id]) => id),
-  );
-  const nodes: GraphNode[] = [
-    egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size, true),
-  ];
+  const nodes: GraphNode[] = [egoNode(center.id, center.name, center.nodeTypeName, CENTER_SIZE, folded.size)];
   const links: GraphLink[] = [];
   for (const [id, n] of folded) {
     // push the link first so target points at the node's about-to-be index
-    links.push({
-      source: 0,
-      target: nodes.length,
-      obs: n.obs,
-      ageDays: Math.max(0, (now - n.lastSeen) / 86_400_000),
-    });
-    nodes.push(egoNode(id, n.name, n.nodeTypeName, NEIGHBOUR_SIZE, 0, labeledNeighborIds.has(id)));
+    links.push({ source: 0, target: nodes.length, obs: n.obs, ageDays: Math.max(0, (now - n.lastSeen) / 86_400_000) });
+    nodes.push(egoNode(id, n.name, n.nodeTypeName, NEIGHBOUR_SIZE, 0));
   }
   return { nodes, links, total: nodes.length, capped: false };
 }
 
 // One legend/category per device type (in NODE_TYPES order) plus an "Other" bucket for unknowns; the
 // GraphNode.category index lines up with this list.
-function graphCategories(c: ChartColors, t?: TFunction) {
+function graphCategories(c: ChartColors, t: TFunction) {
   return [
-    ...NODE_TYPES.map((t) => ({ name: t.label, itemStyle: { color: nodeTypeColor(t.name) } })),
-    { name: t?.('common.other') ?? 'Other', itemStyle: { color: c.primaryDim } },
+    ...NODE_TYPES.map((type) => ({ name: t(`nodeTypes.${type.name}`), itemStyle: { color: nodeTypeColor(type.name, c) } })),
+    { name: t("neighbourGraph.other"), itemStyle: { color: c.primaryDim } },
   ];
 }
 
@@ -233,55 +186,42 @@ function graphCategories(c: ChartColors, t?: TFunction) {
 export function neighbourGraphOption(
   graph: NeighbourGraph,
   c: ChartColors,
-  opts: { ego?: boolean; t?: TFunction } = {},
+  t: TFunction,
+  opts: { ego?: boolean } = {},
 ): EChartsOption {
   const ego = !!opts.ego;
   const big = graph.nodes.length > 500; // settle without animating once the full mesh gets dense
-  const categories = graphCategories(c, opts.t);
-  const usedCategories = new Set(graph.nodes.map((node) => node.category));
   // weighted edges (ego view) get an obs→colour, freshness→opacity line; plain mesh edges stay uniform
   const links = graph.links.map((l) =>
     l.obs != null
-      ? {
-          ...l,
-          lineStyle: { color: obsColor(l.obs, c), opacity: ageOpacity(l.ageDays ?? 0), width: 1.8 },
-        }
+      ? { ...l, lineStyle: { color: obsColor(l.obs, c), opacity: ageOpacity(l.ageDays ?? 0), width: 1.8 } }
       : l,
   );
   return {
     animation: false,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
     tooltip: {
       ...tooltipStyle(c),
-      trigger: 'item',
+      trigger: "item",
       formatter: (p: unknown) => {
         const param = p as { dataType?: string; data: Record<string, unknown> };
-        if (param.dataType === 'edge') {
+        if (param.dataType === "edge") {
           const obs = param.data.obs as number | undefined;
-          if (obs == null) return ''; // uniform mesh edge — nothing to show
+          if (obs == null) return ""; // uniform mesh edge — nothing to show
           const days = Math.round((param.data.ageDays as number) ?? 0);
-          const observationLabel =
-            opts.t?.('stats.observationAbbrev', { count: obs }) ?? `${obs} obs`;
-          const seenLabel =
-            days === 0
-              ? (opts.t?.('stats.seenToday') ?? 'seen today')
-              : (opts.t?.('stats.seenDaysAgo', { count: days }) ?? `seen ${days}d ago`);
-          return `${observationLabel} · ${seenLabel}`;
+          return days === 0 ? t("neighbourGraph.edgeToday", { obs }) : t("neighbourGraph.edgeAgo", { obs, days });
         }
         const d = param.data as unknown as GraphNode;
-        const type = nodeTypeLabel(d.nodeTypeName, opts.t?.('options.unknown') ?? 'Unknown');
-        const neighbours =
-          opts.t?.('entities.neighborCount', { count: d.degree }) ??
-          `${d.degree} neighbour${d.degree === 1 ? '' : 's'}`;
-        return d.degree > 0 ? `${d.name}\n${type} · ${neighbours}` : `${d.name}\n${type}`;
+        const type = d.nodeTypeName || t("neighbourGraph.unknownType");
+        return d.degree > 0 ? `${d.name}\n${type} · ${t("neighbourGraph.neighbors", { count: d.degree })}` : `${d.name}\n${type}`;
       },
     },
     legend: [
       {
-        data: categories.filter((_, index) => usedCategories.has(index)).map((cat) => cat.name),
+        data: graphCategories(c, t).map((cat) => cat.name),
         bottom: 4,
-        left: 'center',
-        icon: 'circle',
+        left: "center",
+        icon: "circle",
         itemWidth: 9,
         itemHeight: 9,
         textStyle: { color: c.textNormal, fontFamily: MONO, fontSize: 10 },
@@ -290,35 +230,17 @@ export function neighbourGraphOption(
     ],
     series: [
       {
-        type: 'graph',
-        layout: 'force',
+        type: "graph",
+        layout: "force",
         roam: true,
         draggable: true,
         scaleLimit: { min: 0.2, max: 8 },
-        categories,
+        categories: graphCategories(c, t),
         force: ego
-          ? {
-              repulsion: 320,
-              edgeLength: 120,
-              gravity: 0.05,
-              friction: 0.15,
-              layoutAnimation: true,
-            }
-          : {
-              repulsion: big ? 60 : 120,
-              edgeLength: big ? [20, 60] : [40, 90],
-              gravity: 0.08,
-              friction: 0.2,
-              layoutAnimation: !big,
-            },
-        emphasis: { focus: 'none', scale: false, label: { show: true, fontSize: 12 } },
-        label: {
-          show: false,
-          position: 'right',
-          color: c.textNormal,
-          fontFamily: MONO,
-          fontSize: 9,
-        },
+          ? { repulsion: 320, edgeLength: 120, gravity: 0.05, friction: 0.15, layoutAnimation: true }
+          : { repulsion: big ? 60 : 120, edgeLength: big ? [20, 60] : [40, 90], gravity: 0.08, friction: 0.2, layoutAnimation: !big },
+        emphasis: { focus: "none", scale: false },
+        label: { show: false, position: "right", color: c.textNormal, fontFamily: MONO, fontSize: 9 },
         labelLayout: { hideOverlap: true },
         lineStyle: { color: withAlpha(c.textMuted, 0.22), width: 0.6 },
         itemStyle: { borderColor: c.bgBase, borderWidth: 0.5 },

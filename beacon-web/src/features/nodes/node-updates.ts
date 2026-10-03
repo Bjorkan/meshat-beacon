@@ -1,165 +1,31 @@
-import type { InfiniteData } from '@tanstack/react-query';
-import type { NodeSummary } from './types';
-import type { CursorPage } from '../../types/api';
-import type { WsNodeUpdate } from '../../types/ws';
-import { patchInfinitePages } from '../../lib/infinite-pages';
+import type { InfiniteData } from "@tanstack/react-query";
+import type { NodeSummary } from "./types";
+import type { CursorPage } from "../../types/api";
+import type { WsNodeUpdate } from "../../types/ws";
+import { patchInfinitePages } from "../../lib/infinite-pages";
 
-export interface NodeListUpdateContext {
-  sort: 'name' | 'type' | 'radio' | 'neighbors' | 'last_seen';
-  type?: string;
-  name?: string;
-  pubkeyPrefix?: string;
-  scope?: string;
-  iatas?: readonly string[];
-}
-
-function sameIATAs(a: NodeSummary['iatas'], b: NodeSummary['iatas']): boolean {
-  return (
-    a.length === b.length &&
-    a.every((entry, index) => {
-      const other = b[index];
-      return other != null && entry.iata === other.iata && entry.lastHeard === other.lastHeard;
-    })
-  );
-}
-
-function nextNodeSummary(prev: NodeSummary, data: WsNodeUpdate['data']): NodeSummary {
-  return {
-    ...prev,
-    publicKey: data.publicKey || prev.publicKey,
-    nodeType: data.nodeType ?? prev.nodeType,
-    nodeTypeName: data.nodeTypeName ?? prev.nodeTypeName,
-    name: data.name || prev.name,
-    lat: data.lat ?? prev.lat,
-    lng: data.lng ?? prev.lng,
-    radio: data.radio ?? prev.radio,
-    defaultScope: data.defaultScope ?? prev.defaultScope,
-    iatas: data.iatas ?? prev.iatas,
-    isObserver: data.isObserver ?? prev.isObserver,
-    possiblyForeign:
-      data.possiblyForeign === undefined
-        ? prev.possiblyForeign
-        : (data.possiblyForeign ?? undefined),
-  };
-}
-
-function intersects(selected: readonly string[] | undefined, values: readonly string[]): boolean {
-  if (!selected?.length) return true;
-  const selectedSet = new Set(selected.map((value) => value.toUpperCase()));
-  return values.some((value) => selectedSet.has(value.toUpperCase()));
-}
-
-function includesCI(value: string | null | undefined, needle: string | undefined): boolean {
-  if (!needle) return true;
-  return (value ?? '').toLocaleLowerCase().includes(needle.toLocaleLowerCase());
-}
-
-/**
- * Server-sorted pages must be invalidated when a live update changes their ordering key or whether
- * the row belongs to the active filter. These changes are rare; ordinary advert updates can still
- * use the cheap in-place patch below without refetching the list.
- */
-export function nodeListUpdateRequiresRefetch(
-  prev: NodeSummary,
-  data: WsNodeUpdate['data'],
-  context: NodeListUpdateContext,
-): boolean {
-  const next = nextNodeSummary(prev, data);
-
-  if (context.sort === 'name' && next.name !== prev.name) return true;
-  if (context.sort === 'type' && next.nodeType !== prev.nodeType) return true;
-  if (context.sort === 'radio' && next.radio !== prev.radio) return true;
-
-  if (context.type && (prev.nodeTypeName === context.type) !== (next.nodeTypeName === context.type))
-    return true;
-  if (context.name && includesCI(prev.name, context.name) !== includesCI(next.name, context.name))
-    return true;
-  if (context.pubkeyPrefix) {
-    const prefix = context.pubkeyPrefix.toLocaleLowerCase();
-    if (
-      prev.publicKey.toLocaleLowerCase().startsWith(prefix) !==
-      next.publicKey.toLocaleLowerCase().startsWith(prefix)
-    )
-      return true;
-  }
-  if (
-    context.scope &&
-    (prev.defaultScope === context.scope) !== (next.defaultScope === context.scope)
-  )
-    return true;
-  if (context.iatas?.length) {
-    const before = intersects(
-      context.iatas,
-      prev.iatas.map((entry) => entry.iata),
-    );
-    const after = intersects(
-      context.iatas,
-      next.iatas.map((entry) => entry.iata),
-    );
-    if (before !== after) return true;
-  }
-
-  return false;
-}
-
-// Lightweight patch used by the map: only name/coords are applied so frequent adverts don't
-// rebuild the entire map FeatureCollection for IATA/radio timestamp churn.
+// Patch a node's name/lat/lng in a cached list (immutably); nodes not already in the list are left
+// alone — the Nodes table can't blindly insert because its cache is filter-scoped. The map uses
+// upsertNodePages below instead, which does insert. Shared so the two stay in step.
 export function patchNodeSummary(
   list: NodeSummary[] | undefined,
-  data: WsNodeUpdate['data'],
+  data: WsNodeUpdate["data"],
 ): NodeSummary[] | undefined {
   if (!list) return list;
   const idx = list.findIndex((n) => n.id === data.nodeId);
   if (idx === -1) return list;
   const prev = list[idx]!;
+  // only name/coords move in practice; nodeType/iatas are near-static, so we drop data.nodeType here
+  // and let a reload carry a rare type change rather than keep a numeric-type lookup in sync
   const name = data.name || prev.name;
-  const lat = data.lat ?? prev.lat;
-  const lng = data.lng ?? prev.lng;
-  const possiblyForeign =
-    data.possiblyForeign === undefined ? prev.possiblyForeign : (data.possiblyForeign ?? undefined);
+  const lat = data.lat === undefined ? prev.lat : data.lat;
+  const lng = data.lng === undefined ? prev.lng : data.lng;
+  const possiblyForeign = data.possiblyForeign === undefined ? prev.possiblyForeign : data.possiblyForeign ?? undefined;
   // a re-advert that re-sends the same values must keep the SAME ref so patchInfinitePages no-ops
   // (otherwise an unchanged node would trigger a full map FeatureCollection rebuild + setData)
-  if (
-    name === prev.name &&
-    lat === prev.lat &&
-    lng === prev.lng &&
-    possiblyForeign === prev.possiblyForeign
-  )
-    return list;
+  if (name === prev.name && lat === prev.lat && lng === prev.lng && possiblyForeign === prev.possiblyForeign) return list;
   const updated = [...list];
   updated[idx] = { ...prev, name, lat, lng, possiblyForeign };
-  return updated;
-}
-
-// Richer patch for the Nodes table. Ordering/filter-sensitive changes are handled by
-// nodeListUpdateRequiresRefetch before this is called; the remaining fields can be refreshed in
-// place without throwing away already loaded pages.
-export function patchNodeTableSummary(
-  list: NodeSummary[] | undefined,
-  data: WsNodeUpdate['data'],
-): NodeSummary[] | undefined {
-  if (!list) return list;
-  const idx = list.findIndex((n) => n.id === data.nodeId);
-  if (idx === -1) return list;
-  const prev = list[idx]!;
-  const next = nextNodeSummary(prev, data);
-  if (
-    next.publicKey === prev.publicKey &&
-    next.nodeType === prev.nodeType &&
-    next.nodeTypeName === prev.nodeTypeName &&
-    next.name === prev.name &&
-    next.lat === prev.lat &&
-    next.lng === prev.lng &&
-    next.radio === prev.radio &&
-    next.defaultScope === prev.defaultScope &&
-    next.isObserver === prev.isObserver &&
-    next.possiblyForeign === prev.possiblyForeign &&
-    sameIATAs(next.iatas, prev.iatas)
-  )
-    return list;
-
-  const updated = [...list];
-  updated[idx] = next;
   return updated;
 }
 
@@ -168,7 +34,7 @@ export function patchNodeTableSummary(
 // never refetches on its own — staleTime is Infinity).
 export function upsertNodePages(
   old: InfiniteData<CursorPage<NodeSummary>> | undefined,
-  data: WsNodeUpdate['data'],
+  data: WsNodeUpdate["data"],
 ): InfiniteData<CursorPage<NodeSummary>> | undefined {
   if (!old || old.pages.length === 0) return old;
   if (old.pages.some((p) => p.items.some((n) => n.id === data.nodeId))) {
@@ -185,6 +51,8 @@ export function upsertNodePages(
     radio: data.radio,
     defaultScope: data.defaultScope,
     iatas: data.iatas,
+    // the nodeUpdate event rides on an advert and doesn't carry a neighbor count; a node we're
+    // meeting for the first time has none resolved yet, so start at 0 until a reload fills it in
     knownNeighborCount: 0,
     isObserver: data.isObserver,
     possiblyForeign: data.possiblyForeign ?? undefined,

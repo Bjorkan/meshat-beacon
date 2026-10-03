@@ -1,21 +1,23 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
-import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearch } from '@tanstack/react-router';
-import { usePackets } from './usePackets';
-import { usePacketDetail } from './usePacketDetail';
-import { usePacketFilters, matchesFilters, toServerFilter } from './usePacketFilters';
-import { useScopes } from '../../hooks/useScopes';
-import { useRegion } from '../../hooks/useRegion';
-import { useWsPacketHandler, useWsLaggedHandler } from '../../hooks/useWsHandlers';
-import { PacketVirtualList } from './PacketVirtualList';
-import { FilterBar } from '../../components/FilterBar';
-import { LoadingPill } from '../../components/LoadingPill';
-import { EmptyState } from '../../components/EmptyState';
-import { SkeletonRows } from '../../components/SkeletonRows';
-import { PAYLOAD_TYPE_NAMES, ROUTE_TYPE_NAMES } from '../../types/enums';
-import type { WsManager } from '../../api/ws-manager';
-import type { PacketDetail, PacketSummary } from '../../types/api';
-import type { WsPacketObservation } from '../../types/ws';
+import { useState, useCallback, useEffect, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { useQueryClient } from "@tanstack/react-query";
+import { usePackets } from "./usePackets";
+import { usePacketDetail } from "./usePacketDetail";
+import { usePacketFilters, matchesFilters, toServerFilter } from "./usePacketFilters";
+import { parsePathSearch } from "./path-search";
+import { useScopes } from "../../hooks/useScopes";
+import { useRegion } from "../../hooks/useRegion";
+import { useWsPacketHandler, useWsLaggedHandler } from "../../hooks/useWsHandlers";
+import { PacketVirtualList } from "./PacketVirtualList";
+import { FilterBar } from "../../components/FilterBar";
+import { LoadingPill } from "../../components/LoadingPill";
+import { SkeletonRows } from "../../components/SkeletonRows";
+import { CloseButton } from "../../components/CloseButton";
+import { PAYLOAD_TYPE_NAMES, ROUTE_TYPE_NAMES } from "../../types/enums";
+import type { WsManager } from "../../api/ws-manager";
+import type { PacketDetail } from "../../types/api";
+import type { WsPacketObservation } from "../../types/ws";
 
 // filter options and storage keys
 
@@ -31,64 +33,24 @@ const ROUTE_OPTIONS = Object.entries(ROUTE_TYPE_NAMES).map(([value, label]) => (
 
 interface PacketListProps {
   wsManager: WsManager;
-  onAnalyze: (hash: string | null) => void;
+  onAnalyze: (hash: string | null, observationId?: number) => void;
   onViewPath: (detail: PacketDetail) => void;
   selectedObservationId: number | null;
   onSelectObservation: (id: number) => void;
 }
 
-function summaryFromDetail(detail: PacketDetail): PacketSummary {
-  const latest = detail.observations.reduce<(typeof detail.observations)[number] | undefined>(
-    (current, observation) =>
-      !current || observation.heardAt > current.heardAt ? observation : current,
-    undefined,
-  );
-
-  return {
-    packetHash: detail.packetHash,
-    payloadType: detail.header.payloadType,
-    payloadTypeName: detail.header.payloadTypeName,
-    routeType: detail.header.routeType,
-    routeTypeName: detail.header.routeTypeName,
-    firstHeardAt: detail.firstHeardAt,
-    lastHeardAt: detail.lastHeardAt,
-    observationCount: detail.observationCount,
-    scope: detail.scope,
-    latestObserver: latest
-      ? {
-          id: latest.observerId,
-          displayName: latest.observerName,
-          iata: latest.iata,
-          pathLength: latest.pathLength,
-          pathBytes: latest.pathBytes,
-          resolvedPath: latest.resolvedPath,
-          resolvedSource: latest.resolvedSource,
-          resolvedDestination: latest.resolvedDestination,
-        }
-      : undefined,
-  };
-}
-
 // main packet view: filters, banner, virtual list
 
-export function PacketList({
-  wsManager,
-  onAnalyze,
-  onViewPath,
-  selectedObservationId,
-  onSelectObservation,
-}: PacketListProps) {
+export function PacketList({ wsManager, onAnalyze, onViewPath, selectedObservationId, onSelectObservation }: PacketListProps) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const { t } = useTranslation();
-  const search = useSearch({ from: '__root__' });
-  const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { filters, setFilter, setSearch, setSearchField, clearFilters } = usePacketFilters();
   // single-value selections go to the server so scrolling pages through matching history
   const serverFilter = useMemo(() => toServerFilter(filters), [filters]);
-  const scopeNames = useScopes();
-  const scopeOptions = useMemo(
-    () => ['*', ...scopeNames].map((s) => ({ value: s, label: s })),
-    [scopeNames],
-  );
+  const pathSearch = useMemo(() => parsePathSearch(filters.search), [filters.search]);
+  const scopeNames = useScopes(filters.scopes);
+  const scopeOptions = useMemo(() => scopeNames.map((s) => ({ value: s, label: s })), [scopeNames]);
   const { regionKey } = useRegion();
 
   // isAtTop drives the freeze (list held static while scrolled off the very top); isScrolledAway
@@ -104,8 +66,8 @@ export function PacketList({
     acknowledgeNewPackets,
     fetchNextPage,
     hasNextPage,
-    isFetchingNextPage,
     isFetching,
+    isFetchingNextPage,
     isLoading,
     isError,
     observersByHash,
@@ -115,78 +77,52 @@ export function PacketList({
     dismissLagged,
   } = usePackets(!isAtTop, serverFilter);
 
-  // ?hash is the selected packet — it expands the row inline. The analyzer is a separate state (?analyze=1).
-  const expandedHash = search.hash ?? null;
-
-  // Shared with the expanded row's own usePacketDetail, so reading it here costs no extra request.
-  const { data: expandedDetail } = usePacketDetail(expandedHash);
-
-  const packets = useMemo(() => {
-    const matching = allPackets.filter((p) => matchesFilters(p, filters, observersByHash));
-    if (
-      !expandedDetail ||
-      matching.some((packet) => packet.packetHash === expandedDetail.packetHash)
-    ) {
-      return matching;
-    }
-
-    // A deep-linked packet can have aged out of the first history page. Keep the URL contract by
-    // materializing the already-fetched detail as one list row; PacketExpansion reuses its query.
-    return [summaryFromDetail(expandedDetail), ...matching];
-  }, [allPackets, expandedDetail, filters, observersByHash]);
-
-  const handleToggleExpand = useCallback(
-    (hash: string) => {
-      const next = expandedHash === hash ? null : hash;
-      navigate({
-        to: '.',
-        search: (prev: Record<string, unknown>) => {
-          const n = { ...prev };
-          if (next) n.hash = next;
-          else n.hash = undefined;
-          return n;
-        },
-        replace: true,
-      });
-    },
-    [expandedHash, navigate],
+  const packets = useMemo(
+    () => allPackets.filter((p) => matchesFilters(p, filters, observersByHash, pathSearch)),
+    [allPackets, filters, observersByHash, pathSearch],
   );
 
-  const handleOpenAnalyzer = useCallback(() => {
-    if (expandedHash) onAnalyze(expandedHash);
+  // ?hash is the selected packet — it expands the row inline. The analyzer is a separate state (?analyze=1).
+  // Lowercased because packet hashes are lowercase hex and a shared link may not be.
+  const expandedHash = searchParams.get("hash")?.toLowerCase() ?? null;
+
+  const handleToggleExpand = useCallback((hash: string) => {
+    const next = expandedHash === hash ? null : hash;
+    setSearchParams((p) => {
+      const n = new URLSearchParams(p);
+      n.delete("observation");
+      if (next) n.set("hash", next); else n.delete("hash");
+      return n;
+    }, { replace: true });
+  }, [expandedHash, setSearchParams]);
+
+  // Shared with the expanded row's own usePacketDetail, so reading it here costs no extra request.
+  const { data: expandedDetail, isError: selectedError, error: detailError, refetch: retryDetail } = usePacketDetail(expandedHash);
+  const detailStatus = detailError && "status" in detailError ? detailError.status : undefined;
+
+  const handleOpenAnalyzer = useCallback((observationId?: number) => {
+    if (!expandedHash) return;
+    if (observationId == null) onAnalyze(expandedHash);
+    else onAnalyze(expandedHash, observationId);
   }, [expandedHash, onAnalyze]);
 
   const handleViewPath = useCallback(() => {
     if (expandedDetail) onViewPath(expandedDetail);
   }, [expandedDetail, onViewPath]);
 
-  // Shared packet-detail cache invalidation lives in QueryWsBridge. This route listener only feeds
-  // the ephemeral live buffer used by the scrolling packet UX.
-  const handleObservation = useCallback(
-    (data: WsPacketObservation['data']) => {
-      handlePacketObservation(data);
-    },
-    [handlePacketObservation],
-  );
+  // Refetch only the open row's detail, so its observation table keeps pace with the count ticking
+  // up beside it. Every other observation just lands in the list.
+  const handleObservation = useCallback((data: WsPacketObservation["data"]) => {
+    handlePacketObservation(data);
+    if (data.packetHash === expandedHash) {
+      queryClient.invalidateQueries({ queryKey: ["packet-detail", expandedHash] });
+    }
+  }, [handlePacketObservation, expandedHash, queryClient]);
 
   useWsPacketHandler(wsManager, handleObservation);
   useWsLaggedHandler(wsManager, handleLagged);
 
-  // Keep live rows at parity with the REST list's include=resolvedPath enrichment while this view is
-  // mounted. Other tabs leave the connection on its cheaper default unless they explicitly need it.
-  useEffect(() => {
-    wsManager.setResolvePath(true);
-    return () => wsManager.setResolvePath(false);
-  }, [wsManager]);
-
   const bannerCount = isScrolledAway ? newPacketCount : 0;
-  const hasFilters = !!(
-    filters.search ||
-    filters.payloadTypes.length ||
-    filters.routeTypes.length ||
-    filters.observers.length ||
-    filters.scopes.length
-  );
 
   // Remount the list (fresh at the top, no stale scroll anchor for the virtualizer to preserve)
   // when returning to the top with packets held while away — a big prepend into the live list
@@ -231,10 +167,10 @@ export function PacketList({
           activeRoutes={filters.routeTypes.map(String)}
           activeObservers={filters.observers}
           activeScopes={filters.scopes}
-          onTypesChange={(v) => setFilter('payloadTypes', v.map(Number))}
-          onRoutesChange={(v) => setFilter('routeTypes', v.map(Number))}
-          onObserversChange={(v) => setFilter('observers', v)}
-          onScopesChange={(v) => setFilter('scopes', v)}
+          onTypesChange={(v) => setFilter("payloadTypes", v.map(Number))}
+          onRoutesChange={(v) => setFilter("routeTypes", v.map(Number))}
+          onObserversChange={(v) => setFilter("observers", v)}
+          onScopesChange={(v) => setFilter("scopes", v)}
           search={filters.search}
           onSearchChange={setSearch}
           searchField={filters.searchField}
@@ -242,45 +178,60 @@ export function PacketList({
           onClear={clearFilters}
         />
 
+        {filters.searchField === "path" && (
+          <p role={pathSearch === null ? "alert" : undefined} className={`px-4 py-1.5 text-xs font-mono ${pathSearch === null ? "text-danger" : "text-text-muted"}`}>
+            {pathSearch === null
+              ? t("packetList.pathSearchInvalid")
+              : t("packetList.pathSearchHint")}
+          </p>
+        )}
+
+        {/* A hash-only link still selects a row; offer the existing analyzer when there is no row. */}
+        {expandedHash && !isLoading && searchParams.get("analyze") !== "1" && !packets.some(p => p.packetHash === expandedHash) && (
+          <section aria-label={t("packetList.selectedPacket")} className="mx-4 my-2 px-3 py-2 border border-border rounded-sm bg-bg-surface flex items-start justify-between gap-3 text-xs text-text-muted">
+            <div>
+              {selectedError ? (
+                <>
+                  <p role="alert">{detailStatus === 400 ? t("packetList.invalidHash") : detailStatus === 404 ? t("packetList.notFound") : t("packetList.loadFailed")}</p>
+                  <button type="button" className="mt-1 px-2 py-1 border border-border rounded-sm hover:bg-bg-raised cursor-pointer" onClick={() => retryDetail()} aria-label={t("packetList.retryLabel")}>{t("packetList.retry")}</button>
+                </>
+              ) : expandedDetail ? (
+                <>
+                  <p>{t("packetList.outsideResults")}</p>
+                  <button type="button" className="mt-1 px-2 py-1 border border-border rounded-sm hover:bg-bg-raised cursor-pointer" onClick={() => handleOpenAnalyzer()}>{t("packetList.openAnalyzer")}</button>
+                </>
+              ) : <p role="status">{t("packetList.loadingSelected")}</p>}
+            </div>
+            <CloseButton label={t("packetList.dismissSelected")} onClose={() => handleToggleExpand(expandedHash)} />
+          </section>
+        )}
+
         {laggedCount > 0 && (
           <div className="mx-4 px-3 py-1.5 bg-warn/6 border border-warn/12 text-warn text-xs font-medium font-mono rounded-b flex items-center justify-between">
-            <span>{t('packets.dropped', { count: laggedCount })}</span>
-            <button type="button" className="underline cursor-pointer" onClick={dismissLagged}>
-              {t('common.dismiss')}
-            </button>
+            <span>{t("packetList.dropped", { count: laggedCount })}</span>
+            <button type="button" className="underline cursor-pointer" onClick={dismissLagged}>{t("packetList.dismiss")}</button>
           </div>
         )}
 
-        {bannerCount > 0 && (
+        {bannerCount > 0 ? (
           <button
             type="button"
-            className="mx-4 flex items-center justify-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/15 border border-primary/20 border-t-0 text-primary text-size-11 font-medium tracking-wide cursor-pointer font-mono rounded-b transition-colors"
+            className="mx-4 flex items-center justify-center gap-2 px-3 py-1.5 bg-primary/10 hover:bg-primary/15 border border-primary/20 border-t-0 text-primary text-[11px] font-medium tracking-wide cursor-pointer font-mono rounded-b transition-colors"
             onClick={handleScrollToTop}
           >
             <span aria-hidden>▲</span>
-            {t('packets.new', { count: bannerCount })}
-            <span className="text-primary/60 font-normal">· {t('packets.scrollTop')}</span>
+            {t("packetList.newPackets", { count: bannerCount })}
+            <span className="text-primary/60 font-normal">{t("packetList.scrollToTop")}</span>
           </button>
+        ) : (
+          <div className="mx-4 flex items-center justify-center gap-1.5 px-3 py-1.5 bg-primary/8 border border-primary/15 border-t-0 text-primary text-[11px] font-medium tracking-wide font-mono rounded-b">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            {t("packetList.live")}
+          </div>
         )}
 
         {isLoading && packets.length === 0 ? (
           <SkeletonRows />
-        ) : packets.length === 0 && !isError ? (
-          <EmptyState
-            title={t(hasFilters ? 'common.noMatches' : 'packets.noPackets')}
-            subtitle={hasFilters ? t('packets.noMatchesHint') : undefined}
-            action={
-              hasFilters ? (
-                <button
-                  type="button"
-                  className="rounded border border-border px-3 py-2 text-text-normal hover:bg-bg-raised"
-                  onClick={clearFilters}
-                >
-                  {t('common.clearAll')}
-                </button>
-              ) : undefined
-            }
-          />
         ) : (
           <PacketVirtualList
             key={listResetKey}
@@ -302,7 +253,7 @@ export function PacketList({
           loading={isLoading || isFetchingNextPage}
           error={isError}
           count={packets.length}
-          noun={t('packets.noun')}
+          noun="packets"
           position="bottom-3 right-3"
         />
       </div>

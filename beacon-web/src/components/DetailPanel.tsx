@@ -1,23 +1,13 @@
-import { useState, type ReactNode } from 'react';
-import { useTranslation } from 'react-i18next';
-import { CloseButton } from './CloseButton';
+import { useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
+import { CloseButton } from "./CloseButton";
 
 // shared scaffolding for the right-hand entity detail panels (observers, nodes, …)
 
-export function Section({
-  title,
-  children,
-  first,
-}: {
-  title: string;
-  children: ReactNode;
-  first?: boolean;
-}) {
+export function Section({ title, children, first }: { title: ReactNode; children: ReactNode; first?: boolean }) {
   return (
-    <div className={`px-3 py-2.5 ${first ? '' : 'border-t border-border-subtle'}`}>
-      <div className="text-xs font-mono font-medium text-text-bright uppercase tracking-wider mb-1.5">
-        {title}
-      </div>
+    <div className={`px-3 py-2.5 ${first ? "" : "border-t border-border-subtle"}`}>
+      <div className="text-xs font-mono font-medium text-text-bright uppercase tracking-wider mb-1.5">{title}</div>
       {children}
     </div>
   );
@@ -25,31 +15,22 @@ export function Section({
 
 export function Field({ label, value }: { label: string; value: ReactNode }) {
   return (
-    <span>
-      <span className="text-text-dim">{label} </span>
-      <span className="text-text-normal">{value}</span>
-    </span>
+    <span><span className="text-text-dim">{label} </span><span className="text-text-normal">{value}</span></span>
   );
 }
 
-// Minimize/expand toggle for the compact overlay only; at lg+ the panel is a sidebar so it's hidden.
-function MinimizeButton({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
+// Minimize/expand toggle for the mobile overlay only; at md+ the panel is a sidebar so it's hidden.
+export function MinimizeButton({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const { t } = useTranslation();
   return (
     <button
       type="button"
       onClick={onToggle}
-      aria-label={collapsed ? t('detailPanel.expand') : t('detailPanel.minimize')}
-      className="lg:hidden flex items-center justify-center w-9 h-9 rounded text-text-muted hover:text-text-bright hover:bg-text-normal/5 cursor-pointer transition-colors"
+      aria-label={t(collapsed ? "common.expandDetailPanel" : "common.minimizeDetailPanel")}
+      className="md:hidden flex items-center justify-center w-9 h-9 rounded text-text-muted hover:text-text-bright hover:bg-text-normal/5 cursor-pointer transition-colors"
     >
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <path
-          d={collapsed ? 'M3 10L8 5L13 10' : 'M3 6L8 11L13 6'}
-          stroke="currentColor"
-          strokeWidth="1.6"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
+        <path d={collapsed ? "M3 10L8 5L13 10" : "M3 6L8 11L13 6"} stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     </button>
   );
@@ -58,19 +39,11 @@ function MinimizeButton({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 interface DetailPanelProps {
   title: string;
   onClose: () => void;
+  closeLabel?: string;
   // mobile-only: adds a minimize toggle that collapses to a bottom bar without deselecting, so the
-  // map underneath (and its neighbor lines) stays visible. No effect at lg+ (the panel is a sidebar).
+  // map underneath (and its neighbor lines) stays visible. No effect at md+ (the panel is a sidebar).
   collapsible?: boolean;
-  // Rich tabular details need more room than the default entity sidebar.
-  wide?: boolean;
-  // Overlay floats over the tab content at lg+ instead of squeezing the list beside it.
-  // Trace-detaljen behöver det: kartan + hopplistan kräver bredd som en statisk sidebar
-  // stjäl från listan (sidan växer då bredare än viewporten).
-  overlay?: boolean;
   isLoading?: boolean;
-  loadError?: boolean;
-  onRetry?: () => void;
-  retrying?: boolean;
   notFound?: boolean;
   notFoundIcon?: ReactNode;
   notFoundLabel?: string;
@@ -79,79 +52,34 @@ interface DetailPanelProps {
   children: ReactNode;
 }
 
-export function DetailPanel({
-  title,
-  onClose,
-  collapsible,
-  wide,
-  overlay,
-  isLoading,
-  loadError,
-  onRetry,
-  retrying,
-  notFound,
-  notFoundIcon,
-  notFoundLabel,
-  headerAction,
-  children,
-}: DetailPanelProps) {
+export function DetailPanel({ title, onClose, closeLabel, collapsible, isLoading, notFound, notFoundIcon, notFoundLabel, headerAction, children }: DetailPanelProps) {
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
-  // collapse only touches the compact overlay: shrink to a bottom bar and hide the body. The lg:*
+  // collapse only touches the mobile overlay: shrink to a bottom bar and hide the body. The md:*
   // classes below always win at desktop width, so a lingering collapsed state never hides the sidebar.
   const minimized = Boolean(collapsible && collapsed);
-  // Overlay-paneler flyter över tabbinnehållet från höger på lg+ istället för att
-  // krympa listan bredvid sig — annars växer sidan bredare än viewporten.
-  // Samma storlek som Paketsökvägens modal (PacketPathMapModal): 860px / 92vw.
-  const desktopClass = overlay
-    ? 'lg:absolute lg:inset-y-0 lg:left-auto lg:right-0 lg:z-30 lg:w-[860px] lg:max-w-[92vw] lg:shadow-2xl'
-    : `lg:static lg:inset-auto lg:z-auto lg:shrink-0 ${wide ? 'lg:w-3/4' : 'lg:w-[400px]'}`;
   return (
-    <div
-      className={`${minimized ? 'absolute inset-x-0 bottom-0' : 'absolute inset-0'} z-30 w-full ${desktopClass} lg:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden`}
-    >
+    <div className={`${minimized ? "absolute inset-x-0 bottom-0" : "absolute inset-0"} z-30 w-full md:static md:inset-auto md:z-auto md:shrink-0 md:w-[400px] md:border-l border-border bg-bg-surface flex flex-col min-h-0 overflow-hidden`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-border-subtle shrink-0">
-        <span className="text-size-13 font-mono font-medium text-text-dim uppercase tracking-wider">
-          {title}
-        </span>
+        <span className="text-[13px] font-mono font-medium text-text-dim uppercase tracking-wider">{title}</span>
         <div className="flex items-center gap-1.5 -mr-1">
           {headerAction}
           <div className="flex items-center gap-0.5">
-            {collapsible && (
-              <MinimizeButton collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />
-            )}
-            <CloseButton onClose={onClose} label={t('detailPanel.close')} />
+            {collapsible && <MinimizeButton collapsed={collapsed} onToggle={() => setCollapsed((v) => !v)} />}
+            <CloseButton onClose={onClose} label={closeLabel ?? t("common.closeDetailPanel")} />
           </div>
         </div>
       </div>
 
-      <div className={`flex-1 overflow-y-auto min-h-0 ${minimized ? 'hidden lg:block' : ''}`}>
-        {loadError && (
-          <div
-            role="alert"
-            className="m-3 flex items-center justify-between gap-3 rounded border border-danger/30 p-3 text-xs text-danger"
-          >
-            {t('common.failedToLoad')}
-            {onRetry && (
-              <button
-                type="button"
-                disabled={retrying}
-                onClick={onRetry}
-                className="shrink-0 text-text-normal underline disabled:opacity-50"
-              >
-                {t('common.tryAgain')}
-              </button>
-            )}
-          </div>
-        )}
+      <div className={`flex-1 overflow-y-auto min-h-0 ${minimized ? "hidden md:block" : ""}`}>
         {isLoading ? (
           <div className="flex flex-col items-center justify-center h-full gap-2.5 text-text-dim">
-            <span className="text-size-13 font-mono">{t('common.loading')}</span>
+            <span className="text-[13px] font-mono">{t("common.loadingDots")}</span>
           </div>
         ) : notFound ? (
           <div className="flex flex-col items-center justify-center h-full gap-2.5 text-text-dim">
             {notFoundIcon}
-            <span className="text-size-13 font-mono">{notFoundLabel ?? t('common.notFound')}</span>
+            <span className="text-[13px] font-mono">{notFoundLabel ?? t("common.notFound")}</span>
           </div>
         ) : (
           children

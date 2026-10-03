@@ -1,11 +1,12 @@
-import { formatHex } from '../../lib/formatters';
-import { useTranslation } from 'react-i18next';
-import { Timestamp } from '../../components/Timestamp';
-import type { PacketSummary } from '../../types/api';
-import { Badge } from '../../components/Badge';
-import { payloadTypeVariant } from '../../components/badge-utils';
-import { ScopeTag } from '../../components/ScopeTag';
-import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from '../../types/enums';
+import { useTranslation } from "react-i18next";
+import { formatHex } from "../../lib/formatters";
+import { Timestamp } from "../../components/Timestamp";
+import type { PacketSummary } from "../../types/api";
+import { Badge } from "../../components/Badge";
+import { Tooltip } from "../../components/Tooltip";
+import { payloadTypeVariant } from "../../components/badge-utils";
+import { ScopeTag } from "../../components/ScopeTag";
+import { PAYLOAD_TYPE_NAMES, type PayloadTypeValue } from "../../types/enums";
 
 interface PacketRowProps {
   packet: PacketSummary;
@@ -18,77 +19,71 @@ interface PacketRowProps {
 
 export function PacketRow({ packet, expanded, isFresh, onToggle }: PacketRowProps) {
   const { t } = useTranslation();
-  const heardBy = t('packets.heardBy', { count: packet.observationCount });
+  const heardBy = t("packetRow.heardBy", { count: packet.observationCount });
   return (
-    <button
-      type="button"
-      className={`w-full text-left group bg-bg-surface border rounded-md px-3.5 py-2.5 cursor-pointer ${
+    <div
+      className={`group bg-bg-surface border rounded-md px-3.5 py-2.5 cursor-pointer ${
         expanded
-          ? // squared bottom joins the expansion below into one unfolded card
-            'border-primary bg-primary/10 rounded-b-none'
+          // squared bottom joins the expansion below into one unfolded card
+          ? "border-primary bg-primary/10 rounded-b-none"
           : isFresh
-            ? 'packet-fresh'
-            : 'border-border hover:border-text-dim/30 hover:bg-bg-raised/50'
+            ? "packet-fresh"
+            : "border-border hover:border-text-dim/30 hover:bg-bg-raised/50"
       }`}
       onClick={() => onToggle()}
-      aria-expanded={expanded}
-      aria-controls={expanded ? `packet-expansion-${packet.packetHash}` : undefined}
+      aria-pressed={expanded}
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onToggle();
+        }
+      }}
     >
-      <span className="flex items-center gap-2.5">
+      <div className="flex items-center gap-2.5">
         <span className="font-mono text-xs font-semibold text-primary tracking-wider">
           {formatHex(packet.packetHash)}
         </span>
         <Badge variant={payloadTypeVariant(packet.payloadType)}>
           {PAYLOAD_TYPE_NAMES[packet.payloadType as PayloadTypeValue] ?? packet.payloadTypeName}
         </Badge>
-        <span
-          className="font-mono text-size-11 text-primary font-semibold whitespace-nowrap bg-primary/6 px-1.5 rounded-sm"
-          aria-label={heardBy}
-          title={heardBy}
-        >
-          ×{packet.observationCount}
-        </span>
-      </span>
+        <Tooltip label={heardBy}>
+          <span
+            className="font-mono text-[11px] text-primary font-semibold whitespace-nowrap bg-primary/6 px-1.5 rounded-sm"
+            aria-label={heardBy}
+          >
+            ×{packet.observationCount}
+          </span>
+        </Tooltip>
+      </div>
 
-      {packet.summary && (
-        <div className="mt-1 truncate text-size-11 text-text-bright" title={packet.summary}>
-          {packet.summary}
-        </div>
-      )}
+      {packet.summary && <div className="mt-1 truncate font-mono text-[10px] text-text-muted tracking-wider" title={packet.summary}>{packet.summary}</div>}
 
-      <span className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-size-11 text-text-dim">
-        <span className="font-mono text-size-11 text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">
-          {packet.routeTypeName || t('packets.unknown')}
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1 text-[11px] text-text-dim">
+        <span className="font-mono text-[11px] text-text-muted uppercase tracking-wider bg-text-muted/8 px-1.5 py-px rounded-sm">
+          {packet.routeTypeName || t("packetRow.unknown")}
         </span>
         {packet.scope && (
           <>
-            <span className="text-size-6 text-border" aria-hidden>
-              ·
+            <span className="text-[6px] text-border" aria-hidden>·</span>
+            <span className="min-w-0 max-w-full" title={packet.scope}>
+              <ScopeTag className="block truncate">{packet.scope}</ScopeTag>
             </span>
-            <ScopeTag>{packet.scope}</ScopeTag>
           </>
         )}
-        <span className="text-size-6 text-border" aria-hidden>
-          ·
-        </span>
-        <Timestamp value={packet.lastHeardAt} insideButton />
+        <span className="text-[6px] text-border" aria-hidden>·</span>
+        <Timestamp value={packet.lastHeardAt} />
         {packet.latestObserver && (
           <>
-            <span className="text-size-6 text-border" aria-hidden>
-              ·
-            </span>
-            <span className="text-text-normal">
-              {packet.latestObserver.displayName ?? packet.latestObserver.id.slice(0, 8)}
-            </span>
-            <span className="text-size-6 text-border" aria-hidden>
-              ·
-            </span>
-            <span className="font-mono font-bold text-primary text-size-11 tracking-wider">
+            <span className="text-[6px] text-border" aria-hidden>·</span>
+            <span className="text-text-normal">{packet.latestObserver.displayName ?? packet.latestObserver.id.slice(0, 8)}</span>
+            <span className="text-[6px] text-border" aria-hidden>·</span>
+            <span className="font-mono font-bold text-primary text-[11px] tracking-wider">
               {packet.latestObserver.iata}
             </span>
           </>
         )}
-      </span>
-    </button>
+      </div>
+    </div>
   );
 }

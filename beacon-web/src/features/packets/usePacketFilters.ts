@@ -1,107 +1,128 @@
-import { useCallback } from 'react';
-import { useNavigate, useSearch } from '@tanstack/react-router';
-import type { PacketFilterState, PacketServerFilter, SearchField } from './types';
-import type { PacketSummary } from '../../types/api';
-import { RouteType, type PayloadTypeValue, type RouteTypeValue } from '../../types/enums';
+import { useSearchParams } from "react-router-dom";
+import { useMemo, useCallback } from "react";
+import type { PacketFilterState, PacketServerFilter, SearchField } from "./types";
+import type { PacketSummary } from "../../types/api";
+import type { PayloadTypeValue, RouteTypeValue } from "../../types/enums";
+import { matchesPathSearch, parsePathSearch, type PathSearch } from "./path-search";
 
-// Packet filter state synced to the /packets route search params (?types/?routes/?obs/?scope/?q/?sf).
-// The params themselves are validated on the ROOT route so they survive tab switches; this hook is
-// the typed reader/writer the filter bar uses.
+// filter state synced to URL search params
+
+function parseIntArray(value: string | null): number[] {
+  if (!value) return [];
+  return value.split(",").map(Number).filter(Number.isFinite);
+}
+
+function parseStringArray(value: string | null): string[] {
+  if (!value) return [];
+  return value.split(",").filter(Boolean);
+}
+
+// Keep unimplemented search modes out of URLs as well as the dropdown.
+const IMPLEMENTED_SEARCH_FIELDS = new Set<SearchField>(["hash", "path"]);
+
+function parseSearchField(value: string | null): SearchField {
+  if (value && IMPLEMENTED_SEARCH_FIELDS.has(value as SearchField)) return value as SearchField;
+  return "hash";
+}
 
 export function usePacketFilters() {
-  // The validated root search carries the URL-param keys (types/routes/obs/scope/q/sf); the hook
-  // maps them onto the domain-shaped PacketFilterState the rest of the feature consumes.
-  const search = useSearch({ from: '__root__' });
-  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const filters: PacketFilterState = {
-    payloadTypes: (search.types ?? []) as PacketFilterState['payloadTypes'],
-    routeTypes: (search.routes ?? []) as PacketFilterState['routeTypes'],
-    observers: search.obs ?? [],
-    scopes: search.scope ?? [],
-    search: search.q ?? '',
-    searchField: search.sf === 'path' || search.sf === 'payload' ? search.sf : 'hash',
-  };
-
-  const patch = useCallback(
-    (
-      updates: Partial<
-        Record<
-          'types' | 'routes' | 'obs' | 'scope' | 'q' | 'sf',
-          string | number[] | string[] | SearchField | undefined
-        >
-      >,
-    ) => {
-      navigate({
-        to: '.',
-        search: (prev: Record<string, unknown>) => {
-          const next = { ...prev };
-          for (const [key, value] of Object.entries(updates)) {
-            if (value == null || value === '' || (Array.isArray(value) && value.length === 0)) {
-              next[key] = undefined;
-            } else {
-              next[key] = value;
-            }
-          }
-          return next;
-        },
-        replace: true,
-      });
-    },
-    [navigate],
+  const filters: PacketFilterState = useMemo(
+    () => ({
+      payloadTypes: parseIntArray(searchParams.get("types")) as PayloadTypeValue[],
+      routeTypes: parseIntArray(searchParams.get("routes")) as RouteTypeValue[],
+      observers: parseStringArray(searchParams.get("obs")),
+      scopes: parseStringArray(searchParams.get("scope")),
+      search: searchParams.get("q") ?? "",
+      searchField: parseSearchField(searchParams.get("sf")),
+    }),
+    [searchParams],
   );
 
   const setFilter = useCallback(
-    (key: 'payloadTypes' | 'routeTypes' | 'observers' | 'scopes', values: (number | string)[]) => {
-      const paramKey =
-        key === 'payloadTypes'
-          ? 'types'
-          : key === 'routeTypes'
-            ? 'routes'
-            : key === 'observers'
-              ? 'obs'
-              : 'scope';
-      patch({ [paramKey]: values });
+    (key: "payloadTypes" | "routeTypes" | "observers" | "scopes", values: (number | string)[]) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const paramKey =
+            key === "payloadTypes" ? "types" : key === "routeTypes" ? "routes" : key === "observers" ? "obs" : "scope";
+          if (values.length === 0) {
+            next.delete(paramKey);
+          } else {
+            next.set(paramKey, values.join(","));
+          }
+          return next;
+        },
+        { replace: true },
+      );
     },
-    [patch],
+    [setSearchParams],
   );
 
-  const setSearch = useCallback((query: string) => patch({ q: query }), [patch]);
+  const setSearch = useCallback(
+    (query: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (query) {
+            next.set("q", query);
+          } else {
+            next.delete("q");
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
 
   const setSearchField = useCallback(
-    (field: SearchField) => patch({ sf: field === 'hash' ? undefined : field }),
-    [patch],
+    (field: SearchField) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (field === "hash") {
+            next.delete("sf");
+          } else {
+            next.set("sf", field);
+          }
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
   );
 
-  const clearFilters = useCallback(
-    () =>
-      patch({
-        types: [],
-        routes: [],
-        obs: [],
-        scope: [],
-        q: '',
-        sf: undefined,
-      }),
-    [patch],
-  );
+  const clearFilters = useCallback(() => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("types");
+        next.delete("routes");
+        next.delete("obs");
+        next.delete("scope");
+        next.delete("q");
+        next.delete("sf");
+        return next;
+      },
+      { replace: true },
+    );
+  }, [setSearchParams]);
 
   return { filters, setFilter, setSearch, setSearchField, clearFilters };
 }
 
-// Every packet filter is sent to /packets so pagination always traverses the matching history instead
-// of filtering a partial client-side page. The predicate below is retained for live WS summaries.
+// The /packets endpoint accepts comma-separated payloadTypes/routeTypes/scopes, so any selected
+// dimension goes server-side and pagination pulls the correctly-filtered set from the full history.
+// (observers has no server param, so it stays client-side in matchesFilters, as does the live buffer.)
 export function toServerFilter(filters: PacketFilterState): PacketServerFilter | null {
   const serverFilter: PacketServerFilter = {};
   if (filters.payloadTypes.length > 0) serverFilter.payloadTypes = filters.payloadTypes;
   if (filters.routeTypes.length > 0) serverFilter.routeTypes = filters.routeTypes;
-  if (filters.observers.length > 0) serverFilter.observers = filters.observers;
   if (filters.scopes.length > 0) serverFilter.scopes = filters.scopes;
-  const search = filters.search.trim();
-  if (search) {
-    serverFilter.search = search;
-    serverFilter.searchField = filters.searchField;
-  }
   return Object.keys(serverFilter).length > 0 ? serverFilter : null;
 }
 
@@ -111,41 +132,31 @@ export function matchesFilters(
   packet: PacketSummary,
   filters: PacketFilterState,
   observersByHash?: ReadonlyMap<string, ReadonlySet<string>>,
+  pathSearch?: PathSearch | null,
 ): boolean {
-  if (
-    filters.payloadTypes.length > 0 &&
-    !filters.payloadTypes.includes(packet.payloadType as PayloadTypeValue)
-  ) {
+  if (filters.payloadTypes.length > 0 && !filters.payloadTypes.includes(packet.payloadType as PayloadTypeValue)) {
     return false;
   }
-  if (
-    filters.routeTypes.length > 0 &&
-    !filters.routeTypes.includes(packet.routeType as RouteTypeValue)
-  ) {
+  if (filters.routeTypes.length > 0 && !filters.routeTypes.includes(packet.routeType as RouteTypeValue)) {
     return false;
   }
   if (filters.observers.length > 0) {
     const known = observersByHash?.get(packet.packetHash);
     const match = known
       ? filters.observers.some((id) => known.has(id))
-      : packet.latestObserver
-        ? filters.observers.includes(packet.latestObserver.id)
-        : false;
+      : packet.latestObserver ? filters.observers.includes(packet.latestObserver.id) : false;
     if (!match) return false;
   }
-  if (filters.scopes.length > 0) {
-    const unscoped = packet.routeType === RouteType.FLOOD || packet.routeType === RouteType.DIRECT;
-    if (
-      !(packet.scope && filters.scopes.includes(packet.scope)) &&
-      !(unscoped && filters.scopes.includes('*'))
-    )
-      return false;
+  if (filters.scopes.length > 0 && (!packet.scope || !filters.scopes.includes(packet.scope))) {
+    return false;
   }
-  if (filters.search && filters.searchField === 'hash') {
-    const q = filters.search.toLowerCase().replace(/[\s:-]/g, '');
+  if (filters.search && filters.searchField === "hash") {
+    const q = filters.search.toLowerCase();
     if (!packet.packetHash.toLowerCase().includes(q)) {
       return false;
     }
   }
+  if (filters.searchField === "path" && !matchesPathSearch(packet,
+    pathSearch === undefined ? parsePathSearch(filters.search) : pathSearch)) return false;
   return true;
 }

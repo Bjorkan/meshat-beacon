@@ -1,23 +1,13 @@
-import type { ActivityPoint, PayloadBreakdownItem, RadioPreset, TelemetryPoint } from './types';
+import type { ActivityPoint, PayloadBreakdownItem, RadioPreset, TelemetryPoint } from "./types";
 
 // Collapse presets to one row each (keeping the node/observer split), dropping junk "0,0,0" configs.
-// A confident suggested title is carried through; ambiguous rows keep title undefined so callers
-// fall back to formatPreset.
-export function aggregatePresets(
-  rows: RadioPreset[],
-): { preset: string; nodes: number; observers: number; title?: string }[] {
-  const byPreset = new Map<string, { nodes: number; observers: number; title?: string }>();
+export function aggregatePresets(rows: RadioPreset[]): { preset: string; nodes: number; observers: number }[] {
+  const byPreset = new Map<string, { nodes: number; observers: number }>();
   for (const r of rows) {
     if (isJunkPreset(r.preset)) continue;
     const cur = byPreset.get(r.preset) ?? { nodes: 0, observers: 0 };
-    if (r.sourceType === 'node') cur.nodes += r.count;
+    if (r.sourceType === "node") cur.nodes += r.count;
     else cur.observers += r.count;
-    // Titles only survive aggregation when every contributing row agrees; a conflicting or
-    // missing title drops back to the raw label rather than guessing.
-    if (r.suggestedTitle) {
-      if (cur.title === undefined) cur.title = r.suggestedTitle;
-      else if (cur.title !== r.suggestedTitle) cur.title = undefined;
-    }
     byPreset.set(r.preset, cur);
   }
   return [...byPreset.entries()]
@@ -25,20 +15,15 @@ export function aggregatePresets(
     .sort((a, b) => b.nodes + b.observers - (a.nodes + a.observers));
 }
 
-// Display label for an aggregated preset row: the suggested title when confident, else raw.
-export function presetLabel(row: { preset: string; title?: string }): string {
-  return row.title ?? formatPreset(row.preset);
-}
-
 function isJunkPreset(preset: string): boolean {
-  return preset.split(',').every((n) => Number(n) === 0);
+  return preset.split(",").every((n) => Number(n) === 0);
 }
 
 // "freqMhz,bwKhz,sf" -> "910.525 · 62.5k · SF7" (freq is MHz by convention); anything that isn't a
 // freq,bw,sf triple is shown as-is.
 export function formatPreset(preset: string): string {
-  const parts = preset.split(',');
-  if (parts.length !== 3 || parts.some((p) => p === '' || Number.isNaN(Number(p)))) return preset;
+  const parts = preset.split(",");
+  if (parts.length !== 3 || parts.some((p) => p === "" || Number.isNaN(Number(p)))) return preset;
   const [freq, bw, sf] = parts;
   return `${freq} · ${bw}k · SF${sf}`;
 }
@@ -66,7 +51,7 @@ export function intervalToMs(interval: string): number | null {
   const m = /^(\d+)([mh])$/.exec(interval);
   if (!m) return null;
   const n = Number(m[1]);
-  return m[2] === 'm' ? n * 60_000 : n * 3_600_000;
+  return m[2] === "m" ? n * 60_000 : n * 3_600_000;
 }
 
 // share of `windowSeconds` spent on air, rounded so tooltips don't show float noise
@@ -74,15 +59,11 @@ function pct(seconds: number, windowSeconds: number): number {
   return Math.round(((seconds * 100) / windowSeconds) * 1000) / 1000;
 }
 
-type AirtimeKey = 'airtimeRxSecs' | 'airtimeTxSecs';
+type AirtimeKey = "airtimeRxSecs" | "airtimeTxSecs";
 
 // The values are on-air seconds: cumulative on raw 1h points, per-bucket on
 // bucketed ones. Chart the increase as a percent of the elapsed time, clamped at 0 on counter resets.
-export function airtimePctSeries(
-  points: TelemetryPoint[],
-  key: AirtimeKey,
-  bucketMs: number | null,
-): [number, number | null][] {
+export function airtimePctSeries(points: TelemetryPoint[], key: AirtimeKey, bucketMs: number | null): [number, number | null][] {
   if (bucketMs != null) {
     return points.map((p) => {
       const v = p[key];
@@ -96,62 +77,51 @@ export function airtimePctSeries(
     const a = prev[key];
     const b = cur[key];
     const gapMs = cur.t - prev.t;
-    out.push([
-      cur.t,
-      a != null && b != null && gapMs > 0 ? pct(Math.max(0, b - a), gapMs / 1000) : null,
-    ]);
+    out.push([cur.t, a != null && b != null && gapMs > 0 ? pct(Math.max(0, b - a), gapMs / 1000) : null]);
   }
   return out;
 }
 
 // Most recent RX / TX percent, for the header stat.
-export function latestAirtimePct(
-  points: TelemetryPoint[],
-  bucketMs: number | null,
-): { rx: number | null; tx: number | null } {
+export function latestAirtimePct(points: TelemetryPoint[], bucketMs: number | null): { rx: number | null; tx: number | null } {
   const last = (key: AirtimeKey) => {
     const s = airtimePctSeries(points, key, bucketMs);
     return s.length ? s[s.length - 1]![1] : null;
   };
-  return { rx: last('airtimeRxSecs'), tx: last('airtimeTxSecs') };
+  return { rx: last("airtimeRxSecs"), tx: last("airtimeTxSecs") };
 }
 
 // The server skips empty buckets; fill them so a quiet stretch draws as zero instead of a skipped line.
 // Starts at the first complete bucket (the server rounds its window start up the same way) and lets
 // one bucket past the window end through, so a client clock behind the server can't hide fresh data.
+// Buckets between rolledUntil and rawFrom were never read (rollup backlog, or no rollup yet when
+// rolledUntil is absent), so they stay gaps.
 export function fillActivity(
   points: ActivityPoint[],
   intervalMs: number,
   window: { start: number; end: number },
+  coverage?: { rolledUntil?: number; rawFrom?: number },
 ): ActivityPoint[] {
   const snap = (t: number) => Math.floor(t / intervalMs) * intervalMs;
   const first = Math.ceil(window.start / intervalMs) * intervalMs;
   const current = snap(window.end);
-  const last = points.some((p) => snap(p.t) === current + intervalMs)
-    ? current + intervalMs
-    : current;
+  const last = points.some((p) => snap(p.t) === current + intervalMs) ? current + intervalMs : current;
   const byBucket = new Map(points.map((p) => [snap(p.t), p]));
+  const { rolledUntil, rawFrom } = coverage ?? {};
+  const unread = (t: number) => rawFrom != null && t < rawFrom && (rolledUntil == null || t >= rolledUntil);
   const out: ActivityPoint[] = [];
   for (let t = first; t <= last; t += intervalMs) {
-    out.push(
-      byBucket.get(t) ?? {
-        t,
-        observations: 0,
-        airtimeMs: 0,
-        snrAvg: null,
-        snrMin: null,
-        rssiAvg: null,
-      },
-    );
+    const filled = unread(t)
+      ? { t, observations: null, airtimeMs: null, snrAvg: null, snrMin: null, rssiAvg: null }
+      : { t, observations: 0, airtimeMs: 0, snrAvg: null, snrMin: null, rssiAvg: null };
+    out.push(byBucket.get(t) ?? filled);
   }
   return out;
 }
 
 // Payload breakdown rows as the bar chart wants them: busiest first, lowercase names.
 export function payloadBarItems(items: PayloadBreakdownItem[]): { name: string; value: number }[] {
-  return [...items]
-    .sort((a, b) => b.count - a.count)
-    .map((p) => ({ name: p.payloadTypeName.toLowerCase(), value: p.count }));
+  return [...items].sort((a, b) => b.count - a.count).map((p) => ({ name: p.payloadTypeName.toLowerCase(), value: p.count }));
 }
 
 // Percent of a bucket spent receiving; null when the server couldn't cost the bucket.

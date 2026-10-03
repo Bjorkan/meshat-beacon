@@ -1,283 +1,113 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
-import type { PacketDetail } from '../../../src/types/api';
-import { PayloadType } from '../../../src/types/enums';
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
+import type { PacketDetail } from "../../../src/types/api";
+import { PayloadType } from "../../../src/types/enums";
 
 // stub the WebGL map; the modal's own logic is the selector + selection state
-vi.mock('../../../src/features/map/PacketPathMap', () => ({
+vi.mock("../../../src/features/map/PacketPathMap", () => ({
   PacketPathMap: ({ selectedKey }: { selectedKey: string | null }) => (
-    <div data-testid="mini-map">{selectedKey ?? 'all'}</div>
+    <div data-testid="mini-map">{selectedKey ?? "all"}</div>
   ),
 }));
 
-// the modal fetches the global 2-byte collision set for its 2-byte gate;
-// default to "no collisions" so 2-byte fixtures draw unless a test overrides it
-vi.mock('@tanstack/react-query', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
-  return {
-    ...actual,
-    useQuery: (options: { queryKey: readonly unknown[] }) =>
-      options?.queryKey[1] === 'ambiguous-prefix2'
-        ? { data: [] as string[] }
-        : actual.useQuery(options as never),
-  };
-});
+import { PacketPathMapModal } from "../../../src/features/map/PacketPathMapModal";
 
-import { PacketPathMapModal } from '../../../src/features/map/PacketPathMapModal';
-
-// this Node/jsdom combo leaves window.localStorage unavailable; stub it so nothing during the
-// modal's render can throw on access.
+// this Node/jsdom combo leaves window.localStorage unavailable; stub it so the modal's
+// style-preference read doesn't throw.
 beforeEach(() => {
   const store = new Map<string, string>();
-  vi.stubGlobal('localStorage', {
+  vi.stubGlobal("localStorage", {
     getItem: (k: string) => store.get(k) ?? null,
     setItem: (k: string, v: string) => store.set(k, v),
   });
 });
 afterEach(() => vi.unstubAllGlobals());
 
-const hop = (id: string, lng: number, lat: number) => ({
-  confidence: 'high' as const,
-  nodes: [{ id, publicKey: 'pk', longitude: lng, latitude: lat }],
-});
+const hop = (id: string, lng: number, lat: number) => ({ confidence: "high" as const, nodes: [{ id, publicKey: "pk", longitude: lng, latitude: lat }] });
 const detail = {
-  packetHash: 'aabbccdd',
+  packetHash: "aabbccdd",
   header: { payloadType: PayloadType.TEXT, routeType: 1 },
   observations: [
-    {
-      id: 1,
-      observerId: 'obs-alpha',
-      observerName: 'Alpha',
-      iata: 'YYZ',
-      heardAt: 0,
-      sourceBroker: 'b',
-      // 3-byte hashes + nearby Västmanland hops: verifiable and drawable.
-      pathLength: { raw: 'c2', hashSize: 3, hopCount: 2 },
-      resolvedPath: [hop('a', 16.5, 59.6), hop('b', 16.52, 59.61)],
-      propagationTimeMs: 100,
-    },
-    {
-      id: 2,
-      observerId: 'obs-bravo',
-      observerName: 'Bravo',
-      iata: 'YOW',
-      heardAt: 0,
-      sourceBroker: 'b',
-      pathLength: { raw: 'c2', hashSize: 3, hopCount: 2 },
-      resolvedPath: [hop('c', 16.54, 59.62), hop('d', 16.56, 59.63)],
-      propagationTimeMs: 480,
-    },
+    { id: 1, observerId: "obs-alpha", observerName: "Alpha", iata: "YYZ", heardAt: 0, sourceBroker: "b", pathLength: { raw: "", hashSize: 1, hopCount: 2 }, resolvedPath: [hop("a", -79, 43), hop("b", -75, 45)], propagationTimeMs: 100 },
+    { id: 2, observerId: "obs-bravo", observerName: "Bravo", iata: "YOW", heardAt: 0, sourceBroker: "b", pathLength: { raw: "", hashSize: 1, hopCount: 2 }, resolvedPath: [hop("c", -80, 44), hop("d", -76, 46)], propagationTimeMs: 480 },
   ],
 } as unknown as PacketDetail;
 
-describe('PacketPathMapModal', () => {
-  it('lists All paths plus a row per observer and starts on All', () => {
+describe("PacketPathMapModal", () => {
+  it("lists All paths plus a row per observer and starts on All", async () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-    expect(screen.getByText('All paths')).toBeInTheDocument();
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Bravo')).toBeInTheDocument();
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
+    expect(screen.getByText("All paths")).toBeInTheDocument();
+    expect(screen.getByText("Alpha")).toBeInTheDocument();
+    expect(screen.getByText("Bravo")).toBeInTheDocument();
+    expect(await screen.findByTestId("mini-map")).toHaveTextContent("all");
   });
 
-  it('isolates a path when its row is clicked', () => {
+  it("isolates a path when its row is clicked", async () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-    fireEvent.click(screen.getByText('Bravo'));
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('obs-bravo');
+    fireEvent.click(screen.getByText("Bravo"));
+    expect(await screen.findByTestId("mini-map")).toHaveTextContent("obs-bravo");
   });
 
   it("shows each observer's propagation", () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-    expect(screen.getByText('0.100s')).toBeInTheDocument(); // formatPropagation(100)
-    expect(screen.getByText('0.480s')).toBeInTheDocument();
+    expect(screen.getByText("0.100s")).toBeInTheDocument(); // formatPropagation(100)
+    expect(screen.getByText("0.480s")).toBeInTheDocument();
   });
 
-  it('closes from the close button', () => {
+  it("closes from the close button", () => {
     const onClose = vi.fn();
     render(<PacketPathMapModal detail={detail} onClose={onClose} />);
-    fireEvent.click(screen.getByLabelText('Close path map'));
+    fireEvent.click(screen.getByLabelText("Close path map"));
     expect(onClose).toHaveBeenCalledOnce();
   });
 
-  it('pre-selects the observer from initialSelectedKey', () => {
-    render(
-      <PacketPathMapModal detail={detail} onClose={() => {}} initialSelectedKey="obs-bravo" />,
-    );
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('obs-bravo');
+  it("pre-selects the observer from initialSelectedKey", async () => {
+    render(<PacketPathMapModal detail={detail} onClose={() => {}} initialSelectedKey="obs-bravo" />);
+    expect(await screen.findByTestId("mini-map")).toHaveTextContent("obs-bravo");
   });
 
-  it("falls back to All when initialSelectedKey isn't a known path", () => {
+  it("does not silently substitute all paths for an unavailable selected path", async () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} initialSelectedKey="nope" />);
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
+    expect(await screen.findByTestId("mini-map")).toHaveTextContent("nope");
+    expect(screen.getByRole("status")).toHaveTextContent("This path can't be mapped");
+    fireEvent.click(screen.getByText("All paths"));
+    expect(await screen.findByTestId("mini-map")).toHaveTextContent("all");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it('renders a copy-link button', () => {
+  it("renders a copy-link button", () => {
     render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Copy path link' })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy path link" })).toBeInTheDocument();
   });
 
-  it('shows the blurred map with the explanation and raw observer rows for a withheld 1-byte route', () => {
-    const shortHash = {
-      ...detail,
-      observations: detail.observations.map((o) => ({
-        ...o,
-        pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
-      })),
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={shortHash} onClose={() => {}} />);
-    // same chrome: map renders (empty), explanation floats over it, observers list raw rows
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
-    expect(screen.getByText('All paths')).toBeInTheDocument();
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Bravo')).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent(/1B hashes.*2B hashes/);
-  });
-
-  it('draws a 2-byte route when the DB reports no collisions', () => {
-    const twoByte = {
-      ...detail,
-      observations: detail.observations.map((o) => ({
-        ...o,
-        pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
-        pathBytes: 'a1b2c3d4',
-      })),
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={twoByte} onClose={() => {}} />);
-    // collision set is mocked empty: both observer rows draw
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Bravo')).toBeInTheDocument();
-    expect(screen.queryByRole('note')).not.toBeInTheDocument();
-  });
-
-  it('shows the blurred map with the explanation for a 2-byte route with an ambiguous hop', () => {
-    const ambiguous = {
-      ...detail,
-      observations: [
-        {
-          ...detail.observations[0],
-          pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
-          pathBytes: 'a1b2c3d4',
-          resolvedPath: [
-            {
-              confidence: 'ambiguous',
-              nodes: [
-                { id: 'x', publicKey: 'pa', longitude: 16.5, latitude: 59.6 },
-                { id: 'y', publicKey: 'pb', longitude: 16.52, latitude: 59.61 },
-              ],
-            },
-            hop('b', 16.54, 59.62),
-          ],
-        },
-        {
-          ...detail.observations[1],
-          pathLength: { raw: '82', hashSize: 2, hopCount: 2 },
-          pathBytes: 'e5f60708',
-          resolvedPath: [
-            {
-              confidence: 'ambiguous',
-              nodes: [
-                { id: 'p', publicKey: 'pc', longitude: 16.56, latitude: 59.63 },
-                { id: 'q', publicKey: 'pd', longitude: 16.58, latitude: 59.64 },
-              ],
-            },
-            hop('d', 16.6, 59.65),
-          ],
-        },
-      ],
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={ambiguous} onClose={() => {}} />);
-    // map renders empty with the explanation over it; observers stay listed with raw hops
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
-    expect(screen.getByText('Alpha')).toBeInTheDocument();
-    expect(screen.getByText('Bravo')).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent(/more than one node/);
-  });
-
-  it('shows the blurred map with the explanation for an MQTT-stitched route with an impossible leg', () => {
-    const stitched = {
-      ...detail,
-      observations: [
-        {
-          ...detail.observations[0],
-          resolvedPath: [hop('a', 16.5, 59.6), hop('far', 12.57, 55.68)],
-        },
-        {
-          ...detail.observations[1],
-          resolvedPath: [hop('c', 16.54, 59.62), hop('far2', 12.57, 55.68)],
-        },
-      ],
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={stitched} onClose={() => {}} />);
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
-    expect(screen.getByRole('note')).toHaveTextContent(/too far apart/);
-  });
-
-  it('renders one Direct row per zero-hop observation without path bytes', () => {
-    const direct = {
-      ...detail,
-      observations: detail.observations.map((o) => ({
-        ...o,
-        pathLength: { raw: '00', hashSize: 1, hopCount: 0 },
-        pathBytes: undefined,
-        resolvedPath: [],
-      })),
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={direct} onClose={() => {}} />);
-    expect(screen.getByTestId('mini-map')).toHaveTextContent('all');
-    expect(screen.getAllByText('Direct')).toHaveLength(2);
-  });
-
-  it('lists unverified observation hops as raw hash blocks', () => {
-    const unverified = {
-      ...detail,
-      observations: [
-        {
-          ...detail.observations[0],
-          pathLength: { raw: '42', hashSize: 1, hopCount: 2 },
-          pathBytes: 'ceb3',
-          resolvedPath: [
-            { confidence: 'none', nodes: [] },
-            { confidence: 'none', nodes: [] },
-          ],
-        },
-      ],
-    } as unknown as PacketDetail;
-    render(<PacketPathMapModal detail={unverified} onClose={() => {}} />);
-    expect(screen.getByText('CE')).toBeInTheDocument();
-    expect(screen.getByText('B3')).toBeInTheDocument();
-  });
-
-  describe('copy path link', () => {
+  describe("copy path link", () => {
     const writeText = vi.fn();
 
     beforeEach(() => {
-      Object.defineProperty(navigator, 'clipboard', {
-        value: { writeText },
-        writable: true,
-        configurable: true,
-      });
+      Object.defineProperty(navigator, "clipboard", { value: { writeText }, writable: true, configurable: true });
       writeText.mockClear();
     });
 
-    afterEach(() => window.history.replaceState({}, '', '/'));
+    afterEach(() => window.history.replaceState({}, "", "/"));
 
-    it('copies the selected path and strips the analyzer', () => {
-      window.history.replaceState({}, '', '/?tab=Packets&hash=aabb&analyze=1');
+    it("copies the selected path and strips the analyzer", () => {
+      window.history.replaceState({}, "", "/?tab=Packets&hash=aabb&analyze=1");
       render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-      fireEvent.click(screen.getByText('Bravo'));
+      fireEvent.click(screen.getByText("Bravo"));
 
-      fireEvent.click(screen.getByRole('button', { name: 'Copy path link' }));
+      fireEvent.click(screen.getByRole("button", { name: "Copy path link" }));
 
       const copied = new URL(writeText.mock.calls[0]![0] as string);
-      expect(copied.searchParams.get('tab')).toBe('Packets');
-      expect(copied.searchParams.get('hash')).toBe(detail.packetHash);
-      expect(copied.searchParams.get('path')).toBe('obs-bravo');
-      expect(copied.searchParams.has('analyze')).toBe(false); // path and analyze are exclusive
+      expect(copied.searchParams.get("tab")).toBe("Packets");
+      expect(copied.searchParams.get("hash")).toBe(detail.packetHash);
+      expect(copied.searchParams.get("path")).toBe("obs-bravo");
+      expect(copied.searchParams.has("analyze")).toBe(false); // path and analyze are exclusive
     });
 
-    it('copies path=all when nothing is isolated', () => {
+    it("copies path=all when nothing is isolated", () => {
       render(<PacketPathMapModal detail={detail} onClose={() => {}} />);
-      fireEvent.click(screen.getByRole('button', { name: 'Copy path link' }));
-      expect(new URL(writeText.mock.calls[0]![0] as string).searchParams.get('path')).toBe('all');
+      fireEvent.click(screen.getByRole("button", { name: "Copy path link" }));
+      expect(new URL(writeText.mock.calls[0]![0] as string).searchParams.get("path")).toBe("all");
     });
   });
 });
