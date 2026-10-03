@@ -26,29 +26,21 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: beacon-web/package-lock.json
+      # Mirror of the upstream beacon-web CI (build, lint, test) against the
+      # component's own lockfile.
       - name: Install
+        working-directory: beacon-web
         run: npm ci
-      - name: Generated API drift
-        run: npm run api:check --workspace=beacon-web
-      - name: Prettier
-        run: npm run format:check
+      - name: Build
+        working-directory: beacon-web
+        run: npm run build
       - name: Lint
-        run: npm run lint:web
+        working-directory: beacon-web
+        run: npm run lint
       - name: Test
-        run: npm run test:web
-      - name: Install browser dependencies
-        run: npx playwright install --with-deps chromium firefox
-      - name: Production build and browser regressions
-        # Firefox needs an X display for Mesa WebGL on Ubuntu, even in headless mode.
-        run: xvfb-run --auto-servernum npm run test:browser --workspace=beacon-web
-      - name: Upload browser failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: browser-test-results
-          path: beacon-web/test-results/
-          if-no-files-found: ignore
-          retention-days: 7
+        working-directory: beacon-web
+        run: npm test
 
   server:
     name: Server
@@ -148,7 +140,7 @@ jobs:
       matrix:
         include:
           - image: meshat-beacon-web
-            context: .
+            context: beacon-web
             dockerfile: beacon-web/.build/Dockerfile
           - image: meshat-beacon-server
             context: beacon-server

@@ -1,7 +1,7 @@
 .PHONY: install dev build lint test check clean
 
 install:
-	npm ci
+	npm ci --prefix beacon-web
 	go -C beacon-server mod download
 
 dev:
